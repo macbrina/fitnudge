@@ -1,0 +1,47 @@
+---
+alwaysApply: true
+projectFiles:
+  - apps/docs/ProjectOverview.md
+  - apps/docs/Architecture.md
+  - apps/docs/DataModels.md
+  - apps/docs/API-Spec.md
+  - apps/docs/EnvironmentSetup.md
+  - apps/docs/Marketing.md
+  - apps/docs/README.md
+  - apps/web/README.md
+  - apps/api/README.md
+  - apps/mobile/README.md
+  - apps/admin-portal/README.md
+  - packages/ui/README.md
+  - packages/themes/README.md
+  - README.md
+---
+
+# Project Documentation Reference
+
+These are the core documentation files that should be referenced for all development work on the FitNudge fitness motivation AI app:
+
+## Core Documentation
+
+- **ProjectOverview.md**: Product vision, MVP features, tech stack, design system, and monorepo structure
+- **Architecture.md**: System architecture, design patterns, scalability, security, and technical implementation details
+- **DataModels.md**: Complete database schema with OAuth support, tables, indexes, and relationships
+- **API-Spec.md**: All API endpoints with request/response examples, authentication, and error handling
+- **EnvironmentSetup.md**: Step-by-step setup guide with all credentials and configuration
+- **Marketing.md**: Pricing strategy, revenue projections, and growth tactics
+- **README.md**: Project overview and getting started guide
+
+## App-Specific Documentation
+
+- **apps/docs/README.md**: Documentation overview and navigation
+- **apps/web/README.md**: Marketing landing page setup and development
+- **apps/api/README.md**: FastAPI backend setup, dependencies, and migrations
+- **apps/mobile/README.md**: React Native/Expo setup with npx expo install preferences
+- **apps/admin-portal/README.md**: Admin dashboard setup and management tools
+
+## Package Documentation
+
+- **packages/ui/README.md**: Shared component library with shadcn/ui
+- **packages/themes/README.md**: Design system with tokens and theme switching
+
+Always reference these files when making architectural decisions, implementing features, or answering questions about the project. Pay special attention to CLI-based package management and migration practices.

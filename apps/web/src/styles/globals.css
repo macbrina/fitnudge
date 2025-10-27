@@ -1,0 +1,349 @@
+@import "@fitnudge/ui/styles/globals.css";
+
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap");
+
+@theme {
+  --font-sans: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+
+  /* FitNudge Brand Colors - Override base theme colors */
+  --color-primary: 59 130 246; /* blue-500 - FitNudge primary */
+  --color-primary-foreground: 255 255 255;
+  --color-secondary: 147 51 234; /* purple-600 - FitNudge secondary */
+  --color-secondary-foreground: 255 255 255;
+  --color-accent: 236 72 153; /* pink-500 - FitNudge accent */
+  --color-accent-foreground: 255 255 255;
+  --color-success: 34 197 94; /* green-500 */
+  --color-warning: 245 158 11; /* amber-500 */
+  --color-destructive: 239 68 68; /* red-500 */
+  --color-destructive-foreground: 255 255 255;
+
+  /* FitNudge Brand Gradients */
+  --color-gradient-primary: linear-gradient(
+    135deg,
+    rgb(59, 130, 246),
+    rgb(147, 51, 234)
+  );
+  --color-gradient-secondary: linear-gradient(
+    135deg,
+    rgb(147, 51, 234),
+    rgb(236, 72, 153)
+  );
+  --color-gradient-accent: linear-gradient(
+    135deg,
+    rgb(59, 130, 246),
+    rgb(236, 72, 153)
+  );
+}
+
+/* Advanced Animations */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-50px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(50px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
+@keyframes float-slow {
+  0%,
+  100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  33% {
+    transform: translateY(-10px) rotate(1deg);
+  }
+  66% {
+    transform: translateY(-5px) rotate(-1deg);
+  }
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(59, 130, 246, 0.6);
+  }
+}
+
+@keyframes gradient-shift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes bounce-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  70% {
+    transform: scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes wiggle {
+  0%,
+  7% {
+    transform: rotateZ(0);
+  }
+  15% {
+    transform: rotateZ(-15deg);
+  }
+  20% {
+    transform: rotateZ(10deg);
+  }
+  25% {
+    transform: rotateZ(-10deg);
+  }
+  30% {
+    transform: rotateZ(6deg);
+  }
+  35% {
+    transform: rotateZ(-4deg);
+  }
+  40%,
+  100% {
+    transform: rotateZ(0);
+  }
+}
+
+/* Animation Classes */
+.animate-fade-in {
+  animation: fade-in 0.6s ease-out forwards;
+}
+
+.animate-slide-up {
+  animation: slide-up 0.8s ease-out forwards;
+}
+
+.animate-slide-in-left {
+  animation: slide-in-left 0.8s ease-out forwards;
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.8s ease-out forwards;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-float-slow {
+  animation: float-slow 6s ease-in-out infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.animate-gradient-shift {
+  background-size: 200% 200%;
+  animation: gradient-shift 3s ease infinite;
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.4),
+    transparent
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+.animate-bounce-in {
+  animation: bounce-in 0.6s ease-out forwards;
+}
+
+.animate-wiggle {
+  animation: wiggle 1s ease-in-out;
+}
+
+/* Hover Effects */
+.hover-lift {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hover-lift:hover {
+  transform: translateY(-8px);
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.1),
+    0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.hover-glow {
+  transition: all 0.3s ease;
+}
+
+.hover-glow:hover {
+  box-shadow: 0 0 30px rgba(59, 130, 246, 0.4);
+}
+
+.hover-scale {
+  transition: transform 0.3s ease;
+}
+
+.hover-scale:hover {
+  transform: scale(1.05);
+}
+
+/* Gradient Text */
+.gradient-text {
+  background: linear-gradient(
+    135deg,
+    rgb(59, 130, 246),
+    rgb(147, 51, 234),
+    rgb(236, 72, 153)
+  );
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-size: 200% 200%;
+  animation: gradient-shift 3s ease infinite;
+}
+
+/* Smooth scrolling */
+/* html {
+  scroll-behavior: smooth;
+} */
+
+/* Hide scrollbar by default, show on hover */
+/* html {
+  scrollbar-width: none; 
+  -ms-overflow-style: none; 
+}
+
+html::-webkit-scrollbar {
+  display: none;
+} */
+
+/* Show scrollbar on hover for better UX */
+/* body:hover {
+  scrollbar-width: thin;
+  scrollbar-color: #6b7280 #f3f4f6;
+}
+
+body:hover::-webkit-scrollbar {
+  display: block;
+  width: 8px;
+}
+
+body:hover::-webkit-scrollbar-track {
+  background: #f3f4f6;
+}
+
+body:hover::-webkit-scrollbar-thumb {
+  background: #6b7280;
+  border-radius: 4px;
+} */
+
+/* Dark mode scrollbar */
+/* .dark body:hover::-webkit-scrollbar-track {
+  background: #374151;
+}
+
+.dark body:hover::-webkit-scrollbar-thumb {
+  background: #6b7280;
+}
+
+.dark body:hover::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+} */
+
+/* Mobile-first responsive design */
+@media (max-width: 768px) {
+  .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  /* Ensure proper mobile spacing */
+  .mobile-padding {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  /* Mobile-friendly text sizes */
+  .mobile-text {
+    font-size: 1.125rem;
+    line-height: 1.75rem;
+  }
+
+  /* Mobile-friendly buttons */
+  .mobile-button {
+    width: 100%;
+    padding: 0.75rem 1rem;
+  }
+}

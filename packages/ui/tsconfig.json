@@ -1,8 +1,23 @@
 {
-  "extends": "@repo/typescript-config/react-library.json",
+  "extends": "@fitnudge/tsconfig/base.json",
   "compilerOptions": {
-    "outDir": "dist"
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "jsx": "react-jsx",
+    "esModuleInterop": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": false,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@/components/*": ["./src/components/*"],
+      "@/lib/*": ["./src/lib/*"],
+      "@/hooks/*": ["./src/hooks/*"],
+      "@/styles/*": ["./src/styles/*"],
+      "@/ui/*": ["./src/components/ui/*"],
+      "@mobileUi": ["./src/components/mobileUi/*"]
+    }
   },
-  "include": ["src"],
+  "include": ["src/**/*", "src/lib/utils.ts"],
   "exclude": ["node_modules", "dist"]
 }

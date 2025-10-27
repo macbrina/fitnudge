@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "es6"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./packages/ui/src/*"],
+      "@/components/*": ["./packages/ui/src/components/*"],
+      "@/lib/*": ["./packages/ui/src/lib/*"],
+      "@/hooks/*": ["./packages/ui/src/hooks/*"],
+      "@/styles/*": ["./packages/ui/src/styles/*"],
+      "@/ui/*": ["./packages/ui/src/components/ui/*"]
+    }
+  },
+  "include": ["packages/ui/src/**/*"],
+  "exclude": ["node_modules"]
+}

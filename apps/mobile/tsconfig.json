@@ -1,0 +1,36 @@
+{
+  "extends": "../../packages/tsconfig/react-native.json",
+  "compilerOptions": {
+    "strict": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@components/*": ["src/components/*"],
+      "@screens/*": ["src/screens/*"],
+      "@navigation/*": ["src/navigation/*"],
+      "@hooks/*": ["src/hooks/*"],
+      "@services/*": ["src/services/*"],
+      "@store/*": ["src/store/*"],
+      "@assetsimages/*": ["./assets/*"],
+      "@styles/*": ["src/styles/*"],
+      "@lib/*": ["src/lib/src/*"],
+      "@i18n": ["src/lib/i18n"],
+      "@types/*": ["src/types/*"],
+      "@locales/*": ["./locales/*"],
+      "@themes/*": ["src/themes/src/*"],
+      "@ui/*": ["../../packages/ui/src/*"]
+    },
+    "types": ["react-native"],
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "nativewind",
+    "lib": ["dom", "esnext"],
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true
+  },
+  "include": ["**/*.ts", "**/*.tsx", "nativewind-env.d.ts"],
+  "exclude": ["node_modules"]
+}

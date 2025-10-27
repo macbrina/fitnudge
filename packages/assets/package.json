@@ -1,0 +1,23 @@
+{
+  "name": "@fitnudge/assets",
+  "version": "1.0.0",
+  "description": "Shared assets for FitNudge applications",
+  "main": "index.ts",
+  "files": [
+    "fonts/**/*",
+    "images/**/*",
+    "index.ts"
+  ],
+  "scripts": {
+    "build": "echo 'No build step needed for assets'",
+    "clean": "echo 'No clean step needed for assets'"
+  },
+  "keywords": [
+    "assets",
+    "fonts",
+    "images",
+    "fitnudge"
+  ],
+  "author": "FitNudge Team",
+  "license": "MIT"
+}

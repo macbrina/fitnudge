@@ -1,0 +1,37 @@
+[tool.poetry]
+name = "fitnudge-api"
+version = "1.0.0"
+description = "FitNudge API - Fitness Motivation AI App API"
+authors = ["FitNudge Team"]
+readme = "README.md"
+packages = [{include = "app"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.120.0"
+uvicorn = {extras = ["standard"], version = "^0.38.0"}
+supabase = "^2.22.2"
+python-jose = {extras = ["cryptography"], version = "^3.5.0"}
+passlib = {extras = ["bcrypt"], version = "^1.7.4"}
+python-multipart = "^0.0.20"
+pydantic = "^2.12.3"
+pydantic-settings = "^2.11.0"
+httpx = "^0.28.1"
+openai = "^2.6.1"
+elevenlabs = "^2.20.1"
+firebase-admin = "^7.1.0"
+celery = "^5.5.3"
+redis = "^7.0.0"
+alembic = "^1.17.0"
+sqlalchemy = "^2.0.44"
+psycopg2-binary = "^2.9.11"
+python-dotenv = "^1.2.1"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.4.2"
+pytest-asyncio = "^1.2.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+

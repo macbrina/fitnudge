@@ -1,0 +1,187 @@
+{
+  "common": {
+    "error": "Error",
+    "user": "Usuario",
+    "logout": "Cerrar sesión"
+  },
+  "auth": {
+    "login": {
+      "title": "Bienvenido a FitNudge",
+      "subtitle": "Inicia sesión para continuar",
+      "email_placeholder": "Correo electrónico",
+      "password_placeholder": "Contraseña",
+      "sign_in": "Iniciar sesión",
+      "signing_in": "Iniciando sesión...",
+      "no_account": "¿No tienes una cuenta?",
+      "sign_up": "Regístrate"
+    },
+    "signup": {
+      "title": "Crear cuenta",
+      "subtitle": "Únete a FitNudge hoy",
+      "name_placeholder": "Nombre completo",
+      "username_placeholder": "Nombre de usuario",
+      "email_placeholder": "Correo electrónico",
+      "password_placeholder": "Contraseña",
+      "create_account": "Crear cuenta",
+      "creating_account": "Creando cuenta...",
+      "already_have_account": "¿Ya tienes una cuenta?",
+      "sign_in": "Iniciar sesión"
+    }
+  },
+  "nav": {
+    "features": "Características",
+    "how_it_works": "Cómo Funciona",
+    "testimonials": "Testimonios",
+    "blog": "Blog",
+    "contact": "Contacto",
+    "download": "Descargar App",
+    "theme": "Tema"
+  },
+  "hero": {
+    "badge": "Confiable por más de 50,000 usuarios en todo el mundo",
+    "title": "Tu Compañero de Responsabilidad Fitness Personal",
+    "subtitle": "Mantén la consistencia con tus objetivos de fitness a través de motivación personalizada con IA y recordatorios inteligentes.",
+    "download_free": "Descargar Gratis",
+    "watch_demo": "Ver Demo",
+    "stats": {
+      "users": "Usuarios Activos",
+      "rating": "Calificación App Store",
+      "support": "Soporte IA"
+    }
+  },
+  "features": {
+    "title": "Transforma Tu Viaje de Fitness",
+    "subtitle": "Experimenta el poder de la motivación de fitness impulsada por IA con nuestras características principales diseñadas para mantenerte consistente y lograr tus objetivos.",
+    "ai": {
+      "title": "Motivación IA",
+      "description": "Mensajes de IA personalizados que se adaptan a tu viaje y te mantienen motivado todos los días."
+    },
+    "goals": {
+      "title": "Seguimiento de Objetivos",
+      "description": "Establece y rastrea tus objetivos de fitness con rachas semanales y resúmenes de progreso."
+    },
+    "reminders": {
+      "title": "Recordatorios Inteligentes",
+      "description": "Notificaciones inteligentes que actúan como una 'llamada' de IA para verificar contigo."
+    },
+    "analytics": {
+      "title": "Análisis de Progreso",
+      "description": "Rastrea tu progreso con análisis detallados e información sobre tu viaje de fitness."
+    },
+    "community": {
+      "title": "Soporte Comunitario",
+      "description": "Conéctate con entusiastas del fitness afines y comparte tu viaje juntos."
+    },
+    "privacy": {
+      "title": "Privacidad y Seguridad",
+      "description": "Tus datos están protegidos con seguridad de nivel empresarial y controles de privacidad."
+    },
+    "cta": {
+      "title": "¿Listo para comenzar?",
+      "subtitle": "Únete a miles de usuarios que ya están transformando su viaje de fitness con FitNudge."
+    }
+  },
+  "testimonials": {
+    "title": "Lo que dicen nuestros usuarios",
+    "subtitle": "No solo tomes nuestra palabra. Ve lo que nuestra comunidad tiene que decir sobre su experiencia con FitNudge.",
+    "rating": "Calificación App Store",
+    "users": "Usuarios Felices",
+    "satisfaction": "Tasa de Satisfacción"
+  },
+  "footer": {
+    "description": "Tu coach de fitness impulsado por IA para una vida más saludable y feliz. Transforma tu viaje de fitness con motivación personalizada y seguimiento inteligente de objetivos.",
+    "product": "Producto",
+    "company": "Empresa",
+    "support": "Soporte",
+    "features": "Características",
+    "download": "Descargar",
+    "blog": "Blog",
+    "contact": "Contacto",
+    "about": "Acerca de",
+    "help_center": "Centro de ayuda",
+    "privacy": "Política de privacidad",
+    "terms": "Términos de servicio",
+    "cookies": "Política de cookies",
+    "rights": "Todos los derechos reservados.",
+    "why_fitnudge": "Por qué FitNudge",
+    "faqs": "Preguntas frecuentes",
+    "legal": "Legal",
+    "download_cta": {
+      "title": "¿Listo para transformar tu viaje de fitness?",
+      "subtitle": "Descarga FitNudge hoy y comienza tu transformación de fitness impulsada por IA",
+      "ios": "Descargar para iOS",
+      "android": "Descargar para Android"
+    }
+  },
+  "cookies": {
+    "title": "Usamos cookies",
+    "description": "Usamos cookies para mejorar tu experiencia, analizar el tráfico del sitio y personalizar el contenido. Puedes personalizar tus preferencias a continuación.",
+    "accept_all": "Aceptar todo",
+    "customize": "Personalizar",
+    "reject_all": "Rechazar todo",
+    "preferences": {
+      "title": "Preferencias de cookies",
+      "save": "Guardar preferencias",
+      "cancel": "Cancelar",
+      "required": "Requerido",
+      "necessary": {
+        "title": "Cookies necesarias",
+        "description": "Esenciales para que el sitio web funcione correctamente. Estas no se pueden deshabilitar."
+      },
+      "analytics": {
+        "title": "Cookies de análisis",
+        "description": "Nos ayudan a entender cómo los visitantes interactúan con nuestro sitio web recopilando información anónima."
+      },
+      "marketing": {
+        "title": "Cookies de marketing",
+        "description": "Se utilizan para rastrear visitantes a través de sitios web para mostrar anuncios relevantes y atractivos."
+      },
+      "functional": {
+        "title": "Cookies funcionales",
+        "description": "Habilitan funcionalidad mejorada y personalización, como recordar tus preferencias."
+      }
+    }
+  },
+  "wellness": {
+    "title": "Tu Entrenador de Fitness Impulsado por IA Que Nunca Duerme.",
+    "description1": "Recibe mensajes de motivación personalizados por IA, recordatorios inteligentes y chequeos diarios que te mantienen responsable de tus objetivos de fitness. Nuestro entrenador IA entiende tu viaje y se adapta a tus necesidades.",
+    "description2": "Rastrea tu progreso con análisis inteligentes, celebra tus rachas y conéctate con una comunidad de apoyo que comparte tu viaje de fitness. Mantente consistente con el poder de la IA.",
+    "cta": "Aprende Más"
+  },
+  "tracker": {
+    "title": "Rastrea Tu Progreso con Rachas Semanales",
+    "description": "Monitorea tu viaje de fitness con seguimiento inteligente de progreso. Ve tus rachas semanales, chequeos diarios y logros con análisis detallados que te ayudan a mantenerte consistente y motivado.",
+    "cta": "Aprende Más"
+  },
+  "download": {
+    "title": "Descarga ahora y comienza tu viaje hacia una mejor salud.",
+    "description": "Únete a miles de usuarios que ya están transformando su viaje de fitness con FitNudge. Disponible en iOS y Android.",
+    "app_store": "App Store",
+    "google_play": "Google Play",
+    "downloads": "Descargas"
+  },
+  "how_it_works": {
+    "title": "Cómo Funciona",
+    "subtitle": "Transforma tu viaje de fitness en solo 3 pasos simples con motivación impulsada por IA y seguimiento inteligente.",
+    "steps": {
+      "set_goal": {
+        "title": "Establece Tu Meta",
+        "description": "Elige entre plantillas o crea objetivos de fitness personalizados. Define lo que quieres lograr y con qué frecuencia entrenarás."
+      },
+      "get_motivation": {
+        "title": "Obtén Motivación IA",
+        "description": "Recibe mensajes personalizados y recordatorios inteligentes de tu entrenador IA. Obtén la motivación que necesitas cuando más la necesites."
+      },
+      "track_progress": {
+        "title": "Rastrea el Progreso",
+        "description": "Monitorea tu consistencia y celebra logros. Ve tus rachas, progreso y mantente responsable de tus objetivos."
+      }
+    },
+    "cta": "¿Listo para comenzar?"
+  },
+  "errors": {
+    "validation_error": "Por favor completa todos los campos",
+    "authentication_error": "Error de inicio de sesión. Por favor intenta de nuevo.",
+    "registration_error": "Error de registro. Por favor intenta de nuevo."
+  }
+}

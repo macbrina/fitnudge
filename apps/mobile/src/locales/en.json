@@ -1,0 +1,117 @@
+{
+  "common": {
+    "error": "Error",
+    "user": "User",
+    "logout": "Logout",
+    "app_name": "FitNudge"
+  },
+  "auth": {
+    "main": {
+      "tagline": "Everything You Need, Nothing You Don't.",
+      "sign_in_email": "Sign in with Email",
+      "sign_in_google": "Sign in with Google",
+      "sign_in_apple": "Sign in with Apple",
+      "no_account": "Doesn't have account?",
+      "sign_up_now": "Sign Up Now"
+    },
+    "login": {
+      "title": "Welcome to FitNudge",
+      "subtitle": "Sign in to continue",
+      "email_placeholder": "Email",
+      "password_placeholder": "Password",
+      "sign_in": "Sign In",
+      "signing_in": "Signing in...",
+      "no_account": "Don't have an account?",
+      "sign_up": "Sign up"
+    },
+    "signup": {
+      "title": "Create Account",
+      "subtitle": "Join FitNudge today",
+      "name_placeholder": "Full Name",
+      "username_placeholder": "Username",
+      "email_placeholder": "Email",
+      "password_placeholder": "Password",
+      "create_account": "Create Account",
+      "creating_account": "Creating account...",
+      "already_have_account": "Already have an account?",
+      "sign_in": "Sign in"
+    }
+  },
+  "home": {
+    "welcome_back": "Welcome back, {{name}}!",
+    "subtitle": "Ready to crush your fitness goals today?",
+    "todays_motivation": "Today's Motivation",
+    "motivation_quote": "Every step you take is a step closer to your goals. Keep pushing forward! 💪",
+    "quick_actions": "Quick Actions",
+    "log_workout": "Log Workout",
+    "set_goal": "Set Goal",
+    "recent_activity": "Recent Activity",
+    "activity_message": "You've been consistent with your workouts this week! 🎉"
+  },
+  "goals": {
+    "title": "My Goals",
+    "subtitle": "Track your progress and stay motivated",
+    "active_goals": "Active Goals",
+    "no_goals_message": "You don't have any active goals yet. Create your first goal to get started!",
+    "create_goal": "Create Goal",
+    "categories": "Goal Categories",
+    "category_fitness": "Fitness",
+    "category_nutrition": "Nutrition",
+    "category_wellness": "Wellness",
+    "category_sleep": "Sleep"
+  },
+  "feed": {
+    "title": "Motivation Feed",
+    "subtitle": "AI-powered motivation and community posts",
+    "ai_motivation": "AI Motivation",
+    "ai_quote_1": "You're doing amazing! Every workout counts and you're building unstoppable momentum! 🚀",
+    "time_ago": "{{hours}} hours ago"
+  },
+  "profile": {
+    "account_settings": "Account Settings",
+    "edit_profile": "Edit Profile",
+    "notifications": "Notifications",
+    "privacy": "Privacy",
+    "subscription": "Subscription",
+    "manage_subscription": "Manage Subscription",
+    "billing_history": "Billing History",
+    "support": "Support",
+    "help_center": "Help Center",
+    "contact_us": "Contact Us",
+    "free_plan": "Free Plan",
+    "pro_plan": "Pro Plan"
+  },
+  "onboarding": {
+    "ai_motivation": {
+      "title": "AI-Powered Motivation",
+      "description": "Get personalized coaching that keeps you motivated and on track with your fitness goals"
+    },
+    "track_progress": {
+      "title": "Track Your Progress",
+      "description": "Never miss a beat. Build streaks and celebrate every milestone on your fitness journey"
+    },
+    "join_community": {
+      "title": "Join Our Community",
+      "description": "Connect with like-minded fitness enthusiasts and stay motivated together"
+    },
+    "sign_up": "Sign Up",
+    "log_in": "Log in"
+  },
+  "web": {
+    "hero": {
+      "title": "Your AI-Powered Fitness Coach",
+      "subtitle": "Get personalized motivation, track your goals, and connect with a community that keeps you accountable. Powered by advanced AI technology.",
+      "download_free": "Download for Free",
+      "learn_more": "Learn More"
+    },
+    "blog": {
+      "title": "FitNudge Blog",
+      "subtitle": "Insights, tips, and stories to help you on your fitness journey. From AI-powered motivation to community success stories."
+    }
+  },
+  "errors": {
+    "validation_error": "Please fill in all fields",
+    "authentication_error": "Login failed. Please try again.",
+    "registration_error": "Signup failed. Please try again."
+  }
+}

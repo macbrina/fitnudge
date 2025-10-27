@@ -1,135 +1,184 @@
-# Turborepo starter
+# 🏋️ FitNudge - Fitness Motivation AI App
 
-This Turborepo starter is maintained by the Turborepo core team.
+An AI-powered motivation and accountability app that helps users stay consistent with their fitness and gym habits through scheduled motivational notifications, smart reminders, and progress tracking.
 
-## Using this example
+## 🎯 Project Overview
 
-Run the following command:
+**Goal**: Build a minimal, mobile-first, emotionally engaging experience that feels alive—a friendly AI that "checks in" daily to help users maintain their fitness goals.
 
-```sh
-npx create-turbo@latest
-```
+### 🏗️ Architecture
 
-## What's inside?
+This is a **monorepo** structured for scalability, shared logic, and clean maintainability between frontend, backend, and mobile clients.
 
-This Turborepo includes the following packages/apps:
+### 📱 Apps and Packages
 
-### Apps and Packages
+**Apps:**
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+- `apps/web`: Marketing landing page (Next.js)
+- `apps/api`: FastAPI backend (Python)
+- `apps/mobile`: React Native app (Expo)
+- `apps/admin-portal`: Admin dashboard for managing users, plans, analytics
+- `apps/docs`: Developer & user documentation
+
+**Packages:**
+
+- `packages/ui`: Shared shadcn/ui components with design system
+- `packages/lib`: Utilities and hooks shared across apps
+- `packages/db`: Supabase ORM client, migrations, and schema
+- `packages/ai`: GPT-5 prompt templates and logic
+- `packages/notifications`: FCM and scheduling utilities
+- `packages/types`: Shared TypeScript types and DTOs
+- `packages/themes`: Design tokens, CSS variables
+- `packages/n8n`: Localization automation for mobile/web
+- `packages/config`: Environment configs and tokens
 
 Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
 
-### Utilities
+## 🚀 Tech Stack
 
-This Turborepo has some additional tools already setup for you:
+**Frontend:**
+
+- **Mobile**: React Native (Expo) with TypeScript
+- **Web**: Next.js with TypeScript
+- **Design System**: Custom design tokens with light/dark mode
+- **State Management**: Zustand (mobile), React Query
+
+**Backend:**
+
+- **API**: FastAPI (Python) with async/await
+- **Database**: Supabase (PostgreSQL) with realtime
+- **Authentication**: Supabase Auth + OAuth (Apple, Google)
+- **AI**: OpenAI GPT-5 + ElevenLabs for voice
+- **Notifications**: Firebase Cloud Messaging
+- **Media**: Cloudflare R2 for images and voice files
+
+**Infrastructure:**
+
+- **Monorepo**: Turborepo for build orchestration
+- **Deployment**: Vercel (web), Railway/Render (API), EAS (mobile)
+- **Monitoring**: Sentry, New Relic, PostHog
+- **Localization**: n8n automation for mobile/web only
+
+## 🛠️ Development Tools
 
 - [TypeScript](https://www.typescriptlang.org/) for static type checking
 - [ESLint](https://eslint.org/) for code linting
 - [Prettier](https://prettier.io) for code formatting
+- [Supabase CLI](https://supabase.com/docs/guides/cli) for database management
+- [Expo CLI](https://docs.expo.dev/workflow/expo-cli/) for mobile development
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Node.js 18+
+- Python 3.11+
+- pnpm
+- Supabase CLI
+- Expo CLI
+
+### Installation
+
+```bash
+# Clone the repository
+git clone <repository-url>
+cd fitnudge
+
+# Install dependencies
+pnpm install
+
+# Set up environment variables (see apps/docs/EnvironmentSetup.md)
+cp apps/api/.env.example apps/api/.env
+cp apps/mobile/.env.example apps/mobile/.env
+cp apps/web/.env.local.example apps/web/.env.local
+```
 
 ### Build
 
-To build all apps and packages, run the following command:
+To build all apps and packages:
 
-```
-cd my-turborepo
+```bash
+# Build everything
+pnpm turbo build
 
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build
-yarn dlx turbo build
-pnpm exec turbo build
+# Build specific app
+pnpm turbo build --filter=web
+pnpm turbo build --filter=mobile
+pnpm turbo build --filter=api
 ```
 
-You can build a specific package by using a [filter](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters):
+### Development
 
-```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build --filter=docs
+Start all development servers:
 
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build --filter=docs
-yarn exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-```
+```bash
+# Start all apps
+pnpm turbo dev
 
-### Develop
-
-To develop all apps and packages, run the following command:
-
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev
-yarn exec turbo dev
-pnpm exec turbo dev
+# Start specific app
+pnpm turbo dev --filter=web      # Marketing site
+pnpm turbo dev --filter=mobile   # React Native app
+pnpm turbo dev --filter=api      # FastAPI backend
 ```
 
-You can develop a specific package by using a [filter](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters):
+### Database Setup
 
-```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev --filter=web
+```bash
+# Start Supabase locally
+npx supabase start
 
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev --filter=web
-yarn exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
+# Run migrations
+npx supabase db push --linked
 ```
 
-### Remote Caching
+## 📚 Documentation
 
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
+Comprehensive documentation is available in `apps/docs/`:
 
-Turborepo can use a technique known as [Remote Caching](https://turborepo.com/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
+- **[ProjectOverview.md](apps/docs/ProjectOverview.md)** - Product vision, features, tech stack
+- **[Architecture.md](apps/docs/Architecture.md)** - System architecture and design patterns
+- **[DataModels.md](apps/docs/DataModels.md)** - Database schema with OAuth support
+- **[API-Spec.md](apps/docs/API-Spec.md)** - API endpoints with examples
+- **[EnvironmentSetup.md](apps/docs/EnvironmentSetup.md)** - Setup guide with credentials
+- **[Marketing.md](apps/docs/Marketing.md)** - Pricing strategy and growth tactics
 
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
+## 🎨 Design System
 
-```
-cd my-turborepo
+FitNudge uses a comprehensive design system with:
 
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo login
+- **Semantic Color Tokens**: Light/dark mode support with success/warning states
+- **Typography**: Space Grotesk font family
+- **Spacing Scale**: Consistent 4px base unit system
+- **Component Library**: Shared shadcn/ui components
+- **Theme Switching**: Auto-detect system preference + manual override
 
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo login
-yarn exec turbo login
-pnpm exec turbo login
-```
+## 🔐 Authentication
 
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
+- **Email/Password**: Traditional signup and login
+- **Apple Sign In**: iOS native authentication
+- **Google Sign In**: Cross-platform OAuth
+- **JWT Tokens**: Secure session management
 
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
+## 💳 Monetization
 
-```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo link
+- **In-App Purchases**: Apple IAP and Google Play Billing
+- **Subscription Tiers**: Free, Pro ($4.99/month), Coach+ ($9.99/month)
+- **Platform Compliance**: Full App Store and Play Store compliance
 
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo link
-yarn exec turbo link
-pnpm exec turbo link
-```
+## 🌍 Localization
 
-## Useful Links
+- **Scope**: Mobile app and web landing page only
+- **Languages**: English, Spanish, French, German (initial)
+- **Admin Portal**: English only
+- **Automation**: n8n workflows for translation management
 
-Learn more about the power of Turborepo:
+## 🚀 Deployment
 
-- [Tasks](https://turborepo.com/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.com/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.com/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.com/docs/reference/configuration)
-- [CLI Usage](https://turborepo.com/docs/reference/command-line-reference)
+- **Web**: Vercel with automatic deployments
+- **API**: Railway/Render with health checks
+- **Mobile**: EAS Build for iOS/Android
+- **Database**: Supabase with realtime sync
+
+## 📞 Support
+
+For development questions, refer to the comprehensive documentation in `apps/docs/` or check the individual app README files.
