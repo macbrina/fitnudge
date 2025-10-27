@@ -1,0 +1,37 @@
+{
+  "name": "@fitnudge/lib",
+  "version": "0.1.0",
+  "description": "Shared utilities and libraries for FitNudge",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "@fitnudge/eslint-config": "workspace:*",
+    "@fitnudge/tsconfig": "workspace:*",
+    "@types/react": "^19.2.0",
+    "@types/react-native": "^0.73.0",
+    "typescript": "5.9.3"
+  },
+  "dependencies": {
+    "@fitnudge/assets": "workspace:*"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./routes": {
+      "import": "./dist/routes.js",
+      "require": "./dist/routes.js",
+      "types": "./dist/routes.d.ts"
+    }
+  }
+}

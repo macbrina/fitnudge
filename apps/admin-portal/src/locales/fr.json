@@ -1,0 +1,92 @@
+{
+  "common": {
+    "error": "Erreur",
+    "user": "Utilisateur",
+    "logout": "Déconnexion"
+  },
+  "auth": {
+    "login": {
+      "title": "Bienvenue sur FitNudge",
+      "subtitle": "Connectez-vous pour continuer",
+      "email_placeholder": "E-mail",
+      "password_placeholder": "Mot de passe",
+      "sign_in": "Se connecter",
+      "signing_in": "Connexion en cours...",
+      "no_account": "Vous n'avez pas de compte ?",
+      "sign_up": "S'inscrire"
+    },
+    "signup": {
+      "title": "Créer un compte",
+      "subtitle": "Rejoignez FitNudge aujourd'hui",
+      "name_placeholder": "Nom complet",
+      "username_placeholder": "Nom d'utilisateur",
+      "email_placeholder": "E-mail",
+      "password_placeholder": "Mot de passe",
+      "create_account": "Créer un compte",
+      "creating_account": "Création du compte...",
+      "already_have_account": "Vous avez déjà un compte ?",
+      "sign_in": "Se connecter"
+    }
+  },
+  "home": {
+    "welcome_back": "Bon retour, {{name}} !",
+    "subtitle": "Prêt à atteindre vos objectifs fitness aujourd'hui ?",
+    "todays_motivation": "Motivation du jour",
+    "motivation_quote": "Chaque pas que vous faites vous rapproche de vos objectifs. Continuez ! 💪",
+    "quick_actions": "Actions rapides",
+    "log_workout": "Enregistrer l'entraînement",
+    "set_goal": "Définir un objectif",
+    "recent_activity": "Activité récente",
+    "activity_message": "Vous avez été constant avec vos entraînements cette semaine ! 🎉"
+  },
+  "goals": {
+    "title": "Mes objectifs",
+    "subtitle": "Suivez vos progrès et restez motivé",
+    "active_goals": "Objectifs actifs",
+    "no_goals_message": "Vous n'avez pas encore d'objectifs actifs. Créez votre premier objectif pour commencer !",
+    "create_goal": "Créer un objectif",
+    "categories": "Catégories d'objectifs",
+    "category_fitness": "Fitness",
+    "category_nutrition": "Nutrition",
+    "category_wellness": "Bien-être",
+    "category_sleep": "Sommeil"
+  },
+  "feed": {
+    "title": "Feed de motivation",
+    "subtitle": "Motivation alimentée par l'IA et publications communautaires",
+    "ai_motivation": "Motivation IA",
+    "ai_quote_1": "Vous faites du super travail ! Chaque entraînement compte et vous construisez un élan irrésistible ! 🚀",
+    "time_ago": "Il y a {{hours}} heures"
+  },
+  "profile": {
+    "account_settings": "Paramètres du compte",
+    "edit_profile": "Modifier le profil",
+    "notifications": "Notifications",
+    "privacy": "Confidentialité",
+    "subscription": "Abonnement",
+    "manage_subscription": "Gérer l'abonnement",
+    "billing_history": "Historique de facturation",
+    "support": "Support",
+    "help_center": "Centre d'aide",
+    "contact_us": "Nous contacter",
+    "free_plan": "Plan gratuit",
+    "pro_plan": "Plan Pro"
+  },
+  "web": {
+    "hero": {
+      "title": "Votre coach fitness alimenté par l'IA",
+      "subtitle": "Obtenez une motivation personnalisée, suivez vos objectifs et connectez-vous avec une communauté qui vous tient responsable. Alimenté par une technologie IA avancée.",
+      "download_free": "Télécharger gratuitement",
+      "learn_more": "En savoir plus"
+    },
+    "blog": {
+      "title": "Blog FitNudge",
+      "subtitle": "Insights, conseils et histoires pour vous aider dans votre parcours fitness. De la motivation alimentée par l'IA aux histoires de succès communautaires."
+    }
+  },
+  "errors": {
+    "validation_error": "Veuillez remplir tous les champs",
+    "authentication_error": "Échec de la connexion. Veuillez réessayer.",
+    "registration_error": "Échec de l'inscription. Veuillez réessayer."
+  }
+}

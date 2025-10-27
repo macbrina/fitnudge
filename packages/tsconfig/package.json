@@ -1,0 +1,11 @@
+{
+  "name": "@fitnudge/tsconfig",
+  "version": "1.0.0",
+  "private": true,
+  "files": [
+    "base.json",
+    "react-native.json",
+    "nextjs.json",
+    "node.json"
+  ]
+}

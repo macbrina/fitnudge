@@ -1,0 +1,361 @@
+{
+  "common": {
+    "error": "Error",
+    "user": "User",
+    "logout": "Logout"
+  },
+  "auth": {
+    "login": {
+      "title": "Welcome to FitNudge",
+      "subtitle": "Sign in to continue",
+      "email_placeholder": "Email",
+      "password_placeholder": "Password",
+      "sign_in": "Sign In",
+      "signing_in": "Signing in...",
+      "no_account": "Don't have an account?",
+      "sign_up": "Sign up"
+    },
+    "signup": {
+      "title": "Create Account",
+      "subtitle": "Join FitNudge today",
+      "name_placeholder": "Full Name",
+      "username_placeholder": "Username",
+      "email_placeholder": "Email",
+      "password_placeholder": "Password",
+      "create_account": "Create Account",
+      "creating_account": "Creating account...",
+      "already_have_account": "Already have an account?",
+      "sign_in": "Sign in"
+    }
+  },
+  "home": {
+    "welcome_back": "Welcome back, {{name}}!",
+    "subtitle": "Ready to crush your fitness goals today?",
+    "todays_motivation": "Today's Motivation",
+    "motivation_quote": "Every step you take is a step closer to your goals. Keep pushing forward! 💪",
+    "quick_actions": "Quick Actions",
+    "log_workout": "Log Workout",
+    "set_goal": "Set Goal",
+    "recent_activity": "Recent Activity",
+    "activity_message": "You've been consistent with your workouts this week! 🎉"
+  },
+  "goals": {
+    "title": "My Goals",
+    "subtitle": "Track your progress and stay motivated",
+    "active_goals": "Active Goals",
+    "no_goals_message": "You don't have any active goals yet. Create your first goal to get started!",
+    "create_goal": "Create Goal",
+    "categories": "Goal Categories",
+    "category_fitness": "Fitness",
+    "category_nutrition": "Nutrition",
+    "category_wellness": "Wellness",
+    "category_sleep": "Sleep"
+  },
+  "feed": {
+    "title": "Motivation Feed",
+    "subtitle": "AI-powered motivation and community posts",
+    "ai_motivation": "AI Motivation",
+    "ai_quote_1": "You're doing amazing! Every workout counts and you're building unstoppable momentum! 🚀",
+    "time_ago": "{{hours}} hours ago"
+  },
+  "profile": {
+    "account_settings": "Account Settings",
+    "edit_profile": "Edit Profile",
+    "notifications": "Notifications",
+    "privacy": "Privacy",
+    "subscription": "Subscription",
+    "manage_subscription": "Manage Subscription",
+    "billing_history": "Billing History",
+    "support": "Support",
+    "help_center": "Help Center",
+    "contact_us": "Contact Us",
+    "free_plan": "Free Plan",
+    "pro_plan": "Pro Plan"
+  },
+  "web": {
+    "hero": {
+      "title": "Your AI-Powered Fitness Coach",
+      "subtitle": "Get personalized motivation, track your goals, and connect with a community that keeps you accountable. Powered by advanced AI technology.",
+      "download_free": "Download for Free",
+      "learn_more": "Learn More"
+    },
+    "blog": {
+      "title": "FitNudge Blog",
+      "subtitle": "Insights, tips, and stories to help you on your fitness journey. From AI-powered motivation to community success stories."
+    }
+  },
+  "nav": {
+    "features": "Features",
+    "how_it_works": "How It Works",
+    "testimonials": "Testimonials",
+    "blog": "Blog",
+    "contact": "Contact",
+    "download": "Download App",
+    "theme": "Theme"
+  },
+  "hero": {
+    "badge": "Trusted by 50,000+ users worldwide",
+    "title": "Your Personal Fitness Accountability Partner",
+    "subtitle": "Stay consistent with your fitness goals through personalized AI motivation and smart reminders.",
+    "download_free": "Download for Free",
+    "watch_demo": "Watch Demo",
+    "stats": {
+      "users": "Active Users",
+      "rating": "App Store Rating",
+      "support": "AI Support"
+    }
+  },
+  "features": {
+    "title": "Transform Your Fitness Journey",
+    "subtitle": "Experience the power of AI-driven fitness motivation with our core features designed to keep you consistent and achieve your goals.",
+    "ai": {
+      "title": "AI Motivation",
+      "description": "Personalized AI messages that adapt to your journey and keep you motivated every day."
+    },
+    "goals": {
+      "title": "Goal Tracking",
+      "description": "Set and track your fitness goals with weekly streaks and progress summaries."
+    },
+    "reminders": {
+      "title": "Smart Reminders",
+      "description": "Intelligent notifications that act like an AI 'call' to check in with you."
+    },
+    "analytics": {
+      "title": "Progress Analytics",
+      "description": "Track your progress with detailed analytics and insights about your fitness journey."
+    },
+    "community": {
+      "title": "Community Support",
+      "description": "Connect with like-minded fitness enthusiasts and share your journey together."
+    },
+    "privacy": {
+      "title": "Privacy & Security",
+      "description": "Your data is protected with enterprise-grade security and privacy controls."
+    },
+    "cta": {
+      "title": "Ready to get started?",
+      "subtitle": "Join thousands of users who are already transforming their fitness journey with FitNudge."
+    }
+  },
+  "testimonials": {
+    "title": "What Our Users Say",
+    "subtitle": "Don't just take our word for it. See what our community has to say about their FitNudge experience.",
+    "rating": "App Store Rating",
+    "users": "Happy Users",
+    "satisfaction": "Satisfaction Rate"
+  },
+  "pricing": {
+    "title": "Simple, Transparent Pricing",
+    "subtitle": "Choose the plan that works for you. All plans include our core AI features.",
+    "popular": "Most Popular",
+    "note": "All plans include a 14-day free trial. No credit card required.",
+    "free": {
+      "name": "Free Plan",
+      "price": "$0",
+      "period": "/month",
+      "description": "Perfect for getting started",
+      "features": {
+        "basic_ai": "Basic AI motivation",
+        "one_goal": "1 active goal",
+        "community": "Community access",
+        "basic_analytics": "Basic progress tracking"
+      },
+      "cta": "Get Started Free"
+    },
+    "pro": {
+      "name": "Pro Plan",
+      "price": "$9.99",
+      "period": "/month",
+      "description": "For serious fitness enthusiasts",
+      "features": {
+        "unlimited_goals": "Unlimited goals",
+        "voice_coaching": "Voice posts & AI coaching",
+        "advanced_analytics": "Advanced analytics",
+        "priority_support": "Priority support",
+        "personalized_plans": "Personalized workout plans",
+        "export_data": "Data export"
+      },
+      "cta": "Start Pro Trial"
+    },
+    "enterprise": {
+      "name": "Enterprise",
+      "price": "Custom",
+      "period": "",
+      "description": "For teams and organizations",
+      "features": {
+        "everything_pro": "Everything in Pro",
+        "team_management": "Team management",
+        "custom_integrations": "Custom integrations",
+        "dedicated_support": "Dedicated support",
+        "advanced_security": "Advanced security",
+        "sla_guarantee": "SLA guarantee"
+      },
+      "cta": "Contact Sales"
+    }
+  },
+  "footer": {
+    "description": "Your AI-powered fitness coach for a healthier, happier you. Transform your fitness journey with personalized motivation and smart goal tracking.",
+    "product": "Product",
+    "company": "Company",
+    "support": "Support",
+    "features": "Features",
+    "pricing": "Pricing",
+    "download": "Download",
+    "blog": "Blog",
+    "contact": "Contact",
+    "about": "About",
+    "help_center": "Help Center",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Service",
+    "cookies": "Cookie Policy",
+    "rights": "All rights reserved.",
+    "why_fitnudge": "Why FitNudge",
+    "faqs": "FAQs",
+    "legal": "Legal",
+    "download_cta": {
+      "title": "Ready to Transform Your Fitness Journey?",
+      "subtitle": "Download FitNudge today and start your AI-powered fitness transformation",
+      "ios": "Download for iOS",
+      "android": "Download for Android"
+    }
+  },
+  "cookies": {
+    "title": "We use cookies",
+    "description": "We use cookies to enhance your experience, analyze site traffic, and personalize content. You can customize your preferences below.",
+    "accept_all": "Accept All",
+    "customize": "Customize",
+    "reject_all": "Reject All",
+    "preferences": {
+      "title": "Cookie Preferences",
+      "save": "Save Preferences",
+      "cancel": "Cancel",
+      "required": "Required",
+      "necessary": {
+        "title": "Necessary Cookies",
+        "description": "Essential for the website to function properly. These cannot be disabled."
+      },
+      "analytics": {
+        "title": "Analytics Cookies",
+        "description": "Help us understand how visitors interact with our website by collecting anonymous information."
+      },
+      "marketing": {
+        "title": "Marketing Cookies",
+        "description": "Used to track visitors across websites to display relevant and engaging advertisements."
+      },
+      "functional": {
+        "title": "Functional Cookies",
+        "description": "Enable enhanced functionality and personalization, such as remembering your preferences."
+      }
+    }
+  },
+  "wellness": {
+    "title": "Your AI-Powered Fitness Coach That Never Sleeps.",
+    "description1": "Get personalized AI motivation messages, smart reminders, and daily check-ins that keep you accountable to your fitness goals. Our AI coach understands your journey and adapts to your needs.",
+    "description2": "Track your progress with intelligent analytics, celebrate your streaks, and connect with a supportive community that shares your fitness journey. Stay consistent with the power of AI.",
+    "cta": "Learn More"
+  },
+  "tracker": {
+    "title": "Track Your Progress with Weekly Streaks",
+    "description": "Monitor your fitness journey with intelligent progress tracking. See your weekly streaks, daily check-ins, and achievements with detailed analytics that help you stay consistent and motivated.",
+    "cta": "Learn More"
+  },
+  "download": {
+    "title": "Download now and begin your journey to better health.",
+    "description": "Join thousands of users who are already transforming their fitness journey with FitNudge. Available on iOS and Android.",
+    "app_store": "App Store",
+    "google_play": "Google Play",
+    "downloads": "Downloads"
+  },
+  "how_it_works": {
+    "title": "How It Works",
+    "subtitle": "Transform your fitness journey in just 3 simple steps with AI-powered motivation and smart tracking.",
+    "steps": {
+      "set_goal": {
+        "title": "Set Your Goal",
+        "description": "Choose from templates or create custom fitness goals. Define what you want to achieve and how often you'll work out."
+      },
+      "get_motivation": {
+        "title": "Get AI Motivation",
+        "description": "Receive personalized messages and smart reminders from your AI coach. Get the motivation you need when you need it most."
+      },
+      "track_progress": {
+        "title": "Track Progress",
+        "description": "Monitor your consistency and celebrate achievements. See your streaks, progress, and stay accountable to your goals."
+      }
+    },
+    "cta": "Ready to get started?"
+  },
+  "about": {
+    "hero": {
+      "title": "About FitNudge",
+      "subtitle": "We're building the future of fitness motivation through AI-powered coaching and community support."
+    },
+    "story": {
+      "title": "Our Story",
+      "subtitle": "Born from a simple idea: what if your fitness coach never slept and always knew exactly what to say?",
+      "description": "It's easy to lose focus and motivation when working out. We've all been there – starting the year with ambitious fitness goals, only to find ourselves skipping workouts by February. The gym feels intimidating, personal trainers are expensive, and generic fitness apps just don't understand our unique struggles and motivations. That's where FitNudge came about. We realized that what people really need isn't another workout plan or calorie counter – they need a coach who understands them, believes in them, and is there 24/7 to keep them moving forward. So we set out to build an AI-powered fitness coach that never sleeps, never judges, and always knows exactly what to say to keep you motivated on your journey to better health."
+    },
+    "mission": {
+      "title": "Our Mission",
+      "subtitle": "We believe everyone deserves a personal fitness coach that understands their journey and keeps them motivated.",
+      "points": {
+        "consistency": {
+          "title": "Consistency First",
+          "description": "We focus on helping users build lasting habits through consistent motivation and accountability."
+        },
+        "ai": {
+          "title": "AI-Powered Coaching",
+          "description": "Our AI coach learns from your progress and adapts its motivation style to keep you engaged."
+        },
+        "community": {
+          "title": "Community Support",
+          "description": "We foster a supportive community where users can share their journey and motivate each other."
+        }
+      }
+    },
+    "values": {
+      "title": "Our Values",
+      "subtitle": "These core values guide everything we do at FitNudge.",
+      "privacy": {
+        "title": "Privacy & Security",
+        "description": "Your data is protected with enterprise-grade security. We never share your personal information without consent."
+      },
+      "community": {
+        "title": "Community First",
+        "description": "We believe in the power of community support and peer motivation to achieve fitness goals."
+      },
+      "innovation": {
+        "title": "Innovation",
+        "description": "We continuously innovate to provide the most effective AI-powered fitness coaching experience."
+      },
+      "empathy": {
+        "title": "Empathy",
+        "description": "We understand that fitness journeys have ups and downs, and we're here to support you through both."
+      }
+    },
+    "team": {
+      "title": "Meet Our Team",
+      "subtitle": "The passionate people behind FitNudge, working to make fitness motivation accessible to everyone.",
+      "founder": {
+        "name": "Alex Johnson",
+        "role": "Founder & CEO",
+        "bio": "Fitness enthusiast and AI researcher with 10+ years in health tech. Passionate about making fitness accessible to everyone."
+      },
+      "cto": {
+        "name": "Sarah Chen",
+        "role": "CTO",
+        "bio": "Full-stack engineer and AI specialist. Leads our technical team in building scalable, intelligent fitness solutions."
+      },
+      "designer": {
+        "name": "Mike Rodriguez",
+        "role": "Head of Design",
+        "bio": "UX/UI designer focused on creating intuitive, engaging experiences that motivate users to achieve their fitness goals."
+      }
+    }
+  },
+  "errors": {
+    "validation_error": "Please fill in all fields",
+    "authentication_error": "Login failed. Please try again.",
+    "registration_error": "Signup failed. Please try again."
+  }
+}

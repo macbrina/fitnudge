@@ -1,0 +1,187 @@
+{
+  "common": {
+    "error": "Erreur",
+    "user": "Utilisateur",
+    "logout": "Déconnexion"
+  },
+  "auth": {
+    "login": {
+      "title": "Bienvenue sur FitNudge",
+      "subtitle": "Connectez-vous pour continuer",
+      "email_placeholder": "Email",
+      "password_placeholder": "Mot de passe",
+      "sign_in": "Se connecter",
+      "signing_in": "Connexion en cours...",
+      "no_account": "Vous n'avez pas de compte ?",
+      "sign_up": "S'inscrire"
+    },
+    "signup": {
+      "title": "Créer un compte",
+      "subtitle": "Rejoignez FitNudge aujourd'hui",
+      "name_placeholder": "Nom complet",
+      "username_placeholder": "Nom d'utilisateur",
+      "email_placeholder": "Email",
+      "password_placeholder": "Mot de passe",
+      "create_account": "Créer un compte",
+      "creating_account": "Création du compte...",
+      "already_have_account": "Vous avez déjà un compte ?",
+      "sign_in": "Se connecter"
+    }
+  },
+  "nav": {
+    "features": "Fonctionnalités",
+    "how_it_works": "Comment ça Marche",
+    "testimonials": "Témoignages",
+    "blog": "Blog",
+    "contact": "Contact",
+    "download": "Télécharger l'App",
+    "theme": "Thème"
+  },
+  "hero": {
+    "badge": "Fait confiance par plus de 50 000 utilisateurs dans le monde",
+    "title": "Votre Partenaire de Responsabilité Fitness Personnel",
+    "subtitle": "Restez cohérent avec vos objectifs de fitness grâce à la motivation personnalisée par IA et aux rappels intelligents.",
+    "download_free": "Télécharger Gratuitement",
+    "watch_demo": "Voir la Démo",
+    "stats": {
+      "users": "Utilisateurs Actifs",
+      "rating": "Note App Store",
+      "support": "Support IA"
+    }
+  },
+  "features": {
+    "title": "Transformez Votre Parcours Fitness",
+    "subtitle": "Découvrez le pouvoir de la motivation fitness alimentée par l'IA avec nos fonctionnalités principales conçues pour vous garder constant et atteindre vos objectifs.",
+    "ai": {
+      "title": "Motivation IA",
+      "description": "Messages IA personnalisés qui s'adaptent à votre parcours et vous maintiennent motivé chaque jour."
+    },
+    "goals": {
+      "title": "Suivi d'Objectifs",
+      "description": "Définissez et suivez vos objectifs de fitness avec des séries hebdomadaires et des résumés de progression."
+    },
+    "reminders": {
+      "title": "Rappels Intelligents",
+      "description": "Notifications intelligentes qui agissent comme un 'appel' IA pour vérifier avec vous."
+    },
+    "analytics": {
+      "title": "Analyses de Progression",
+      "description": "Suivez votre progression avec des analyses détaillées et des informations sur votre parcours fitness."
+    },
+    "community": {
+      "title": "Support Communautaire",
+      "description": "Connectez-vous avec des passionnés de fitness partageant les mêmes idées et partagez votre parcours ensemble."
+    },
+    "privacy": {
+      "title": "Confidentialité et Sécurité",
+      "description": "Vos données sont protégées avec une sécurité de niveau entreprise et des contrôles de confidentialité."
+    },
+    "cta": {
+      "title": "Prêt à commencer ?",
+      "subtitle": "Rejoignez des milliers d'utilisateurs qui transforment déjà leur parcours fitness avec FitNudge."
+    }
+  },
+  "testimonials": {
+    "title": "Ce que disent nos utilisateurs",
+    "subtitle": "Ne prenez pas seulement notre parole. Voyez ce que notre communauté dit de son expérience FitNudge.",
+    "rating": "Note App Store",
+    "users": "Utilisateurs Heureux",
+    "satisfaction": "Taux de Satisfaction"
+  },
+  "footer": {
+    "description": "Votre coach fitness alimenté par l'IA pour une vie plus saine et plus heureuse. Transformez votre parcours fitness avec une motivation personnalisée et un suivi intelligent des objectifs.",
+    "product": "Produit",
+    "company": "Entreprise",
+    "support": "Support",
+    "features": "Fonctionnalités",
+    "download": "Télécharger",
+    "blog": "Blog",
+    "contact": "Contact",
+    "about": "À propos",
+    "help_center": "Centre d'aide",
+    "privacy": "Politique de confidentialité",
+    "terms": "Conditions de service",
+    "cookies": "Politique des cookies",
+    "rights": "Tous droits réservés.",
+    "why_fitnudge": "Pourquoi FitNudge",
+    "faqs": "FAQ",
+    "legal": "Légal",
+    "download_cta": {
+      "title": "Prêt à transformer votre parcours fitness ?",
+      "subtitle": "Téléchargez FitNudge aujourd'hui et commencez votre transformation fitness alimentée par l'IA",
+      "ios": "Télécharger pour iOS",
+      "android": "Télécharger pour Android"
+    }
+  },
+  "cookies": {
+    "title": "Nous utilisons des cookies",
+    "description": "Nous utilisons des cookies pour améliorer votre expérience, analyser le trafic du site et personnaliser le contenu. Vous pouvez personnaliser vos préférences ci-dessous.",
+    "accept_all": "Tout accepter",
+    "customize": "Personnaliser",
+    "reject_all": "Tout rejeter",
+    "preferences": {
+      "title": "Préférences des cookies",
+      "save": "Sauvegarder les préférences",
+      "cancel": "Annuler",
+      "required": "Requis",
+      "necessary": {
+        "title": "Cookies nécessaires",
+        "description": "Essentiels au bon fonctionnement du site web. Ceux-ci ne peuvent pas être désactivés."
+      },
+      "analytics": {
+        "title": "Cookies d'analyse",
+        "description": "Nous aident à comprendre comment les visiteurs interagissent avec notre site web en collectant des informations anonymes."
+      },
+      "marketing": {
+        "title": "Cookies marketing",
+        "description": "Utilisés pour suivre les visiteurs à travers les sites web pour afficher des publicités pertinentes et engageantes."
+      },
+      "functional": {
+        "title": "Cookies fonctionnels",
+        "description": "Permettent une fonctionnalité améliorée et la personnalisation, comme mémoriser vos préférences."
+      }
+    }
+  },
+  "wellness": {
+    "title": "Votre Coach de Fitness Alimenté par IA Qui Ne Dort Jamais.",
+    "description1": "Recevez des messages de motivation personnalisés par IA, des rappels intelligents et des vérifications quotidiennes qui vous tiennent responsable de vos objectifs de fitness. Notre coach IA comprend votre parcours et s'adapte à vos besoins.",
+    "description2": "Suivez vos progrès avec des analyses intelligentes, célébrez vos séries et connectez-vous avec une communauté de soutien qui partage votre parcours de fitness. Restez constant avec le pouvoir de l'IA.",
+    "cta": "En Savoir Plus"
+  },
+  "tracker": {
+    "title": "Suivez Vos Progrès avec des Séries Hebdomadaires",
+    "description": "Surveillez votre parcours fitness avec un suivi intelligent des progrès. Voyez vos séries hebdomadaires, vérifications quotidiennes et réussites avec des analyses détaillées qui vous aident à rester constant et motivé.",
+    "cta": "En Savoir Plus"
+  },
+  "download": {
+    "title": "Téléchargez maintenant et commencez votre voyage vers une meilleure santé.",
+    "description": "Rejoignez des milliers d'utilisateurs qui transforment déjà leur parcours fitness avec FitNudge. Disponible sur iOS et Android.",
+    "app_store": "App Store",
+    "google_play": "Google Play",
+    "downloads": "Téléchargements"
+  },
+  "how_it_works": {
+    "title": "Comment Ça Marche",
+    "subtitle": "Transformez votre parcours fitness en seulement 3 étapes simples avec la motivation alimentée par IA et le suivi intelligent.",
+    "steps": {
+      "set_goal": {
+        "title": "Définissez Votre Objectif",
+        "description": "Choisissez parmi des modèles ou créez des objectifs fitness personnalisés. Définissez ce que vous voulez accomplir et à quelle fréquence vous vous entraînerez."
+      },
+      "get_motivation": {
+        "title": "Obtenez la Motivation IA",
+        "description": "Recevez des messages personnalisés et des rappels intelligents de votre coach IA. Obtenez la motivation dont vous avez besoin quand vous en avez le plus besoin."
+      },
+      "track_progress": {
+        "title": "Suivez les Progrès",
+        "description": "Surveillez votre constance et célébrez les réussites. Voyez vos séries, progrès et restez responsable de vos objectifs."
+      }
+    },
+    "cta": "Prêt à commencer ?"
+  },
+  "errors": {
+    "validation_error": "Veuillez remplir tous les champs",
+    "authentication_error": "Échec de la connexion. Veuillez réessayer.",
+    "registration_error": "Échec de l'inscription. Veuillez réessayer."
+  }
+}
