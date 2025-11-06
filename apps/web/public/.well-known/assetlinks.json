@@ -4,7 +4,9 @@
     "target": {
       "namespace": "android_app",
       "package_name": "com.fitnudge.app",
-      "sha256_cert_fingerprints": ["SHA256_FINGERPRINT_HERE"]
+      "sha256_cert_fingerprints": [
+        "A0:24:F0:FE:F7:55:BE:39:37:EE:44:7B:C7:C7:FC:08:A6:A0:02:B6:C5:14:0A:4D:FB:E2:F6:B3:00:62:04:C4"
+      ]
     }
   }
 ]
