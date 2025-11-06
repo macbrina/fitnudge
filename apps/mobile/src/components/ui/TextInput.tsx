@@ -13,7 +13,7 @@ import { EyeClosedIcon } from "@/components/icons/eye-closed-icon";
 import { EyeOpenIcon } from "@/components/icons/eye-open-icon";
 import { useTheme } from "@/themes";
 
-interface TextInputProps {
+export interface TextInputProps {
   label?: string;
   placeholder?: string;
   value: string;
@@ -30,6 +30,9 @@ interface TextInputProps {
   containerStyle?: any;
   inputStyle?: any;
   labelStyle?: any;
+  multiline?: boolean;
+  numberOfLines?: number;
+  maxLength?: number;
 }
 
 const makeTextInputStyles = (tokens: any, colors: any, brandColors: any) => {
@@ -61,6 +64,11 @@ const makeTextInputStyles = (tokens: any, colors: any, brandColors: any) => {
       color: colors.text.primary,
       fontFamily: fontFamily.groteskRegular,
       minHeight: toRN(48),
+    },
+    inputMultiline: {
+      textAlignVertical: "top" as const,
+      minHeight: toRN(80),
+      paddingTop: toRN(tokens.spacing[3]),
     },
     inputFocused: {
       borderColor: brandColors.primary,
@@ -113,6 +121,9 @@ export const TextInput: React.FC<TextInputProps> = ({
   containerStyle,
   inputStyle,
   labelStyle,
+  multiline = false,
+  numberOfLines,
+  maxLength,
 }) => {
   const [isFocused, setIsFocused] = useState(false);
   const [isPasswordVisible, setIsPasswordVisible] = useState(!secureTextEntry);
@@ -129,11 +140,13 @@ export const TextInput: React.FC<TextInputProps> = ({
   const getInputStyle = () => {
     let style = [styles.input];
 
+    if (multiline) style.push(styles.inputMultiline);
     if (isFocused) style.push(styles.inputFocused);
     if (error) style.push(styles.inputError);
     if (disabled) style.push(styles.inputDisabled);
-    if (leftIcon) style.push({ paddingLeft: toRN(40) });
-    if (rightIcon || showPasswordToggle) style.push({ paddingRight: toRN(40) });
+    if (leftIcon && !multiline) style.push({ paddingLeft: toRN(40) });
+    if ((rightIcon || showPasswordToggle) && !multiline)
+      style.push({ paddingRight: toRN(40) });
     if (inputStyle) style.push(inputStyle);
 
     return style;
@@ -159,6 +172,9 @@ export const TextInput: React.FC<TextInputProps> = ({
           autoCapitalize={autoCapitalize}
           autoCorrect={autoCorrect}
           editable={!disabled}
+          multiline={multiline}
+          numberOfLines={numberOfLines}
+          maxLength={maxLength}
         />
 
         {showPasswordToggle && (

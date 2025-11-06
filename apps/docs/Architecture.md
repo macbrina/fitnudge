@@ -1236,32 +1236,42 @@ class ConnectionManager {
 
 ### 📨 Email Service Provider
 
-**SendGrid Integration:**
+**Namecheap Private Email Integration:**
 
 ```python
 # Email service configuration
-import sendgrid
-from sendgrid.helpers.mail import Mail, Email, To, Content
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 class EmailService:
     def __init__(self):
-        self.sg = sendgrid.SendGridAPIClient(api_key=SENDGRID_API_KEY)
+        self.smtp_host = SMTP_HOST
+        self.smtp_port = SMTP_PORT
+        self.username = SMTP_USERNAME
+        self.password = SMTP_PASSWORD
 
-    async def send_transactional_email(self, to_email: str, template_id: str, data: dict):
-        message = Mail(
-            from_email=Email("noreply@fitnudge.com", "FitNudge"),
-            to_emails=To(to_email),
-        )
+    async def send_transactional_email(self, to_email: str, subject: str, html_content: str):
+        msg = MIMEMultipart('alternative')
+        msg['From'] = self.username
+        msg['To'] = to_email
+        msg['Subject'] = subject
 
-        message.template_id = template_id
-        message.dynamic_template_data = data
+        # Add HTML content
+        html_part = MIMEText(html_content, 'html')
+        msg.attach(html_part)
 
+        # Send email via SMTP
         try:
-            response = self.sg.send(message)
-            return response.status_code == 202
+            with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
+                server.starttls()
+                server.login(self.username, self.password)
+                server.send_message(msg)
         except Exception as e:
-            logger.error(f"Email send failed: {e}")
-            return False
+            logger.error(f"Failed to send email: {e}")
+            raise
+
+        return True
 ```
 
 **Transactional Email Templates:**
@@ -1384,9 +1394,9 @@ class EmailAnalytics:
 **Email Reputation Management:**
 
 ```python
-# Webhook handler for SendGrid events
-@app.post("/webhooks/sendgrid")
-async def sendgrid_webhook(request: Request):
+# Email delivery tracking (if needed)
+@app.post("/webhooks/email-events")
+async def email_webhook(request: Request):
     events = await request.json()
 
     for event in events:

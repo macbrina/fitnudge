@@ -22,7 +22,10 @@
     "clean": "rm -rf dist",
     "lint": "eslint . --max-warnings 0",
     "generate:component": "turbo gen react-component",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "fix-imports": "node scripts/fix-imports.js",
+    "shadcn:add": "node scripts/shadcn-add.js",
+    "postinstall": "npm run fix-imports"
   },
   "devDependencies": {
     "@fitnudge/eslint-config": "workspace:*",

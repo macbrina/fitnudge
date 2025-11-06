@@ -1,0 +1,87 @@
+import React from "react";
+import { Text, TextProps } from "react-native";
+import { InAppBrowser } from "./InAppBrowser";
+import { useTheme } from "@/themes";
+
+interface LinkTextProps extends TextProps {
+  /**
+   * URL to open when pressed
+   */
+  url: string;
+  /**
+   * Title to display in the browser
+   */
+  title?: string;
+  /**
+   * Whether to show user choice between in-app and external browser
+   */
+  showChoice?: boolean;
+  /**
+   * Whether to open directly in external browser
+   */
+  openExternal?: boolean;
+  /**
+   * Custom text color (defaults to brand primary)
+   */
+  color?: string;
+  /**
+   * Whether to show underline
+   */
+  underline?: boolean;
+}
+
+/**
+ * LinkText component for clickable text that opens URLs
+ * Automatically handles in-app browser vs external browser
+ */
+export default function LinkText({
+  url,
+  title,
+  showChoice = false,
+  openExternal = false,
+  color,
+  underline = true,
+  style,
+  children,
+  ...props
+}: LinkTextProps) {
+  const { colors, brandColors } = useTheme();
+
+  const handlePress = () => {
+    if (openExternal) {
+      InAppBrowser.openExternal(url);
+    } else if (showChoice) {
+      InAppBrowser.openWithChoice({
+        url,
+        title,
+        showOpenInBrowser: true,
+        toolbarColor: brandColors.primary,
+        controlsColor: colors.text.primary,
+      });
+    } else {
+      InAppBrowser.open({
+        url,
+        title,
+        showOpenInBrowser: true,
+        toolbarColor: brandColors.primary,
+        controlsColor: colors.text.primary,
+      });
+    }
+  };
+
+  return (
+    <Text
+      style={[
+        {
+          color: color || brandColors.primary,
+          textDecorationLine: underline ? "underline" : "none",
+        },
+        style,
+      ]}
+      onPress={handlePress}
+      {...props}
+    >
+      {children}
+    </Text>
+  );
+}

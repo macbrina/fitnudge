@@ -1,4 +1,6 @@
 // Design tokens for FitNudge
+import { getLineHeight as calculateLineHeight } from "@/lib/units";
+
 export const tokens = {
   colors: {
     // Light mode colors
@@ -9,7 +11,7 @@ export const tokens = {
       primaryForeground: "#ffffff",
       secondary: "#f1f5f9",
       secondaryForeground: "#0f172a",
-      muted: "#f8fafc",
+      muted: "#f4f5f7",
       mutedForeground: "#64748b",
       accent: "#f1f5f9",
       accentForeground: "#0f172a",
@@ -132,3 +134,15 @@ export type ColorToken = keyof typeof tokens.colors.light;
 export type Tokens = typeof tokens;
 export type SpacingToken = keyof typeof tokens.spacing;
 export type TypographyToken = keyof typeof tokens.typography;
+
+/**
+ * Helper function to calculate lineHeight for React Native
+ * Usage: lineHeight(fontSize, tokens.typography.lineHeight.tight)
+ * Example: lineHeight(tokens.typography.fontSize["4xl"], tokens.typography.lineHeight.tight)
+ */
+export const lineHeight = (
+  fontSize: number | string,
+  lineHeightMultiplier: number | string
+): number => {
+  return calculateLineHeight(fontSize, lineHeightMultiplier);
+};

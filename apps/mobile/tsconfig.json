@@ -20,7 +20,7 @@
       "@themes/*": ["src/themes/src/*"],
       "@ui/*": ["../../packages/ui/src/*"]
     },
-    "types": ["react-native"],
+    "types": ["react-native", "node"],
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "jsx": "react-jsx",

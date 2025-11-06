@@ -4,11 +4,19 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 export const STORAGE_KEYS = {
   // Onboarding
   HAS_SEEN_ONBOARDING: "has_seen_onboarding",
+  HAS_SEEN_NOTIFICATION_PERMISSION: "has_seen_notification_permission",
+  HAS_SEEN_PERSONALIZATION: "has_seen_personalization",
+  HAS_SEEN_SUBSCRIPTION: "has_seen_subscription",
+  HAS_SEEN_SUGGESTED_GOALS: "has_seen_suggested_goals",
 
   // Authentication
   AUTH_TOKEN: "auth_token",
   REFRESH_TOKEN: "refresh_token",
   USER_DATA: "user_data",
+  REMEMBER_ME_EMAIL: "remember_me_email",
+  REMEMBER_ME_ENABLED: "remember_me_enabled",
+  NOTIFICATION_PREFERENCES: "notification_preferences",
+  NOTIFICATION_SOFT_PROMPT_SHOWN: "notification_soft_prompt_shown",
 
   // User preferences
   LANGUAGE: "user_pref_language",
@@ -43,6 +51,13 @@ class StorageUtil {
   // Basic storage operations
   async setItem<T>(key: string, value: T): Promise<void> {
     try {
+      // Don't save null or undefined values
+      if (value === null || value === undefined) {
+        console.warn(
+          `Attempted to save null/undefined value for key: ${key}. Use removeItem instead.`
+        );
+        return;
+      }
       await AsyncStorage.setItem(key, JSON.stringify(value));
     } catch (error) {
       console.error(`Error saving to storage (${key}):`, error);

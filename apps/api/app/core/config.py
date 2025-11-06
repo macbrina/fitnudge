@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = os.getenv("DATABASE_URL", "")
     SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
-    SUPABASE_KEY: str = os.getenv("SUPABASE_KEY", "")
+    SUPABASE_SERVICE_KEY: str = os.getenv("SUPABASE_SERVICE_KEY", "")
 
     # JWT
     SECRET_KEY: str = os.getenv("SECRET_KEY", "")
@@ -23,8 +23,16 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", 7)
 
     # CORS
-    ALLOWED_ORIGINS: List[str] = os.getenv("ALLOWED_ORIGINS", ["*"]).split(",")
-    ALLOWED_HOSTS: List[str] = os.getenv("ALLOWED_HOSTS", ["*"]).split(",")
+    ALLOWED_ORIGINS: str = os.getenv("ALLOWED_ORIGINS", "*")
+    ALLOWED_HOSTS: str = os.getenv("ALLOWED_HOSTS", "*")
+
+    @property
+    def allowed_origins_list(self) -> List[str]:
+        return self.ALLOWED_ORIGINS.split(",")
+
+    @property
+    def allowed_hosts_list(self) -> List[str]:
+        return self.ALLOWED_HOSTS.split(",")
 
     # AI Services
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
@@ -60,13 +68,31 @@ class Settings(BaseSettings):
     # Rate Limiting
     RATE_LIMIT_PER_MINUTE: int = os.getenv("RATE_LIMIT_PER_MINUTE", 100)
 
-    # Email
-    SENDGRID_API_KEY: str = os.getenv("SENDGRID_API_KEY", "")
+    # Email (Namecheap Private Email)
+    SMTP_HOST: str = os.getenv("SMTP_HOST", "mail.privateemail.com")
+    SMTP_PORT: int = os.getenv("SMTP_PORT", 587)
+    SMTP_USERNAME: str = os.getenv("SMTP_USERNAME", "")
+    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
+    REPLY_TO_EMAIL: str = os.getenv("REPLY_TO_EMAIL", "hello@fitnudge.app")
     FROM_EMAIL: str = os.getenv("FROM_EMAIL", "noreply@fitnudge.app")
+    FROM_NAME: str = os.getenv("FROM_NAME", "FitNudge")
+    BASE_URL: str = os.getenv("BASE_URL", "https://fitnudge.app")
+
+    # Monitoring
+    NEW_RELIC_LICENSE_KEY: str = os.getenv("NEW_RELIC_LICENSE_KEY", "")
+    NEW_RELIC_APP_NAME: str = os.getenv("NEW_RELIC_APP_NAME", "fitnudge-api")
+
+    # PostHog Analytics
+    POSTHOG_API_KEY: str = os.getenv("POSTHOG_API_KEY", "")
+    POSTHOG_HOST: str = os.getenv("POSTHOG_HOST", "https://us.i.posthog.com")
+    POSTHOG_ENABLE_EXCEPTION_AUTOCAPTURE: bool = (
+        os.getenv("POSTHOG_ENABLE_EXCEPTION_AUTOCAPTURE", "true").lower() == "true"
+    )
 
     class Config:
-        env_file = ".env"
+        env_file = [".env.local", ".env"]
         case_sensitive = True
+        extra = "ignore"
 
 
 # Create settings instance

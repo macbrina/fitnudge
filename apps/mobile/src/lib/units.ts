@@ -28,6 +28,21 @@ export const toRN = (v: number | string): number => {
 };
 
 /**
+ * Calculate lineHeight for React Native based on fontSize and lineHeight multiplier
+ * @param fontSize - The font size (can be token string like "2.25rem" or number)
+ * @param lineHeightMultiplier - The lineHeight multiplier (e.g., "1.25", "1.5")
+ * @returns The calculated lineHeight in pixels
+ */
+export const getLineHeight = (
+  fontSize: number | string,
+  lineHeightMultiplier: number | string
+): number => {
+  const fontSizePx = toRN(fontSize);
+  const multiplier = parseFloat(String(lineHeightMultiplier));
+  return fontSizePx * multiplier;
+};
+
+/**
  * Converts height-based values (for vertical spacing)
  */
 export const toRNHeight = (value: number): number => {

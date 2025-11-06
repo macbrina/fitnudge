@@ -69,16 +69,24 @@ EXPO_ACCESS_TOKEN=your-expo-access-token
 REDIS_URL=redis://localhost:6379
 SENTRY_DSN=https://your-sentry-dsn@sentry.io/project-id
 
-# Email Service
-SENDGRID_API_KEY=SG.your-sendgrid-api-key
-SENDGRID_FROM_EMAIL=noreply@fitnudge.com
+# Email Service (Namecheap Private Email)
+SMTP_HOST=mail.privateemail.com
+SMTP_PORT=587
+SMTP_USERNAME=noreply@fitnudge.com
+SMTP_PASSWORD=your-email-password
+FROM_EMAIL=noreply@fitnudge.com
 
 # Feature Flags
 LAUNCHDARKLY_SDK_KEY=your-launchdarkly-sdk-key
 
 # Monitoring
 NEW_RELIC_LICENSE_KEY=your-newrelic-license-key
-POSTHOG_API_KEY=your-posthog-api-key
+NEW_RELIC_APP_NAME=fitnudge-api
+
+# PostHog Analytics
+POSTHOG_API_KEY=phc_your-posthog-project-api-key
+POSTHOG_HOST=https://us.i.posthog.com
+POSTHOG_ENABLE_EXCEPTION_AUTOCAPTURE=true
 ```
 
 ### Mobile (.env)
@@ -331,25 +339,42 @@ CLOUDFLARE_PUBLIC_URL=https://your-bucket.your-account.r2.cloudflarestorage.com
    - Configure webhook endpoint
    - Test with license testing accounts
 
-### 9. SendGrid
+### 9. Namecheap Private Email
 
-**Purpose**: Transactional emails
+**Purpose**: Transactional emails via SMTP
 
 **Setup Steps**:
 
-1. **Create Account**
-   - Sign up at [SendGrid](https://sendgrid.com)
-   - Verify email address
+1. **Create Namecheap Account**
+   - Sign up at [Namecheap](https://namecheap.com)
+   - Purchase domain (e.g., fitnudge.com)
 
-2. **Generate API Key**
-   - Go to Settings → API Keys
-   - Create new API key with full access
-   - Add to backend `.env` as `SENDGRID_API_KEY`
+2. **Set Up Private Email**
+   - Go to Domain List → Manage → Private Email
+   - Create email account: `noreply@fitnudge.com`
+   - Set up email password
 
-3. **Configure Sender**
-   - Set up sender identity
-   - Verify domain (recommended)
-   - Create email templates
+3. **Configure SMTP Settings**
+   - **SMTP Host**: `mail.privateemail.com`
+   - **SMTP Port**: `587` (TLS) or `465` (SSL)
+   - **Username**: `noreply@fitnudge.com`
+   - **Password**: Your email password
+
+4. **Configure Backend**
+   ```bash
+   SMTP_HOST=mail.privateemail.com
+   SMTP_PORT=587
+   SMTP_USERNAME=noreply@fitnudge.com
+   SMTP_PASSWORD=your-email-password
+   FROM_EMAIL=noreply@fitnudge.com
+   ```
+
+**Benefits**:
+
+- **Cost Effective**: Included with domain purchase
+- **Reliable**: Professional email service
+- **Simple Setup**: Standard SMTP configuration
+- **No API Limits**: Direct SMTP sending
 
 ### 10. Redis
 
@@ -380,7 +405,9 @@ CLOUDFLARE_PUBLIC_URL=https://your-bucket.your-account.r2.cloudflarestorage.com
 
 3. **PostHog** (Analytics)
    - Create account at [PostHog](https://posthog.com)
-   - Get API key for events tracking
+   - Create a new project
+   - Get project API key from Project Settings
+   - Set `POSTHOG_API_KEY` in your environment variables
 
 4. **LaunchDarkly** (Feature Flags)
    - Sign up at [LaunchDarkly](https://launchdarkly.com)

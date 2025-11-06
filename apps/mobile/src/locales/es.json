@@ -6,27 +6,39 @@
     "app_name": "FitNudge"
   },
   "auth": {
+    "main": {
+      "tagline": "Tu Entrenador de Fitness Impulsado por IA",
+      "sign_in_now": "Iniciar sesión ahora",
+      "sign_up_now": "Regístrate Ahora"
+    },
     "login": {
-      "title": "Bienvenido a FitNudge",
-      "subtitle": "Inicia sesión para continuar",
-      "email_placeholder": "Correo electrónico",
-      "password_placeholder": "Contraseña",
+      "title": "Inicia sesión en tu Cuenta",
+      "subtitle": "Una app para cada paso: navega, compara, compra, rastrea y repite con facilidad.",
+      "email_label": "Correo electrónico",
+      "email_placeholder": "Ingresa tu correo electrónico",
+      "password_label": "Contraseña",
+      "password_placeholder": "Ingresa tu contraseña",
+      "remember_me": "Recordarme",
+      "forgot_password": "¿Olvidaste tu contraseña?",
       "sign_in": "Iniciar sesión",
       "signing_in": "Iniciando sesión...",
-      "no_account": "¿No tienes una cuenta?",
-      "sign_up": "Regístrate"
+      "no_account": "¿No tienes una cuenta? Regístrate"
     },
     "signup": {
-      "title": "Crear cuenta",
-      "subtitle": "Únete a FitNudge hoy",
-      "name_placeholder": "Nombre completo",
-      "username_placeholder": "Nombre de usuario",
-      "email_placeholder": "Correo electrónico",
-      "password_placeholder": "Contraseña",
+      "title": "Crea tu Cuenta",
+      "subtitle": "Únete a FitNudge y comienza tu viaje de fitness con entrenamiento personalizado de IA",
+      "username_label": "Nombre de usuario",
+      "username_placeholder": "Ingresa tu nombre de usuario",
+      "email_label": "Correo electrónico",
+      "email_placeholder": "Ingresa tu correo electrónico",
+      "password_label": "Contraseña",
+      "password_placeholder": "Ingresa tu contraseña",
       "create_account": "Crear cuenta",
       "creating_account": "Creando cuenta...",
-      "already_have_account": "¿Ya tienes una cuenta?",
-      "sign_in": "Iniciar sesión"
+      "terms_text": "Al crear una cuenta reconoces y aceptas los",
+      "terms_of_use": "Términos de Uso",
+      "privacy_policy": "Política de Privacidad",
+      "already_have_account": "¿Ya tienes una cuenta? Iniciar sesión"
     }
   },
   "home": {

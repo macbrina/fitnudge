@@ -1,15 +1,14 @@
-import type { Metadata } from "next";
-import localFont from "next/font/local";
+import type { Metadata, Viewport } from "next";
+import { Nunito } from "next/font/google";
 import "@/styles/globals.css";
 import "@/lib/i18n"; // Initialize i18n
 
-const geistSans = localFont({
-  src: "./fonts/GeistVF.woff",
-  variable: "--font-geist-sans",
-});
-const geistMono = localFont({
-  src: "./fonts/GeistMonoVF.woff",
-  variable: "--font-geist-mono",
+const nunito = Nunito({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
+  style: ["normal", "italic"],
+  variable: "--font-nunito",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -47,7 +46,11 @@ export const metadata: Metadata = {
       "Transform your fitness journey with AI-powered motivation and personalized coaching",
     images: ["/og-image.jpg"],
   },
-  viewport: "width=device-width, initial-scale=1",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#ffffff" },
     { media: "(prefers-color-scheme: dark)", color: "#111827" },
@@ -60,10 +63,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="scroll-smooth">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased w-full`}
-      >
+    <html lang="en" className={`scroll-smooth ${nunito.variable}`}>
+      <body className={`antialiased w-full font-sans ${nunito.className}`}>
         {children}
       </body>
     </html>

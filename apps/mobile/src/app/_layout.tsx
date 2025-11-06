@@ -6,6 +6,51 @@ import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ThemeProvider, useTheme } from "@/themes";
 import { Platform, View } from "react-native";
+import * as Sentry from "@sentry/react-native";
+import { logger } from "@/services/logger";
+import { LaunchDarklyProvider } from "@/services/launchDarklyProvider";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { NotificationProvider } from "@/contexts/NotificationContext";
+import { PostHogProvider } from "@/providers/PostHogProvider";
+import { setupDeepLinkListener } from "@/utils/deepLinkHandler";
+import { useEffect } from "react";
+
+// Initialize Sentry with error handling
+try {
+  Sentry.init({
+    dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
+    sendDefaultPii: true,
+    enableLogs: true,
+    replaysSessionSampleRate: 0.1,
+    replaysOnErrorSampleRate: 1,
+    integrations: [
+      Sentry.mobileReplayIntegration(),
+      Sentry.feedbackIntegration(),
+    ],
+    spotlight: __DEV__,
+  });
+
+  // Initialize vendor logger after Sentry
+  logger.markInitialized();
+} catch (error) {
+  console.warn("Sentry initialization failed:", error);
+}
+
+// Initialize React Query
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      retry: 3,
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    },
+    mutations: {
+      retry: 1,
+    },
+  },
+});
+
+// LaunchDarkly is now handled by the provider pattern
 
 function SafeAreaWrapper() {
   const segments = useSegments();
@@ -96,17 +141,33 @@ function BackgroundColorWrapper({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function RootLayout() {
+// LaunchDarkly user identification is now handled by the provider
+
+export default Sentry.wrap(function RootLayout() {
+  // Setup deep link listener
+  useEffect(() => {
+    const cleanup = setupDeepLinkListener();
+    return cleanup;
+  }, []);
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <ThemeProvider initialBrand="fitnudge">
-          <BackgroundColorWrapper>
-            <StatusBarWrapper />
-            <SafeAreaWrapper />
-          </BackgroundColorWrapper>
-        </ThemeProvider>
+        <QueryClientProvider client={queryClient}>
+          <ThemeProvider initialBrand="fitnudge">
+            <PostHogProvider>
+              <LaunchDarklyProvider>
+                <NotificationProvider>
+                  <BackgroundColorWrapper>
+                    <StatusBarWrapper />
+                    <SafeAreaWrapper />
+                  </BackgroundColorWrapper>
+                </NotificationProvider>
+              </LaunchDarklyProvider>
+            </PostHogProvider>
+          </ThemeProvider>
+        </QueryClientProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
-}
+});

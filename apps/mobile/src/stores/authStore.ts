@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { storageUtil } from "../utils/storageUtil";
+import { TokenManager } from "@/services/api/base";
 
 interface User {
   id: string;
@@ -9,10 +9,13 @@ interface User {
   name: string;
   username: string;
   plan: string;
+  timezone: string; // IANA timezone string (e.g., 'America/New_York')
   email_verified: boolean;
   auth_provider: string;
   created_at: string;
 }
+
+export type LogoutReason = "not_found" | "disabled" | "suspended" | null;
 
 interface AuthState {
   user: User | null;
@@ -20,13 +23,19 @@ interface AuthState {
   refreshToken: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  logoutReason: LogoutReason;
 }
 
 interface AuthActions {
-  login: (user: User, accessToken: string, refreshToken: string) => void;
-  logout: () => void;
+  login: (
+    user: User,
+    accessToken: string,
+    refreshToken: string
+  ) => Promise<void>;
+  logout: (reason?: LogoutReason) => Promise<void>;
   updateUser: (user: Partial<User>) => void;
   setLoading: (loading: boolean) => void;
+  clearLogoutReason: () => void;
 }
 
 export const useAuthStore = create<AuthState & AuthActions>()(
@@ -38,9 +47,10 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       refreshToken: null,
       isAuthenticated: false,
       isLoading: false,
+      logoutReason: null,
 
       // Actions
-      login: (user, accessToken, refreshToken) => {
+      login: async (user, accessToken, refreshToken) => {
         set({
           user,
           accessToken,
@@ -49,23 +59,23 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           isLoading: false,
         });
 
-        // Store tokens securely
-        storageUtil.setSecureItem("accessToken", accessToken);
-        storageUtil.setSecureItem("refreshToken", refreshToken);
+        // Store tokens securely using TokenManager
+        await TokenManager.setTokens(accessToken, refreshToken);
       },
 
-      logout: () => {
+      logout: async (reason?: LogoutReason) => {
         set({
           user: null,
           accessToken: null,
           refreshToken: null,
           isAuthenticated: false,
           isLoading: false,
+          logoutReason: reason || null,
         });
 
-        // Clear stored tokens
-        storageUtil.removeItem("accessToken");
-        storageUtil.removeItem("refreshToken");
+        // Clear stored tokens and remember me preferences
+        await TokenManager.clearTokens();
+        await TokenManager.clearRememberMe();
       },
 
       updateUser: (userData) => {
@@ -80,6 +90,10 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       setLoading: (loading) => {
         set({ isLoading: loading });
       },
+
+      clearLogoutReason: () => {
+        set({ logoutReason: null });
+      },
     }),
     {
       name: "auth-storage",
@@ -87,6 +101,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       partialize: (state) => ({
         user: state.user,
         isAuthenticated: state.isAuthenticated,
+        logoutReason: state.logoutReason,
       }),
     }
   )

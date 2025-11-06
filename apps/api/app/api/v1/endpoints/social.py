@@ -2,9 +2,11 @@ from fastapi import APIRouter, HTTPException, status, Depends, Query
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
-from app.api.v1.endpoints.auth import get_current_user
+from app.core.flexible_auth import get_current_user
 
-router = APIRouter()
+router = APIRouter(
+    redirect_slashes=False
+)  # Disable redirects to preserve Authorization header
 
 
 # Pydantic models

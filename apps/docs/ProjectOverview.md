@@ -30,21 +30,28 @@ The MVP focuses on a **minimal, mobile-first**, emotionally engaging experience 
 | **Advanced Filtering**           | Filter feed by date, user, category, post type, popularity.                                           | Free          |
 | **Notification Scheduling**      | Users choose custom times for AI reminders.                                                           | Free          |
 | **Dark/Light Mode**              | Clean, minimal design with auto theme switch.                                                         | Free          |
+| **Mood Check-In**                | Track mood (1-5 scale) with check-ins to understand emotional patterns.                               | Free          |
+| **Progress Photos**              | Upload photos with check-ins to track visual changes over time.                                       | Free          |
+| **Achievement Badges**           | Unlock badges for milestones (streaks, check-ins, consistency).                                       | Free          |
+| **Weekly Recaps**                | AI-generated weekly progress summaries with insights and motivation.                                  | Free          |
+| **Community Challenges**         | Join and participate in community challenges with leaderboards.                                       | Free          |
+| **Habit Chains**                 | Visual chain visualization showing streak consistency over time.                                      | Free          |
+| **Social Accountability**        | Share goals with friends, find accountability partners, create group goals.                           | Free          |
+| **Meal Tracking**                | Log meals with nutritional data for accountability tracking.                                          | Free          |
+| **Custom Reminder Messages**     | Personalize reminder messages for goals.                                                              | Free          |
 
 ---
 
 ## 🔁 Later (Post-MVP / Growth Phase)
 
-| Feature                             | Description                                                                  | Access |
-| ----------------------------------- | ---------------------------------------------------------------------------- | ------ |
-| **AI Voice Messages**               | Generate short pep-talk voice notes via ElevenLabs.                          | Paid   |
-| **Integration with Fitness APIs**   | Pull activity data from Apple Health, Fitbit, Strava.                        | Paid   |
-| **Mood Check-In**                   | Ask “How do you feel today?” and adapt tone accordingly.                     | Free   |
-| **AI Progress Reflection**          | Weekly “AI coach summary” referencing user’s emotional and workout patterns. | Paid   |
-| **Reminders via Multiple Channels** | Telegram, WhatsApp, or Email check-ins.                                      | Paid   |
-| **Direct Messaging**                | Private one-on-one conversations between users.                              | Free   |
-| **Custom Routine Templates**        | Choose predefined training templates.                                        | Paid   |
-| **Community Challenges**            | 21-day streak or group challenges.                                           | Paid   |
+| Feature                             | Description                                                                                  | Access     |
+| ----------------------------------- | -------------------------------------------------------------------------------------------- | ---------- |
+| **AI Voice Messages**               | Generate short pep-talk voice notes via ElevenLabs.                                          | Paid       |
+| **Integration with Fitness APIs**   | Pull activity data from Apple Health, Fitbit, Strava.                                        | Paid       |
+| **AI Progress Reflections**         | Premium deep AI coach summaries with actionable insights (enhanced version of weekly recap). | Pro/Coach+ |
+| **Reminders via Multiple Channels** | Telegram, WhatsApp, or Email check-ins.                                                      | Paid       |
+| **Direct Messaging**                | Private one-on-one conversations between users.                                              | Free       |
+| **Custom Routine Templates**        | Choose predefined training templates.                                                        | Paid       |
 
 ---
 
@@ -207,8 +214,8 @@ api/
 **Key Tables:**
 
 - `users` — basic profile, subscription tier, preferences.
-- `goals` — each user’s fitness target (1 per Free user).
-- `check_ins` — daily progress (date, success, reflection).
+- `goals` — each user's fitness target (1 per Free user, multiple for Starter/Pro/Coach+).
+- `check_ins` — daily progress (date, success, reflection, mood, photo_urls).
 - `motivations` — AI-generated messages per goal.
 - `posts` — social wall content (text, voice, created_at).
 - `comments` — post comments (post_id, user_id, text, created_at).
@@ -218,6 +225,19 @@ api/
 - `subscriptions` — user subscription details (platform, product_id, expires_at, status).
 - `iap_receipts` — Apple/Google receipt storage for verification.
 - `offer_codes` — promotional offer codes and usage tracking.
+- `user_fitness_profiles` — personalization data for AI goal suggestions.
+- `actionable_plans` — AI-generated structured plans for goals (meal, workout, habit, accountability).
+- `achievement_types` — badge definitions and unlock conditions.
+- `user_achievements` — unlocked badges for users.
+- `progress_photos` — photo records linked to check-ins for visual tracking.
+- `challenges` — community challenges with leaderboards.
+- `challenge_participants` — user participation in challenges.
+- `goal_shares` — goal sharing permissions for social accountability.
+- `accountability_partners` — accountability partner matching and relationships.
+- `group_goals` — collaborative goals shared by multiple users.
+- `meal_logs` — meal tracking with nutritional data.
+- `daily_nutrition_summaries` — aggregated nutrition data per day.
+- `habit_chains` — visual chain data for streak visualization.
 
 ---
 
@@ -235,25 +255,42 @@ api/
 
 ## 🔌 API Endpoints (MVP)
 
-| Endpoint                      | Method   | Description                              |
-| ----------------------------- | -------- | ---------------------------------------- |
-| `/api/v1/auth/signup`         | POST     | Register user.                           |
-| `/api/v1/auth/login`          | POST     | User login.                              |
-| `/api/v1/goals`               | POST     | Create goal (Free = 1 limit).            |
-| `/api/v1/goals/:id/checkin`   | POST     | Record daily check-in.                   |
-| `/api/v1/motivation/generate` | POST     | Generate AI motivational message.        |
-| `/api/v1/motivation/schedule` | POST     | Schedule reminder via FCM.               |
-| `/api/v1/feed`                | GET      | Fetch motivational feed.                 |
-| `/api/v1/posts`               | GET/POST | Get or create community posts.           |
-| `/api/v1/posts/:id/comments`  | GET/POST | Get or create comments on posts.         |
-| `/api/v1/likes`               | POST     | Add/remove cheer on post.                |
-| `/api/v1/users/:id/follow`    | POST     | Follow/unfollow users.                   |
-| `/api/v1/users/:id/profile`   | GET      | Get user profile details.                |
-| `/api/v1/feed/filter`         | GET      | Get filtered feed with query params.     |
-| `/api/v1/analytics`           | GET      | Weekly summary (Pro users).              |
-| `/api/v1/media/upload`        | POST     | Get signed upload URL for Cloudflare R2. |
-| `/api/v1/users/me/data`       | GET      | Export user data (GDPR compliance).      |
-| `/api/v1/users/me/delete`     | DELETE   | Delete user account and data.            |
+| Endpoint                                                        | Method   | Description                                       |
+| --------------------------------------------------------------- | -------- | ------------------------------------------------- |
+| `/api/v1/auth/signup`                                           | POST     | Register user.                                    |
+| `/api/v1/auth/login`                                            | POST     | User login.                                       |
+| `/api/v1/goals`                                                 | POST     | Create goal (Free = 1 limit).                     |
+| `/api/v1/goals/:id/checkin`                                     | POST     | Record daily check-in.                            |
+| `/api/v1/goals/:id/habit-chains`                                | GET      | Get habit chain data for visualization.           |
+| `/api/v1/motivation/generate`                                   | POST     | Generate AI motivational message.                 |
+| `/api/v1/motivation/schedule`                                   | POST     | Schedule reminder via FCM.                        |
+| `/api/v1/feed`                                                  | GET      | Fetch motivational feed.                          |
+| `/api/v1/posts`                                                 | GET/POST | Get or create community posts.                    |
+| `/api/v1/posts/:id/comments`                                    | GET/POST | Get or create comments on posts.                  |
+| `/api/v1/likes`                                                 | POST     | Add/remove cheer on post.                         |
+| `/api/v1/users/:id/follow`                                      | POST     | Follow/unfollow users.                            |
+| `/api/v1/users/:id/profile`                                     | GET      | Get user profile details.                         |
+| `/api/v1/feed/filter`                                           | GET      | Get filtered feed with query params.              |
+| `/api/v1/analytics`                                             | GET      | Weekly summary (Pro users).                       |
+| `/api/v1/media/upload`                                          | POST     | Get signed upload URL for Cloudflare R2.          |
+| `/api/v1/users/me/data`                                         | GET      | Export user data (GDPR compliance).               |
+| `/api/v1/users/me/delete`                                       | DELETE   | Delete user account and data.                     |
+| `/api/v1/onboarding/profile`                                    | POST     | Save user fitness profile.                        |
+| `/api/v1/onboarding/suggested-goals`                            | GET      | Get AI-suggested goals.                           |
+| `/api/v1/achievements/types`                                    | GET      | Get all achievement types.                        |
+| `/api/v1/achievements/me`                                       | GET      | Get user's unlocked achievements.                 |
+| `/api/v1/challenges`                                            | GET/POST | Get or create challenges.                         |
+| `/api/v1/challenges/:id/join`                                   | POST     | Join a challenge.                                 |
+| `/api/v1/challenges/:id/leaderboard`                            | GET      | Get challenge leaderboard.                        |
+| `/api/v1/recaps/weekly`                                         | GET      | Get weekly AI recap.                              |
+| `/api/v1/progress-reflections`                                  | GET      | Get premium AI progress reflections (Pro/Coach+). |
+| `/api/v1/social-accountability/goals/:id/share`                 | POST     | Share goal with user.                             |
+| `/api/v1/social-accountability/goals/shared-with-me`            | GET      | Get goals shared with user.                       |
+| `/api/v1/social-accountability/accountability-partners/request` | POST     | Request accountability partner.                   |
+| `/api/v1/social-accountability/goals/:id/group`                 | POST     | Create group goal.                                |
+| `/api/v1/meals`                                                 | GET/POST | Get or log meals.                                 |
+| `/api/v1/meals/nutrition/summary/:date`                         | GET      | Get daily nutrition summary.                      |
+| `/api/v1/meals/nutrition/summaries`                             | GET      | Get nutrition summaries for date range.           |
 
 ## 📱 Subscription & In-App Purchase Endpoints
 
@@ -376,17 +413,20 @@ Calm: “Remember why you started—today’s effort is tomorrow’s reward.”
 
 ## 🧾 Feature Access Table (Free vs Paid Summary)
 
-| Category            | Free                                    | Paid                         |
-| ------------------- | --------------------------------------- | ---------------------------- |
-| Goal creation       | 1 goal                                  | Multiple goals               |
-| Motivation messages | Text only                               | Voice + text                 |
-| Personality tone    | Default                                 | Custom tones                 |
-| Analytics           | Basic streak                            | Weekly insights              |
-| Notifications       | Single daily                            | Multiple / adaptive          |
-| Social wall         | Text + Voice posts (Voice = Pro/Coach+) | Comments, following, filters |
-| Integrations        | —                                       | Fitbit, Apple Health         |
-| Challenges          | —                                       | Group & leaderboard          |
-| Memory AI           | —                                       | Personalized recall          |
+| Category              | Free                                    | Paid                                               |
+| --------------------- | --------------------------------------- | -------------------------------------------------- |
+| Goal creation         | 1 goal                                  | Multiple goals (Starter: 3, Pro/Coach+: unlimited) |
+| Motivation messages   | Text only                               | Voice + text (Pro/Coach+)                          |
+| Personality tone      | Default                                 | Custom reminder messages                           |
+| Analytics             | Basic streak, habit chains              | Advanced insights, AI reflections (Pro/Coach+)     |
+| Notifications         | Single daily                            | Multiple / adaptive                                |
+| Social wall           | Text + Voice posts (Voice = Pro/Coach+) | Comments, following, filters                       |
+| Social Accountability | Share goals, partners, group goals      | Full accountability features                       |
+| Meal Tracking         | Log meals with nutritional data         | Daily nutrition summaries                          |
+| Progress Tracking     | Streaks, photos, achievements           | Weekly recaps (all plans)                          |
+| Challenges            | Join and participate in challenges      | Create challenges, leaderboards                    |
+| Integrations          | —                                       | Fitbit, Apple Health (Paid)                        |
+| Memory AI             | —                                       | Personalized recall (Future)                       |
 
 ---
 

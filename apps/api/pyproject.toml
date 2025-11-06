@@ -14,7 +14,7 @@ supabase = "^2.22.2"
 python-jose = {extras = ["cryptography"], version = "^3.5.0"}
 passlib = {extras = ["bcrypt"], version = "^1.7.4"}
 python-multipart = "^0.0.20"
-pydantic = "^2.12.3"
+pydantic = {extras = ["email"], version = "^2.12.3"}
 pydantic-settings = "^2.11.0"
 httpx = "^0.28.1"
 openai = "^2.6.1"
@@ -26,6 +26,13 @@ alembic = "^1.17.0"
 sqlalchemy = "^2.0.44"
 psycopg2-binary = "^2.9.11"
 python-dotenv = "^1.2.1"
+newrelic = "^11.0.1"
+posthog = "^6.7.10"
+python-magic = "^0.4.27" # File type detection
+pillow = "^10.0.0" # Image processing
+clamd = "^1.0.2" # ClamAV integration
+geoip2 = "^4.7.0" # GeoIP blocking
+user-agents = "^2.2.0" # User agent parsing
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.4.2"

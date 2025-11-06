@@ -388,14 +388,15 @@ CREATE TABLE user_consents (
 ```sql
 CREATE TABLE goal_templates (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name TEXT NOT NULL,
+    title TEXT NOT NULL,  -- Changed from 'name' to match goals table
     description TEXT,
-    category TEXT NOT NULL,
-    frequency TEXT NOT NULL,
+    category goal_category NOT NULL,  -- Use enum instead of TEXT
+    frequency goal_frequency NOT NULL,  -- Use enum instead of TEXT
     target_days INTEGER,
     reminder_times TEXT[],
-    is_premium BOOLEAN DEFAULT false,
-    created_at TIMESTAMP DEFAULT NOW()
+    is_ai_generated BOOLEAN DEFAULT false,  -- Track AI vs manual templates
+    match_reason TEXT,  -- For AI suggestion reasoning
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 ```
 
@@ -529,11 +530,11 @@ VALUES (
 ### Goal Templates
 
 ```sql
-INSERT INTO goal_templates (name, description, category, frequency, target_days, reminder_times, is_premium) VALUES
-('Gym 3x Weekly', 'Go to the gym 3 times per week', 'fitness', 'weekly', 3, ARRAY['09:00', '18:00'], false),
-('Daily Workout', 'Exercise every day', 'fitness', 'daily', 7, ARRAY['07:00'], false),
-('Morning Run', 'Run every morning', 'fitness', 'daily', 7, ARRAY['06:00'], false),
-('Premium Coaching', 'Personalized coaching program', 'wellness', 'daily', 7, ARRAY['08:00', '20:00'], true);
+INSERT INTO goal_templates (title, description, category, frequency, target_days, reminder_times, is_ai_generated, match_reason) VALUES
+('Gym 3x Weekly', 'Go to the gym 3 times per week', 'fitness', 'weekly', 3, ARRAY['09:00', '18:00'], false, 'Perfect for beginners starting their fitness journey'),
+('Daily Workout', 'Exercise every day', 'fitness', 'daily', 7, ARRAY['07:00'], false, 'Great for building consistent habits'),
+('Morning Run', 'Run every morning', 'fitness', 'daily', 7, ARRAY['06:00'], false, 'Outdoor activity to start your day'),
+('Strength Building', 'Build muscle and strength through progressive training', 'fitness', 'weekly', 4, ARRAY['18:00'], false, 'Focused on muscle building');
 ```
 
 ### Blog Categories

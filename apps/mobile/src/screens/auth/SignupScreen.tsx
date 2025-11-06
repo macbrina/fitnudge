@@ -2,13 +2,11 @@ import React, { useState } from "react";
 import {
   View,
   Text,
-  TouchableOpacity,
   Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   Image,
-  Linking,
 } from "react-native";
 import { useAuthStore } from "@/stores/authStore";
 import { useTranslation } from "@/lib/i18n";
@@ -20,53 +18,129 @@ import Button from "@/components/ui/Button";
 import TextInput from "@/components/ui/TextInput";
 import SocialSignInContainer from "@/components/ui/SocialSignInContainer";
 import BackButton from "@/components/ui/BackButton";
+import LinkText from "@/components/ui/LinkText";
 import { router } from "expo-router";
-import { tokens } from "@/themes/tokens";
+import { tokens, lineHeight } from "@/themes/tokens";
 import { useTheme } from "@/themes";
 import { MOBILE_ROUTES } from "@/lib/routes";
+import { useSignup } from "@/hooks/api/useAuth";
 
 export default function SignupScreen() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const { login, setLoading, isLoading } = useAuthStore();
+  const [errors, setErrors] = useState<{
+    username?: string;
+    email?: string;
+    password?: string;
+  }>({});
+
+  const { login } = useAuthStore();
   const { t } = useTranslation();
   const styles = useStyles(makeSignupScreenStyles);
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
 
+  // Use the signup mutation hook
+  const signupMutation = useSignup();
+
+  // Validation functions
+  const validateForm = () => {
+    const newErrors: typeof errors = {};
+
+    // Username validation
+    if (!username.trim()) {
+      newErrors.username = t("errors.username_required");
+    } else if (username.length < 3) {
+      newErrors.username = t("errors.username_too_short");
+    } else if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+      newErrors.username = t("errors.username_invalid");
+    }
+
+    // Email validation
+    if (!email.trim()) {
+      newErrors.email = t("errors.email_required");
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      newErrors.email = t("errors.email_invalid");
+    }
+
+    // Password validation
+    if (!password) {
+      newErrors.password = t("errors.password_required");
+    } else if (password.length < 8) {
+      newErrors.password = t("errors.password_too_short");
+    } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)) {
+      newErrors.password = t("errors.password_weak");
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSignup = async () => {
-    if (!username || !email || !password) {
-      Alert.alert(t("common.error"), t("errors.validation_error"));
+    // Clear previous errors
+    setErrors({});
+
+    // Validate form
+    if (!validateForm()) {
       return;
     }
 
-    setLoading(true);
-    try {
-      // TODO: Implement actual API call
-      // For now, simulate signup
-      const mockUser = {
-        id: "1",
-        email,
-        name: username, // Use username as name for now
-        username,
-        plan: "free",
-        email_verified: false,
-        auth_provider: "email",
-        created_at: new Date().toISOString(),
-      };
+    // Call the API
+    signupMutation.mutate(
+      {
+        username: username.trim(),
+        email: email.trim().toLowerCase(),
+        password,
+      },
+      {
+        onSuccess: async (response) => {
+          console.log("Signup success:", response);
+          if (response.data) {
+            // Login the user with the returned data
+            await login(
+              response.data.user,
+              response.data.access_token,
+              response.data.refresh_token
+            );
 
-      const mockTokens = {
-        accessToken: "mock-access-token",
-        refreshToken: "mock-refresh-token",
-      };
+            // Check if email verification is required
+            const user = response.data.user;
+            if (
+              user &&
+              !user.email_verified &&
+              user.auth_provider === "email"
+            ) {
+              // Redirect to email verification screen
+              router.replace(MOBILE_ROUTES.AUTH.VERIFY_EMAIL);
+            } else {
+              // Navigate to onboarding flow
+              router.replace(MOBILE_ROUTES.ONBOARDING.NOTIFICATION_PERMISSION);
+            }
+          }
+        },
+        onError: (error: any) => {
+          console.error("Signup error:", error);
 
-      login(mockUser, mockTokens.accessToken, mockTokens.refreshToken);
-    } catch (error) {
-      Alert.alert(t("common.error"), t("errors.registration_error"));
-    } finally {
-      setLoading(false);
-    }
+          // Handle specific error cases
+          if (error?.response?.status === 400) {
+            const errorData = error.response.data;
+            if (errorData?.detail?.includes("email")) {
+              setErrors({ email: t("errors.email_already_exists") });
+            } else if (errorData?.detail?.includes("username")) {
+              setErrors({ username: t("errors.username_already_taken") });
+            } else {
+              Alert.alert(
+                t("common.error"),
+                errorData?.detail || t("errors.registration_error")
+              );
+            }
+          } else {
+            Alert.alert(t("common.error"), t("errors.registration_error"));
+          }
+        },
+      }
+    );
   };
 
   const handleGoogleSignIn = () => {
@@ -79,14 +153,6 @@ export default function SignupScreen() {
     console.log("Apple sign-in pressed");
   };
 
-  const handleTermsPress = () => {
-    Linking.openURL("https://fitnudge.app/terms-of-service");
-  };
-
-  const handlePrivacyPress = () => {
-    Linking.openURL("https://fitnudge.com/privacy-policy");
-  };
-
   return (
     <View style={styles.container}>
       <KeyboardAvoidingView
@@ -95,11 +161,15 @@ export default function SignupScreen() {
       >
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={{ flexGrow: 1 }}
+          contentContainerStyle={{
+            flexGrow: 1,
+            paddingTop: insets.top,
+            paddingBottom: insets.bottom,
+          }}
           showsVerticalScrollIndicator={false}
         >
           {/* Header with back button */}
-          <BackButton onPress={() => router.back()} />
+          {/* <BackButton onPress={() => router.back()} /> */}
 
           {/* Logo */}
           <View style={styles.logoContainer}>
@@ -112,11 +182,8 @@ export default function SignupScreen() {
 
           {/* Title and Subtitle */}
           <View style={styles.titleContainer}>
-            <Text style={styles.title}>Create your Account</Text>
-            <Text style={styles.subtitle}>
-              Join FitNudge and start your fitness journey with personalized AI
-              coaching
-            </Text>
+            <Text style={styles.title}>{t("auth.signup.title")}</Text>
+            <Text style={styles.subtitle}>{t("auth.signup.subtitle")}</Text>
           </View>
 
           {/* Social Sign In Buttons */}
@@ -128,58 +195,88 @@ export default function SignupScreen() {
           {/* Form */}
           <View style={styles.form}>
             <TextInput
-              label="Username"
-              placeholder="Enter your username"
+              label={t("auth.signup.username_label")}
+              placeholder={t("auth.signup.username_placeholder")}
               value={username}
-              onChangeText={setUsername}
+              onChangeText={(text) => {
+                setUsername(text);
+                if (errors.username) {
+                  setErrors((prev) => ({ ...prev, username: undefined }));
+                }
+              }}
               autoCapitalize="none"
               autoCorrect={false}
+              error={errors.username}
             />
 
             <TextInput
-              label="Email"
-              placeholder="Enter your email"
+              label={t("auth.signup.email_label")}
+              placeholder={t("auth.signup.email_placeholder")}
               value={email}
-              onChangeText={setEmail}
+              onChangeText={(text) => {
+                setEmail(text);
+                if (errors.email) {
+                  setErrors((prev) => ({ ...prev, email: undefined }));
+                }
+              }}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
+              error={errors.email}
             />
 
             <TextInput
-              label="Password"
-              placeholder="Enter your password"
+              label={t("auth.signup.password_label")}
+              placeholder={t("auth.signup.password_placeholder")}
               value={password}
-              onChangeText={setPassword}
+              onChangeText={(text) => {
+                setPassword(text);
+                if (errors.password) {
+                  setErrors((prev) => ({ ...prev, password: undefined }));
+                }
+              }}
               secureTextEntry
               showPasswordToggle
               autoCapitalize="none"
+              error={errors.password}
             />
 
             {/* Sign Up Button */}
             <Button
-              title={isLoading ? "Creating account..." : "Create account"}
+              title={
+                signupMutation.isPending
+                  ? t("auth.signup.creating_account")
+                  : t("auth.signup.create_account")
+              }
               onPress={handleSignup}
-              disabled={isLoading}
+              disabled={signupMutation.isPending}
             />
 
             {/* Terms */}
             <View style={styles.termsContainer}>
               <Text style={styles.termsText}>
-                By creating an account you acknowledge and agree to FitNudge{" "}
-                <Text style={styles.linkText} onPress={handleTermsPress}>
-                  Terms of Use
-                </Text>
+                {t("auth.signup.terms_text")}{" "}
+                <LinkText
+                  url="https://fitnudge.app/terms-of-service"
+                  title={t("auth.signup.terms_of_use")}
+                  style={styles.linkText}
+                >
+                  {t("auth.signup.terms_of_use")}
+                </LinkText>
                 {" and "}
-                <Text style={styles.linkText} onPress={handlePrivacyPress}>
-                  Privacy Policy
-                </Text>
+                <LinkText
+                  url="https://fitnudge.com/privacy-policy"
+                  title={t("auth.signup.privacy_policy")}
+                  style={styles.linkText}
+                >
+                  {t("auth.signup.privacy_policy")}
+                </LinkText>
               </Text>
             </View>
 
             {/* Login Link */}
             <Button
-              title="Already have an account? Sign in"
+              title={t("auth.signup.already_have_account")}
               onPress={() => router.push(MOBILE_ROUTES.AUTH.LOGIN)}
               variant="text"
               size="sm"
@@ -226,22 +323,20 @@ const makeSignupScreenStyles = (tokens: any, colors: any, brand: any) => {
       fontSize: toRN(tokens.typography.fontSize.base),
       color: colors.text.secondary,
       textAlign: "center" as const,
-      lineHeight: toRN(tokens.typography.lineHeight.relaxed),
+      lineHeight: lineHeight(
+        tokens.typography.fontSize.base,
+        tokens.typography.lineHeight.relaxed
+      ),
       fontFamily: fontFamily.groteskRegular,
     },
     form: {
       paddingHorizontal: toRN(tokens.spacing[6]),
       flex: 1,
     },
-    signUpButton: {
-      backgroundColor: brand.primary,
-      borderRadius: toRN(tokens.borderRadius.lg),
-      paddingVertical: toRN(tokens.spacing[4]),
-      marginBottom: toRN(tokens.spacing[6]),
-    },
+
     loginLinkContainer: {
       alignItems: "center" as const,
-      marginBottom: toRN(tokens.spacing[2]),
+      // marginBottom: toRN(tokens.spacing[2]),
       marginTop: toRN(tokens.spacing[4]),
     },
     loginLinkText: {
@@ -263,7 +358,10 @@ const makeSignupScreenStyles = (tokens: any, colors: any, brand: any) => {
       color: colors.text.secondary,
       textAlign: "center" as const,
       fontFamily: fontFamily.groteskRegular,
-      // lineHeight: toRN(tokens.typography.lineHeight.relaxed),
+      lineHeight: lineHeight(
+        tokens.typography.fontSize.sm,
+        tokens.typography.lineHeight.relaxed
+      ),
     },
     linkText: {
       fontSize: toRN(tokens.typography.fontSize.sm),

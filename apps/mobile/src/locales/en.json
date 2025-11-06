@@ -1,40 +1,130 @@
 {
   "common": {
     "error": "Error",
+    "info": "Information",
     "user": "User",
     "logout": "Logout",
-    "app_name": "FitNudge"
+    "app_name": "FitNudge",
+    "loading": "Loading...",
+    "creating": "Creating...",
+    "continue": "Continue",
+    "skip": "Skip",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "done": "Done",
+    "back": "Back",
+    "next": "Next",
+    "finish": "Finish",
+    "retry": "Retry",
+    "close": "Close",
+    "read_more": "Read more",
+    "read_less": "Read less"
   },
   "auth": {
     "main": {
-      "tagline": "Everything You Need, Nothing You Don't.",
-      "sign_in_email": "Sign in with Email",
-      "sign_in_google": "Sign in with Google",
-      "sign_in_apple": "Sign in with Apple",
-      "no_account": "Doesn't have account?",
+      "tagline": "Your AI-Powered Fitness Coach",
+      "sign_in_now": "Sign in now",
       "sign_up_now": "Sign Up Now"
     },
     "login": {
-      "title": "Welcome to FitNudge",
-      "subtitle": "Sign in to continue",
-      "email_placeholder": "Email",
-      "password_placeholder": "Password",
-      "sign_in": "Sign In",
+      "title": "Sign in your Account",
+      "subtitle": "One app for every step: browse, compare, buy, track, and repeat with ease.",
+      "email_label": "Email",
+      "email_placeholder": "Enter your email",
+      "password_label": "Password",
+      "password_placeholder": "Enter your password",
+      "remember_me": "Remember me",
+      "forgot_password": "Forgot password?",
+      "sign_in": "Sign in",
       "signing_in": "Signing in...",
-      "no_account": "Don't have an account?",
-      "sign_up": "Sign up"
+      "no_account": "Don't have an account? Sign up"
     },
     "signup": {
-      "title": "Create Account",
-      "subtitle": "Join FitNudge today",
-      "name_placeholder": "Full Name",
-      "username_placeholder": "Username",
-      "email_placeholder": "Email",
-      "password_placeholder": "Password",
-      "create_account": "Create Account",
+      "title": "Create your Account",
+      "subtitle": "Join FitNudge and start your fitness journey with personalized AI coaching",
+      "username_label": "Username",
+      "username_placeholder": "Enter your username",
+      "email_label": "Email",
+      "email_placeholder": "Enter your email",
+      "password_label": "Password",
+      "password_placeholder": "Enter your password",
+      "create_account": "Create account",
       "creating_account": "Creating account...",
-      "already_have_account": "Already have an account?",
-      "sign_in": "Sign in"
+      "terms_text": "By creating an account you acknowledge and agree to FitNudge",
+      "terms_of_use": "Terms of Use",
+      "privacy_policy": "Privacy Policy",
+      "already_have_account": "Already have an account? Sign in"
+    },
+    "verify_email": {
+      "title": "Check Your Email",
+      "subtitle": "Enter the 6-digit code sent to",
+      "verify_button": "Verify Email",
+      "verifying": "Verifying...",
+      "resend_question": "Didn't receive the code?",
+      "resend_in": "Resend in",
+      "resend_button": "Resend Code",
+      "sending": "Sending...",
+      "success_title": "Success",
+      "success_message": "Verification code sent to your email. Please check your spam folder if you don't see it.",
+      "error_title": "Error",
+      "error_code_required": "Please enter the 6-digit code",
+      "error_invalid_code": "Invalid verification code. Please try again.",
+      "error_resend_failed": "Failed to resend verification code"
+    },
+    "forgot_password": {
+      "title": "Forgot Password",
+      "subtitle": "Enter your email address and we'll send you a password reset link",
+      "email_label": "Email",
+      "email_placeholder": "Enter your email",
+      "send_reset_link": "Send Reset Link",
+      "sending": "Sending...",
+      "success_title": "Success",
+      "success_message": "If an account exists with this email, a password reset link has been sent. Please check your email and spam folder.",
+      "error_send_failed": "Failed to send password reset email",
+      "back_to_login": "Back to Login"
+    },
+    "reset_password": {
+      "title": "Reset Password",
+      "subtitle": "Enter your reset token and new password",
+      "token_label": "Reset Token",
+      "token_placeholder": "Enter the token from your email",
+      "token_required": "Reset token is required",
+      "password_label": "New Password",
+      "password_placeholder": "Enter your new password",
+      "confirm_password_label": "Confirm Password",
+      "confirm_password_placeholder": "Confirm your new password",
+      "confirm_password_required": "Please confirm your password",
+      "passwords_dont_match": "Passwords do not match",
+      "reset_password": "Reset Password",
+      "resetting": "Resetting...",
+      "success_title": "Success",
+      "success_message": "Your password has been reset successfully. You can now log in with your new password.",
+      "error_reset_failed": "Failed to reset password",
+      "error_invalid_token": "Invalid or expired reset token",
+      "error_token_expired": "Reset token has expired. Please request a new one.",
+      "back_to_login": "Back to Login"
+    },
+    "change_password": {
+      "title": "Change Password",
+      "subtitle": "Update your password to keep your account secure",
+      "current_password_label": "Current Password",
+      "current_password_placeholder": "Enter your current password",
+      "current_password_required": "Current password is required",
+      "new_password_label": "New Password",
+      "new_password_placeholder": "Enter your new password",
+      "confirm_password_label": "Confirm New Password",
+      "confirm_password_placeholder": "Confirm your new password",
+      "confirm_password_required": "Please confirm your new password",
+      "passwords_dont_match": "Passwords do not match",
+      "new_password_same": "New password must be different from current password",
+      "change_password": "Change Password",
+      "changing": "Changing...",
+      "success_title": "Success",
+      "success_message": "Your password has been changed successfully.",
+      "error_change_failed": "Failed to change password",
+      "error_incorrect_password": "Current password is incorrect"
     }
   },
   "home": {
@@ -58,7 +148,38 @@
     "category_fitness": "Fitness",
     "category_nutrition": "Nutrition",
     "category_wellness": "Wellness",
-    "category_sleep": "Sleep"
+    "category_sleep": "Sleep",
+    "frequency": {
+      "daily": "Daily",
+      "weekly": "Weekly",
+      "monthly": "Monthly",
+      "custom": "Custom"
+    },
+    "target_days": "{{days}} days",
+    "create": {
+      "title": "Create Your Goal",
+      "form": {
+        "title": "Goal Title",
+        "title_placeholder": "e.g., Walk 10,000 steps daily",
+        "description": "Description (optional)",
+        "description_placeholder": "Add more details about your goal... This will help us create a personalized plan for you.",
+        "category": "Category",
+        "frequency": "Frequency",
+        "target_days": "Target Days",
+        "target_days_helper": "How many days per week (1-7)",
+        "reminder_times": "Reminder Times",
+        "select_reminder_times": "Select Reminder Times",
+        "reminder_times_selected": "{{count}} time(s) selected"
+      },
+      "button_create": "Create Goal",
+      "success": "Goal created successfully!",
+      "error": "Failed to create goal. Please try again.",
+      "error_title_required": "Goal title is required",
+      "error_category_required": "Please select a category",
+      "error_frequency_required": "Please select a frequency",
+      "error_invalid_target_days": "Target days must be between 1 and 7",
+      "error_failed": "Failed to create goal. Please try again."
+    }
   },
   "feed": {
     "title": "Motivation Feed",
@@ -81,22 +202,6 @@
     "free_plan": "Free Plan",
     "pro_plan": "Pro Plan"
   },
-  "onboarding": {
-    "ai_motivation": {
-      "title": "AI-Powered Motivation",
-      "description": "Get personalized coaching that keeps you motivated and on track with your fitness goals"
-    },
-    "track_progress": {
-      "title": "Track Your Progress",
-      "description": "Never miss a beat. Build streaks and celebrate every milestone on your fitness journey"
-    },
-    "join_community": {
-      "title": "Join Our Community",
-      "description": "Connect with like-minded fitness enthusiasts and stay motivated together"
-    },
-    "sign_up": "Sign Up",
-    "log_in": "Log in"
-  },
   "web": {
     "hero": {
       "title": "Your AI-Powered Fitness Coach",
@@ -112,6 +217,346 @@
   "errors": {
     "validation_error": "Please fill in all fields",
     "authentication_error": "Login failed. Please try again.",
-    "registration_error": "Signup failed. Please try again."
+    "registration_error": "Signup failed. Please try again.",
+    "username_required": "Username is required",
+    "username_too_short": "Username must be at least 3 characters",
+    "username_invalid": "Username can only contain letters, numbers, and underscores",
+    "username_already_taken": "Username is already taken",
+    "email_required": "Email is required",
+    "email_invalid": "Please enter a valid email address",
+    "email_already_exists": "An account with this email already exists",
+    "password_required": "Password is required",
+    "password_too_short": "Password must be at least 8 characters",
+    "password_weak": "Password must contain uppercase, lowercase, and numbers"
+  },
+  "notifications": {
+    "permission": {
+      "title": "Stay Motivated with Notifications",
+      "subtitle": "Get personalized reminders and AI motivation to help you achieve your fitness goals",
+      "enable_button": "Enable Notifications",
+      "maybe_later_button": "Maybe Later",
+      "not_now_button": "Not Now",
+      "privacy_note": "You can change these settings anytime in your device settings"
+    },
+    "benefits": {
+      "ai_motivation": {
+        "title": "AI Motivation Calls",
+        "description": "Get personalized AI motivation when you need it most"
+      },
+      "reminders": {
+        "title": "Smart Reminders",
+        "description": "Never miss your workout reminders and check-ins"
+      },
+      "achievements": {
+        "title": "Celebrate Wins",
+        "description": "Get notified when you hit milestones and achievements"
+      },
+      "community": {
+        "title": "Stay Connected",
+        "description": "Get updates from your fitness community and friends"
+      }
+    },
+    "settings": {
+      "title": "Notification Settings",
+      "master_toggle": "Enable Notifications",
+      "categories": {
+        "ai_motivation": "AI Motivation Calls",
+        "reminders": "Workout Reminders",
+        "social": "Social Activity",
+        "achievements": "Achievements",
+        "reengagement": "Re-engagement"
+      },
+      "quiet_hours": {
+        "title": "Quiet Hours",
+        "subtitle": "Don't disturb me during these times",
+        "enabled": "Enable Quiet Hours",
+        "start_time": "Start Time",
+        "end_time": "End Time"
+      },
+      "test_notification": "Send Test Notification",
+      "test_sent": "Test notification sent!",
+      "test_failed": "Failed to send test notification"
+    },
+    "messages": {
+      "ai_motivation": {
+        "title": "🤖 Your AI Coach is calling!",
+        "body": "Ready for your motivation boost?"
+      },
+      "reminder": {
+        "title": "⏰ Time for your check-in!",
+        "body": "How did your workout go today?"
+      },
+      "achievement": {
+        "title": "🎉 Achievement Unlocked!",
+        "body": "You're crushing your fitness goals!"
+      },
+      "social": {
+        "title": "👥 New Activity",
+        "body": "Someone liked your post!"
+      },
+      "reengagement": {
+        "title": "We miss you! 💪",
+        "body": "Your fitness goals are waiting for you"
+      }
+    },
+    "errors": {
+      "permission_denied": "Notification permission denied",
+      "permission_required": "Notification permission is required for this feature",
+      "schedule_failed": "Failed to schedule notification",
+      "cancel_failed": "Failed to cancel notification",
+      "register_failed": "Failed to register for notifications"
+    }
+  },
+  "onboarding": {
+    "ai_motivation": {
+      "title": "AI-Powered Motivation",
+      "description": "Get personalized coaching that keeps you motivated and on track with your fitness goals"
+    },
+    "track_progress": {
+      "title": "Track Your Progress",
+      "description": "Never miss a beat. Build streaks and celebrate every milestone on your fitness journey"
+    },
+    "join_community": {
+      "title": "Join Our Community",
+      "description": "Connect with like-minded fitness enthusiasts and stay motivated together"
+    },
+    "sign_up": "Sign Up",
+    "log_in": "Log in",
+    "notifications": {
+      "title": "Stay on Track",
+      "subtitle": "We'll send you smart reminders to help you stay consistent with your fitness goals",
+      "benefit_reminders": "Check-in reminders",
+      "benefit_motivation": "Motivation when you need it most",
+      "benefit_celebrations": "Streak celebrations",
+      "enable_button": "Enable Notifications",
+      "maybe_later": "Maybe Later",
+      "disclaimer": "You can change this anytime in settings"
+    },
+    "personalization": {
+      "welcome": {
+        "title": "Let's personalize your journey",
+        "subtitle": "Answer a few questions to help us create the perfect fitness experience for you",
+        "benefit_goals": "Personalized goal recommendations",
+        "benefit_ai": "AI coaching tailored to your style",
+        "benefit_tracking": "Smart progress tracking"
+      },
+      "step": "Step {{current}} of {{total}}",
+      "continue": "Continue",
+      "generate_goals": "Generate My Goals",
+      "submitting": "Generating goals...",
+      "fitness_level": {
+        "title": "What's your current fitness level?",
+        "subtitle": "This helps us recommend the right goals for you",
+        "beginner": {
+          "title": "Beginner",
+          "description": "Just starting out or getting back into fitness"
+        },
+        "intermediate": {
+          "title": "Intermediate",
+          "description": "Regularly active, comfortable with basic exercises"
+        },
+        "advanced": {
+          "title": "Advanced",
+          "description": "Very active, looking for challenging workouts"
+        },
+        "athlete": {
+          "title": "Athlete",
+          "description": "Competitive athlete or fitness professional"
+        }
+      },
+      "primary_goal": {
+        "title": "What's your primary fitness goal?",
+        "subtitle": "Choose the goal that matters most to you right now",
+        "lose_weight": {
+          "title": "Lose Weight",
+          "description": "Burn fat and get leaner"
+        },
+        "build_muscle": {
+          "title": "Build Muscle",
+          "description": "Gain strength and muscle mass"
+        },
+        "stay_active": {
+          "title": "Stay Active",
+          "description": "Maintain general fitness and health"
+        },
+        "general_fitness": {
+          "title": "General Fitness",
+          "description": "Improve overall health and wellness"
+        },
+        "sport_specific": {
+          "title": "Sport-Specific",
+          "description": "Train for a specific sport or activity"
+        }
+      },
+      "current_habits": {
+        "title": "How often do you currently exercise?",
+        "subtitle": "Be honest - this helps us set realistic expectations",
+        "never": {
+          "title": "Never",
+          "description": "I don't currently exercise regularly"
+        },
+        "1-2x_week": {
+          "title": "1-2 times per week",
+          "description": "Light activity, getting started"
+        },
+        "3-4x_week": {
+          "title": "3-4 times per week",
+          "description": "Moderately active, good routine"
+        },
+        "5+_week": {
+          "title": "5+ times per week",
+          "description": "Very active, dedicated to fitness"
+        },
+        "daily": {
+          "title": "Daily",
+          "description": "Exercise is a daily habit"
+        }
+      },
+      "workout_setting": {
+        "title": "Where do you prefer to work out?",
+        "subtitle": "This helps us suggest the right types of goals",
+        "gym": {
+          "title": "Gym",
+          "description": "I prefer working out at a gym or fitness center"
+        },
+        "home": {
+          "title": "Home",
+          "description": "I prefer working out at home"
+        },
+        "outdoor": {
+          "title": "Outdoor",
+          "description": "I prefer outdoor activities and exercises"
+        },
+        "mix": {
+          "title": "Mix",
+          "description": "I like to mix it up with different locations"
+        },
+        "dont_know": {
+          "title": "Don't know yet",
+          "description": "I'm still figuring out what works for me"
+        }
+      },
+      "available_time": {
+        "title": "How much time can you commit to workouts?",
+        "subtitle": "This helps us suggest realistic goals",
+        "less_30min": {
+          "title": "Less than 30 minutes",
+          "description": "Quick, efficient workouts"
+        },
+        "30-60min": {
+          "title": "30-60 minutes",
+          "description": "Standard workout duration"
+        },
+        "1-2hrs": {
+          "title": "1-2 hours",
+          "description": "Longer, more comprehensive sessions"
+        },
+        "flexible": {
+          "title": "Flexible",
+          "description": "Time varies depending on the day"
+        }
+      },
+      "biggest_challenge": {
+        "title": "What's your biggest fitness challenge?",
+        "subtitle": "This helps us understand what you need the most support with",
+        "time_management": {
+          "title": "Time Management",
+          "description": "Struggling to find time to exercise regularly"
+        },
+        "lack_of_motivation": {
+          "title": "Lack of Motivation",
+          "description": "Finding it hard to stay motivated and consistent"
+        },
+        "not_knowing_what_to_do": {
+          "title": "Not Knowing What to Do",
+          "description": "Uncertain about what exercises or routines to follow"
+        },
+        "consistency": {
+          "title": "Consistency",
+          "description": "Difficulty maintaining a regular workout routine"
+        },
+        "accountability": {
+          "title": "Accountability",
+          "description": "Need someone to keep me on track"
+        },
+        "injury_concerns": {
+          "title": "Injury Concerns",
+          "description": "Worried about getting hurt or re-injuring myself"
+        }
+      },
+      "motivation_style": {
+        "title": "What motivates you most?",
+        "subtitle": "This helps us tailor your AI coach's personality",
+        "tough_love": {
+          "title": "Tough Love",
+          "description": "I need someone to push me hard and hold me accountable"
+        },
+        "gentle_encouragement": {
+          "title": "Gentle Encouragement",
+          "description": "I respond best to supportive, positive reinforcement"
+        },
+        "data_driven": {
+          "title": "Data-Driven",
+          "description": "I'm motivated by numbers, stats, and measurable progress"
+        },
+        "accountability_buddy": {
+          "title": "Accountability Buddy",
+          "description": "I need someone to check in with and share my journey"
+        }
+      }
+    },
+    "ai_loading": {
+      "analyzing_profile": "Analyzing your fitness profile...",
+      "finding_goals": "Finding the perfect goals for you...",
+      "personalizing": "Personalizing your journey...",
+      "considering_preferences": "Considering your preferences...",
+      "matching_goals": "Matching goals to your lifestyle...",
+      "optimizing_recommendations": "Optimizing recommendations...",
+      "customizing_suggestions": "Customizing suggestions for you...",
+      "refining_details": "Refining the details...",
+      "finalizing": "Finalizing your recommendations...",
+      "almost_there": "Almost there...",
+      "crafting_perfect_plan": "Crafting your perfect plan...",
+      "analyzing_patterns": "Analyzing your patterns...",
+      "generating_insights": "Generating personalized insights...",
+      "tailoring_experience": "Tailoring your experience...",
+      "connecting_dots": "Connecting the dots...",
+      "building_momentum": "Building your momentum...",
+      "discovering_possibilities": "Discovering possibilities...",
+      "creating_magic": "Creating something special...",
+      "polishing_details": "Polishing every detail...",
+      "bringing_it_together": "Bringing it all together..."
+    },
+    "suggested_goals": {
+      "title": "Perfect! Here are some goals we recommend for you",
+      "subtitle": "Based on your answers, we've selected goals that match your fitness level and preferences",
+      "loading": "Finding the perfect goals for you...",
+      "create_goal": "Create This Goal",
+      "create_goals": "Create {{count}} Goals",
+      "create_custom": "Create My Own Goal",
+      "skip": "Skip for Now",
+      "change_preferences": "Change My Preferences",
+      "error_title": "Something went wrong",
+      "error_loading": "Failed to load suggested goals. Please try again.",
+      "error_timeout": "AI suggestions are taking longer than expected. Please try again or create your own goal.",
+      "error_creating": "Failed to create goal. Please try again.",
+      "error_ai_failed": "Unable to load AI suggestions. Try creating your own goal!",
+      "no_goals": "No goals available at the moment.",
+      "goal_limit_reached": "You can only create {{limit}} goal(s) on your current plan. Upgrade to create more goals.",
+      "too_many_goals_selected": "You've selected {{selected}} goals but can only create {{limit}}. Please deselect some goals."
+    },
+    "subscription": {
+      "title": "🎉 Your Goal is Set!",
+      "subtitle": "Choose the plan that fits you best:",
+      "continue_free": "Continue with Free",
+      "disclaimer": "Cancel anytime. Terms apply.",
+      "exit_offer": {
+        "title": "⚡ Wait! Exclusive First-Time Offer",
+        "subtitle": "Get 50% OFF Annual Plans:",
+        "disclaimer": "One-time offer, won't see again",
+        "select_plan": "Select Plan",
+        "continue_free": "No thanks, continue with Free"
+      }
+    }
   }
 }

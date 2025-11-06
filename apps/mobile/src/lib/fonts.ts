@@ -18,10 +18,10 @@ export const fontFamily = {
   semiBoldItalic: "Nunito-SemiBoldItalic",
   boldItalic: "Nunito-BoldItalic",
 
-  groteskRegular: "SpaceGrotesk-Regular",
-  groteskMedium: "SpaceGrotesk-Medium",
-  groteskSemiBold: "SpaceGrotesk-SemiBold",
-  groteskBold: "SpaceGrotesk-Bold",
+  groteskRegular: "Nunito-Regular",
+  groteskMedium: "Nunito-Medium",
+  groteskSemiBold: "Nunito-SemiBold",
+  groteskBold: "Nunito-Bold",
 };
 
 // Helper function to get font family based on weight

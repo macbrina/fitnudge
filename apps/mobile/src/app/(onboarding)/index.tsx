@@ -8,20 +8,20 @@ export default function OnboardingScreen() {
   const handleComplete = async () => {
     try {
       await storageUtil.setItem(STORAGE_KEYS.HAS_SEEN_ONBOARDING, true);
-      router.replace(MOBILE_ROUTES.AUTH.MAIN);
+      router.replace(MOBILE_ROUTES.AUTH.SIGNUP);
     } catch (error) {
       console.error("Error saving onboarding status:", error);
-      router.replace(MOBILE_ROUTES.AUTH.MAIN);
+      router.replace(MOBILE_ROUTES.AUTH.SIGNUP);
     }
   };
 
   const handleSkip = async () => {
     try {
       await storageUtil.setItem(STORAGE_KEYS.HAS_SEEN_ONBOARDING, true);
-      router.replace(MOBILE_ROUTES.AUTH.MAIN);
+      router.replace(MOBILE_ROUTES.AUTH.LOGIN);
     } catch (error) {
       console.error("Error saving onboarding status:", error);
-      router.replace(MOBILE_ROUTES.AUTH.MAIN);
+      router.replace(MOBILE_ROUTES.AUTH.LOGIN);
     }
   };
 

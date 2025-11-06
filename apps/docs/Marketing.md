@@ -41,7 +41,55 @@ Bridge the gap between Free and Pro:
 
 ---
 
-## 🎯 Freemium Conversion Tactics
+## 🎯 Onboarding & Conversion Strategy
+
+### 🚀 Complete Onboarding Flow
+
+**User Journey:**
+
+1. **App Launch** → OnboardingCarousel (3 slides about app features)
+2. **Signup/Login** → Account creation
+3. **Notification Permission** → "Stay on Track" with benefits explanation
+4. **Personalization Flow** → 7 mandatory questions to understand user:
+   - Fitness level (Beginner/Intermediate/Advanced/Athlete)
+   - Primary goal (Lose weight/Build muscle/Stay active/General fitness/Sport-specific)
+   - Current habits (Never/1-2x week/3-4x week/5+ week/Daily)
+   - Workout setting (Gym/Home/Outdoor/Mix/Don't know)
+   - Available time (<30min/30-60min/1-2hrs/Flexible)
+   - Motivation style (Tough love/Gentle encouragement/Data-driven/Accountability buddy)
+   - Biggest challenge (Staying consistent/Getting started/Time/Lack of knowledge)
+5. **AI-Suggested Goals** → Personalized recommendations based on profile
+6. **First Goal Creation** → User selects and customizes their first goal
+7. **Subscription Screen** → All 4 plans with Monthly/Annual toggle + exit intent
+
+### 🎯 Free Trial Strategy
+
+**Pro Plan Only**: 3-day free trial
+
+- **Why Pro?**: Gives users time to experience voice motivation (the killer feature)
+- **Why not Starter?**: Low price point ($2.99) = low friction, trial not needed
+- **Why not Coach+?**: Advanced users know what they want, ready to commit
+- **Why 3 days?**: Long enough to create habit, short enough to create urgency
+
+**Trial Conversion Tactics:**
+
+- Day 1: Welcome email + "Try voice motivation now"
+- Day 2: Push notification: "2 days left in your trial"
+- Day 3: Final email: "Trial ends today - Continue for just $4.99/mo"
+
+**Post-Trial:**
+
+- Auto-convert to paid subscription (standard IAP behavior)
+- If cancelled: Win-back offer (50% off annual)
+
+### 🎁 Exit Intent Offers
+
+**50% Off Annual Plans (First-time users only):**
+
+- Triggered when user tries to skip subscription screen
+- Shows once per user (tracked in AsyncStorage)
+- Offers: Starter $14.99/year, Pro $24.99/year + trial, Coach+ $49.99/year
+- "One-time offer, won't see again" messaging
 
 ### 🔒 Strategic Feature Gating
 
@@ -398,6 +446,16 @@ Bridge the gap between Free and Pro:
 ---
 
 ## 📊 Key Metrics to Track
+
+### 🎯 Onboarding Conversion Metrics
+
+- **Signup → Notification Permission Grant Rate**: Target 70-80%
+- **Personalization Completion Rate**: Target 85-90% (all 7 screens)
+- **First Goal Creation Rate**: Target 80-85%
+- **Subscription Screen View → Free Trial Start Rate (Pro)**: Target 25-35%
+- **Exit Intent Offer Show → Acceptance Rate**: Target 15-25%
+- **Overall Signup → Paid Conversion Rate**: Target 8-12%
+- **Time to Complete Onboarding Flow**: Target <5 minutes
 
 ### 🎯 Conversion Metrics
 

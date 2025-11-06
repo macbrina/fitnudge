@@ -1,0 +1,19 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "AUBNC6893W.com.fitnudge.app",
+        "paths": [
+          "/reset-password*",
+          "/verify-email*",
+          "/invite*",
+          "/goal*",
+          "/profile*",
+          "/notification*",
+          "*"
+        ]
+      }
+    ]
+  }
+}

@@ -82,6 +82,43 @@ cp .env.example .env
 poetry run uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
+## 📊 Monitoring
+
+### New Relic APM
+
+New Relic monitoring is automatically enabled when `NEW_RELIC_LICENSE_KEY` is set in your environment variables. The monitoring includes:
+
+- **Application Performance Monitoring (APM)**
+- **Error tracking and alerting**
+- **Database query monitoring**
+- **Custom metrics and dashboards**
+- **Distributed tracing**
+
+### PostHog Analytics
+
+PostHog analytics is automatically enabled when `POSTHOG_API_KEY` is set in your environment variables. The analytics includes:
+
+- **User event tracking**
+- **User identification and properties**
+- **Exception autocapture**
+- **Custom event tracking**
+- **User journey analytics**
+
+#### Usage Example
+
+```python
+from app.core.analytics import track_event, identify_user, track_user_signup
+
+# Identify a user
+identify_user(user_id="user123", properties={"email": "user@example.com"})
+
+# Track custom events
+track_event(user_id="user123", event_name="goal_created", properties={"category": "fitness"})
+
+# Track user signup
+track_user_signup(user_id="user123", auth_provider="google")
+```
+
 ### Adding Dependencies
 
 ```bash
@@ -177,6 +214,16 @@ CLOUDFLARE_ACCESS_KEY_ID=your-access-key
 CLOUDFLARE_SECRET_ACCESS_KEY=your-secret-key
 CLOUDFLARE_BUCKET_NAME=fitnudge-media
 CLOUDFLARE_PUBLIC_URL=https://your-bucket.your-account.r2.cloudflarestorage.com
+
+# Email
+SMTP_HOST=mail.privateemail.com
+SMTP_PORT=587
+SMTP_USERNAME=your-email@fitnudge.app
+SMTP_PASSWORD=your-password
+FROM_EMAIL=noreply@fitnudge.app
+FROM_NAME=FitNudge
+REPLY_TO_EMAIL=hello@fitnudge.app
+BASE_URL=https://fitnudge.app  # For development: http://localhost:3000
 
 # Notifications
 FCM_SERVER_KEY=...

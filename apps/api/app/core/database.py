@@ -2,8 +2,9 @@ from supabase import create_client, Client
 from app.core.config import settings
 import asyncio
 
+
 # Create Supabase client
-supabase: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
+supabase: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
 
 
 async def create_tables():

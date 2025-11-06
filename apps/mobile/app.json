@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "fitnudge",
+    "name": "FitNudge",
     "slug": "fitnudge",
     "scheme": "fitnudge",
     "version": "1.0.0",
@@ -14,8 +14,13 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
+      "usesAppleSignIn": true,
       "supportsTablet": true,
-      "bundleIdentifier": "com.fitnudge.app"
+      "bundleIdentifier": "com.fitnudge.app",
+      "infoPlist": {
+        "UIBackgroundModes": ["remote-notification"]
+      },
+      "associatedDomains": ["applinks:fitnudge.app"]
     },
     "android": {
       "adaptiveIcon": {
@@ -24,20 +29,41 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.fitnudge.app"
+      "package": "com.fitnudge.app",
+      "permissions": [
+        "POST_NOTIFICATIONS",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "fitnudge.app"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
     },
     "extra": {
+      "posthogApiKey": "phc_mlphAT3brUuEDVqCQyxLNUp4c2qRUIIofXzyGxksdAQ",
+      "posthogHost": "https://us.i.posthog.com",
+      "router": {},
       "eas": {
         "projectId": "c3c6f292-99b6-4d63-8e88-ee8c94048e19"
-      },
-      "apiUrl": "http://localhost:8000/api/v1"
+      }
     },
     "owner": "fitnudge",
     "plugins": [
+      "expo-apple-authentication",
       "expo-router",
       [
         "expo-font",
@@ -134,7 +160,26 @@
             ]
           }
         }
-      ]
+      ],
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/",
+          "project": "fitnudge",
+          "organization": "fitnudge"
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#2563EB",
+          "sounds": ["./assets/sounds/motivation_call.mp3"],
+          "mode": "production"
+        }
+      ],
+      "expo-web-browser",
+      "expo-localization"
     ]
   }
 }

@@ -1,27 +1,26 @@
+import { DumbellIcon } from "@/components/icons/dumbell-icon";
+import { EmailIcon } from "@/components/icons/email-icon";
+import { FemaleIcon } from "@/components/icons/female-icon";
+import { ShoeIcon } from "@/components/icons/shoe-icon";
+import { TabsIcon } from "@/components/icons/tabs-icon";
+import { UserPlusIcon } from "@/components/icons/user-plus-icon";
+import { WeightIcon } from "@/components/icons/weight-icon";
+import { fontFamily } from "@/lib/fonts";
+import { useTranslation } from "@/lib/i18n";
+import { MOBILE_ROUTES } from "@/lib/routes";
+import { toRN } from "@/lib/units";
+import { useStyles } from "@/themes/makeStyles";
+import { tokens } from "@/themes/tokens";
+import { router } from "expo-router";
 import React from "react";
 import {
-  View,
+  Dimensions,
+  ScrollView,
   Text,
   TouchableOpacity,
-  Image,
-  ScrollView,
-  Dimensions,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useTranslation } from "@/lib/i18n";
-import { useStyles } from "@/themes/makeStyles";
-import { fontFamily } from "@/lib/fonts";
-import { toRN } from "@/lib/units";
-import { EmailIcon } from "@/components/icons/email-icon";
-import { UserPlusIcon } from "@/components/icons/user-plus-icon";
-import { DumbellIcon } from "@/components/icons/dumbell-icon";
-import { ShoeIcon } from "@/components/icons/shoe-icon";
-import { WeightIcon } from "@/components/icons/weight-icon";
-import { FemaleIcon } from "@/components/icons/female-icon";
-import { TabsIcon } from "@/components/icons/tabs-icon";
-import { tokens } from "@/themes/tokens";
-import { MOBILE_ROUTES, ROUTES } from "@/lib/routes";
-import { router } from "expo-router";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
@@ -225,7 +224,7 @@ export const AuthScreen: React.FC = () => {
               <EmailIcon size={24} color={styles.emailButtonText.color} />
             </View>
             <Text style={[styles.buttonText, styles.emailButtonText]}>
-              Sign in now
+              {t("auth.main.sign_in_now")}
             </Text>
           </TouchableOpacity>
 

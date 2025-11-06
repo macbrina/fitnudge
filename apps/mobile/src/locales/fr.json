@@ -6,27 +6,39 @@
     "app_name": "FitNudge"
   },
   "auth": {
+    "main": {
+      "tagline": "Votre Coach Fitness Alimenté par l'IA",
+      "sign_in_now": "Se connecter maintenant",
+      "sign_up_now": "S'inscrire Maintenant"
+    },
     "login": {
-      "title": "Bienvenue sur FitNudge",
-      "subtitle": "Connectez-vous pour continuer",
-      "email_placeholder": "E-mail",
-      "password_placeholder": "Mot de passe",
+      "title": "Connectez-vous à votre Compte",
+      "subtitle": "Une app pour chaque étape : naviguer, comparer, acheter, suivre et répéter avec facilité.",
+      "email_label": "E-mail",
+      "email_placeholder": "Entrez votre e-mail",
+      "password_label": "Mot de passe",
+      "password_placeholder": "Entrez votre mot de passe",
+      "remember_me": "Se souvenir de moi",
+      "forgot_password": "Mot de passe oublié ?",
       "sign_in": "Se connecter",
       "signing_in": "Connexion en cours...",
-      "no_account": "Vous n'avez pas de compte ?",
-      "sign_up": "S'inscrire"
+      "no_account": "Vous n'avez pas de compte ? S'inscrire"
     },
     "signup": {
-      "title": "Créer un compte",
-      "subtitle": "Rejoignez FitNudge aujourd'hui",
-      "name_placeholder": "Nom complet",
-      "username_placeholder": "Nom d'utilisateur",
-      "email_placeholder": "E-mail",
-      "password_placeholder": "Mot de passe",
+      "title": "Créez votre Compte",
+      "subtitle": "Rejoignez FitNudge et commencez votre parcours fitness avec un coaching personnalisé par IA",
+      "username_label": "Nom d'utilisateur",
+      "username_placeholder": "Entrez votre nom d'utilisateur",
+      "email_label": "E-mail",
+      "email_placeholder": "Entrez votre e-mail",
+      "password_label": "Mot de passe",
+      "password_placeholder": "Entrez votre mot de passe",
       "create_account": "Créer un compte",
       "creating_account": "Création du compte...",
-      "already_have_account": "Vous avez déjà un compte ?",
-      "sign_in": "Se connecter"
+      "terms_text": "En créant un compte, vous reconnaissez et acceptez les",
+      "terms_of_use": "Conditions d'Utilisation",
+      "privacy_policy": "Politique de Confidentialité",
+      "already_have_account": "Vous avez déjà un compte ? Se connecter"
     }
   },
   "home": {

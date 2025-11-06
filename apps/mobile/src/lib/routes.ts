@@ -9,6 +9,7 @@ export const ROUTES = {
     FORGOT_PASSWORD: "/auth/forgot-password",
     RESET_PASSWORD: "/auth/reset-password",
     VERIFY_EMAIL: "/auth/verify-email",
+    RESEND_VERIFICATION: "/auth/resend-verification",
     OAUTH: {
       APPLE: "/auth/oauth/apple",
       GOOGLE: "/auth/oauth/google",
@@ -17,14 +18,23 @@ export const ROUTES = {
 
   // Goals routes
   GOALS: {
-    LIST: "/goals",
-    CREATE: "/goals",
+    LIST: "/goals/",
+    ARCHIVE: (id: string) => `/goals/${id}/archive`,
+    UNARCHIVE: (id: string) => `/goals/${id}/unarchive`,
+    ACTIVATE: (id: string) => `/goals/${id}/activate`,
+    DUPLICATE_GOAL: (id: string) => `/goals/${id}/duplicate`,
+    GET_GOALS_BY_CATEGORY: (category: string) => `/goals/?category=${category}`,
+    GET_ACTIVE_GOALS: "/goals/?is_active=true",
+    GET_COMPLETED_GOALS: "/goals/?is_active=false",
+    CREATE: "/goals/",
     GET: (id: string) => `/goals/${id}`,
     UPDATE: (id: string) => `/goals/${id}`,
     DELETE: (id: string) => `/goals/${id}`,
     CHECKIN: (id: string) => `/goals/${id}/checkin`,
     CHECKINS: (id: string) => `/goals/${id}/checkins`,
-    TEMPLATES: "/goals/templates",
+    TEMPLATES: "/goals/templates/",
+    GET_STATS: (id: string) => `/goals/${id}/stats`,
+    STATS: "/goals/stats",
   },
 
   // Motivation routes
@@ -55,6 +65,17 @@ export const ROUTES = {
       FOLLOWERS: (id: string) => `/social/users/${id}/followers`,
       FOLLOWING: (id: string) => `/social/users/${id}/following`,
     },
+    SEARCH: {
+      USERS: "/users/search",
+      POSTS: "/posts/search",
+    },
+    TRENDING: {
+      POSTS: "/posts/trending",
+      HASHTAGS: "/hashtags/trending",
+    },
+    NOTIFICATIONS: "/notifications",
+    NOTIFICATION_READ: (id: string) => `/notifications/${id}/read`,
+    NOTIFICATION_READ_ALL: "/notifications/read-all",
   },
 
   // Subscription routes
@@ -79,6 +100,12 @@ export const ROUTES = {
     },
   },
 
+  // Subscription Plans
+  SUBSCRIPTION_PLANS: {
+    PLANS: "/subscription-plans/plans",
+    PLAN_BY_ID: "/subscription-plans/plans/:id",
+  },
+
   // Blog routes
   BLOG: {
     POSTS: "/blog/posts",
@@ -99,10 +126,36 @@ export const ROUTES = {
 
   // User routes
   USERS: {
+    GET: (id: string) => `/users/${id}`,
+    GET_PROFILE: (id: string) => `/users/${id}/profile`,
+    STATS: (id: string) => `/users/${id}/stats`,
+    ME_STATS: "/users/me/stats",
+    BASE_STATS: "/stats",
     PROFILE: "/users/profile",
     UPDATE_PROFILE: "/users/profile",
     DELETE_ACCOUNT: "/users/delete",
     EXPORT_DATA: "/users/me/data",
+    CHANGE_PASSWORD: "/users/change-password",
+    PROFILE_PICTURE: "/users/profile-picture",
+    NOTIFICATION_SETTINGS: "/users/notification-settings",
+  },
+
+  // Check-ins routes
+  CHECKINS: {
+    LIST: "/check-ins",
+    GET: (id: string) => `/check-ins/${id}`,
+    CREATE: "/check-ins",
+    UPDATE: (id: string) => `/check-ins/${id}`,
+    DELETE: (id: string) => `/check-ins/${id}`,
+    STATS: "/check-ins/stats",
+    STATS_BY_GOAL: (goalId: string) => `/check-ins/stats?goal_id=${goalId}`,
+    CALENDAR: "/check-ins/calendar",
+    BY_DATE_RANGE: "/check-ins/range",
+    TODAY: "/check-ins/today",
+    STREAK: "/check-ins/streak",
+    STREAK_BY_GOAL: (goalId: string) => `/check-ins/streak?goal_id=${goalId}`,
+    BULK_CREATE: "/check-ins/bulk",
+    MOOD_TRENDS: "/check-ins/mood-trends",
   },
 
   // Media routes
@@ -117,6 +170,22 @@ export const ROUTES = {
     GOALS: "/analytics/goals",
     MOTIVATION: "/analytics/motivation",
     SOCIAL: "/analytics/social",
+  },
+
+  // Notification routes
+  NOTIFICATIONS: {
+    PREFERENCES: "/notifications/preferences",
+    REGISTER_DEVICE: "/notifications/register-device",
+    UNREGISTER_DEVICE: "/notifications/register-device",
+    TEST: "/notifications/test",
+    HISTORY: "/notifications/history",
+    ANALYTICS: "/notifications/analytics",
+  },
+
+  // Onboarding routes
+  ONBOARDING: {
+    PROFILE: "/onboarding/profile",
+    SUGGESTED_GOALS: "/onboarding/suggested-goals",
   },
 } as const;
 
@@ -150,6 +219,10 @@ export const MOBILE_ROUTES = {
     MAIN: "/(auth)/auth",
     LOGIN: "/(auth)/login",
     SIGNUP: "/(auth)/signup",
+    VERIFY_EMAIL: "/(auth)/verify-email",
+    FORGOT_PASSWORD: "/(auth)/forgot-password",
+    RESET_PASSWORD: "/(auth)/reset-password",
+    CHANGE_PASSWORD: "/(auth)/change-password",
   },
 
   // Main tabs
@@ -163,10 +236,10 @@ export const MOBILE_ROUTES = {
   // Goal screens
   GOALS: {
     LIST: "/(user)/(tabs)/goals",
-    CREATE: "/(user)/goals/create",
-    EDIT: "/(user)/goals/edit",
-    DETAILS: "/(user)/goals/details",
-    CHECKIN: "/(user)/goals/checkin",
+    CREATE: "/(user)/(goals)/create",
+    EDIT: "/(user)/(goals)/edit",
+    DETAILS: "/(user)/(goals)/details",
+    CHECKIN: "/(user)/(goals)/checkin",
   },
 
   // Social screens
@@ -184,10 +257,17 @@ export const MOBILE_ROUTES = {
     SETTINGS: "/(user)/profile/settings",
     NOTIFICATIONS: "/(user)/profile/notifications",
     SUBSCRIPTION: "/(user)/profile/subscription",
+    CHANGE_PASSWORD: "/(user)/profile/change-password",
   },
 
   // Onboarding
-  ONBOARDING: "/(onboarding)",
+  ONBOARDING: {
+    MAIN: "/(onboarding)",
+    NOTIFICATION_PERMISSION: "/(user)/(onboarding)/notification-permission",
+    PERSONALIZATION: "/(user)/(onboarding)/personalization",
+    SUGGESTED_GOALS: "/(user)/(onboarding)/suggested-goals",
+    SUBSCRIPTION: "/(user)/(onboarding)/subscription",
+  },
 } as const;
 
 // Web routes (for Next.js)
