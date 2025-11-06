@@ -95,7 +95,6 @@ export default function SignupScreen() {
       },
       {
         onSuccess: async (response) => {
-          console.log("Signup success:", response);
           if (response.data) {
             // Login the user with the returned data
             await login(

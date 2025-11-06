@@ -1,29 +1,26 @@
-import React, { useState, useRef } from "react";
+import BackButton from "@/components/ui/BackButton";
+import Button from "@/components/ui/Button";
+import { useResendVerification, useVerifyEmail } from "@/hooks/api/useAuth";
+import { usePostHog } from "@/hooks/usePostHog";
+import { fontFamily } from "@/lib/fonts";
+import { useTranslation } from "@/lib/i18n";
+import { toRN } from "@/lib/units";
+import { useAuthStore } from "@/stores/authStore";
+import { useStyles } from "@/themes/makeStyles";
+import { lineHeight } from "@/themes/tokens";
+import { getRedirection } from "@/utils/getRedirection";
+import { router } from "expo-router";
+import { useRef, useState } from "react";
 import {
-  View,
-  Text,
-  TextInput,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Text,
+  TextInput,
   TouchableOpacity,
-  Alert,
+  View,
 } from "react-native";
-import { useAuthStore } from "@/stores/authStore";
-import { useTranslation } from "@/lib/i18n";
-import { fontFamily } from "@/lib/fonts";
-import { toRN } from "@/lib/units";
-import { useStyles } from "@/themes/makeStyles";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Button from "@/components/ui/Button";
-import BackButton from "@/components/ui/BackButton";
-import { router } from "expo-router";
-import { tokens, lineHeight } from "@/themes/tokens";
-import { useTheme } from "@/themes";
-import { authService } from "@/services/api";
-import { usePostHog } from "@/hooks/usePostHog";
-import { getRedirection } from "@/utils/getRedirection";
-import { useVerifyEmail, useResendVerification } from "@/hooks/api/useAuth";
 
 const makeVerifyEmailScreenStyles = (tokens: any, colors: any, brand: any) => ({
   container: {
@@ -214,6 +211,12 @@ export default function VerifyEmailScreen() {
         const errorMessage =
           response.error || t("auth.verify_email.error_invalid_code");
         setError(errorMessage);
+        // Clear the code input on error
+        setCode(["", "", "", "", "", ""]);
+        // Focus the first input
+        setTimeout(() => {
+          inputRefs.current[0]?.focus();
+        }, 100);
       }
     } catch (error: any) {
       const errorMessage =
@@ -223,6 +226,12 @@ export default function VerifyEmailScreen() {
         t("auth.verify_email.error_invalid_code");
 
       setError(errorMessage);
+      // Clear the code input on error
+      setCode(["", "", "", "", "", ""]);
+      // Focus the first input
+      setTimeout(() => {
+        inputRefs.current[0]?.focus();
+      }, 100);
     }
   };
 

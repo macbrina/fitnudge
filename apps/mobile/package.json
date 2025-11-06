@@ -10,7 +10,9 @@
     "build": "expo build",
     "test": "jest",
     "start:ios": "expo start --ios",
-    "start:android": "expo start --android"
+    "start:android": "expo start --android",
+    "start:device:ios": "expo start --dev-client --scheme fitnudge --lan",
+    "start:device:android": "expo start --android --device"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
@@ -67,6 +69,7 @@
     "@babel/core": "^7.25.2",
     "@fitnudge/eslint-config": "workspace:*",
     "@fitnudge/tsconfig": "workspace:*",
+    "@sentry/cli": "^2.57.0",
     "@types/node": "^24.9.1",
     "@types/react": "~19.1.10",
     "@types/react-dom": "~19.1.10",

@@ -26,17 +26,42 @@ const resolveBaseUrl = (): string => {
     }
   }
 
-  // Defaults based on platform
-  // For real devices, use your computer's local IP (192.168.0.141)
-  // For simulators/emulators, use appropriate localhost variants
+  // Try to get IP dynamically from Metro connection in development
   const isDevice = Device.isDevice ?? false;
 
+  if (isDevice && __DEV__) {
+    // Try to extract IP from Expo Constants (Metro connection info)
+    // hostUri format: "192.168.1.100:8081" or "localhost:8081"
+    const hostUri = Constants.expoConfig?.hostUri;
+
+    if (hostUri) {
+      // Extract IP address (remove port if present)
+      const ipMatch = hostUri.match(/^([^:]+)/);
+      if (ipMatch) {
+        const ip = ipMatch[1];
+        // Only use if it's not localhost (real device should have network IP)
+        if (ip !== "localhost" && ip !== "127.0.0.1") {
+          const dynamicUrl = `http://${ip}:8000/api/v1`;
+          if (__DEV__) {
+            console.log(
+              `[API] Using dynamic IP from Metro connection: ${dynamicUrl}`
+            );
+          }
+          return dynamicUrl;
+        }
+      }
+    }
+  }
+
+  // Defaults based on platform
+  // For real devices, use your computer's local IP (fallback)
+  // For simulators/emulators, use appropriate localhost variants
   if (isDevice) {
-    // Real device - use network IP (update this to your computer's IP)
+    // Real device - use network IP (fallback if dynamic detection fails)
     return Platform.select({
-      ios: "http://192.168.0.141:8000/api/v1",
-      android: "http://192.168.0.141:8000/api/v1",
-      default: "http://192.168.0.141:8000/api/v1",
+      ios: "http://172.20.10.2:8000/api/v1",
+      android: "http://172.20.10.2:8000/api/v1",
+      default: "http://172.20.10.2:8000/api/v1",
     })!;
   }
 
@@ -220,6 +245,8 @@ export abstract class BaseApiService {
         endpoint.includes("/auth/refresh") ||
         endpoint.includes("/auth/forgot-password") ||
         endpoint.includes("/auth/reset-password");
+
+      console.log("URL ENDPOINT: ", url);
 
       if (!isAuthEndpoint) {
         // Only log at debug level - this is expected during app initialization

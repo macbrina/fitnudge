@@ -18,9 +18,10 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.fitnudge.app",
       "infoPlist": {
-        "UIBackgroundModes": ["remote-notification"]
+        "UIBackgroundModes": ["remote-notification", "remote-notification"],
+        "ITSAppUsesNonExemptEncryption": false
       },
-      "associatedDomains": ["applinks:fitnudge.app"]
+      "associatedDomains": ["applinks:fitnudge.app", "applinks:fitnudge.app"]
     },
     "android": {
       "adaptiveIcon": {
