@@ -11,6 +11,7 @@ import { logger } from "@/services/logger";
 import { LaunchDarklyProvider } from "@/services/launchDarklyProvider";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { NotificationProvider } from "@/contexts/NotificationContext";
+import { AlertModalProvider } from "@/contexts/AlertModalContext";
 import { PostHogProvider } from "@/providers/PostHogProvider";
 import { setupDeepLinkListener } from "@/utils/deepLinkHandler";
 import { useEffect } from "react";
@@ -158,10 +159,12 @@ export default Sentry.wrap(function RootLayout() {
             <PostHogProvider>
               <LaunchDarklyProvider>
                 <NotificationProvider>
-                  <BackgroundColorWrapper>
-                    <StatusBarWrapper />
-                    <SafeAreaWrapper />
-                  </BackgroundColorWrapper>
+                  <AlertModalProvider>
+                    <BackgroundColorWrapper>
+                      <StatusBarWrapper />
+                      <SafeAreaWrapper />
+                    </BackgroundColorWrapper>
+                  </AlertModalProvider>
                 </NotificationProvider>
               </LaunchDarklyProvider>
             </PostHogProvider>

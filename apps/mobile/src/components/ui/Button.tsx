@@ -263,6 +263,9 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
   loadingText: {
     marginLeft: toRN(tokens.spacing[2]),
   },
+  disabledSpinner: {
+    marginLeft: toRN(tokens.spacing[2]),
+  },
 
   // Action button small style
   actionButtonSmall: {
@@ -427,6 +430,15 @@ export default function Button({
               size={iconSize}
               color={iconColor}
               style={styles.rightIcon}
+            />
+          )}
+
+          {/* Disabled spinner indicator */}
+          {!iconOnly && !icon && isDisabled && (
+            <ActivityIndicator
+              size={iconSize}
+              color={iconColor}
+              style={styles.disabledSpinner}
             />
           )}
         </View>

@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { Button } from "@fitnudge/ui";
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
   const [isClient, setIsClient] = useState(false);
@@ -84,7 +84,7 @@ export default function ResetPasswordPage() {
 
         <div className="bg-gray-50 rounded-lg p-4 mb-6">
           <p className="text-sm text-gray-700 text-center md:text-left mb-4 font-semibold">
-            Don't have the app installed?
+            Do not have the app installed?
           </p>
           <div className="space-y-2 md:space-y-0 flex flex-col md:flex-row md:justify-center items-center">
             <a
@@ -120,7 +120,7 @@ export default function ResetPasswordPage() {
 
         <div className="border-t pt-6">
           <p className="text-sm text-gray-600 mb-3">
-            If the app didn't open automatically, you can manually enter this
+            If the app did not open automatically, you can manually enter this
             reset token:
           </p>
           <div className="bg-gray-100 rounded-lg p-4 mb-4 relative">
@@ -136,11 +136,28 @@ export default function ResetPasswordPage() {
             </Button>
           </div>
           <p className="text-xs text-gray-500">
-            This token will expire in 1 hour. If you didn't request a password
+            This token will expire in 1 hour. If you did not request a password
             reset, please ignore this email.
           </p>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto" />
+            <p className="mt-4 text-gray-600">Loading reset page...</p>
+          </div>
+        </div>
+      }
+    >
+      <ResetPasswordContent />
+    </Suspense>
   );
 }

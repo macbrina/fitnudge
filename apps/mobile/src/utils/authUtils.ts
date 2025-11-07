@@ -3,12 +3,17 @@ import { TokenManager } from "@/services/api/base";
 import { router } from "expo-router";
 import { MOBILE_ROUTES } from "@/lib/routes";
 
-export type LogoutReason = "not_found" | "disabled" | "suspended";
+export type LogoutReason =
+  | "not_found"
+  | "disabled"
+  | "suspended"
+  | "expired_session";
 
 const statusMessages: Record<LogoutReason, string> = {
   not_found: "Account not found or invalid credentials.",
   disabled: "Your account has been disabled. Please contact support.",
   suspended: "Your account has been suspended. Please contact support.",
+  expired_session: "Session expired. Please login again.",
 };
 
 /**

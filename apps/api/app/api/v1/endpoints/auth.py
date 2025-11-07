@@ -15,6 +15,10 @@ from app.core.database import get_supabase_client
 from app.core.config import settings
 from app.core.flexible_auth import get_current_user
 from datetime import timedelta, datetime, timezone
+from app.services.email_service import email_service
+from app.services.logger import logger
+import secrets
+from postgrest.exceptions import APIError
 
 router = APIRouter(
     redirect_slashes=False
@@ -545,10 +549,6 @@ async def resend_verification(
 @router.post("/forgot-password")
 async def forgot_password(reset_data: PasswordReset):
     """Send password reset email"""
-    from app.core.database import get_supabase_client
-    from app.services.email_service import email_service
-    from app.services.logger import logger
-    import secrets
 
     supabase = get_supabase_client()
 
@@ -579,9 +579,19 @@ async def forgot_password(reset_data: PasswordReset):
     expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
 
     # Invalidate any existing unused tokens for this user
-    supabase.table("password_reset_tokens").update({"used": True}).eq(
-        "user_id", user_id
-    ).eq("used", False).execute()
+    try:
+        supabase.table("password_reset_tokens").update({"used": True}).eq(
+            "user_id", user_id
+        ).eq("used", False).execute()
+    except APIError as exc:
+        # Supabase/PostgREST returns a 404 when no rows match the update filter.
+        # That's expected if the user hasn't requested a token before, so we can safely ignore it.
+        if str(getattr(exc, "code", "")) not in {"404", "PGRST116"}:
+            logger.error(
+                "Failed to invalidate existing password reset tokens",
+                {"user_id": user_id, "error": exc.message},
+            )
+            raise
 
     # Store new reset token
     supabase.table("password_reset_tokens").insert(

@@ -8,10 +8,21 @@ import {
 } from "react-native";
 import { useAuthStore } from "../../stores/authStore";
 import { useTranslation } from "@/lib/i18n";
+import { useRouter } from "expo-router";
+import Button from "@/components/ui/Button";
+import { MOBILE_ROUTES } from "@/lib/routes";
 
 export default function ProfileScreen() {
-  const { user, logout } = useAuthStore();
+  const { user, logout, isLoggingOut } = useAuthStore();
   const { t } = useTranslation();
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    const success = await logout();
+    if (success) {
+      router.replace(MOBILE_ROUTES.AUTH.LOGIN);
+    }
+  };
 
   return (
     <ScrollView style={styles.container}>
@@ -81,9 +92,15 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity style={styles.logoutButton} onPress={logout}>
-          <Text style={styles.logoutButtonText}>{t("common.logout")}</Text>
-        </TouchableOpacity>
+        <Button
+          title={t("common.logout")}
+          variant="danger"
+          onPress={handleLogout}
+          loading={isLoggingOut}
+          disabled={isLoggingOut}
+          fullWidth
+          style={styles.logoutButton}
+        />
       </View>
     </ScrollView>
   );
@@ -177,15 +194,6 @@ const styles = StyleSheet.create({
     color: "#9ca3af",
   },
   logoutButton: {
-    backgroundColor: "#ef4444",
-    borderRadius: 8,
-    paddingVertical: 12,
-    alignItems: "center",
     marginTop: 24,
-  },
-  logoutButtonText: {
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "600",
   },
 });

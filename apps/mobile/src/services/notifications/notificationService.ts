@@ -14,6 +14,7 @@ import {
 import { storageUtil } from "@/utils/storageUtil";
 import { STORAGE_KEYS } from "@/utils/storageUtil";
 import posthog from "@/lib/posthog";
+import { notificationApi } from "@/services/api/notifications";
 
 // Configure notification behavior
 Notifications.setNotificationHandler({
@@ -287,7 +288,6 @@ class NotificationService {
       };
 
       // Register device with backend
-      const { notificationApi } = await import("../api/notifications");
       await notificationApi.registerDevice(deviceInfo);
 
       console.log("Device token registered:", deviceInfo);
@@ -403,7 +403,6 @@ class NotificationService {
       );
 
       // Sync preferences to backend
-      const { notificationApi } = await import("../api/notifications");
       await notificationApi.updateNotificationPreferences(preferences);
 
       console.log("Notification preferences updated:", preferences);
@@ -416,7 +415,6 @@ class NotificationService {
     try {
       // Try to get from backend first
       try {
-        const { notificationApi } = await import("../api/notifications");
         const response = await notificationApi.getNotificationPreferences();
 
         // Store locally for offline access (setItem already stringifies)
@@ -524,7 +522,6 @@ class NotificationService {
       // Unregister device from backend
       if (this.fcmToken) {
         try {
-          const { notificationApi } = await import("../api/notifications");
           await notificationApi.unregisterDevice(this.fcmToken);
         } catch (error) {
           console.error("Failed to unregister device from backend:", error);

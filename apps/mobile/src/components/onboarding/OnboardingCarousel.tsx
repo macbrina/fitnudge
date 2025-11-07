@@ -1,10 +1,19 @@
 import { useStyles } from "@/themes";
 import { makeOnboardingCarouselStyles } from "@/themes/stylesheets/onboarding.style";
-import { LinearGradient } from "expo-linear-gradient";
 import React, { useRef, useState, useMemo } from "react";
 import { Dimensions, Text, TouchableOpacity, View } from "react-native";
+import Svg, {
+  Defs,
+  LinearGradient as SvgLinearGradient,
+  Stop,
+  Rect,
+} from "react-native-svg";
 import { FlatList } from "react-native-gesture-handler";
-import { useSharedValue } from "react-native-reanimated";
+import {
+  ReducedMotionConfig,
+  ReduceMotion,
+  useSharedValue,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "@/lib/i18n";
 import { AICoachIllustration } from "./illustrations/AICoachIllustration";
@@ -104,42 +113,77 @@ export const OnboardingCarousel: React.FC<OnboardingCarouselProps> = ({
 
   const gradientColors =
     currentIndex === 0
-      ? ["#5d9862", "#5d9862"]
+      ? ["#5d9862", "#4a7c59"] // Green gradient
       : currentIndex === 1
-        ? ["#e6e5fd", "#e6e5fd"]
-        : ["#f7ffe4", "#f7ffe4"];
+        ? ["#e6e5fd", "#d4d3f0"] // Purple gradient
+        : ["#f7ffe4", "#e8f5d4"]; // Light green/yellow gradient
 
   return (
-    <LinearGradient
-      colors={gradientColors as [string, string]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={styles.container}
-    >
-      {/* Carousel */}
-      <FlatList
-        ref={flatListRef}
-        data={onboardingData}
-        renderItem={renderScreen}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
-        style={styles.carousel}
-      />
+    <>
+      <ReducedMotionConfig mode={ReduceMotion.Never} />
+      <View style={styles.container}>
+        {/* Gradient Background using SVG */}
+        <View
+          style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
+        >
+          <Svg
+            width={screenWidth}
+            height={Dimensions.get("window").height}
+            style={{ position: "absolute" }}
+          >
+            <Defs>
+              <SvgLinearGradient
+                id="backgroundGradient"
+                x1="0%"
+                y1="0%"
+                x2="100%"
+                y2="100%"
+              >
+                <Stop
+                  offset="0%"
+                  stopColor={gradientColors[0]}
+                  stopOpacity="1"
+                />
+                <Stop
+                  offset="100%"
+                  stopColor={gradientColors[1]}
+                  stopOpacity="1"
+                />
+              </SvgLinearGradient>
+            </Defs>
+            <Rect width="100%" height="100%" fill="url(#backgroundGradient)" />
+          </Svg>
+        </View>
 
-      {/* Fixed Bottom Section */}
-      <View style={[styles.fixedBottom, { paddingBottom: insets.bottom + 20 }]}>
-        <TouchableOpacity style={styles.signUpButton} onPress={onComplete}>
-          <Text style={styles.signUpButtonText}>{t("onboarding.sign_up")}</Text>
-        </TouchableOpacity>
+        {/* Carousel */}
+        <FlatList
+          ref={flatListRef}
+          data={onboardingData}
+          renderItem={renderScreen}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+          style={styles.carousel}
+        />
 
-        <TouchableOpacity style={styles.loginButton} onPress={onSkip}>
-          <Text style={styles.loginText}>{t("onboarding.log_in")}</Text>
-        </TouchableOpacity>
+        {/* Fixed Bottom Section */}
+        <View
+          style={[styles.fixedBottom, { paddingBottom: insets.bottom + 20 }]}
+        >
+          <TouchableOpacity style={styles.signUpButton} onPress={onComplete}>
+            <Text style={styles.signUpButtonText}>
+              {t("onboarding.sign_up")}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.loginButton} onPress={onSkip}>
+            <Text style={styles.loginText}>{t("onboarding.log_in")}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-    </LinearGradient>
+    </>
   );
 };
 

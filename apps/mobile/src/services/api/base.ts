@@ -327,6 +327,9 @@ export abstract class BaseApiService {
 
       // Only set data if request was successful (2xx status codes)
       if (!response.ok) {
+        console.log(
+          `[API] Request failed with status ${response.status}, data: ${JSON.stringify(data)}`
+        );
         // If 401 Unauthorized, try to refresh the token and retry the request once
         // Skip auto-refresh for the refresh endpoint itself to avoid infinite loops
         if (
@@ -452,6 +455,16 @@ export abstract class BaseApiService {
             } catch (error) {
               console.error("[API] Failed to handle auto-logout:", error);
             }
+          }
+        }
+
+        if (response.status === 401 && data) {
+          console.log(`Session expired, triggering auto-logout`);
+          try {
+            const { handleAutoLogout } = await import("@/utils/authUtils");
+            await handleAutoLogout("expired_session");
+          } catch (error) {
+            console.error("[API] Failed to handle auto-logout:", error);
           }
         }
 

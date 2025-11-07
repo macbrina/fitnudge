@@ -2,6 +2,8 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { TokenManager } from "@/services/api/base";
+import { authService } from "@/services/api/auth";
+import { notificationService } from "@/services/notifications/notificationService";
 
 interface User {
   id: string;
@@ -23,6 +25,7 @@ interface AuthState {
   refreshToken: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  isLoggingOut: boolean;
   logoutReason: LogoutReason;
 }
 
@@ -32,7 +35,7 @@ interface AuthActions {
     accessToken: string,
     refreshToken: string
   ) => Promise<void>;
-  logout: (reason?: LogoutReason) => Promise<void>;
+  logout: (reason?: LogoutReason) => Promise<boolean>;
   updateUser: (user: Partial<User>) => void;
   setLoading: (loading: boolean) => void;
   clearLogoutReason: () => void;
@@ -47,6 +50,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       refreshToken: null,
       isAuthenticated: false,
       isLoading: false,
+      isLoggingOut: false,
       logoutReason: null,
 
       // Actions
@@ -57,25 +61,68 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           refreshToken,
           isAuthenticated: true,
           isLoading: false,
+          isLoggingOut: false,
         });
 
         // Store tokens securely using TokenManager
         await TokenManager.setTokens(accessToken, refreshToken);
       },
 
-      logout: async (reason?: LogoutReason) => {
-        set({
-          user: null,
-          accessToken: null,
-          refreshToken: null,
-          isAuthenticated: false,
-          isLoading: false,
-          logoutReason: reason || null,
-        });
+      logout: async (reason) => {
+        if (get().isLoggingOut) {
+          return false;
+        }
 
-        // Clear stored tokens and remember me preferences
-        await TokenManager.clearTokens();
-        await TokenManager.clearRememberMe();
+        set({ isLoggingOut: true });
+
+        let success = false;
+
+        try {
+          try {
+            await notificationService.clearAllData();
+          } catch (notificationError) {
+            console.warn(
+              "[AuthStore] Failed to clear notification data during logout:",
+              notificationError
+            );
+          }
+
+          const response = await authService.logout();
+          if (response.status >= 200 && response.status < 400) {
+            success = true;
+          } else if (response.status === 401) {
+            // Treat missing/expired session as logged out
+            success = true;
+          } else {
+            console.warn(
+              `[AuthStore] Logout request returned status ${response.status}: ${response.error}`
+            );
+          }
+        } catch (error) {
+          console.error("[AuthStore] Logout failed:", error);
+        } finally {
+          try {
+            await TokenManager.clearTokens();
+            await TokenManager.clearRememberMe();
+          } catch (tokenError) {
+            console.warn(
+              "[AuthStore] Failed to clear stored tokens during logout:",
+              tokenError
+            );
+          }
+
+          set({
+            user: null,
+            accessToken: null,
+            refreshToken: null,
+            isAuthenticated: false,
+            isLoading: false,
+            isLoggingOut: false,
+            logoutReason: reason || null,
+          });
+        }
+
+        return success;
       },
 
       updateUser: (userData) => {

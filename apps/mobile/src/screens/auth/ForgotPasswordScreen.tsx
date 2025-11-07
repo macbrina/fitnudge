@@ -1,24 +1,23 @@
-import React, { useState } from "react";
+import Button from "@/components/ui/Button";
+import TextInput from "@/components/ui/TextInput";
+import { useForgotPassword } from "@/hooks/api/useAuth";
+import { fontFamily } from "@/lib/fonts";
+import { useTranslation } from "@/lib/i18n";
+import { toRN } from "@/lib/units";
+import { useStyles } from "@/themes/makeStyles";
+import { lineHeight } from "@/themes/tokens";
+import { router } from "expo-router";
+import { useState } from "react";
 import {
-  View,
-  Text,
-  Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Image,
+  Text,
+  View,
 } from "react-native";
-import { useTranslation } from "@/lib/i18n";
-import { fontFamily } from "@/lib/fonts";
-import { toRN } from "@/lib/units";
-import { useStyles } from "@/themes/makeStyles";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Button from "@/components/ui/Button";
-import TextInput from "@/components/ui/TextInput";
-import { router } from "expo-router";
-import { tokens, lineHeight } from "@/themes/tokens";
-import { MOBILE_ROUTES } from "@/lib/routes";
-import { useForgotPassword } from "@/hooks/api/useAuth";
+import { useAlertModal } from "@/contexts/AlertModalContext";
 
 export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState("");
@@ -30,6 +29,7 @@ export default function ForgotPasswordScreen() {
   const styles = useStyles(makeForgotPasswordScreenStyles);
   const insets = useSafeAreaInsets();
   const forgotPasswordMutation = useForgotPassword();
+  const { showAlert } = useAlertModal();
 
   const validateForm = () => {
     const newErrors: typeof errors = {};
@@ -54,24 +54,29 @@ export default function ForgotPasswordScreen() {
     forgotPasswordMutation.mutate(
       { email: email.trim().toLowerCase() },
       {
-        onSuccess: () => {
-          Alert.alert(
-            t("auth.forgot_password.success_title"),
-            t("auth.forgot_password.success_message"),
-            [
-              {
-                text: t("common.done"),
-                onPress: () => router.back(),
-              },
-            ]
-          );
+        onSuccess: async () => {
+          const confirmed = await showAlert({
+            title: t("auth.forgot_password.success_title"),
+            message: t("auth.forgot_password.success_message"),
+            confirmLabel: t("common.done"),
+            dismissible: false,
+            variant: "success",
+          });
+
+          if (confirmed) {
+            router.back();
+          }
         },
-        onError: (error: any) => {
+        onError: async (error: any) => {
           console.error("Forgot password error:", error);
-          Alert.alert(
-            t("common.error"),
-            error?.error || t("auth.forgot_password.error_send_failed")
-          );
+          await showAlert({
+            title: t("common.error"),
+            message:
+              error?.error || t("auth.forgot_password.error_send_failed"),
+            confirmLabel: t("common.ok"),
+            dismissible: true,
+            variant: "error",
+          });
         },
       }
     );

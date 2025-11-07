@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
 import { Calendar, Clock, User } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 // Mock blog posts data
 const blogPosts = [
@@ -42,6 +45,7 @@ const blogPosts = [
 ];
 
 export default function BlogPage() {
+  const { t } = useTranslation();
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
@@ -70,7 +74,7 @@ export default function BlogPage() {
       </header>
 
       {/* Hero Section */}
-      <section className="py-16 bg-gradient-to-br from-blue-50 to-indigo-100">
+      <section className="py-16 bg-linear-to-br from-blue-50 to-indigo-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
@@ -93,7 +97,7 @@ export default function BlogPage() {
             <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
               <div className="md:flex">
                 <div className="md:w-1/2">
-                  <div className="h-64 md:h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                  <div className="h-64 md:h-full bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center">
                     <div className="text-center text-white">
                       <h3 className="text-2xl font-bold mb-2">AI & Fitness</h3>
                       <p className="text-blue-100">The future is here</p>
@@ -140,7 +144,7 @@ export default function BlogPage() {
                   key={post.id}
                   className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow"
                 >
-                  <div className="h-48 bg-gradient-to-br from-green-500 to-blue-600 flex items-center justify-center">
+                  <div className="h-48 bg-linear-to-br from-green-500 to-blue-600 flex items-center justify-center">
                     <div className="text-center text-white">
                       <h4 className="text-lg font-bold">{post.category}</h4>
                     </div>

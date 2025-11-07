@@ -4,9 +4,12 @@ import { useTranslation } from "@/lib/i18n";
 import { fontFamily } from "@/lib/fonts";
 import { toRN } from "@/lib/units";
 import { useStyles } from "@/themes/makeStyles";
-import { tokens, lineHeight } from "@/themes/tokens";
-import { useTheme } from "@/themes";
+import { lineHeight } from "@/themes/tokens";
 import PersonalizationLayout from "./PersonalizationLayout";
+import { useAuthStore } from "@/stores/authStore";
+import { useRouter } from "expo-router";
+import { MOBILE_ROUTES } from "@/lib/routes";
+import Button from "@/components/ui/Button";
 
 interface PersonalizationWelcomeScreenProps {
   onContinue: () => void;
@@ -17,7 +20,15 @@ export default function PersonalizationWelcomeScreen({
 }: PersonalizationWelcomeScreenProps) {
   const { t } = useTranslation();
   const styles = useStyles(makePersonalizationWelcomeScreenStyles);
-  const { colors } = useTheme();
+  const router = useRouter();
+  const { logout, isLoggingOut } = useAuthStore();
+
+  const handleLogout = async () => {
+    const success = await logout();
+    if (success) {
+      router.replace(MOBILE_ROUTES.AUTH.LOGIN);
+    }
+  };
 
   return (
     <PersonalizationLayout
@@ -76,6 +87,15 @@ export default function PersonalizationWelcomeScreen({
             </Text>
           </View>
         </View>
+
+        <Button
+          title={t("common.logout")}
+          variant="secondary"
+          onPress={handleLogout}
+          loading={isLoggingOut}
+          disabled={isLoggingOut}
+          fullWidth
+        />
       </View>
     </PersonalizationLayout>
   );
@@ -149,14 +169,12 @@ const makePersonalizationWelcomeScreenStyles = (
     },
     benefitsContainer: {
       width: "100%",
-      // maxWidth: 340,
       gap: toRN(tokens.spacing[4]),
     },
     benefitCard: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
       backgroundColor: colors.bg.surface,
-      // paddingVertical: toRN(tokens.spacing[4]),
       paddingHorizontal: toRN(tokens.spacing[5]),
       borderRadius: toRN(tokens.borderRadius.lg),
       shadowColor: colors.shadow.default,
@@ -167,8 +185,6 @@ const makePersonalizationWelcomeScreenStyles = (
       shadowOpacity: 0.08,
       shadowRadius: 8,
       elevation: 2,
-      // borderWidth: 1,
-      // borderColor: colors.border.default,
     },
     benefitIconContainer: {
       width: 48,

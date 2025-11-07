@@ -6,6 +6,7 @@ import uuid
 
 from app.core.database import get_supabase_client
 from app.core.flexible_auth import get_current_user
+from postgrest.exceptions import APIError
 
 router = APIRouter(
     redirect_slashes=False
@@ -199,27 +200,29 @@ async def register_device(
         supabase = get_supabase_client()
 
         # Deactivate old tokens for this user
-        supabase.table("device_tokens").update({"is_active": False}).eq(
-            "user_id", current_user["id"]
-        ).execute()
+        try:
+            supabase.table("device_tokens").update({"is_active": False}).eq(
+                "user_id", current_user["id"]
+            ).execute()
+        except APIError as exc:
+            # Supabase returns a 404 when no rows match the update filter. That's fine.
+            if getattr(exc, "code", "") not in {"404", "PGRST116"}:
+                raise
 
         # Insert or update device token
-        result = (
-            supabase.table("device_tokens")
-            .upsert(
-                {
-                    "user_id": current_user["id"],
-                    "fcm_token": device_info.fcm_token,
-                    "device_type": device_info.device_type,
-                    "device_id": device_info.device_id,
-                    "timezone": device_info.timezone,
-                    "app_version": device_info.app_version,
-                    "os_version": device_info.os_version,
-                    "is_active": True,
-                }
-            )
-            .execute()
-        )
+        supabase.table("device_tokens").upsert(
+            {
+                "user_id": current_user["id"],
+                "fcm_token": device_info.fcm_token,
+                "device_type": device_info.device_type,
+                "device_id": device_info.device_id,
+                "timezone": device_info.timezone,
+                "app_version": device_info.app_version,
+                "os_version": device_info.os_version,
+                "is_active": True,
+            },
+            on_conflict="fcm_token",
+        ).execute()
 
         return DeviceTokenResponse(success=True, device_id=device_info.device_id)
     except HTTPException:

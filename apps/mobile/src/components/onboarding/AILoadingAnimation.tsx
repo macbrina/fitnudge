@@ -6,7 +6,13 @@ import { toRN } from "@/lib/units";
 import { useStyles } from "@/themes/makeStyles";
 import { tokens } from "@/themes/tokens";
 import { useTheme } from "@/themes";
-import { LinearGradient } from "expo-linear-gradient";
+import Svg, {
+  Defs,
+  LinearGradient as SvgLinearGradient,
+  Stop,
+  Rect,
+} from "react-native-svg";
+import { ReducedMotionConfig, ReduceMotion } from "react-native-reanimated";
 
 const { width, height } = Dimensions.get("window");
 
@@ -383,194 +389,245 @@ export default function AILoadingAnimation({
   });
 
   return (
-    <View style={styles.container}>
-      {/* Animated background gradient */}
-      <Animated.View
-        style={[
-          styles.backgroundGradient,
-          {
-            opacity: fadeAnim.interpolate({
-              inputRange: [0, 1],
-              outputRange: [0, 0.15],
-            }),
-          },
-        ]}
-      />
-
-      <Animated.View
-        style={[
-          styles.animationContainer,
-          {
-            opacity: fadeAnim,
-            transform: [{ scale: scaleAnim }],
-          },
-        ]}
-      >
-        {/* Main morphing orb */}
-        <View style={styles.orbContainer}>
-          <Animated.View
-            style={[
-              styles.orbGlow,
-              {
-                opacity: glowOpacity,
-                transform: [{ scale: orbScale }],
-              },
-            ]}
-          />
-
-          {/* Orb with border radius - separate to avoid native driver conflict */}
-          <Animated.View
-            style={[
-              styles.orb,
-              {
-                borderRadius,
-              },
-            ]}
-          >
-            <Animated.View
-              style={[
-                styles.orbGradient,
-                {
-                  transform: [{ scale: orbScale }, { rotate: orbRotate }],
-                },
-              ]}
-            >
-              <LinearGradient
-                colors={orbGradientColors as [string, string, ...string[]]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.orbGradientInner}
-              >
-                {/* Shimmer overlay */}
-                <Animated.View
-                  style={[
-                    styles.shimmer,
-                    {
-                      transform: [{ translateX: shimmerTranslateX }],
-                    },
-                  ]}
-                />
-              </LinearGradient>
-            </Animated.View>
-          </Animated.View>
-
-          {/* Floating decorative elements */}
-          {floatingElements.map((element, index) => {
-            const rotate = element.rotation.interpolate({
-              inputRange: [0, 1],
-              outputRange: ["0deg", "360deg"],
-            });
-
-            return (
-              <Animated.View
-                key={index}
-                style={[
-                  styles.floatingElement,
-                  {
-                    transform: [
-                      { translateX: element.translateX },
-                      { translateY: element.translateY },
-                      { rotate },
-                      { scale: element.scale },
-                    ],
-                    opacity: element.opacity,
-                  },
-                ]}
-              >
-                <View style={styles.floatingDot} />
-              </Animated.View>
-            );
-          })}
-        </View>
-
-        {/* Loading message */}
+    <>
+      <ReducedMotionConfig mode={ReduceMotion.Never} />
+      <View style={styles.container}>
+        {/* Animated background gradient */}
         <Animated.View
           style={[
-            styles.messageContainer,
+            styles.backgroundGradient,
             {
-              opacity: messageFadeAnim,
+              opacity: fadeAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0, 0.15],
+              }),
+            },
+          ]}
+        />
+
+        <Animated.View
+          style={[
+            styles.animationContainer,
+            {
+              opacity: fadeAnim,
+              transform: [{ scale: scaleAnim }],
             },
           ]}
         >
-          <Text style={styles.loadingMessage}>
-            {loadingMessages[currentMessageIndex]}
-          </Text>
-          <View style={styles.dotsContainer}>
-            {[0, 1, 2].map((i) => (
+          {/* Main morphing orb */}
+          <View style={styles.orbContainer}>
+            <Animated.View
+              style={[
+                styles.orbGlow,
+                {
+                  opacity: glowOpacity,
+                  transform: [{ scale: orbScale }],
+                },
+              ]}
+            />
+
+            {/* Orb with border radius - separate to avoid native driver conflict */}
+            <Animated.View
+              style={[
+                styles.orb,
+                {
+                  borderRadius,
+                },
+              ]}
+            >
               <Animated.View
-                key={i}
                 style={[
-                  styles.dot,
+                  styles.orbGradient,
                   {
-                    opacity: messageFadeAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0.3, 1],
-                    }),
+                    transform: [{ scale: orbScale }, { rotate: orbRotate }],
+                  },
+                ]}
+              >
+                <View style={styles.orbGradientInner}>
+                  <Svg
+                    width={toRN(tokens.spacing[20])}
+                    height={toRN(tokens.spacing[20])}
+                    style={{ position: "absolute" }}
+                  >
+                    <Defs>
+                      <SvgLinearGradient
+                        id="orbGradient"
+                        x1="0%"
+                        y1="0%"
+                        x2="100%"
+                        y2="100%"
+                      >
+                        {orbGradientColors.map((color, index) => (
+                          <Stop
+                            key={index}
+                            offset={`${(index / (orbGradientColors.length - 1)) * 100}%`}
+                            stopColor={color}
+                            stopOpacity="1"
+                          />
+                        ))}
+                      </SvgLinearGradient>
+                    </Defs>
+                    <Rect
+                      width={toRN(tokens.spacing[20])}
+                      height={toRN(tokens.spacing[20])}
+                      fill="url(#orbGradient)"
+                    />
+                  </Svg>
+                  {/* Shimmer overlay */}
+                  <Animated.View
+                    style={[
+                      styles.shimmer,
+                      {
+                        transform: [{ translateX: shimmerTranslateX }],
+                      },
+                    ]}
+                  />
+                </View>
+              </Animated.View>
+            </Animated.View>
+
+            {/* Floating decorative elements */}
+            {floatingElements.map((element, index) => {
+              const rotate = element.rotation.interpolate({
+                inputRange: [0, 1],
+                outputRange: ["0deg", "360deg"],
+              });
+
+              return (
+                <Animated.View
+                  key={index}
+                  style={[
+                    styles.floatingElement,
+                    {
+                      transform: [
+                        { translateX: element.translateX },
+                        { translateY: element.translateY },
+                        { rotate },
+                        { scale: element.scale },
+                      ],
+                      opacity: element.opacity,
+                    },
+                  ]}
+                >
+                  <View style={styles.floatingDot} />
+                </Animated.View>
+              );
+            })}
+          </View>
+
+          {/* Loading message */}
+          <Animated.View
+            style={[
+              styles.messageContainer,
+              {
+                opacity: messageFadeAnim,
+              },
+            ]}
+          >
+            <Text style={styles.loadingMessage}>
+              {loadingMessages[currentMessageIndex]}
+            </Text>
+            <View style={styles.dotsContainer}>
+              {[0, 1, 2].map((i) => (
+                <Animated.View
+                  key={i}
+                  style={[
+                    styles.dot,
+                    {
+                      opacity: messageFadeAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.3, 1],
+                      }),
+                      transform: [
+                        {
+                          scale: messageFadeAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [0.8, 1],
+                          }),
+                        },
+                      ],
+                    },
+                  ]}
+                />
+              ))}
+            </View>
+          </Animated.View>
+
+          {/* Modern progress bar */}
+          <View style={styles.progressContainer}>
+            <View style={styles.progressBarBackground}>
+              {/* Wave effect in background */}
+              <Animated.View
+                style={[
+                  styles.progressWave,
+                  {
                     transform: [
                       {
-                        scale: messageFadeAnim.interpolate({
+                        translateX: waveOffset.interpolate({
                           inputRange: [0, 1],
-                          outputRange: [0.8, 1],
+                          outputRange: [-width, width],
                         }),
                       },
                     ],
                   },
                 ]}
               />
-            ))}
+
+              {/* Progress fill with gradient */}
+              <Animated.View
+                style={[
+                  styles.progressFillContainer,
+                  {
+                    width: progressWidth,
+                  },
+                ]}
+              >
+                <View style={styles.progressGradient}>
+                  <Svg
+                    width={progressBarWidth}
+                    height={toRN(tokens.spacing[1.5])}
+                    style={{ position: "absolute" }}
+                  >
+                    <Defs>
+                      <SvgLinearGradient
+                        id="progressGradient"
+                        x1="0%"
+                        y1="0%"
+                        x2="100%"
+                        y2="0%"
+                      >
+                        {progressGradientColors.map((color, index) => (
+                          <Stop
+                            key={index}
+                            offset={`${(index / (progressGradientColors.length - 1)) * 100}%`}
+                            stopColor={color}
+                            stopOpacity="1"
+                          />
+                        ))}
+                      </SvgLinearGradient>
+                    </Defs>
+                    <Rect
+                      width={progressBarWidth}
+                      height={toRN(tokens.spacing[1.5])}
+                      fill="url(#progressGradient)"
+                    />
+                  </Svg>
+                  {/* Shimmer on progress */}
+                  <Animated.View
+                    style={[
+                      styles.progressShimmer,
+                      {
+                        transform: [{ translateX: shimmerTranslateX }],
+                      },
+                    ]}
+                  />
+                </View>
+              </Animated.View>
+            </View>
           </View>
         </Animated.View>
-
-        {/* Modern progress bar */}
-        <View style={styles.progressContainer}>
-          <View style={styles.progressBarBackground}>
-            {/* Wave effect in background */}
-            <Animated.View
-              style={[
-                styles.progressWave,
-                {
-                  transform: [
-                    {
-                      translateX: waveOffset.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [-width, width],
-                      }),
-                    },
-                  ],
-                },
-              ]}
-            />
-
-            {/* Progress fill with gradient */}
-            <Animated.View
-              style={[
-                styles.progressFillContainer,
-                {
-                  width: progressWidth,
-                },
-              ]}
-            >
-              <LinearGradient
-                colors={progressGradientColors as [string, string, ...string[]]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.progressGradient}
-              >
-                {/* Shimmer on progress */}
-                <Animated.View
-                  style={[
-                    styles.progressShimmer,
-                    {
-                      transform: [{ translateX: shimmerTranslateX }],
-                    },
-                  ]}
-                />
-              </LinearGradient>
-            </Animated.View>
-          </View>
-        </View>
-      </Animated.View>
-    </View>
+      </View>
+    </>
   );
 }
 
