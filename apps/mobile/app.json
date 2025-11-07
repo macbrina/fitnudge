@@ -21,7 +21,7 @@
         "UIBackgroundModes": ["remote-notification", "remote-notification"],
         "ITSAppUsesNonExemptEncryption": false
       },
-      "associatedDomains": ["applinks:fitnudge.app", "applinks:fitnudge.app"]
+      "associatedDomains": ["applinks:fitnudge.app"]
     },
     "android": {
       "adaptiveIcon": {

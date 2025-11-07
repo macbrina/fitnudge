@@ -46,6 +46,9 @@ export const metadata: Metadata = {
       "Transform your fitness journey with AI-powered motivation and personalized coaching",
     images: ["/og-image.jpg"],
   },
+  other: {
+    "apple-itunes-app": "app-id=XXXXXXXXXX",
+  },
 };
 
 export const viewport: Viewport = {

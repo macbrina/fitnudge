@@ -6,14 +6,39 @@
         "appID": "AUBNC6893W.com.fitnudge.app",
         "paths": [
           "/reset-password*",
+          "/reset-password/*",
           "/verify-email*",
           "/invite*",
           "/goal*",
+          "/goals/*",
+          "/social/*",
+          "/analytics/*",
+          "/notifications/*",
+          "/onboarding/*",
+          "/subscription/*",
+          "/achievements/*",
+          "/challenges/*",
+          "/recaps/*",
+          "/social-accountability/*",
+          "/meals/*",
+          "/progress-reflections/*",
           "/profile*",
+          "/profile/*",
           "/notification*",
+          "/notification/*",
           "*"
         ]
       }
+    ]
+  },
+  "activitycontinuation": {
+    "apps": [
+      "AUBNC6893W.com.fitnudge.app"
+    ]
+  },
+  "webcredentials": {
+    "apps": [
+      "AUBNC6893W.com.fitnudge.app"
     ]
   }
 }
