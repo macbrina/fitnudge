@@ -98,6 +98,9 @@ export default function Index() {
   }
 
   if (!isAuthenticated) {
+    if (redirectUrl === MOBILE_ROUTES.ONBOARDING.MAIN) {
+      return <Redirect href={redirectUrl} />;
+    }
     return <Redirect href={MOBILE_ROUTES.AUTH.MAIN} />;
   }
 

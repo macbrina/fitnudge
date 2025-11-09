@@ -85,7 +85,11 @@ class NotificationApiService extends BaseApiService {
    * Unregister device from push notifications
    */
   async unregisterDevice(fcmToken: string): Promise<{ success: boolean }> {
-    const response = await this.delete(ROUTES.NOTIFICATIONS.UNREGISTER_DEVICE);
+    const response = await this.delete(
+      `${ROUTES.NOTIFICATIONS.UNREGISTER_DEVICE}?fcm_token=${encodeURIComponent(
+        fcmToken
+      )}`
+    );
 
     return response.data as { success: boolean };
   }

@@ -15,6 +15,7 @@ interface User {
   email_verified: boolean;
   auth_provider: string;
   created_at: string;
+  linked_providers?: string[];
 }
 
 export type LogoutReason = "not_found" | "disabled" | "suspended" | null;

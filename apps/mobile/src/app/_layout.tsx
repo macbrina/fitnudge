@@ -15,6 +15,8 @@ import { AlertModalProvider } from "@/contexts/AlertModalContext";
 import { PostHogProvider } from "@/providers/PostHogProvider";
 import { setupDeepLinkListener } from "@/utils/deepLinkHandler";
 import { useEffect } from "react";
+import { SystemStatusListener } from "@/components/system/SystemStatusListener";
+import { useBackendHealthMonitor } from "@/hooks/useBackendHealthMonitor";
 
 // Initialize Sentry with error handling
 try {
@@ -55,7 +57,7 @@ const queryClient = new QueryClient({
 
 function SafeAreaWrapper() {
   const segments = useSegments();
-  const { isDark, colors } = useTheme();
+  const { colors } = useTheme();
 
   const isSafeAreaHidden =
     segments.includes("(onboarding)") || segments.includes("auth");
@@ -150,6 +152,7 @@ export default Sentry.wrap(function RootLayout() {
     const cleanup = setupDeepLinkListener();
     return cleanup;
   }, []);
+  useBackendHealthMonitor();
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -163,6 +166,7 @@ export default Sentry.wrap(function RootLayout() {
                     <BackgroundColorWrapper>
                       <StatusBarWrapper />
                       <SafeAreaWrapper />
+                      <SystemStatusListener />
                     </BackgroundColorWrapper>
                   </AlertModalProvider>
                 </NotificationProvider>

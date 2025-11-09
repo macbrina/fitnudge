@@ -1,7 +1,9 @@
 from fastapi import APIRouter, HTTPException, status, Depends
 from pydantic import BaseModel, EmailStr
-from typing import Optional
+from typing import Optional, Dict, Any, List
 import json
+import re
+import httpx
 from app.core.auth import (
     authenticate_user,
     create_user,
@@ -19,6 +21,7 @@ from app.services.email_service import email_service
 from app.services.logger import logger
 import secrets
 from postgrest.exceptions import APIError
+from jose import jwt, JWTError
 
 router = APIRouter(
     redirect_slashes=False
@@ -43,14 +46,15 @@ class UserLogin(BaseModel):
 
 
 class AppleOAuth(BaseModel):
-    id_token: str
-    authorization_code: str
-    user: Optional[dict] = None
+    identity_token: str
+    authorization_code: Optional[str] = None
+    email: Optional[str] = None
+    full_name: Optional[dict] = None
 
 
 class GoogleOAuth(BaseModel):
     id_token: str
-    access_token: str
+    access_token: Optional[str] = None
 
 
 class TokenRefresh(BaseModel):
@@ -71,12 +75,278 @@ class PasswordResetConfirm(BaseModel):
     new_password: str
 
 
+class PasswordResetValidate(BaseModel):
+    token: str
+
+
 class ResendVerificationRequest(BaseModel):
     email: Optional[EmailStr] = None  # Optional if authenticated user
 
 
 # Import the flexible authentication system
 from app.core.flexible_auth import get_current_user
+
+
+APPLE_KEYS_CACHE: Dict[str, Any] = {"keys": None, "expires_at": None}
+
+
+def normalize_username_candidate(value: str) -> Optional[str]:
+    if not value:
+        return None
+
+    normalized = value.lower()
+    normalized = re.sub(r"[^a-z0-9_]+", "", normalized)
+    normalized = normalized.strip("_")
+
+    if not normalized:
+        return None
+
+    return normalized[:24]
+
+
+def ensure_unique_username(*candidates: str) -> str:
+    supabase = get_supabase_client()
+
+    candidate_sources = [candidate for candidate in candidates if candidate]
+    candidate_sources.append("fitnudge")
+
+    for source in candidate_sources:
+        base = normalize_username_candidate(source)
+        if not base:
+            continue
+
+        suffix = 0
+        while suffix < 5000:
+            if suffix == 0:
+                username = base
+            else:
+                suffix_str = str(suffix)
+                truncated_base = base[: max(1, 24 - len(suffix_str))]
+                username = f"{truncated_base}{suffix_str}"
+
+            existing = (
+                supabase.table("users").select("id").eq("username", username).execute()
+            )
+            if not existing.data:
+                return username
+
+            suffix += 1
+
+    # Final fallback with secrets if all else fails
+    random_suffix = secrets.token_hex(3)
+    return f"fitnudge{random_suffix}"
+
+
+def get_linked_providers(
+    user_id: str, primary_provider: Optional[str] = None
+) -> List[str]:
+    supabase = get_supabase_client()
+    providers: List[str] = []
+
+    if primary_provider:
+        providers.append(primary_provider)
+
+    result = (
+        supabase.table("oauth_accounts")
+        .select("provider")
+        .eq("user_id", user_id)
+        .execute()
+    )
+
+    if result.data:
+        providers.extend(
+            [row["provider"] for row in result.data if row.get("provider")]
+        )
+
+    # Deduplicate while preserving order
+    seen = set()
+    unique_providers = []
+    for provider in providers:
+        if provider and provider not in seen:
+            seen.add(provider)
+            unique_providers.append(provider)
+
+    return unique_providers
+
+
+def serialize_user(user: Dict[str, Any]) -> Dict[str, Any]:
+    linked_providers = get_linked_providers(user["id"], user.get("auth_provider"))
+
+    return {
+        "id": user["id"],
+        "email": user["email"],
+        "name": user.get("name"),
+        "username": user.get("username"),
+        "plan": user.get("plan", "free"),
+        "timezone": user.get("timezone", "UTC"),
+        "email_verified": user.get("email_verified", False),
+        "auth_provider": user.get("auth_provider", "email"),
+        "created_at": user.get("created_at"),
+        "last_login_at": user.get("last_login_at"),
+        "linked_providers": linked_providers,
+    }
+
+
+def upsert_oauth_account(
+    user_id: str,
+    provider: str,
+    provider_user_id: str,
+    *,
+    email: Optional[str] = None,
+    name: Optional[str] = None,
+    picture: Optional[str] = None,
+    raw: Optional[Dict[str, Any]] = None,
+    access_token: Optional[str] = None,
+    refresh_token: Optional[str] = None,
+    token_expires_at: Optional[str] = None,
+):
+    supabase = get_supabase_client()
+    payload = {
+        "user_id": user_id,
+        "provider": provider,
+        "provider_user_id": provider_user_id,
+        "provider_email": email,
+        "provider_name": name,
+        "provider_picture": picture,
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_expires_at": token_expires_at,
+        "raw_user_data": raw,
+        "updated_at": datetime.utcnow().isoformat(),
+    }
+
+    supabase.table("oauth_accounts").upsert(
+        payload, on_conflict="provider,provider_user_id"
+    ).execute()
+
+
+def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
+    if not email:
+        return None
+
+    supabase = get_supabase_client()
+    result = supabase.table("users").select("*").eq("email", email).execute()
+    if result.data:
+        return result.data[0]
+    return None
+
+
+async def verify_google_id_token(id_token: str) -> Dict[str, Any]:
+    if not settings.google_client_ids:
+        logger.error("Google OAuth attempted without server configuration")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Google OAuth is not configured on the server",
+        )
+
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        response = await client.get(
+            "https://oauth2.googleapis.com/tokeninfo",
+            params={"id_token": id_token},
+        )
+
+    if response.status_code != 200:
+        logger.warning(
+            "Google token validation failed",
+            {"status_code": response.status_code, "response": response.text},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Google credentials",
+        )
+
+    token_data = response.json()
+    audience = token_data.get("aud")
+
+    if audience not in settings.google_client_ids:
+        logger.warning(
+            "Google token audience mismatch",
+            {"audience": audience, "allowed": settings.google_client_ids},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Google token audience mismatch. Update GOOGLE_CLIENT_IDS to include this client.",
+        )
+
+    return token_data
+
+
+async def fetch_apple_public_keys() -> List[Dict[str, Any]]:
+    global APPLE_KEYS_CACHE
+
+    now = datetime.utcnow()
+    cached_keys = APPLE_KEYS_CACHE.get("keys")
+    expires_at = APPLE_KEYS_CACHE.get("expires_at")
+
+    if cached_keys and expires_at and expires_at > now:
+        return cached_keys
+
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        response = await client.get("https://appleid.apple.com/auth/keys")
+
+    if response.status_code != 200:
+        logger.error(
+            "Failed to fetch Apple public keys",
+            {"status_code": response.status_code, "response": response.text},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Unable to verify Apple credentials right now",
+        )
+
+    keys = response.json().get("keys", [])
+    APPLE_KEYS_CACHE = {
+        "keys": keys,
+        "expires_at": now + timedelta(hours=1),
+    }
+    return keys
+
+
+async def verify_apple_identity_token(identity_token: str) -> Dict[str, Any]:
+    if not settings.apple_client_ids:
+        logger.error("Apple OAuth attempted without server configuration")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Apple OAuth is not configured on the server",
+        )
+
+    try:
+        headers = jwt.get_unverified_header(identity_token)
+    except JWTError as error:
+        logger.warning("Invalid Apple identity token header", {"error": str(error)})
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Apple credentials",
+        ) from error
+
+    keys = await fetch_apple_public_keys()
+    matching_key = next(
+        (key for key in keys if key.get("kid") == headers.get("kid")), None
+    )
+
+    if not matching_key:
+        logger.warning("Apple identity token key mismatch", headers)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Apple credentials",
+        )
+
+    try:
+        payload = jwt.decode(
+            identity_token,
+            matching_key,
+            algorithms=[headers.get("alg", "RS256")],
+            audience=settings.apple_client_ids,
+            issuer="https://appleid.apple.com",
+        )
+    except JWTError as error:
+        logger.warning("Failed to decode Apple identity token", {"error": str(error)})
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Apple credentials",
+        ) from error
+
+    return payload
 
 
 @router.post("/signup", status_code=status.HTTP_201_CREATED)
@@ -116,17 +386,7 @@ async def signup(user_data: UserSignup):
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,
-        "user": {
-            "id": user["id"],
-            "email": user["email"],
-            "name": user["name"],
-            "username": user["username"],
-            "plan": user["plan"],
-            "timezone": user.get("timezone", "UTC"),
-            "email_verified": user["email_verified"],
-            "auth_provider": user["auth_provider"],
-            "created_at": user["created_at"],
-        },
+        "user": serialize_user(user),
     }
 
 
@@ -171,55 +431,257 @@ async def login(credentials: UserLogin):
 
     # Update last login
     supabase = get_supabase_client()
-    supabase.table("users").update({"last_login_at": "now()"}).eq(
+    current_timestamp = datetime.now(timezone.utc).isoformat()
+    supabase.table("users").update({"last_login_at": current_timestamp}).eq(
         "id", user["id"]
     ).execute()
-
-    print("Login success:", json.dumps(user, indent=2))
+    user["last_login_at"] = current_timestamp
 
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,
         "remember_me": credentials.remember_me,
-        "user": {
-            "id": user["id"],
-            "email": user["email"],
-            "name": user["name"],
-            "username": user["username"],
-            "plan": user["plan"],
-            "timezone": user.get("timezone", "UTC"),
-            "email_verified": user["email_verified"],
-            "auth_provider": user["auth_provider"],
-            "created_at": user["created_at"],
-            "last_login_at": user["last_login_at"],
-        },
+        "user": serialize_user(user),
     }
-
-
-@router.post("/oauth/apple")
-async def apple_oauth(oauth_data: AppleOAuth):
-    """Sign in with Apple (iOS only)"""
-    # TODO: Implement Apple OAuth verification
-    # This would involve verifying the id_token with Apple's servers
-    # For now, return a placeholder response
-
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Apple OAuth not yet implemented",
-    )
 
 
 @router.post("/oauth/google")
 async def google_oauth(oauth_data: GoogleOAuth):
     """Sign in with Google (iOS + Android)"""
-    # TODO: Implement Google OAuth verification
-    # This would involve verifying the id_token with Google's servers
-    # For now, return a placeholder response
 
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Google OAuth not yet implemented",
+    token_data = await verify_google_id_token(oauth_data.id_token)
+    google_sub = token_data.get("sub")
+
+    if not google_sub:
+        logger.warning("Google token missing subject", token_data)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Google credentials",
+        )
+
+    email = token_data.get("email")
+    email_verified = str(token_data.get("email_verified", "")).lower() in (
+        "true",
+        "1",
     )
+    full_name = token_data.get("name") or token_data.get("given_name")
+    picture = token_data.get("picture")
+
+    supabase = get_supabase_client()
+
+    # Step 1: Check if this Google account is already linked
+    account_result = (
+        supabase.table("oauth_accounts")
+        .select("user_id")
+        .eq("provider", "google")
+        .eq("provider_user_id", google_sub)
+        .execute()
+    )
+
+    user: Optional[Dict[str, Any]] = None
+
+    if account_result.data:
+        user_id = account_result.data[0]["user_id"]
+        user = await get_user_by_id(user_id)
+        if not user:
+            logger.warning(
+                "Google account linked to missing user", {"user_id": user_id}
+            )
+
+    # Step 2: If not linked, look up by email
+    if not user and email:
+        existing_user = get_user_by_email(email)
+        if existing_user:
+            user = existing_user
+
+    # Step 3: Create a new user if none found
+    if not user:
+        if not email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Google account did not return an email address.",
+            )
+
+        username = ensure_unique_username(
+            token_data.get("preferred_username"),
+            token_data.get("name"),
+            token_data.get("given_name"),
+            token_data.get("family_name"),
+            email.split("@")[0],
+        )
+
+        display_name = full_name or username
+
+        user = await create_user(
+            {
+                "email": email,
+                "name": display_name,
+                "username": username,
+                "auth_provider": "google",
+                "email_verified": email_verified,
+                "plan": "free",
+                "timezone": token_data.get("timezone") or "UTC",
+                "language": token_data.get("locale", "en"),
+                "profile_picture_url": picture,
+            }
+        )
+    else:
+        # Update email verification if Google confirms it
+        if email_verified and not user.get("email_verified"):
+            supabase.table("users").update({"email_verified": True}).eq(
+                "id", user["id"]
+            ).execute()
+            user["email_verified"] = True
+
+        # Keep profile picture up to date if we have one
+        if picture and not user.get("profile_picture_url"):
+            supabase.table("users").update({"profile_picture_url": picture}).eq(
+                "id", user["id"]
+            ).execute()
+            user["profile_picture_url"] = picture
+
+    upsert_oauth_account(
+        user_id=user["id"],
+        provider="google",
+        provider_user_id=google_sub,
+        email=email,
+        name=full_name,
+        picture=picture,
+        raw=token_data,
+        access_token=oauth_data.access_token,
+    )
+
+    current_timestamp = datetime.now(timezone.utc).isoformat()
+    supabase.table("users").update({"last_login_at": current_timestamp}).eq(
+        "id", user["id"]
+    ).execute()
+    user["last_login_at"] = current_timestamp
+
+    access_token = create_access_token({"user_id": user["id"]})
+    refresh_token = create_refresh_token({"user_id": user["id"]})
+
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "user": serialize_user(user),
+    }
+
+
+@router.post("/oauth/apple")
+async def apple_oauth(oauth_data: AppleOAuth):
+    """Sign in with Apple"""
+
+    payload = await verify_apple_identity_token(oauth_data.identity_token)
+    apple_sub = payload.get("sub")
+
+    if not apple_sub:
+        logger.warning("Apple identity token missing subject", payload)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Apple credentials",
+        )
+
+    email_from_token = payload.get("email")
+    email = oauth_data.email or email_from_token
+    email_verified = str(payload.get("email_verified", "")).lower() in (
+        "true",
+        "1",
+    )
+
+    name_payload = oauth_data.full_name or {}
+    full_name = None
+    if isinstance(name_payload, dict):
+        given = name_payload.get("givenName") or name_payload.get("given_name")
+        family = name_payload.get("familyName") or name_payload.get("family_name")
+        if given and family:
+            full_name = f"{given} {family}".strip()
+        elif given:
+            full_name = given
+        elif family:
+            full_name = family
+
+    supabase = get_supabase_client()
+
+    account_result = (
+        supabase.table("oauth_accounts")
+        .select("user_id")
+        .eq("provider", "apple")
+        .eq("provider_user_id", apple_sub)
+        .execute()
+    )
+
+    user: Optional[Dict[str, Any]] = None
+
+    if account_result.data:
+        user_id = account_result.data[0]["user_id"]
+        user = await get_user_by_id(user_id)
+        if not user:
+            logger.warning("Apple account linked to missing user", {"user_id": user_id})
+
+    if not user and email:
+        existing_user = get_user_by_email(email)
+        if existing_user:
+            user = existing_user
+
+    if not user:
+        if not email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Apple did not provide an email address for this account.",
+            )
+
+        username = ensure_unique_username(
+            full_name,
+            email.split("@")[0],
+        )
+
+        display_name = full_name or username
+
+        user = await create_user(
+            {
+                "email": email,
+                "name": display_name,
+                "username": username,
+                "auth_provider": "apple",
+                "email_verified": email_verified,
+                "plan": "free",
+                "timezone": "UTC",
+                "language": payload.get("locale", "en"),
+            }
+        )
+    else:
+        if email_verified and not user.get("email_verified"):
+            supabase.table("users").update({"email_verified": True}).eq(
+                "id", user["id"]
+            ).execute()
+            user["email_verified"] = True
+
+    upsert_oauth_account(
+        user_id=user["id"],
+        provider="apple",
+        provider_user_id=apple_sub,
+        email=email,
+        name=full_name,
+        raw={
+            "identity_token": payload,
+            "authorization_code": oauth_data.authorization_code,
+        },
+    )
+
+    current_timestamp = datetime.now(timezone.utc).isoformat()
+    supabase.table("users").update({"last_login_at": current_timestamp}).eq(
+        "id", user["id"]
+    ).execute()
+    user["last_login_at"] = current_timestamp
+
+    access_token = create_access_token({"user_id": user["id"]})
+    refresh_token = create_refresh_token({"user_id": user["id"]})
+
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "user": serialize_user(user),
+    }
 
 
 @router.post("/refresh")
@@ -388,7 +850,7 @@ async def verify_email(
 
     return {
         "message": "Email verified successfully",
-        "user": updated_user,
+        "user": serialize_user(updated_user),
     }
 
 
@@ -619,6 +1081,44 @@ async def forgot_password(reset_data: PasswordReset):
     return {"message": "If an account exists, a password reset email has been sent"}
 
 
+@router.post("/reset-password/validate")
+async def validate_reset_token(reset_data: PasswordResetValidate):
+    from app.core.database import get_supabase_client
+    from datetime import datetime, timezone
+
+    supabase = get_supabase_client()
+
+    token_result = (
+        supabase.table("password_reset_tokens")
+        .select("*")
+        .eq("token", reset_data.token)
+        .eq("used", False)
+        .execute()
+    )
+
+    if not token_result.data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token",
+        )
+
+    reset_token = token_result.data[0]
+
+    expires_at = datetime.fromisoformat(
+        reset_token["expires_at"].replace("Z", "+00:00")
+    )
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+    if datetime.now(timezone.utc) > expires_at:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Reset token has expired, please request a new one",
+        )
+
+    return {"valid": True, "expires_at": expires_at.isoformat()}
+
+
 @router.post("/reset-password")
 async def reset_password(reset_data: PasswordResetConfirm):
     """Reset password with token"""
@@ -656,7 +1156,7 @@ async def reset_password(reset_data: PasswordResetConfirm):
     if datetime.now(timezone.utc) > expires_at:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Reset token has expired",
+            detail="Reset token has expired, please request a new one",
         )
 
     user_id = reset_token["user_id"]

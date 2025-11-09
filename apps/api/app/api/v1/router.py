@@ -21,6 +21,7 @@ from app.api.v1.endpoints import (
     social_accountability,
     meals,
     progress_reflections,
+    system_health,
 )
 
 # Create main API router
@@ -67,4 +68,9 @@ api_router.include_router(
     progress_reflections.router,
     prefix="/progress-reflections",
     tags=["AI Progress Reflections"],
+)
+api_router.include_router(
+    system_health.router,
+    prefix="/system/health",
+    tags=["System Health"],
 )

@@ -1,5 +1,5 @@
 import React from "react";
-import { TouchableOpacity, Text, View } from "react-native";
+import { TouchableOpacity, Text, View, ActivityIndicator } from "react-native";
 import { useStyles } from "@/themes/makeStyles";
 import { fontFamily } from "@/lib/fonts";
 import { toRN } from "@/lib/units";
@@ -10,6 +10,7 @@ interface SocialSignInButtonProps {
   provider: "google" | "apple";
   onPress: () => void;
   disabled?: boolean;
+  loading?: boolean;
   style?: any;
 }
 
@@ -65,6 +66,7 @@ export const SocialSignInButton: React.FC<SocialSignInButtonProps> = ({
   provider,
   onPress,
   disabled = false,
+  loading = false,
   style,
 }) => {
   const styles = useStyles(makeSocialSignInButtonStyles);
@@ -78,7 +80,7 @@ export const SocialSignInButton: React.FC<SocialSignInButtonProps> = ({
       buttonStyle.push(styles.appleButton);
     }
 
-    if (disabled) {
+    if (disabled || loading) {
       buttonStyle.push(styles.buttonDisabled);
     }
 
@@ -98,14 +100,27 @@ export const SocialSignInButton: React.FC<SocialSignInButtonProps> = ({
       textStyle.push(styles.appleButtonText);
     }
 
+    if (loading) {
+      textStyle.push({ opacity: 0.8 });
+    }
+
     return textStyle;
   };
 
   const getButtonText = () => {
+    if (loading) {
+      return provider === "google"
+        ? "Signing in with Google..."
+        : "Signing in with Apple...";
+    }
     return provider === "google" ? "Sign in with Google" : "Sign in with Apple";
   };
 
   const renderIcon = () => {
+    if (loading) {
+      const spinnerColor = provider === "apple" ? "#ffffff" : "#374151";
+      return <ActivityIndicator size="small" color={spinnerColor} />;
+    }
     if (provider === "google") {
       return <GoogleIcon size={20} />;
     } else if (provider === "apple") {
@@ -118,7 +133,7 @@ export const SocialSignInButton: React.FC<SocialSignInButtonProps> = ({
     <TouchableOpacity
       style={getButtonStyle()}
       onPress={onPress}
-      disabled={disabled}
+      disabled={disabled || loading}
       activeOpacity={0.7}
     >
       <View style={styles.iconContainer}>{renderIcon()}</View>

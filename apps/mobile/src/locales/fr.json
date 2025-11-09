@@ -3,7 +3,9 @@
     "error": "Erreur",
     "user": "Utilisateur",
     "logout": "Déconnexion",
-    "app_name": "FitNudge"
+    "app_name": "FitNudge",
+    "ok": "OK",
+    "and": "et"
   },
   "auth": {
     "main": {
@@ -39,6 +41,37 @@
       "terms_of_use": "Conditions d'Utilisation",
       "privacy_policy": "Politique de Confidentialité",
       "already_have_account": "Vous avez déjà un compte ? Se connecter"
+    },
+    "reset_password": {
+      "title": "Réinitialiser le mot de passe",
+      "subtitle": "Créez un nouveau mot de passe pour sécuriser votre compte",
+      "password_label": "Nouveau mot de passe",
+      "password_placeholder": "Entrez votre nouveau mot de passe",
+      "confirm_password_label": "Confirmez le mot de passe",
+      "confirm_password_placeholder": "Confirmez votre nouveau mot de passe",
+      "confirm_password_required": "Veuillez confirmer votre mot de passe",
+      "passwords_dont_match": "Les mots de passe ne correspondent pas",
+      "reset_password": "Réinitialiser le mot de passe",
+      "resetting": "Réinitialisation...",
+      "success_title": "Succès",
+      "success_message": "Votre mot de passe a été réinitialisé. Vous pouvez maintenant vous connecter avec votre nouveau mot de passe.",
+      "error_reset_failed": "Échec de la réinitialisation du mot de passe",
+      "error_invalid_token": "Lien de réinitialisation invalide ou expiré",
+      "error_token_expired": "Le lien de réinitialisation a expiré. Veuillez en demander un nouveau.",
+      "validating_link": "Validation de votre lien...",
+      "request_new_link": "Demander un nouvel e-mail",
+      "back_to_login": "Retour à la connexion"
+    },
+    "social": {
+      "provider_mismatch_title": "Essayez une autre méthode de connexion",
+      "provider_mismatch_message": "Vous avez déjà utilisé {{providers}} avec cet e-mail. Connectez-vous avec cette méthode, puis liez d'autres fournisseurs dans les paramètres.",
+      "provider_mismatch_message_default": "Un compte existe déjà avec cet e-mail. Connectez-vous avec votre méthode d'origine, puis liez d'autres fournisseurs dans les paramètres.",
+      "coming_soon": "Bientôt disponible",
+      "providers": {
+        "password": "e-mail et mot de passe",
+        "google": "Google",
+        "apple": "Connexion avec Apple"
+      }
     }
   },
   "home": {
@@ -83,7 +116,14 @@
     "help_center": "Centre d'aide",
     "contact_us": "Nous contacter",
     "free_plan": "Plan gratuit",
-    "pro_plan": "Plan Pro"
+    "pro_plan": "Plan Pro",
+    "linked_accounts": "Comptes liés",
+    "link_account": "Lier",
+    "unlink_account": "Délier",
+    "linked": "Lié",
+    "not_linked": "Non lié",
+    "linking_unavailable": "La liaison sera disponible bientôt.",
+    "primary_provider_notice": "Votre méthode de connexion principale est {{provider}}."
   },
   "onboarding": {
     "ai_motivation": {

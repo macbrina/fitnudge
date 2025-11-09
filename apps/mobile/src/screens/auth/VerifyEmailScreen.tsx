@@ -347,6 +347,7 @@ export default function VerifyEmailScreen() {
               disabled={
                 verifyEmailMutation.isPending || code.join("").length !== 6
               }
+              loading={verifyEmailMutation.isPending}
             />
 
             <View style={styles.resendContainer}>

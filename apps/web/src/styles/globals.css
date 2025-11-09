@@ -1,36 +1,51 @@
 @import "@fitnudge/ui/styles/globals.css";
 
-@theme {
-  /* FitNudge Brand Colors - Override base theme colors */
-  --color-primary: 59 130 246; /* blue-500 - FitNudge primary */
-  --color-primary-foreground: 255 255 255;
-  --color-secondary: 147 51 234; /* purple-600 - FitNudge secondary */
-  --color-secondary-foreground: 255 255 255;
-  --color-accent: 236 72 153; /* pink-500 - FitNudge accent */
-  --color-accent-foreground: 255 255 255;
-  --color-success: 34 197 94; /* green-500 */
-  --color-warning: 245 158 11; /* amber-500 */
-  --color-destructive: 239 68 68; /* red-500 */
-  --color-destructive-foreground: 255 255 255;
+@layer base {
+  :root,
+  :host {
+    /* FitNudge Brand Colors - Override base theme colors (oklch) */
+    --color-primary: oklch(0.67 0.12 253);
+    --color-primary-foreground: oklch(0.98 0.01 253);
+    --color-secondary: oklch(0.63 0.22 296);
+    --color-secondary-foreground: oklch(0.98 0.01 296);
+    --color-accent: oklch(0.62 0.22 18);
+    --color-accent-foreground: oklch(0.98 0.01 18);
+    --color-success: oklch(0.73 0.18 142);
+    --color-warning: oklch(0.76 0.19 70);
+    --color-destructive: oklch(0.62 0.24 25);
+    --color-destructive-foreground: oklch(0.98 0.01 25);
 
-  /* FitNudge Brand Gradients */
-  --color-gradient-primary: linear-gradient(
-    135deg,
-    rgb(59, 130, 246),
-    rgb(147, 51, 234)
-  );
-  --color-gradient-secondary: linear-gradient(
-    135deg,
-    rgb(147, 51, 234),
-    rgb(236, 72, 153)
-  );
-  --color-gradient-accent: linear-gradient(
-    135deg,
-    rgb(59, 130, 246),
-    rgb(236, 72, 153)
-  );
+    /* FitNudge Brand Gradients */
+    --color-gradient-primary: linear-gradient(
+      135deg,
+      rgb(59, 130, 246),
+      rgb(147, 51, 234)
+    );
+    --color-gradient-secondary: linear-gradient(
+      135deg,
+      rgb(147, 51, 234),
+      rgb(236, 72, 153)
+    );
+    --color-gradient-accent: linear-gradient(
+      135deg,
+      rgb(59, 130, 246),
+      rgb(236, 72, 153)
+    );
+  }
 }
 
+/* @layer theme {
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+} */
 /* Advanced Animations */
 @keyframes fade-in {
   from {
@@ -268,6 +283,82 @@
   -webkit-text-fill-color: transparent;
   background-size: 200% 200%;
   animation: gradient-shift 3s ease infinite;
+}
+
+.bg-success-soft {
+  background-color: color-mix(in oklch, var(--color-success) 12%, transparent);
+}
+
+.border-success-soft {
+  border-color: color-mix(in oklch, var(--color-success) 35%, transparent);
+}
+
+.bg-warning-soft {
+  background-color: color-mix(in oklch, var(--color-warning) 16%, transparent);
+}
+
+.border-warning-soft {
+  border-color: color-mix(in oklch, var(--color-warning) 35%, transparent);
+}
+
+.bg-destructive-soft {
+  background-color: color-mix(
+    in oklch,
+    var(--color-destructive) 15%,
+    transparent
+  );
+}
+
+.border-destructive-soft {
+  border-color: color-mix(in oklch, var(--color-destructive) 35%, transparent);
+}
+
+.bg-secondary-soft {
+  background-color: color-mix(
+    in oklch,
+    var(--color-secondary) 15%,
+    transparent
+  );
+}
+
+.bg-success {
+  background-color: var(--color-success);
+}
+.text-success {
+  color: var(--color-success);
+}
+.border-success {
+  border-color: var(--color-success);
+}
+
+.bg-warning {
+  background-color: var(--color-warning);
+}
+.text-warning {
+  color: var(--color-warning);
+}
+.border-warning {
+  border-color: var(--color-warning);
+}
+
+.bg-destructive {
+  background-color: var(--color-destructive);
+}
+.text-destructive {
+  color: var(--color-destructive);
+}
+.border-destructive {
+  border-color: var(--color-destructive);
+}
+
+.bg-secondary {
+  background-color: var(--color-secondary);
+}
+.text-secondary {
+  color: var(--color-secondary);
+}
+.border-secondary {
+  border-color: var(--color-secondary);
 }
 
 /* Smooth scrolling */

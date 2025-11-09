@@ -197,11 +197,11 @@ JWT_ACCESS_TOKEN_EXPIRE_MINUTES=15
 JWT_REFRESH_TOKEN_EXPIRE_DAYS=7
 
 # OAuth
-APPLE_CLIENT_ID=com.fitnudge.app
+APPLE_CLIENT_IDS=com.fitnudge.app,com.fitnudge.dev (optional, comma-separated list)
 APPLE_TEAM_ID=ABC123DEF4
 APPLE_KEY_ID=XYZ789
 APPLE_PRIVATE_KEY_PATH=./certs/AuthKey_XYZ789.p8
-GOOGLE_CLIENT_ID=123456789-abcdefg.apps.googleusercontent.com
+GOOGLE_CLIENT_IDS=ios-client-id.apps.googleusercontent.com,android-client-id.apps.googleusercontent.com (optional, comma-separated list)
 GOOGLE_CLIENT_SECRET=GOCSPX-...
 
 # AI

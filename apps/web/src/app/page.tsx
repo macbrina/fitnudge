@@ -1,6 +1,6 @@
 "use client";
 
-import { Layout } from "@/components/layout/layout";
+import { LandingLayout } from "@/components/layout/LandingLayout";
 import { Hero } from "@/components/landing/hero";
 import { Wellness } from "@/components/landing/wellness";
 import { Features } from "@/components/landing/features";
@@ -10,13 +10,13 @@ import { Download } from "@/components/landing/download";
 
 export default function HomePage() {
   return (
-    <Layout>
+    <LandingLayout>
       <Hero />
       <Wellness />
       <Features />
       <Tracker />
       <HowItWorks />
       <Download />
-    </Layout>
+    </LandingLayout>
   );
 }

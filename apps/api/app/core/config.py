@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings
-from typing import List, Optional
+from typing import List
 from dotenv import load_dotenv
 import os
 
@@ -38,12 +38,6 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     ELEVENLABS_API_KEY: str = os.getenv("ELEVENLABS_API_KEY", "")
 
-    # Firebase
-    FIREBASE_CREDENTIALS_PATH: Optional[str] = os.getenv(
-        "FIREBASE_CREDENTIALS_PATH", None
-    )
-    FIREBASE_PROJECT_ID: str = os.getenv("FIREBASE_PROJECT_ID", "")
-
     # Redis
     REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379")
 
@@ -55,15 +49,54 @@ class Settings(BaseSettings):
     CLOUDFLARE_PUBLIC_URL: str = os.getenv("CLOUDFLARE_PUBLIC_URL", "")
 
     # Apple OAuth
-    APPLE_CLIENT_ID: str = os.getenv("APPLE_CLIENT_ID", "")
+    APPLE_CLIENT_IDS: str = os.getenv("APPLE_CLIENT_IDS", "")
     APPLE_CLIENT_SECRET: str = os.getenv("APPLE_CLIENT_SECRET", "")
     APPLE_TEAM_ID: str = os.getenv("APPLE_TEAM_ID", "")
     APPLE_KEY_ID: str = os.getenv("APPLE_KEY_ID", "")
     APPLE_PRIVATE_KEY: str = os.getenv("APPLE_PRIVATE_KEY", "")
 
     # Google OAuth
-    GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
+    GOOGLE_CLIENT_IDS: str = os.getenv("GOOGLE_CLIENT_IDS", "")
     GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
+
+    @property
+    def google_client_ids(self) -> List[str]:
+        ids = []
+        if self.GOOGLE_CLIENT_IDS:
+            ids.extend(
+                [
+                    client_id.strip()
+                    for client_id in self.GOOGLE_CLIENT_IDS.split(",")
+                    if client_id.strip()
+                ]
+            )
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_ids = []
+        for client_id in ids:
+            if client_id and client_id not in seen:
+                seen.add(client_id)
+                unique_ids.append(client_id)
+        return unique_ids
+
+    @property
+    def apple_client_ids(self) -> List[str]:
+        ids = []
+        if self.APPLE_CLIENT_IDS:
+            ids.extend(
+                [
+                    client_id.strip()
+                    for client_id in self.APPLE_CLIENT_IDS.split(",")
+                    if client_id.strip()
+                ]
+            )
+        seen = set()
+        unique_ids = []
+        for client_id in ids:
+            if client_id and client_id not in seen:
+                seen.add(client_id)
+                unique_ids.append(client_id)
+        return unique_ids
 
     # Rate Limiting
     RATE_LIMIT_PER_MINUTE: int = os.getenv("RATE_LIMIT_PER_MINUTE", 100)

@@ -7,6 +7,7 @@ import uuid
 from app.core.database import get_supabase_client
 from app.core.flexible_auth import get_current_user
 from postgrest.exceptions import APIError
+from app.services.expo_push_service import send_push_to_user
 
 router = APIRouter(
     redirect_slashes=False
@@ -336,37 +337,32 @@ async def send_test_notification(
                 detail=f"Notification type '{notification_type}' is disabled for this user",
             )
 
-        # Get user's active device tokens
-        tokens_result = supabase.rpc(
-            "get_user_active_device_tokens", {"p_user_id": current_user["id"]}
-        ).execute()
+        payload_data = {
+            "type": notification_type,
+            "test_notification": True,
+            **(data or {}),
+        }
 
-        if not tokens_result.data:
+        send_result = await send_push_to_user(
+            current_user["id"],
+            title="Test Notification",
+            body=f"This is a test {notification_type} notification",
+            data=payload_data,
+            notification_type=notification_type,
+        )
+
+        if not send_result.get("notification_id"):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No active device tokens found for this user",
+                detail="No active Expo push tokens registered for this user.",
             )
 
-        # Log test notification in history
-        notification_id = str(uuid.uuid4())
-        supabase.table("notification_history").insert(
-            {
-                "id": notification_id,
-                "user_id": current_user["id"],
-                "notification_type": notification_type,
-                "title": "Test Notification",
-                "body": f"This is a test {notification_type} notification",
-                "data": data or {},
-            }
-        ).execute()
-
-        # TODO: Send actual FCM notification here
-        # For now, just return success
-
         return {
-            "success": True,
-            "message_id": notification_id,
-            "tokens_count": len(tokens_result.data),
+            "success": bool(send_result.get("notification_id")),
+            "message_id": send_result.get("notification_id"),
+            "delivered": send_result.get("delivered"),
+            "tokens_attempted": send_result.get("tokens_attempted", 0),
+            "invalid_tokens": send_result.get("invalid_tokens", []),
         }
     except HTTPException:
         raise

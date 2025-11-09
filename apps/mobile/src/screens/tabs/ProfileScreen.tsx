@@ -11,17 +11,75 @@ import { useTranslation } from "@/lib/i18n";
 import { useRouter } from "expo-router";
 import Button from "@/components/ui/Button";
 import { MOBILE_ROUTES } from "@/lib/routes";
+import { useAlertModal } from "@/contexts/AlertModalContext";
 
 export default function ProfileScreen() {
   const { user, logout, isLoggingOut } = useAuthStore();
   const { t } = useTranslation();
   const router = useRouter();
+  const { showAlert } = useAlertModal();
+
+  const providerLabels: Record<string, string> = {
+    password: t("auth.social.providers.password"),
+    email: t("auth.social.providers.password"),
+    google: t("auth.social.providers.google"),
+    apple: t("auth.social.providers.apple"),
+  };
+
+  const linkedProviders = user?.linked_providers ?? [];
+  const primaryProvider = user?.auth_provider;
+
+  const handleLinkingPress = async () => {
+    await showAlert({
+      title: t("auth.social.coming_soon"),
+      message: t("profile.linking_unavailable"),
+      variant: "info",
+      confirmLabel: t("common.ok"),
+    });
+  };
 
   const handleLogout = async () => {
     const success = await logout();
     if (success) {
       router.replace(MOBILE_ROUTES.AUTH.LOGIN);
     }
+  };
+
+  const renderLinkedAccountRow = (provider: "google" | "apple") => {
+    const isPrimary = primaryProvider === provider;
+    const isLinked = isPrimary || linkedProviders.includes(provider);
+    const statusLabel = isLinked
+      ? t("profile.linked")
+      : t("profile.not_linked");
+
+    return (
+      <View key={provider} style={styles.linkedRow}>
+        <View style={styles.linkedInfo}>
+          <Text style={styles.linkedProviderLabel}>
+            {providerLabels[provider]}
+          </Text>
+          <Text
+            style={[
+              styles.linkedStatus,
+              isLinked
+                ? styles.linkedStatusActive
+                : styles.linkedStatusInactive,
+            ]}
+          >
+            {statusLabel}
+          </Text>
+        </View>
+        <Button
+          title={
+            isLinked ? t("profile.unlink_account") : t("profile.link_account")
+          }
+          size="sm"
+          variant={isLinked ? "secondary" : "primary"}
+          onPress={handleLinkingPress}
+          disabled={isPrimary}
+        />
+      </View>
+    );
   };
 
   return (
@@ -48,6 +106,20 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.content}>
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>{t("profile.linked_accounts")}</Text>
+          <Text style={styles.primaryProviderText}>
+            {t("profile.primary_provider_notice", {
+              provider:
+                providerLabels[
+                  primaryProvider as keyof typeof providerLabels
+                ] || primaryProvider,
+            })}
+          </Text>
+          {renderLinkedAccountRow("google")}
+          {renderLinkedAccountRow("apple")}
+        </View>
+
         <View style={styles.card}>
           <Text style={styles.cardTitle}>{t("profile.account_settings")}</Text>
           <TouchableOpacity style={styles.settingItem}>
@@ -157,6 +229,38 @@ const styles = StyleSheet.create({
   content: {
     padding: 24,
     gap: 16,
+  },
+  primaryProviderText: {
+    fontSize: 12,
+    color: "#6b7280",
+    marginBottom: 12,
+  },
+  linkedRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#e5e7eb",
+  },
+  linkedInfo: {
+    flex: 1,
+    marginRight: 16,
+  },
+  linkedProviderLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#0f172a",
+  },
+  linkedStatus: {
+    marginTop: 4,
+    fontSize: 12,
+  },
+  linkedStatusActive: {
+    color: "#16a34a",
+  },
+  linkedStatusInactive: {
+    color: "#f97316",
   },
   card: {
     backgroundColor: "#ffffff",

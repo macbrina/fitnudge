@@ -5,12 +5,15 @@ import { useState } from "react";
 import { Menu, X } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 import { ThemeToggle } from "../ui";
-import { Button } from "@fitnudge/ui";
+import { Button, cn } from "@fitnudge/ui";
 import { ROUTES } from "@/lib/routes";
+import { usePathname } from "next/navigation";
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { t } = useTranslation();
+  const pathname = usePathname();
+  const isHome = pathname === ROUTES.HOME;
 
   const navigation = [
     { name: t("nav.features"), href: ROUTES.FEATURES },
@@ -20,12 +23,17 @@ export function Header() {
   ];
 
   return (
-    <header className="absolute top-0 left-0 right-0 z-30 w-full">
+    <header
+      className={cn(
+        "absolute top-0 left-0 right-0 z-30 w-full",
+        !isHome && "bg-primary"
+      )}
+    >
       <div className="w-full px-8 pt-8 pb-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2 sm:space-x-3">
             <div className="w-8 h-8 sm:w-10 sm:h-10 bg-white rounded-lg flex items-center justify-center">
-              <span className="text-blue-600 font-bold text-sm sm:text-lg">
+              <span className="text-primary font-bold text-sm sm:text-lg">
                 F
               </span>
             </div>

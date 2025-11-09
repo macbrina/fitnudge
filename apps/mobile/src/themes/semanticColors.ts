@@ -17,7 +17,8 @@ export const semanticLight = {
   },
   text: {
     primary: tokens.colors.light.foreground, // #0f172a
-    secondary: tokens.colors.light.mutedForeground, // #64748b
+    secondary: tokens.colors.light.secondaryForeground, // #0f172a
+    muted: tokens.colors.light.mutedForeground, // #f8fafc
     onPrimary: tokens.colors.light.primaryForeground, // #ffffff
     onSecondary: tokens.colors.light.secondaryForeground, // #0f172a
     onAccent: tokens.colors.light.accentForeground, // #0f172a
@@ -60,7 +61,8 @@ export const semanticDark = {
   },
   text: {
     primary: tokens.colors.dark.foreground, // #f8fafc
-    secondary: tokens.colors.dark.mutedForeground, // #94a3b8
+    secondary: tokens.colors.dark.secondaryForeground, // #f8fafc
+    muted: tokens.colors.dark.mutedForeground, // #94a3b8
     onPrimary: tokens.colors.dark.primaryForeground, // #ffffff
     onSecondary: tokens.colors.dark.secondaryForeground, // #f8fafc
     onAccent: tokens.colors.dark.accentForeground, // #f8fafc

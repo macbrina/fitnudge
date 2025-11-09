@@ -289,8 +289,6 @@ class NotificationService {
 
       // Register device with backend
       await notificationApi.registerDevice(deviceInfo);
-
-      console.log("Device token registered:", deviceInfo);
     } catch (error) {
       console.error("Failed to send token to backend:", error);
     }

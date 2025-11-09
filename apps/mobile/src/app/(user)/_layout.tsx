@@ -1,6 +1,14 @@
-import { Stack } from "expo-router";
+import { Stack, Redirect } from "expo-router";
+import { useAuthStore } from "@/stores/authStore";
+import { MOBILE_ROUTES } from "@/lib/routes";
 
 export default function UserLayout() {
+  const { isAuthenticated, isLoading } = useAuthStore();
+
+  if (!isLoading && !isAuthenticated) {
+    return <Redirect href={MOBILE_ROUTES.AUTH.LOGIN} />;
+  }
+
   return (
     <Stack>
       <Stack.Screen

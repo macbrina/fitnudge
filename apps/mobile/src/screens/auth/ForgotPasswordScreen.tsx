@@ -18,6 +18,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAlertModal } from "@/contexts/AlertModalContext";
+import { MOBILE_ROUTES } from "@/lib";
 
 export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState("");
@@ -64,7 +65,7 @@ export default function ForgotPasswordScreen() {
           });
 
           if (confirmed) {
-            router.back();
+            router.push(MOBILE_ROUTES.AUTH.LOGIN);
           }
         },
         onError: async (error: any) => {
@@ -141,6 +142,7 @@ export default function ForgotPasswordScreen() {
               }
               onPress={handleSubmit}
               disabled={forgotPasswordMutation.isPending}
+              loading={forgotPasswordMutation.isPending}
             />
 
             {/* Back to Login */}

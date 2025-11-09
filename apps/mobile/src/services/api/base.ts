@@ -2,6 +2,7 @@ import { Platform } from "react-native";
 import Constants from "expo-constants";
 import * as Device from "expo-device";
 import { STORAGE_KEYS, storageUtil } from "../../utils/storageUtil";
+import { useSystemStatusStore } from "@/stores/systemStatusStore";
 
 // Types
 export interface ApiResponse<T = any> {
@@ -12,7 +13,7 @@ export interface ApiResponse<T = any> {
 }
 
 // Configuration
-const resolveBaseUrl = (): string => {
+export const resolveBaseUrl = (): string => {
   // Prefer Expo config extra first, then env var
   const configured = process.env.EXPO_PUBLIC_API_URL;
 
@@ -77,6 +78,37 @@ const API_CONFIG = {
   baseURL: resolveBaseUrl(),
   timeout: 60000, // 60 seconds - increased for AI generation endpoints
   retryAttempts: 3,
+};
+
+export const resolveApiRootUrl = (): string => {
+  const base = API_CONFIG.baseURL;
+  if (base.endsWith("/api/v1")) {
+    return base.replace(/\/api\/v1$/, "");
+  }
+  return base;
+};
+
+const PUBLIC_ENDPOINTS = new Set<string>([
+  "/auth/login",
+  "/auth/signup",
+  "/auth/forgot-password",
+  "/auth/reset-password",
+  "/auth/reset-password/validate",
+  "/auth/verify-email",
+  "/auth/resend-verification",
+  "/auth/logout",
+  "/auth/refresh",
+  "/health",
+]);
+
+const PUBLIC_ENDPOINT_PREFIXES = ["/auth/oauth/"];
+
+const isPublicEndpoint = (endpoint: string): boolean => {
+  if (PUBLIC_ENDPOINTS.has(endpoint)) {
+    return true;
+  }
+
+  return PUBLIC_ENDPOINT_PREFIXES.some((prefix) => endpoint.startsWith(prefix));
 };
 
 // Global token cache for fast access
@@ -229,6 +261,19 @@ export abstract class BaseApiService {
         ? global.accessToken
         : await TokenManager.getAccessToken();
 
+    if (!token && !isPublicEndpoint(endpoint)) {
+      if (__DEV__) {
+        console.debug(
+          `[API] Skipping request to ${endpoint} because user is not authenticated`
+        );
+      }
+
+      return {
+        status: 401,
+        error: "Not authenticated",
+      };
+    }
+
     const defaultHeaders: HeadersInit = {
       "Content-Type": "application/json",
       Accept: "application/json",
@@ -236,27 +281,6 @@ export abstract class BaseApiService {
 
     if (token) {
       defaultHeaders["Authorization"] = `Bearer ${token}`;
-    } else {
-      // Only log warning for authenticated endpoints (not public auth endpoints)
-      // Suppress warnings for expected cases like app startup or public routes
-      const isAuthEndpoint =
-        endpoint.includes("/auth/login") ||
-        endpoint.includes("/auth/signup") ||
-        endpoint.includes("/auth/refresh") ||
-        endpoint.includes("/auth/forgot-password") ||
-        endpoint.includes("/auth/reset-password");
-
-      console.log("URL ENDPOINT: ", url);
-
-      if (!isAuthEndpoint) {
-        // Only log at debug level - this is expected during app initialization
-        // The actual error will be returned by the API
-        if (__DEV__) {
-          console.debug(
-            `[API] Missing access token for request to ${endpoint} (this may be expected during app initialization)`
-          );
-        }
-      }
     }
 
     // Ensure headers are properly merged - convert to plain object
@@ -288,19 +312,6 @@ export abstract class BaseApiService {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
-      // Debug logging
-      // const authHeaderValue =
-      //   headersObj["Authorization"] || headersObj["authorization"];
-      // console.log(`[API] Request to ${url}`, {
-      //   method: config.method || "GET",
-      //   hasToken: !!token,
-      //   tokenValue: token ? `${token.substring(0, 10)}...` : null,
-      //   authHeaderValue: authHeaderValue
-      //     ? `${authHeaderValue.substring(0, 30)}...`
-      //     : null,
-      //   headers: Object.keys(headersObj),
-      // });
-
       const response = await fetch(url, {
         ...config,
         signal: controller.signal,
@@ -327,9 +338,6 @@ export abstract class BaseApiService {
 
       // Only set data if request was successful (2xx status codes)
       if (!response.ok) {
-        console.log(
-          `[API] Request failed with status ${response.status}, data: ${JSON.stringify(data)}`
-        );
         // If 401 Unauthorized, try to refresh the token and retry the request once
         // Skip auto-refresh for the refresh endpoint itself to avoid infinite loops
         if (
@@ -442,8 +450,6 @@ export abstract class BaseApiService {
         if (response.status === 403 && data) {
           const errorData = typeof data === "object" ? data : {};
           const userStatus = errorData.status || errorData.detail?.status;
-          const statusError =
-            errorData.error || errorData.detail?.error || errorData.detail;
 
           if (userStatus === "disabled" || userStatus === "suspended") {
             console.log(
@@ -467,6 +473,32 @@ export abstract class BaseApiService {
             console.error("[API] Failed to handle auto-logout:", error);
           }
         }
+        console.log("response", response.status, data);
+
+        if (response.status === 503) {
+          useSystemStatusStore
+            .getState()
+            .setBackendStatus(
+              "offline",
+              (data && (data.detail || data.message || data.error)) ||
+                "Service temporarily unavailable"
+            );
+        } else if (response.status >= 500) {
+          useSystemStatusStore
+            .getState()
+            .setBackendStatus(
+              "offline",
+              `Server error (HTTP ${response.status})`
+            );
+        } else if (response.status >= 400) {
+          useSystemStatusStore
+            .getState()
+            .setBackendStatus(
+              "degraded",
+              (data && (data.detail || data.message || data.error)) ||
+                `Request failed (HTTP ${response.status})`
+            );
+        }
 
         return {
           status: response.status,
@@ -477,6 +509,8 @@ export abstract class BaseApiService {
         };
       }
 
+      useSystemStatusStore.getState().setBackendStatus("online", null);
+
       // Success: return data only if status is 2xx
       return {
         status: response.status,
@@ -484,6 +518,19 @@ export abstract class BaseApiService {
         error: undefined, // Explicitly undefined on success
       };
     } catch (error) {
+      if (__DEV__) {
+        console.warn(
+          `[API] Request to ${url} failed. Is the backend running?`,
+          error
+        );
+      }
+      console.log("error", error);
+      useSystemStatusStore
+        .getState()
+        .setBackendStatus(
+          "offline",
+          error instanceof Error ? error.message : "Network error"
+        );
       if (error instanceof Error) {
         if (error.name === "AbortError") {
           return {

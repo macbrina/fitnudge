@@ -14,6 +14,12 @@ export function handleDeepLink(url: string): void {
     const parsed = Linking.parse(url);
     const { hostname, path, queryParams } = parsed;
 
+    const normalizedPath = path
+      ? path.startsWith("/")
+        ? path
+        : `/${path}`
+      : "/";
+
     // Handle fitnudge.app (production) or localhost/ngrok (development)
     const isProductionDomain = hostname === "fitnudge.app";
     const isDevelopmentDomain =
@@ -29,7 +35,7 @@ export function handleDeepLink(url: string): void {
     }
 
     // Route based on path
-    switch (path) {
+    switch (normalizedPath) {
       case "/reset-password":
         if (queryParams?.token) {
           router.push(

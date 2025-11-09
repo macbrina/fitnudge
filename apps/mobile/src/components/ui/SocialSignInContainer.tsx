@@ -6,9 +6,15 @@ import { toRN } from "@/lib/units";
 import SocialSignInButton from "./SocialSignInButton";
 
 interface SocialSignInContainerProps {
-  onGooglePress: () => void;
-  onApplePress: () => void;
-  showOrText?: boolean;
+  onGooglePress?: () => void;
+  onApplePress?: () => void;
+  showGoogle?: boolean;
+  showApple?: boolean;
+  googleDisabled?: boolean;
+  appleDisabled?: boolean;
+  googleLoading?: boolean;
+  appleLoading?: boolean;
+  showDividerText?: boolean;
   containerStyle?: any;
 }
 
@@ -34,18 +40,49 @@ const makeSocialSignInContainerStyles = (
 export const SocialSignInContainer: React.FC<SocialSignInContainerProps> = ({
   onGooglePress,
   onApplePress,
-  showOrText = true,
+  showGoogle = true,
+  showApple = true,
+  googleDisabled = false,
+  appleDisabled = false,
+  googleLoading = false,
+  appleLoading = false,
+  showDividerText = true,
   containerStyle,
 }) => {
   const styles = useStyles(makeSocialSignInContainerStyles);
 
+  const renderGoogle = showGoogle;
+  const renderApple = showApple;
+  const googleHandler = onGooglePress ?? (() => {});
+  const appleHandler = onApplePress ?? (() => {});
+
+  if (!renderGoogle && !renderApple) {
+    return null;
+  }
+
   return (
     <View style={[styles.container, containerStyle]}>
-      <SocialSignInButton provider="google" onPress={onGooglePress} />
+      {renderGoogle && (
+        <SocialSignInButton
+          provider="google"
+          onPress={googleHandler}
+          disabled={googleDisabled}
+          loading={googleLoading}
+        />
+      )}
 
-      <SocialSignInButton provider="apple" onPress={onApplePress} />
+      {renderApple && (
+        <SocialSignInButton
+          provider="apple"
+          onPress={appleHandler}
+          disabled={appleDisabled}
+          loading={appleLoading}
+        />
+      )}
 
-      {showOrText && <Text style={styles.orText}>or sign in with</Text>}
+      {showDividerText && renderGoogle && renderApple && (
+        <Text style={styles.orText}>or sign in with</Text>
+      )}
     </View>
   );
 };

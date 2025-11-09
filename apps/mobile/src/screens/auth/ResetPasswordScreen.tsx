@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   Image,
+  ActivityIndicator,
 } from "react-native";
 import { useTranslation } from "@/lib/i18n";
 import { fontFamily } from "@/lib/fonts";
@@ -19,35 +19,127 @@ import { router, useLocalSearchParams } from "expo-router";
 import { tokens, lineHeight } from "@/themes/tokens";
 import { MOBILE_ROUTES } from "@/lib/routes";
 import { useResetPassword } from "@/hooks/api/useAuth";
+import { authService } from "@/services/api";
+import { useAlertModal } from "@/contexts/AlertModalContext";
+import { useAuthStore } from "@/stores/authStore";
+import { getRedirection } from "@/utils/getRedirection";
+import LoadingContainer from "@/components/common/LoadingContainer";
 
 export default function ResetPasswordScreen() {
   const params = useLocalSearchParams<{ token?: string }>();
-  const [token, setToken] = useState(params.token || "");
+  const initialToken = useMemo(() => params.token || "", [params.token]);
+  const [token, setToken] = useState(initialToken);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [errors, setErrors] = useState<{
-    token?: string;
     password?: string;
     confirmPassword?: string;
   }>({});
+  const [validationState, setValidationState] = useState<
+    "checking" | "valid" | "invalid"
+  >(initialToken ? "checking" : "invalid");
+  const [validationMessage, setValidationMessage] = useState<string | null>(
+    initialToken ? null : null
+  );
 
   const { t } = useTranslation();
   const styles = useStyles(makeResetPasswordScreenStyles);
   const insets = useSafeAreaInsets();
   const resetPasswordMutation = useResetPassword();
+  const { showAlert } = useAlertModal();
+  const { isAuthenticated } = useAuthStore();
 
   useEffect(() => {
-    if (params.token) {
-      setToken(params.token);
+    let isMounted = true;
+
+    const handleAuthenticatedRedirect = async () => {
+      try {
+        const destination = await getRedirection();
+        if (isMounted) {
+          router.replace(destination);
+        }
+      } catch (error) {
+        console.warn(
+          "[ResetPassword] Failed to compute authenticated redirect",
+          error
+        );
+        if (isMounted) {
+          router.replace(MOBILE_ROUTES.MAIN.HOME);
+        }
+      }
+    };
+
+    if (isAuthenticated) {
+      handleAuthenticatedRedirect();
     }
-  }, [params.token]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    setToken(initialToken);
+    if (initialToken) {
+      setValidationState("checking");
+      setValidationMessage(null);
+    } else {
+      setValidationState("invalid");
+      setValidationMessage(t("auth.reset_password.error_invalid_token"));
+    }
+  }, [initialToken, t]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const validate = async () => {
+      if (isAuthenticated) {
+        return;
+      }
+
+      if (!token) {
+        if (!isMounted) return;
+        setValidationState("invalid");
+        setValidationMessage(t("auth.reset_password.error_invalid_token"));
+        return;
+      }
+
+      setValidationState("checking");
+      setValidationMessage(null);
+
+      try {
+        const response = await authService.validateResetToken(token);
+
+        if (!isMounted) return;
+
+        if (response.status >= 200 && response.status < 300) {
+          setValidationState("valid");
+          setValidationMessage(null);
+        } else {
+          setValidationState("invalid");
+          setValidationMessage(
+            response.error || t("auth.reset_password.error_token_expired")
+          );
+        }
+      } catch (error) {
+        if (!isMounted) return;
+        console.error("Reset token validation failed:", error);
+        setValidationState("invalid");
+        setValidationMessage(t("auth.reset_password.error_token_expired"));
+      }
+    };
+
+    if (token) {
+      validate();
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [token, t]);
 
   const validateForm = () => {
     const newErrors: typeof errors = {};
-
-    if (!token.trim()) {
-      newErrors.token = t("auth.reset_password.token_required");
-    }
 
     if (!password) {
       newErrors.password = t("errors.password_required");
@@ -76,25 +168,36 @@ export default function ResetPasswordScreen() {
       return;
     }
 
+    if (validationState !== "valid") {
+      showAlert({
+        title: t("common.error"),
+        message:
+          validationMessage || t("auth.reset_password.error_token_expired"),
+        variant: "error",
+      });
+      return;
+    }
+
     resetPasswordMutation.mutate(
       {
         token: token.trim(),
         new_password: password,
       },
       {
-        onSuccess: () => {
-          Alert.alert(
-            t("auth.reset_password.success_title"),
-            t("auth.reset_password.success_message"),
-            [
-              {
-                text: t("common.done"),
-                onPress: () => router.replace(MOBILE_ROUTES.AUTH.LOGIN),
-              },
-            ]
-          );
+        onSuccess: async () => {
+          const confirmed = await showAlert({
+            title: t("auth.reset_password.success_title"),
+            message: t("auth.reset_password.success_message"),
+            confirmLabel: t("common.done"),
+            dismissible: false,
+            variant: "success",
+          });
+
+          if (confirmed) {
+            router.replace(MOBILE_ROUTES.AUTH.LOGIN);
+          }
         },
-        onError: (error: any) => {
+        onError: async (error: any) => {
           console.error("Reset password error:", error);
           const errorMessage =
             error?.error ||
@@ -103,22 +206,41 @@ export default function ResetPasswordScreen() {
             t("auth.reset_password.error_reset_failed");
 
           if (errorMessage.includes("expired")) {
-            Alert.alert(
-              t("common.error"),
-              t("auth.reset_password.error_token_expired")
-            );
+            await showAlert({
+              title: t("common.error"),
+              message: t("auth.reset_password.error_token_expired"),
+              variant: "error",
+            });
+            setValidationState("invalid");
+            setValidationMessage(t("auth.reset_password.error_token_expired"));
           } else if (errorMessage.includes("Invalid")) {
-            Alert.alert(
-              t("common.error"),
-              t("auth.reset_password.error_invalid_token")
-            );
+            await showAlert({
+              title: t("common.error"),
+              message: t("auth.reset_password.error_invalid_token"),
+              variant: "error",
+            });
+            setValidationState("invalid");
+            setValidationMessage(t("auth.reset_password.error_invalid_token"));
           } else {
-            Alert.alert(t("common.error"), errorMessage);
+            await showAlert({
+              title: t("common.error"),
+              message: errorMessage,
+              variant: "error",
+            });
           }
         },
       }
     );
   };
+
+  if (validationState === "checking" || isAuthenticated) {
+    return (
+      <LoadingContainer
+        visible
+        text={t("auth.reset_password.validating_link")}
+      />
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -150,25 +272,16 @@ export default function ResetPasswordScreen() {
             <Text style={styles.subtitle}>
               {t("auth.reset_password.subtitle")}
             </Text>
+            {validationState === "invalid" && (
+              <Text style={styles.validationMessage}>
+                {validationMessage ||
+                  t("auth.reset_password.error_token_expired")}
+              </Text>
+            )}
           </View>
 
           {/* Form */}
           <View style={styles.form}>
-            <TextInput
-              label={t("auth.reset_password.token_label")}
-              placeholder={t("auth.reset_password.token_placeholder")}
-              value={token}
-              onChangeText={(text) => {
-                setToken(text);
-                if (errors.token) {
-                  setErrors((prev) => ({ ...prev, token: undefined }));
-                }
-              }}
-              autoCapitalize="none"
-              autoCorrect={false}
-              error={errors.token}
-            />
-
             <TextInput
               label={t("auth.reset_password.password_label")}
               placeholder={t("auth.reset_password.password_placeholder")}
@@ -183,6 +296,7 @@ export default function ResetPasswordScreen() {
               showPasswordToggle
               autoCapitalize="none"
               error={errors.password}
+              disabled={validationState !== "valid"}
             />
 
             <TextInput
@@ -204,6 +318,7 @@ export default function ResetPasswordScreen() {
               showPasswordToggle
               autoCapitalize="none"
               error={errors.confirmPassword}
+              disabled={validationState !== "valid"}
             />
 
             {/* Submit Button */}
@@ -214,18 +329,34 @@ export default function ResetPasswordScreen() {
                   : t("auth.reset_password.reset_password")
               }
               onPress={handleSubmit}
-              disabled={resetPasswordMutation.isPending}
+              disabled={
+                resetPasswordMutation.isPending || validationState !== "valid"
+              }
+              loading={resetPasswordMutation.isPending}
             />
 
             {/* Back to Login */}
             <View style={styles.backToLoginContainer}>
               <Button
                 title={t("auth.reset_password.back_to_login")}
-                onPress={() => router.back()}
+                onPress={() => router.replace(MOBILE_ROUTES.AUTH.LOGIN)}
                 variant="text"
                 size="sm"
               />
             </View>
+
+            {validationState === "invalid" && (
+              <View style={styles.validationMessageContainer}>
+                <Button
+                  title={t("auth.reset_password.request_new_link")}
+                  onPress={() =>
+                    router.replace(MOBILE_ROUTES.AUTH.FORGOT_PASSWORD)
+                  }
+                  variant="text"
+                  size="sm"
+                />
+              </View>
+            )}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -281,6 +412,26 @@ const makeResetPasswordScreenStyles = (
     backToLoginContainer: {
       alignItems: "center" as const,
       marginTop: toRN(tokens.spacing[6]),
+    },
+    validationStateContainer: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      marginBottom: toRN(tokens.spacing[4]),
+    },
+    validationStateText: {
+      color: colors.text.secondary,
+      fontFamily: fontFamily.groteskRegular,
+      marginLeft: toRN(tokens.spacing[2]),
+    },
+    validationMessageContainer: {
+      alignItems: "center" as const,
+    },
+    validationMessage: {
+      color: colors.feedback.error,
+      textAlign: "center" as const,
+      fontFamily: fontFamily.groteskRegular,
+      fontSize: toRN(tokens.typography.fontSize.sm),
+      marginBottom: toRN(tokens.spacing[2]),
     },
   };
 };

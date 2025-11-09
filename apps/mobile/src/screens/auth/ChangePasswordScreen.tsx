@@ -217,6 +217,7 @@ export default function ChangePasswordScreen() {
               }
               onPress={handleSubmit}
               disabled={changePasswordMutation.isPending}
+              loading={changePasswordMutation.isPending}
             />
           </View>
         </ScrollView>

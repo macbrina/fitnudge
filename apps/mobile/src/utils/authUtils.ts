@@ -22,6 +22,8 @@ const statusMessages: Record<LogoutReason, string> = {
  * @returns Status-specific error message
  */
 export async function handleAutoLogout(reason: LogoutReason): Promise<string> {
+  const wasAuthenticated = useAuthStore.getState().isAuthenticated;
+
   // Clear auth store
   await useAuthStore.getState().logout();
 
@@ -29,8 +31,10 @@ export async function handleAutoLogout(reason: LogoutReason): Promise<string> {
   await TokenManager.clearTokens();
   await TokenManager.clearRememberMe();
 
-  // Navigate to login screen
-  router.replace(MOBILE_ROUTES.AUTH.LOGIN);
+  // Navigate to login screen only if we were previously in an authenticated flow
+  if (wasAuthenticated) {
+    router.replace(MOBILE_ROUTES.AUTH.LOGIN);
+  }
 
   // Return status-specific message for display
   return statusMessages[reason];

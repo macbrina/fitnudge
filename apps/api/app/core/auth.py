@@ -202,9 +202,19 @@ async def create_user(user_data: Dict[str, Any]) -> Dict[str, Any]:
     """Create new user"""
     supabase = get_supabase_client()
 
-    # Hash password
-    user_data["password_hash"] = get_password_hash(user_data["password"])
-    del user_data["password"]
+    # Hash password if provided (email/password signup)
+    password = user_data.pop("password", None)
+    auth_provider = user_data.get("auth_provider", "email")
+
+    if password:
+        user_data["password_hash"] = get_password_hash(password)
+    elif auth_provider == "email" and not user_data.get("password_hash"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password is required for email/password signups",
+        )
+    elif "password_hash" not in user_data:
+        user_data["password_hash"] = None
 
     # Set default timezone to UTC if not provided
     if "timezone" not in user_data or not user_data.get("timezone"):

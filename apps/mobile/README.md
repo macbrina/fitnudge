@@ -93,6 +93,23 @@ cp .env.example .env
 npx expo start
 ```
 
+### Quick backend availability check
+
+Before launching the app, make sure the API is up. From `apps/mobile` run:
+
+```bash
+# Check http://localhost:8000/health (or API_HEALTH_URL if set)
+pnpm run check:backend
+```
+
+If you prefer running from the monorepo root, you can target the mobile package directly:
+
+```bash
+pnpm --filter @fitnudge/mobile run check:backend
+```
+
+The script exits early with a clear message if the backend is offline, which helps avoid debugging stale "network request failed" errors.
+
 ### Adding Dependencies
 
 ```bash
@@ -124,10 +141,24 @@ EXPO_PUBLIC_APPLE_CLIENT_ID=com.fitnudge.app
 EXPO_PUBLIC_GOOGLE_CLIENT_ID=123456789-abcdefg.apps.googleusercontent.com
 EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=123456789-hijklmn.apps.googleusercontent.com
 
+# Derived iOS URL scheme (reverse client ID used by config plugin)
+GOOGLE_IOS_URL_SCHEME=com.googleusercontent.apps.123456789-abcdefg
+
 # Analytics
 EXPO_PUBLIC_POSTHOG_API_KEY=your-posthog-api-key
 EXPO_PUBLIC_POSTHOG_HOST=https://app.posthog.com
 ```
+
+### Rebuilding the development client
+
+Installing native Google Sign-In requires a fresh native build. After updating any of the above credentials, rebuild the Expo dev client and reinstall it on your devices:
+
+```bash
+eas build --profile development --platform ios
+eas build --profile development --platform android
+```
+
+Then launch the app with `expo start --dev-client` to test the native sheets.
 
 ## 📁 Project Structure
 

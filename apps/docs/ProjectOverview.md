@@ -165,6 +165,8 @@ api/
 
 ## 📱 Mobile App Architecture
 
+- **Alert & Confirmation UI** _(mobile apps only)_: Always use the shared `AlertModalContext` (`@/contexts/AlertModalContext`) for toasts, confirmations, and error messaging to keep UX consistent and avoid the React Native `Alert` API.
+
 ### 🔄 Offline-First Strategy
 
 - **React Query**: Persistent cache with background sync

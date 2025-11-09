@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.security import HTTPBearer
+from fastapi.responses import JSONResponse
 import uvicorn
 import os
 from dotenv import load_dotenv
@@ -26,6 +27,7 @@ from app.core.middleware import (
     SQLInjectionProtectionMiddleware,
     SessionManagementMiddleware,
 )
+from app.core.health import build_health_report, HealthStatus
 
 # Load environment variables
 load_dotenv()
@@ -70,7 +72,13 @@ app.include_router(api_router, prefix="/api/v1")
 # Health check endpoint
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "version": "1.0.0"}
+    report = await build_health_report(api_version=app.version)
+    status_code = (
+        status.HTTP_200_OK
+        if report.status != HealthStatus.CRITICAL
+        else status.HTTP_503_SERVICE_UNAVAILABLE
+    )
+    return JSONResponse(content=report.model_dump(mode="json"), status_code=status_code)
 
 
 # Startup event

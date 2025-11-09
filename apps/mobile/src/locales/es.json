@@ -3,7 +3,9 @@
     "error": "Error",
     "user": "Usuario",
     "logout": "Cerrar sesión",
-    "app_name": "FitNudge"
+    "app_name": "FitNudge",
+    "ok": "OK",
+    "and": "y"
   },
   "auth": {
     "main": {
@@ -39,6 +41,37 @@
       "terms_of_use": "Términos de Uso",
       "privacy_policy": "Política de Privacidad",
       "already_have_account": "¿Ya tienes una cuenta? Iniciar sesión"
+    },
+    "reset_password": {
+      "title": "Restablecer contraseña",
+      "subtitle": "Crea una nueva contraseña para proteger tu cuenta",
+      "password_label": "Nueva contraseña",
+      "password_placeholder": "Ingresa tu nueva contraseña",
+      "confirm_password_label": "Confirmar contraseña",
+      "confirm_password_placeholder": "Confirma tu nueva contraseña",
+      "confirm_password_required": "Por favor confirma tu contraseña",
+      "passwords_dont_match": "Las contraseñas no coinciden",
+      "reset_password": "Restablecer contraseña",
+      "resetting": "Restableciendo...",
+      "success_title": "Éxito",
+      "success_message": "Tu contraseña ha sido restablecida. Ahora puedes iniciar sesión con tu nueva contraseña.",
+      "error_reset_failed": "No se pudo restablecer la contraseña",
+      "error_invalid_token": "El enlace de restablecimiento no es válido o ha expirado",
+      "error_token_expired": "El enlace de restablecimiento ha expirado. Solicita uno nuevo.",
+      "validating_link": "Validando tu enlace...",
+      "request_new_link": "Solicitar un nuevo correo",
+      "back_to_login": "Volver a iniciar sesión"
+    },
+    "social": {
+      "provider_mismatch_title": "Prueba otro método de inicio de sesión",
+      "provider_mismatch_message": "Ya usaste {{providers}} con este correo. Inicia sesión con ese método y luego vincula otros proveedores en Configuración.",
+      "provider_mismatch_message_default": "Ya existe una cuenta con este correo. Inicia sesión con tu método original y luego vincula otros proveedores en Configuración.",
+      "coming_soon": "Próximamente",
+      "providers": {
+        "password": "correo y contraseña",
+        "google": "Google",
+        "apple": "Iniciar sesión con Apple"
+      }
     }
   },
   "home": {
@@ -83,7 +116,14 @@
     "help_center": "Centro de ayuda",
     "contact_us": "Contáctanos",
     "free_plan": "Plan gratuito",
-    "pro_plan": "Plan Pro"
+    "pro_plan": "Plan Pro",
+    "linked_accounts": "Cuentas vinculadas",
+    "link_account": "Vincular",
+    "unlink_account": "Desvincular",
+    "linked": "Vinculada",
+    "not_linked": "No vinculada",
+    "linking_unavailable": "La vinculación estará disponible pronto.",
+    "primary_provider_notice": "Tu método principal de inicio de sesión es {{provider}}."
   },
   "onboarding": {
     "ai_motivation": {

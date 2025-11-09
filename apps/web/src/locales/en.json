@@ -248,6 +248,159 @@
       }
     }
   },
+  "health": {
+    "badge": "FitNudge System Status",
+    "title": "Platform Availability",
+    "tagline": "Live view of our core infrastructure. Every bar below represents the last recorded health check. Green means healthy, amber indicates partial degradation, and red points to a service disruption.",
+    "status": {
+      "operational": "Operational",
+      "degraded": "Degraded",
+      "critical": "Outage",
+      "not_configured": "Not Configured",
+      "checking": "Checking…"
+    },
+    "metrics": {
+      "overall_uptime": "Overall uptime (rolling)",
+      "healthy_checks": "{{value}}% healthy checks",
+      "last_updated": "Last Updated",
+      "environment": "Environment",
+      "api_version": "API Version",
+      "loading_placeholder": "—"
+    },
+    "labels": {
+      "unknown": "unknown"
+    },
+    "how_we_track": {
+      "button": "How we track status",
+      "title": "How we track status",
+      "description": "Every minute we run automated checks across critical infrastructure. Here’s what we monitor:",
+      "items": {
+        "api": "API heartbeat, database reachability, cache connections.",
+        "queues": "Background queue health, email transport, analytics providers.",
+        "third_party": "Third-party AI services and analytics integrations."
+      }
+    },
+    "cards": {
+      "uptime": "{{value}}% uptime",
+      "last_check": "Last check {{value}}",
+      "affected_one": "{{count}} component affected",
+      "affected_other": "{{count}} components affected"
+    },
+    "incidents": {
+      "loading": "Loading…",
+      "none": "No active incidents",
+      "show_details": "Show details",
+      "hide_details": "Hide details",
+      "title": "Active incidents",
+      "investigating": "Investigating."
+    },
+    "loading_banner": "Checking system status…",
+    "error": {
+      "title": "Unable to reach the status service.",
+      "developer_hint": "Developers: ensure the backend is running at {{url}} before reloading.",
+      "default_url": "your API base URL",
+      "missing_api": "API base URL is not configured."
+    },
+    "components_section": {
+      "title": "Component Health",
+      "description": "Each card represents a critical dependency. We retain a rolling window of checks so you can spot trends at a glance."
+    },
+    "history": {
+      "view_button": "View history",
+      "title": "Incident history",
+      "description": "Recent records captured by our automated checks.",
+      "loading": "Loading history…",
+      "error": "Unable to load history right now.",
+      "missing_api": "API base URL is not configured.",
+      "empty": "No incidents recorded yet.",
+      "list_heading": "Historical incidents",
+      "list_description": "Browse previous incidents recorded by our automated checks and follow their resolution updates.",
+      "back_to_status": "Back to system status",
+      "back_to_history": "Back to incident history",
+      "detail_not_found": "We couldn't find that incident.",
+      "detail_impacted": "Impacted components",
+      "detail_no_impacted": "No components were marked as impacted.",
+      "detail_updates": "Update timeline",
+      "detail_update_count": "{{count}} updates",
+      "detail_reported": "Reported {{value}}",
+      "latest_update": "Latest update",
+      "view_details": "View details",
+      "no_updates": "No updates posted yet.",
+      "timestamp": "Logged {{value}}",
+      "impacted": "Impacted components",
+      "no_details": "No additional details provided.",
+      "summary": {
+        "operational": "All systems operational",
+        "single": "{{component}} reported a {{status}} condition",
+        "multiple": "{{count}} components impacted"
+      },
+      "update_status": {
+        "identified": "Identified",
+        "monitoring": "Monitoring",
+        "resolved": "Resolved"
+      }
+    },
+    "components": {
+      "environment": {
+        "name": "Core Configuration",
+        "descriptions": {
+          "ok": "Configuration is valid.",
+          "degraded": "Configuration contains unexpected values.",
+          "critical": "Configuration could not be read."
+        }
+      },
+      "supabase": {
+        "name": "Primary Database",
+        "descriptions": {
+          "ok": "Database connection is healthy.",
+          "critical": "Database is unreachable."
+        }
+      },
+      "redis": {
+        "name": "Caching Layer",
+        "descriptions": {
+          "ok": "Cache server is responding.",
+          "critical": "Cache server is unreachable."
+        }
+      },
+      "celery": {
+        "name": "Background Jobs",
+        "descriptions": {
+          "ok": "Workers are accepting jobs.",
+          "degraded": "Background workers are not responding.",
+          "critical": "Worker queue could not be reached."
+        }
+      },
+      "smtp": {
+        "name": "Email Delivery",
+        "descriptions": {
+          "ok": "Outbound email service is available.",
+          "degraded": "Email service is experiencing issues."
+        }
+      },
+      "openai": {
+        "name": "AI Assistance",
+        "descriptions": {
+          "ok": "AI provider is configured.",
+          "not_configured": "AI features are not configured."
+        }
+      },
+      "elevenlabs": {
+        "name": "Voice Coach",
+        "descriptions": {
+          "ok": "Voice synthesis provider is configured.",
+          "not_configured": "Voice assistant features are disabled."
+        }
+      },
+      "cloudflare_r2": {
+        "name": "Media Storage",
+        "descriptions": {
+          "ok": "Media storage credentials configured.",
+          "not_configured": "Media storage not configured."
+        }
+      }
+    }
+  },
   "wellness": {
     "title": "Your AI-Powered Fitness Coach That Never Sleeps.",
     "description1": "Get personalized AI motivation messages, smart reminders, and daily check-ins that keep you accountable to your fitness goals. Our AI coach understands your journey and adapts to your needs.",

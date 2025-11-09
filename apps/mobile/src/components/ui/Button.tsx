@@ -391,9 +391,7 @@ export default function Button({
         <View style={styles.loadingContainer}>
           <ActivityIndicator size={iconSize} color={iconColor} />
           {!iconOnly && (
-            <Text style={[buttonTextStyle, styles.loadingText]}>
-              Loading...
-            </Text>
+            <Text style={[buttonTextStyle, styles.loadingText]}>{title}</Text>
           )}
         </View>
       ) : (
@@ -434,7 +432,7 @@ export default function Button({
           )}
 
           {/* Disabled spinner indicator */}
-          {!iconOnly && !icon && isDisabled && (
+          {!iconOnly && !icon && loading && (
             <ActivityIndicator
               size={iconSize}
               color={iconColor}

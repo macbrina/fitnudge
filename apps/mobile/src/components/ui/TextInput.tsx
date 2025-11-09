@@ -162,7 +162,9 @@ export const TextInput: React.FC<TextInputProps> = ({
         <RNTextInput
           style={getInputStyle()}
           placeholder={placeholder}
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor={
+            disabled ? colors.text.muted : colors.text.secondary
+          }
           value={value}
           onChangeText={onChangeText}
           onFocus={handleFocus}
@@ -181,11 +183,18 @@ export const TextInput: React.FC<TextInputProps> = ({
           <TouchableOpacity
             style={[styles.rightIconContainer, styles.passwordToggle]}
             onPress={togglePasswordVisibility}
+            disabled={disabled}
           >
             {isPasswordVisible ? (
-              <EyeOpenIcon size={24} color={colors.text.primary} />
+              <EyeOpenIcon
+                size={24}
+                color={disabled ? colors.text.muted : colors.text.secondary}
+              />
             ) : (
-              <EyeClosedIcon size={24} color={colors.text.primary} />
+              <EyeClosedIcon
+                size={24}
+                color={disabled ? colors.text.muted : colors.text.secondary}
+              />
             )}
           </TouchableOpacity>
         )}

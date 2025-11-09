@@ -19,6 +19,7 @@ export interface LoginResponse {
     email_verified: boolean;
     auth_provider: string;
     created_at: string;
+    linked_providers?: string[];
   };
   access_token: string;
   refresh_token: string;
@@ -40,6 +41,20 @@ export interface RefreshTokenResponse {
   refresh_token: string;
 }
 
+export interface GoogleLoginPayload {
+  id_token: string;
+}
+
+export interface AppleLoginPayload {
+  identityToken: string;
+  authorizationCode: string;
+  email?: string;
+  fullName?: {
+    givenName?: string;
+    familyName?: string;
+  };
+}
+
 // Auth Service
 export class AuthService extends BaseApiService {
   async login(credentials: LoginRequest): Promise<ApiResponse<LoginResponse>> {
@@ -47,8 +62,6 @@ export class AuthService extends BaseApiService {
       ROUTES.AUTH.LOGIN,
       credentials
     );
-
-    console.log("Login success:", JSON.stringify(response.data, null, 2));
 
     if (response.data) {
       const { TokenManager } = await import("./base");
@@ -162,6 +175,49 @@ export class AuthService extends BaseApiService {
     });
   }
 
+  async validateResetToken(
+    token: string
+  ): Promise<ApiResponse<{ valid: boolean }>> {
+    return this.post(ROUTES.AUTH.VALIDATE_RESET_TOKEN, { token });
+  }
+
+  async loginWithGoogle(idToken: string): Promise<ApiResponse<LoginResponse>> {
+    const response = await this.post<LoginResponse>(ROUTES.AUTH.OAUTH.GOOGLE, {
+      id_token: idToken,
+    });
+
+    if (response.data) {
+      const { TokenManager } = await import("./base");
+      await TokenManager.setTokens(
+        response.data.access_token,
+        response.data.refresh_token
+      );
+    }
+
+    return response;
+  }
+
+  async loginWithApple(
+    payload: AppleLoginPayload
+  ): Promise<ApiResponse<LoginResponse>> {
+    const response = await this.post<LoginResponse>(ROUTES.AUTH.OAUTH.APPLE, {
+      identity_token: payload.identityToken,
+      authorization_code: payload.authorizationCode,
+      email: payload.email,
+      full_name: payload.fullName,
+    });
+
+    if (response.data) {
+      const { TokenManager } = await import("./base");
+      await TokenManager.setTokens(
+        response.data.access_token,
+        response.data.refresh_token
+      );
+    }
+
+    return response;
+  }
+
   async changePassword(
     currentPassword: string,
     newPassword: string
@@ -213,43 +269,6 @@ export class AuthService extends BaseApiService {
       return { email, enabled: true };
     }
     return null;
-  }
-
-  // OAuth methods
-  async loginWithApple(
-    appleToken: string
-  ): Promise<ApiResponse<LoginResponse>> {
-    const response = await this.post<LoginResponse>(ROUTES.AUTH.OAUTH.APPLE, {
-      apple_token: appleToken,
-    });
-
-    if (response.data) {
-      const { TokenManager } = await import("./base");
-      await TokenManager.setTokens(
-        response.data.access_token,
-        response.data.refresh_token
-      );
-    }
-
-    return response;
-  }
-
-  async loginWithGoogle(
-    googleToken: string
-  ): Promise<ApiResponse<LoginResponse>> {
-    const response = await this.post<LoginResponse>(ROUTES.AUTH.OAUTH.GOOGLE, {
-      google_token: googleToken,
-    });
-
-    if (response.data) {
-      const { TokenManager } = await import("./base");
-      await TokenManager.setTokens(
-        response.data.access_token,
-        response.data.refresh_token
-      );
-    }
-
-    return response;
   }
 }
 

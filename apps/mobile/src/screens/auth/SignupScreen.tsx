@@ -1,8 +1,7 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -24,6 +23,20 @@ import { tokens, lineHeight } from "@/themes/tokens";
 import { useTheme } from "@/themes";
 import { MOBILE_ROUTES } from "@/lib/routes";
 import { useSignup } from "@/hooks/api/useAuth";
+import { getRedirection } from "@/utils/getRedirection";
+import { useAlertModal } from "@/contexts/AlertModalContext";
+import { authService, type LoginResponse } from "@/services/api/auth";
+import {
+  performNativeGoogleSignIn,
+  getFriendlyGoogleError,
+  hasGoogleSignInConfiguration,
+  isGoogleCancelledError,
+} from "@/lib/auth/google";
+import {
+  performNativeAppleSignIn,
+  isAppleSigninAvailable,
+  isAppleCancelledError,
+} from "@/lib/auth/apple";
 
 export default function SignupScreen() {
   const [username, setUsername] = useState("");
@@ -40,9 +53,59 @@ export default function SignupScreen() {
   const styles = useStyles(makeSignupScreenStyles);
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
+  const { showAlert } = useAlertModal();
 
   // Use the signup mutation hook
   const signupMutation = useSignup();
+
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [isAppleLoading, setIsAppleLoading] = useState(false);
+  const [appleAvailable, setAppleAvailable] = useState(false);
+
+  const showGoogle = hasGoogleSignInConfiguration();
+  const showApple = Platform.OS === "ios" && appleAvailable;
+
+  useEffect(() => {
+    let isMounted = true;
+
+    if (Platform.OS === "ios") {
+      isAppleSigninAvailable()
+        .then((available) => {
+          if (isMounted) {
+            setAppleAvailable(available);
+          }
+        })
+        .catch(() => {
+          if (isMounted) {
+            setAppleAvailable(false);
+          }
+        });
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const handleSocialSuccess = async (payload: LoginResponse) => {
+    await login(payload.user, payload.access_token, payload.refresh_token);
+
+    try {
+      const destination = await getRedirection();
+      router.replace(destination);
+    } catch (redirectError) {
+      console.warn("[Signup] Failed to compute redirection", redirectError);
+      router.replace(MOBILE_ROUTES.MAIN.HOME);
+    }
+  };
+
+  const handleSocialError = async (message: string) => {
+    await showAlert({
+      title: t("common.error"),
+      message,
+      variant: "error",
+    });
+  };
 
   // Validation functions
   const validateForm = () => {
@@ -113,12 +176,20 @@ export default function SignupScreen() {
               // Redirect to email verification screen
               router.replace(MOBILE_ROUTES.AUTH.VERIFY_EMAIL);
             } else {
-              // Navigate to onboarding flow
-              router.replace(MOBILE_ROUTES.ONBOARDING.NOTIFICATION_PERMISSION);
+              try {
+                const destination = await getRedirection();
+                router.replace(destination);
+              } catch (redirectError) {
+                console.warn(
+                  "[Signup] Failed to compute redirection",
+                  redirectError
+                );
+                router.replace(MOBILE_ROUTES.MAIN.HOME);
+              }
             }
           }
         },
-        onError: (error: any) => {
+        onError: async (error: any) => {
           console.error("Signup error:", error);
 
           // Handle specific error cases
@@ -129,27 +200,109 @@ export default function SignupScreen() {
             } else if (errorData?.detail?.includes("username")) {
               setErrors({ username: t("errors.username_already_taken") });
             } else {
-              Alert.alert(
-                t("common.error"),
-                errorData?.detail || t("errors.registration_error")
-              );
+              await showAlert({
+                title: t("common.error"),
+                message: errorData?.detail || t("errors.registration_error"),
+                variant: "error",
+              });
             }
           } else {
-            Alert.alert(t("common.error"), t("errors.registration_error"));
+            await showAlert({
+              title: t("common.error"),
+              message: t("errors.registration_error"),
+              variant: "error",
+            });
           }
         },
       }
     );
   };
 
-  const handleGoogleSignIn = () => {
-    // TODO: Implement Google sign-in
-    console.log("Google sign-in pressed");
+  const handleGoogleSignIn = async () => {
+    if (!showGoogle) {
+      await handleSocialError(
+        t("errors.authentication_error") ||
+          "Google Sign-In is not configured for this build."
+      );
+      return;
+    }
+
+    try {
+      setIsGoogleLoading(true);
+      const { idToken } = await performNativeGoogleSignIn();
+
+      const response = await authService.loginWithGoogle(idToken);
+
+      if (response.data) {
+        await handleSocialSuccess(response.data);
+      } else {
+        await handleSocialError(
+          response.error || t("errors.authentication_error")
+        );
+      }
+    } catch (error) {
+      if (isGoogleCancelledError(error)) {
+        return;
+      }
+
+      console.error("Google sign-in failed:", error);
+      await handleSocialError(getFriendlyGoogleError(error));
+    } finally {
+      setIsGoogleLoading(false);
+    }
   };
 
-  const handleAppleSignIn = () => {
-    // TODO: Implement Apple sign-in
-    console.log("Apple sign-in pressed");
+  const handleAppleSignIn = async () => {
+    if (!showApple) {
+      await handleSocialError(
+        "Sign in with Apple is not available on this device."
+      );
+      return;
+    }
+
+    try {
+      setIsAppleLoading(true);
+      const credential = await performNativeAppleSignIn();
+
+      if (!credential.identityToken) {
+        await handleSocialError(t("errors.authentication_error"));
+        return;
+      }
+
+      if (!credential.authorizationCode) {
+        await handleSocialError(t("errors.authentication_error"));
+        return;
+      }
+
+      const response = await authService.loginWithApple({
+        identityToken: credential.identityToken,
+        authorizationCode: credential.authorizationCode,
+        email: credential.email ?? undefined,
+        fullName: credential.fullName
+          ? {
+              givenName: credential.fullName.givenName ?? undefined,
+              familyName: credential.fullName.familyName ?? undefined,
+            }
+          : undefined,
+      });
+
+      if (response.data) {
+        await handleSocialSuccess(response.data);
+      } else {
+        await handleSocialError(
+          response.error || t("errors.authentication_error")
+        );
+      }
+    } catch (error: any) {
+      if (isAppleCancelledError(error)) {
+        return;
+      }
+
+      console.error("Apple sign-in failed:", error);
+      await handleSocialError(t("errors.authentication_error"));
+    } finally {
+      setIsAppleLoading(false);
+    }
   };
 
   return (
@@ -187,8 +340,14 @@ export default function SignupScreen() {
 
           {/* Social Sign In Buttons */}
           <SocialSignInContainer
+            showGoogle={showGoogle}
+            showApple={showApple}
             onGooglePress={handleGoogleSignIn}
             onApplePress={handleAppleSignIn}
+            googleDisabled={!showGoogle || isGoogleLoading}
+            googleLoading={isGoogleLoading}
+            appleDisabled={!showApple || isAppleLoading}
+            appleLoading={isAppleLoading}
           />
 
           {/* Form */}
@@ -249,6 +408,7 @@ export default function SignupScreen() {
               }
               onPress={handleSignup}
               disabled={signupMutation.isPending}
+              loading={signupMutation.isPending}
             />
 
             {/* Terms */}

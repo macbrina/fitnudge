@@ -47,8 +47,8 @@ APPLE_KEY_ID=XYZ789
 APPLE_PRIVATE_KEY_PATH=./certs/AuthKey_XYZ789.p8
 
 # OAuth - Google Sign In (Mobile)
-GOOGLE_IOS_CLIENT_ID=123456789-abcdefg.apps.googleusercontent.com
-GOOGLE_ANDROID_CLIENT_ID=123456789-hijklmn.apps.googleusercontent.com
+EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=123456789-abcdefg.apps.googleusercontent.com
+EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID=123456789-hijklmn.apps.googleusercontent.com
 
 # AI Services
 OPENAI_API_KEY=sk-your-openai-api-key
@@ -210,8 +210,8 @@ NEXT_PUBLIC_LAUNCHDARKLY_CLIENT_ID=your-launchdarkly-client-id
 
    ```bash
    # Mobile apps don't need client secrets - they use config files
-   GOOGLE_IOS_CLIENT_ID=123456789-abcdefg.apps.googleusercontent.com
-   GOOGLE_ANDROID_CLIENT_ID=123456789-hijklmn.apps.googleusercontent.com
+   EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=123456789-abcdefg.apps.googleusercontent.com
+   EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID=123456789-hijklmn.apps.googleusercontent.com
    ```
 
 5. **Configure Mobile**

@@ -56,7 +56,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
         Array.isArray(activeGoalsResponse.data)
       ) {
         const activeGoals = activeGoalsResponse.data.filter(
-          (goal) =>
+          (goal: any) =>
             goal.is_active &&
             goal.reminder_times &&
             goal.reminder_times.length > 0
