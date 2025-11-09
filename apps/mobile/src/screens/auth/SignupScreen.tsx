@@ -26,6 +26,7 @@ import { useSignup } from "@/hooks/api/useAuth";
 import { getRedirection } from "@/utils/getRedirection";
 import { useAlertModal } from "@/contexts/AlertModalContext";
 import { authService, type LoginResponse } from "@/services/api/auth";
+import { getApiErrorDetails } from "@/services/api/errors";
 import {
   performNativeGoogleSignIn,
   getFriendlyGoogleError,
@@ -189,27 +190,42 @@ export default function SignupScreen() {
             }
           }
         },
-        onError: async (error: any) => {
+        onError: async (error: unknown) => {
           console.error("Signup error:", error);
 
+          const {
+            status: errorStatus,
+            dataRecord,
+            detailRecord,
+            detailString,
+            backendMessage,
+          } = getApiErrorDetails(error);
+
           // Handle specific error cases
-          if (error?.response?.status === 400) {
-            const errorData = error.response.data;
-            if (errorData?.detail?.includes("email")) {
+          if (errorStatus === 400) {
+            const messageSource =
+              backendMessage ||
+              detailString ||
+              (detailRecord?.detail as string | undefined) ||
+              (dataRecord?.detail as string | undefined) ||
+              "";
+            const hint = messageSource.toLowerCase();
+
+            if (hint.includes("email")) {
               setErrors({ email: t("errors.email_already_exists") });
-            } else if (errorData?.detail?.includes("username")) {
+            } else if (hint.includes("username")) {
               setErrors({ username: t("errors.username_already_taken") });
             } else {
               await showAlert({
                 title: t("common.error"),
-                message: errorData?.detail || t("errors.registration_error"),
+                message: backendMessage || t("errors.registration_error"),
                 variant: "error",
               });
             }
           } else {
             await showAlert({
               title: t("common.error"),
-              message: t("errors.registration_error"),
+              message: backendMessage || t("errors.registration_error"),
               variant: "error",
             });
           }
@@ -246,7 +262,8 @@ export default function SignupScreen() {
       }
 
       console.error("Google sign-in failed:", error);
-      await handleSocialError(getFriendlyGoogleError(error));
+      // Trigger alert asynchronously so loading state can reset immediately
+      void handleSocialError(getFriendlyGoogleError(error));
     } finally {
       setIsGoogleLoading(false);
     }

@@ -19,7 +19,7 @@ export function SystemStatusListener() {
     const previousReason = previousReasonRef.current;
 
     const shouldDisplayAlert =
-      (backendStatus === "offline" || backendStatus === "degraded") &&
+      backendStatus === "offline" &&
       (backendStatus !== previousStatus ||
         (reason !== null && reason !== previousReason));
 

@@ -32,7 +32,7 @@
     },
     "login": {
       "title": "Sign in your Account",
-      "subtitle": "One app for every step: browse, compare, buy, track, and repeat with ease.",
+      "subtitle": "Sign in to your account to continue",
       "email_label": "Email",
       "email_placeholder": "Enter your email",
       "password_label": "Password",
@@ -103,7 +103,7 @@
       "error_reset_failed": "Failed to reset password",
       "error_invalid_token": "Invalid or expired reset token",
       "error_token_expired": "Reset token has expired. Please request a new one.",
-      "validating_link": "Validating your reset link...",
+      "validating_link": "Validating reset link...",
       "request_new_link": "Request a new reset email",
       "back_to_login": "Back to Login"
     },

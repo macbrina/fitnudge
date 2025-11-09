@@ -25,7 +25,9 @@ export async function handleAutoLogout(reason: LogoutReason): Promise<string> {
   const wasAuthenticated = useAuthStore.getState().isAuthenticated;
 
   // Clear auth store
-  await useAuthStore.getState().logout();
+  if (wasAuthenticated) {
+    await useAuthStore.getState().logout();
+  }
 
   // Clear tokens (logout already does this, but ensure it's done)
   await TokenManager.clearTokens();

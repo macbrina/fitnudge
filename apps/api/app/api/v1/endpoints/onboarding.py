@@ -259,7 +259,7 @@ async def save_fitness_profile(
 
     except Exception as e:
         logger.error(
-            f"Error saving fitness profile for user {current_user.get('id')}",
+            f"Error saving fitness profile for user {current_user.get('id')} {e}",
             {"error": str(e), "user_id": current_user.get("id")},
         )
         raise HTTPException(
@@ -268,7 +268,7 @@ async def save_fitness_profile(
         )
 
 
-@router.get("/profile", response_model=FitnessProfileResponse)
+@router.get("/profile", response_model=Optional[FitnessProfileResponse])
 async def get_fitness_profile(
     current_user: Dict[str, Any] = Depends(get_current_user),
     supabase=Depends(get_supabase_client),
@@ -286,11 +286,7 @@ async def get_fitness_profile(
 
         if result.data:
             return FitnessProfileResponse(**result.data[0])
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Fitness profile not found",
-            )
+        return None
 
     except HTTPException:
         raise

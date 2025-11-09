@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -48,6 +48,16 @@ export default function ResetPasswordScreen() {
   const resetPasswordMutation = useResetPassword();
   const { showAlert } = useAlertModal();
   const { isAuthenticated } = useAuthStore();
+
+  const redirectToLoginWithMessage = useCallback(
+    (message: string) => {
+      router.replace({
+        pathname: MOBILE_ROUTES.AUTH.LOGIN,
+        params: { alertMessage: message },
+      });
+    },
+    [router]
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -99,8 +109,10 @@ export default function ResetPasswordScreen() {
 
       if (!token) {
         if (!isMounted) return;
+        const message = t("auth.reset_password.error_invalid_token");
         setValidationState("invalid");
-        setValidationMessage(t("auth.reset_password.error_invalid_token"));
+        setValidationMessage(message);
+        redirectToLoginWithMessage(message);
         return;
       }
 
@@ -116,16 +128,18 @@ export default function ResetPasswordScreen() {
           setValidationState("valid");
           setValidationMessage(null);
         } else {
+          const message =
+            response.error || t("auth.reset_password.error_token_expired");
           setValidationState("invalid");
-          setValidationMessage(
-            response.error || t("auth.reset_password.error_token_expired")
-          );
+          setValidationMessage(message);
+          redirectToLoginWithMessage(message);
         }
       } catch (error) {
         if (!isMounted) return;
-        console.error("Reset token validation failed:", error);
+        const message = t("auth.reset_password.error_token_expired");
         setValidationState("invalid");
-        setValidationMessage(t("auth.reset_password.error_token_expired"));
+        setValidationMessage(message);
+        redirectToLoginWithMessage(message);
       }
     };
 
@@ -136,7 +150,7 @@ export default function ResetPasswordScreen() {
     return () => {
       isMounted = false;
     };
-  }, [token, t]);
+  }, [token, t, redirectToLoginWithMessage]);
 
   const validateForm = () => {
     const newErrors: typeof errors = {};
@@ -198,7 +212,6 @@ export default function ResetPasswordScreen() {
           }
         },
         onError: async (error: any) => {
-          console.error("Reset password error:", error);
           const errorMessage =
             error?.error ||
             error?.response?.data?.detail ||
@@ -211,16 +224,20 @@ export default function ResetPasswordScreen() {
               message: t("auth.reset_password.error_token_expired"),
               variant: "error",
             });
+            const message = t("auth.reset_password.error_token_expired");
             setValidationState("invalid");
-            setValidationMessage(t("auth.reset_password.error_token_expired"));
+            setValidationMessage(message);
+            redirectToLoginWithMessage(message);
           } else if (errorMessage.includes("Invalid")) {
             await showAlert({
               title: t("common.error"),
               message: t("auth.reset_password.error_invalid_token"),
               variant: "error",
             });
+            const message = t("auth.reset_password.error_invalid_token");
             setValidationState("invalid");
-            setValidationMessage(t("auth.reset_password.error_invalid_token"));
+            setValidationMessage(message);
+            redirectToLoginWithMessage(message);
           } else {
             await showAlert({
               title: t("common.error"),
@@ -274,7 +291,7 @@ export default function ResetPasswordScreen() {
             </Text>
             {validationState === "invalid" && (
               <Text style={styles.validationMessage}>
-                {validationMessage ||
+                {t(`${validationMessage}`) ||
                   t("auth.reset_password.error_token_expired")}
               </Text>
             )}

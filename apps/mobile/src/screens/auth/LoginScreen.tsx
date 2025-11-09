@@ -9,10 +9,11 @@ import { useTranslation } from "@/lib/i18n";
 import { MOBILE_ROUTES } from "@/lib/routes";
 import { toRN } from "@/lib/units";
 import { authService } from "@/services/api";
+import { getApiErrorDetails } from "@/services/api/errors";
 import { useAuthStore } from "@/stores/authStore";
 import { useStyles } from "@/themes/makeStyles";
 import { lineHeight } from "@/themes/tokens";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   Image,
@@ -40,6 +41,7 @@ import type { LoginResponse } from "@/services/api/auth";
 import { logger } from "@/services/logger";
 
 export default function LoginScreen() {
+  const params = useLocalSearchParams<{ alertMessage?: string }>();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
@@ -57,6 +59,8 @@ export default function LoginScreen() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [isAppleLoading, setIsAppleLoading] = useState(false);
   const [appleAvailable, setAppleAvailable] = useState(false);
+  const [alertHandled, setAlertHandled] = useState(false);
+  const [initialAlertShown, setInitialAlertShown] = useState(false);
 
   const showGoogle = hasGoogleSignInConfiguration();
   const showApple = Platform.OS === "ios" && appleAvailable;
@@ -130,6 +134,33 @@ export default function LoginScreen() {
     loadRememberMePreference();
   }, []);
 
+  useEffect(() => {
+    let isMounted = true;
+    const alertMessage = Array.isArray(params.alertMessage)
+      ? params.alertMessage[0]
+      : params.alertMessage;
+
+    const maybeShowAlert = async () => {
+      if (!initialAlertShown && alertMessage) {
+        await showAlert({
+          title: t("common.error"),
+          message: alertMessage,
+          variant: "error",
+        });
+        if (!isMounted) {
+          return;
+        }
+        setInitialAlertShown(true);
+      }
+    };
+
+    maybeShowAlert();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [params.alertMessage, initialAlertShown, showAlert, t, router]);
+
   // Validation functions
   const validateForm = () => {
     const newErrors: typeof errors = {};
@@ -168,6 +199,7 @@ export default function LoginScreen() {
       },
       {
         onSuccess: async (response) => {
+          console.log("response", response);
           if (response.data) {
             // Login the user with the returned data
             await login(
@@ -206,16 +238,23 @@ export default function LoginScreen() {
             }
           }
         },
-        onError: async (error: any) => {
+        onError: async (error: unknown) => {
           console.error("Login error:", error);
 
-          const errorStatus = error?.response?.status;
-          const errorData = error?.response?.data || error?.data || {};
-          const statusDetail = errorData.detail || errorData;
-          const userStatus = statusDetail?.status || errorData?.status;
+          const {
+            status: errorStatus,
+            dataRecord,
+            detailRecord,
+            detailString,
+            backendMessage,
+          } = getApiErrorDetails(error);
+
+          const userStatus =
+            (detailRecord?.status as string | undefined) ||
+            (dataRecord?.status as string | undefined);
 
           // Track failed login
-          logger.error(new Error("user_login_failed"), {
+          logger.error("user_login_failed", {
             method: "email",
             error_type:
               errorStatus === 401
@@ -223,11 +262,7 @@ export default function LoginScreen() {
                 : errorStatus === 403 && userStatus
                   ? `account_${userStatus}`
                   : "unknown",
-            error_message:
-              statusDetail?.error ||
-              statusDetail?.message ||
-              statusDetail ||
-              "Unknown error",
+            error_message: backendMessage || detailString || "Unknown error",
           });
 
           // Handle status-specific errors (403 Forbidden)
@@ -240,7 +275,8 @@ export default function LoginScreen() {
             };
             const message =
               statusMessages[userStatus] ||
-              statusDetail?.error ||
+              backendMessage ||
+              detailString ||
               "Your account cannot be accessed. Please contact support.";
 
             await showAlert({
@@ -267,15 +303,17 @@ export default function LoginScreen() {
             await showAlert({
               title: t("common.error"),
               message:
-                statusDetail?.detail ||
-                statusDetail?.error ||
+                detailString ||
+                (detailRecord?.detail as string | undefined) ||
+                (detailRecord?.error as string | undefined) ||
+                backendMessage ||
                 t("errors.authentication_error"),
               variant: "error",
             });
           } else {
             await showAlert({
               title: t("common.error"),
-              message: t("errors.authentication_error"),
+              message: backendMessage || t("errors.authentication_error"),
               variant: "error",
             });
           }
@@ -312,7 +350,7 @@ export default function LoginScreen() {
       }
 
       console.error("Google sign-in failed:", error);
-      await handleSocialError(getFriendlyGoogleError(error));
+      void handleSocialError(getFriendlyGoogleError(error));
     } finally {
       setIsGoogleLoading(false);
     }

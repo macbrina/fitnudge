@@ -9,13 +9,6 @@ import { storageUtil, STORAGE_KEYS } from "@/utils/storageUtil";
 export async function getRedirection(): Promise<string> {
   // Check onboarding flags in order
   try {
-    const hasSeenOnboarding = await storageUtil.getItem<boolean>(
-      STORAGE_KEYS.HAS_SEEN_ONBOARDING
-    );
-    if (!hasSeenOnboarding) {
-      return MOBILE_ROUTES.ONBOARDING.MAIN;
-    }
-
     const hasSeenNotificationPermission = await storageUtil.getItem<boolean>(
       STORAGE_KEYS.HAS_SEEN_NOTIFICATION_PERMISSION
     );

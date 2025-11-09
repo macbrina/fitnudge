@@ -4,14 +4,40 @@ Celery Application Configuration
 Celery task queue using Redis as broker and backend.
 """
 
+from __future__ import annotations
+
+import ssl
+from typing import Dict, Optional
+
 from celery import Celery
 from app.core.config import settings
 
+
+def _build_redis_ssl_options(url: str) -> Optional[Dict[str, int]]:
+    """
+    Celery requires explicit SSL options when connecting to Redis over TLS.
+    Upstash supplies rediss:// URLs without extra parameters, so provide a
+    sensible default to keep local development working.
+    """
+
+    if not url or not url.startswith("rediss://"):
+        return None
+
+    # Respect explicit ssl_cert_reqs in the URL if provided.
+    if "ssl_cert_reqs" in url:
+        return None
+
+    return {"ssl_cert_reqs": ssl.CERT_NONE}
+
+
 # Create Celery app instance
+redis_url = settings.REDIS_URL
+redis_ssl_options = _build_redis_ssl_options(redis_url)
+
 celery_app = Celery(
     "fitnudge",
-    broker=settings.REDIS_URL,
-    backend=settings.REDIS_URL,
+    broker=redis_url,
+    backend=redis_url,
     include=["app.services.tasks"],  # Include task modules
 )
 
@@ -30,6 +56,8 @@ celery_app.conf.update(
     result_expires=3600,  # Results expire after 1 hour
     task_acks_late=True,  # Acknowledge task only after completion
     task_reject_on_worker_lost=True,  # Reject task if worker dies
+    broker_use_ssl=redis_ssl_options,
+    redis_backend_use_ssl=redis_ssl_options,
     # Beat schedule for periodic tasks
     beat_schedule={
         "generate-weekly-recaps": {

@@ -86,10 +86,12 @@ export const performNativeGoogleSignIn =
     }
 
     const userInfo = await GoogleSignin.signIn();
-    const { idToken, serverAuthCode } = userInfo as {
-      idToken?: string | null;
-      serverAuthCode?: string | null;
-    };
+    const { idToken, serverAuthCode } =
+      userInfo?.data ??
+      ({} as {
+        idToken?: string | null;
+        serverAuthCode?: string | null;
+      });
 
     if (!idToken) {
       throw new Error("Google Sign-In did not return an ID token.");

@@ -108,10 +108,13 @@ def get_current_user_id(token: str) -> Optional[str]:
 
 
 async def authenticate_user(email: str, password: str) -> Optional[Dict[str, Any]]:
-    """Authenticate user with email and password"""
-    supabase = get_supabase_client()
+    """Authenticate user with email/password.
 
-    print("Authenticating user:", email)
+    Returns the user if credentials are valid. If the account was created through
+    a social provider (Google/Apple) and no password exists, raise a 403 with an
+    instruction to reset their password.
+    """
+    supabase = get_supabase_client()
 
     # Get user from database
     result = supabase.table("users").select("*").eq("email", email).execute()
@@ -120,6 +123,13 @@ async def authenticate_user(email: str, password: str) -> Optional[Dict[str, Any
         return None
 
     user = result.data[0]
+
+    # Social accounts without password should trigger password reset guidance
+    if not user.get("password_hash"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This account was created with Google or Apple sign-in. Reset your password to sign in with email",
+        )
 
     # Verify password
     if not verify_password(password, user["password_hash"]):

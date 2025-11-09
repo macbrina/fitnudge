@@ -331,20 +331,40 @@ async def verify_apple_identity_token(identity_token: str) -> Dict[str, Any]:
             detail="Invalid Apple credentials",
         )
 
-    try:
-        payload = jwt.decode(
-            identity_token,
-            matching_key,
-            algorithms=[headers.get("alg", "RS256")],
-            audience=settings.apple_client_ids,
-            issuer="https://appleid.apple.com",
+    audiences = settings.apple_client_ids or []
+    if not audiences:
+        audiences = [headers.get("kid")]
+
+    payload = None
+    last_error: Optional[Exception] = None
+
+    for aud in audiences:
+        if not aud:
+            continue
+        try:
+            payload = jwt.decode(
+                identity_token,
+                matching_key,
+                algorithms=[headers.get("alg", "RS256")],
+                audience=aud,
+                issuer="https://appleid.apple.com",
+            )
+            break
+        except JWTError as error:
+            last_error = error
+
+    if payload is None:
+        logger.warning(
+            "Failed to decode Apple identity token",
+            {
+                "error": str(last_error) if last_error else None,
+                "audiences": audiences,
+            },
         )
-    except JWTError as error:
-        logger.warning("Failed to decode Apple identity token", {"error": str(error)})
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid Apple credentials",
-        ) from error
+        ) from last_error
 
     return payload
 

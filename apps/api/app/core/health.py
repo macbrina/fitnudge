@@ -217,6 +217,8 @@ async def _check_smtp() -> HealthCheckResult:
 
     host = settings.SMTP_HOST
     port = settings.SMTP_PORT
+    username = settings.SMTP_USERNAME
+    password = settings.SMTP_PASSWORD
 
     if not host or not port:
         return HealthCheckResult(
@@ -233,6 +235,10 @@ async def _check_smtp() -> HealthCheckResult:
         if port == 587:
             smtp.starttls(context=context)
             smtp.ehlo()
+
+        # Some providers throttle unauthenticated probes; authenticate when credentials exist.
+        if username and password:
+            smtp.login(username, password)
 
         smtp.quit()
 

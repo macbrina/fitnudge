@@ -12,6 +12,44 @@ export interface ApiResponse<T = any> {
   status: number;
 }
 
+const extractMessageValue = (value: unknown, depth = 0): string | undefined => {
+  if (typeof value === "string" && value.trim()) {
+    return value;
+  }
+
+  if (
+    value &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    depth < 3
+  ) {
+    const record = value as Record<string, unknown>;
+    for (const key of ["message", "error", "detail", "next_steps"] as const) {
+      const candidate = extractMessageValue(record[key], depth + 1);
+      if (candidate) {
+        return candidate;
+      }
+    }
+  }
+
+  return undefined;
+};
+
+export class ApiError<T = any> extends Error {
+  status: number;
+  data?: T;
+
+  constructor(status: number, detail: T, fallbackMessage?: string) {
+    const message =
+      extractMessageValue(detail) || fallbackMessage || "Request failed";
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.data = detail;
+    Object.setPrototypeOf(this, ApiError.prototype);
+  }
+}
+
 // Configuration
 export const resolveBaseUrl = (): string => {
   // Prefer Expo config extra first, then env var
@@ -268,10 +306,7 @@ export abstract class BaseApiService {
         );
       }
 
-      return {
-        status: 401,
-        error: "Not authenticated",
-      };
+      throw new ApiError(401, null, "Not authenticated");
     }
 
     const defaultHeaders: HeadersInit = {
@@ -338,6 +373,8 @@ export abstract class BaseApiService {
 
       // Only set data if request was successful (2xx status codes)
       if (!response.ok) {
+        const errorPayload = data;
+
         // If 401 Unauthorized, try to refresh the token and retry the request once
         // Skip auto-refresh for the refresh endpoint itself to avoid infinite loops
         if (
@@ -393,16 +430,11 @@ export abstract class BaseApiService {
 
             // Return retry response
             if (!retryResponse.ok) {
-              return {
-                status: retryResponse.status,
-                error:
-                  (retryData &&
-                    (retryData.detail ||
-                      retryData.message ||
-                      retryData.error)) ||
-                  `Request failed with status ${retryResponse.status}`,
-                data: undefined,
-              };
+              throw new ApiError(
+                retryResponse.status,
+                retryData,
+                `Request failed with status ${retryResponse.status}`
+              );
             }
 
             return {
@@ -432,9 +464,6 @@ export abstract class BaseApiService {
               refreshResponse.status === 404 ||
               refreshResponse.status === 500
             ) {
-              console.log(
-                `[API] User appears to be deleted/invalid (status: ${refreshResponse.status}, error: ${refreshError}), triggering auto-logout`
-              );
               try {
                 const { handleAutoLogout } = await import("@/utils/authUtils");
                 await handleAutoLogout("not_found");
@@ -483,33 +512,13 @@ export abstract class BaseApiService {
               (data && (data.detail || data.message || data.error)) ||
                 "Service temporarily unavailable"
             );
-        } else if (response.status >= 500) {
-          useSystemStatusStore
-            .getState()
-            .setBackendStatus(
-              "offline",
-              `Server error (HTTP ${response.status})`
-            );
-        } else if (response.status >= 400) {
-          useSystemStatusStore
-            .getState()
-            .setBackendStatus(
-              "degraded",
-              (data && (data.detail || data.message || data.error)) ||
-                `Request failed (HTTP ${response.status})`
-            );
         }
-
-        return {
-          status: response.status,
-          error:
-            (data && (data.detail || data.message || data.error)) ||
-            `Request failed with status ${response.status}`,
-          data: undefined, // Explicitly undefined on failure
-        };
+        throw new ApiError(
+          response.status,
+          errorPayload,
+          `Request failed with status ${response.status}`
+        );
       }
-
-      useSystemStatusStore.getState().setBackendStatus("online", null);
 
       // Success: return data only if status is 2xx
       return {
@@ -518,6 +527,9 @@ export abstract class BaseApiService {
         error: undefined, // Explicitly undefined on success
       };
     } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
       if (__DEV__) {
         console.warn(
           `[API] Request to ${url} failed. Is the backend running?`,
@@ -525,28 +537,30 @@ export abstract class BaseApiService {
         );
       }
       console.log("error", error);
-      useSystemStatusStore
-        .getState()
-        .setBackendStatus(
-          "offline",
-          error instanceof Error ? error.message : "Network error"
-        );
+      if (
+        error instanceof Error &&
+        error.message.includes("Network request failed")
+      ) {
+        useSystemStatusStore
+          .getState()
+          .setBackendStatus(
+            "offline",
+            error instanceof Error ? error.message : "Network error"
+          );
+      }
       if (error instanceof Error) {
         if (error.name === "AbortError") {
-          return {
-            status: 408,
-            error: "Request timeout",
-          };
+          throw new ApiError(408, null, "Request timeout");
         }
-        return {
-          status: 0,
-          error: error.message,
-        };
+        throw new ApiError(0, null, error.message);
       }
-      return {
-        status: 0,
-        error: "Unknown error occurred",
-      };
+      const status =
+        typeof (error as Record<string, unknown>)?.status === "number"
+          ? ((error as Record<string, unknown>).status as number)
+          : 0;
+      const detail =
+        (error as Record<string, unknown>)?.error ?? "Unknown error occurred";
+      throw new ApiError(status, detail, "Unknown error occurred");
     }
   }
 

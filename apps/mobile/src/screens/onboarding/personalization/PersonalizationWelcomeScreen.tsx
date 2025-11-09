@@ -1,15 +1,10 @@
-import React from "react";
-import { View, Text, Image } from "react-native";
-import { useTranslation } from "@/lib/i18n";
 import { fontFamily } from "@/lib/fonts";
+import { useTranslation } from "@/lib/i18n";
 import { toRN } from "@/lib/units";
 import { useStyles } from "@/themes/makeStyles";
 import { lineHeight } from "@/themes/tokens";
+import { Image, Text, View } from "react-native";
 import PersonalizationLayout from "./PersonalizationLayout";
-import { useAuthStore } from "@/stores/authStore";
-import { useRouter } from "expo-router";
-import { MOBILE_ROUTES } from "@/lib/routes";
-import Button from "@/components/ui/Button";
 
 interface PersonalizationWelcomeScreenProps {
   onContinue: () => void;
@@ -20,15 +15,6 @@ export default function PersonalizationWelcomeScreen({
 }: PersonalizationWelcomeScreenProps) {
   const { t } = useTranslation();
   const styles = useStyles(makePersonalizationWelcomeScreenStyles);
-  const router = useRouter();
-  const { logout, isLoggingOut } = useAuthStore();
-
-  const handleLogout = async () => {
-    const success = await logout();
-    if (success) {
-      router.replace(MOBILE_ROUTES.AUTH.LOGIN);
-    }
-  };
 
   return (
     <PersonalizationLayout
@@ -87,15 +73,6 @@ export default function PersonalizationWelcomeScreen({
             </Text>
           </View>
         </View>
-
-        <Button
-          title={t("common.logout")}
-          variant="secondary"
-          onPress={handleLogout}
-          loading={isLoggingOut}
-          disabled={isLoggingOut}
-          fullWidth
-        />
       </View>
     </PersonalizationLayout>
   );

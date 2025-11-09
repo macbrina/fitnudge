@@ -6,6 +6,7 @@ import { useAppFonts } from "@/lib/fonts";
 import { LoadingContainer } from "@/components/common/LoadingContainer";
 import { TokenManager } from "@/services/api/base";
 import { getRedirection } from "@/utils/getRedirection";
+import { storageUtil, STORAGE_KEYS } from "@/utils/storageUtil";
 
 export default function Index() {
   const { isAuthenticated, user } = useAuthStore();
@@ -86,7 +87,14 @@ export default function Index() {
         const url = await getRedirection();
         setRedirectUrl(url);
       } else {
-        setRedirectUrl(MOBILE_ROUTES.AUTH.MAIN);
+        const hasSeenOnboarding = await storageUtil.getItem<boolean>(
+          STORAGE_KEYS.HAS_SEEN_ONBOARDING
+        );
+        if (!hasSeenOnboarding) {
+          setRedirectUrl(MOBILE_ROUTES.ONBOARDING.MAIN);
+        } else {
+          setRedirectUrl(MOBILE_ROUTES.AUTH.MAIN);
+        }
       }
     };
     initialize();

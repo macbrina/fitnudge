@@ -14,7 +14,7 @@ import { NotificationProvider } from "@/contexts/NotificationContext";
 import { AlertModalProvider } from "@/contexts/AlertModalContext";
 import { PostHogProvider } from "@/providers/PostHogProvider";
 import { setupDeepLinkListener } from "@/utils/deepLinkHandler";
-import { useEffect } from "react";
+import { useEffect, type ReactElement, type ReactNode } from "react";
 import { SystemStatusListener } from "@/components/system/SystemStatusListener";
 import { useBackendHealthMonitor } from "@/hooks/useBackendHealthMonitor";
 
@@ -135,7 +135,7 @@ function StatusBarWrapper() {
   );
 }
 
-function BackgroundColorWrapper({ children }: { children: React.ReactNode }) {
+function BackgroundColorWrapper({ children }: { children: ReactNode }) {
   const { colors } = useTheme();
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg.canvas }}>
@@ -146,7 +146,7 @@ function BackgroundColorWrapper({ children }: { children: React.ReactNode }) {
 
 // LaunchDarkly user identification is now handled by the provider
 
-export default Sentry.wrap(function RootLayout() {
+function RootLayout(): ReactElement {
   // Setup deep link listener
   useEffect(() => {
     const cleanup = setupDeepLinkListener();
@@ -177,4 +177,10 @@ export default Sentry.wrap(function RootLayout() {
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
-});
+}
+
+const WrappedRootLayout = Sentry.wrap(RootLayout);
+
+export default function RootLayoutContainer(): ReactElement {
+  return <WrappedRootLayout />;
+}

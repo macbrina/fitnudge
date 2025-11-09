@@ -8,6 +8,7 @@ import {
 } from "@/services/api";
 import { useGoalNotifications } from "@/hooks/notifications/useGoalNotifications";
 import { useUserTimezone } from "@/hooks/useUserTimezone";
+import { useAuthStore } from "@/stores/authStore";
 
 // Query Keys
 export const goalsQueryKeys = {
