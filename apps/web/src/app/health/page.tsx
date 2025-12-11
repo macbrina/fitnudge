@@ -378,7 +378,9 @@ export default function HealthPage() {
       setError(null);
 
       try {
-        const response = await fetch(`${root}/health`, { cache: "no-cache" });
+        const response = await fetch(`${root}/health?force=true`, {
+          cache: "no-cache",
+        });
 
         if (!response.ok) {
           const payload = await response.json().catch(() => null);

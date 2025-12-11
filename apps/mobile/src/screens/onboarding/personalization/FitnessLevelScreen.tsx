@@ -8,6 +8,7 @@ import { tokens, lineHeight } from "@/themes/tokens";
 import { useTheme } from "@/themes";
 import PersonalizationLayout from "./PersonalizationLayout";
 import { useOnboardingStore } from "@/stores/onboardingStore";
+import { Card } from "@/components/ui/Card";
 
 interface FitnessLevelScreenProps {
   onContinue: (fitnessLevel: string) => void;
@@ -85,45 +86,53 @@ export default function FitnessLevelScreen({
         </Text>
 
         <View style={styles.optionsContainer}>
-          {FITNESS_LEVELS.map((level) => (
-            <TouchableOpacity
-              key={level.id}
-              onPress={() => setSelectedLevel(level.id)}
-              style={[
-                styles.optionCard,
-                selectedLevel === level.id && styles.optionCardSelected,
-              ]}
-              activeOpacity={0.7}
-            >
-              <View
-                style={[
-                  styles.iconContainer,
-                  selectedLevel === level.id && styles.iconContainerSelected,
-                ]}
+          {FITNESS_LEVELS.map((level) => {
+            const isSelected = selectedLevel === level.id;
+            return (
+              <TouchableOpacity
+                key={level.id}
+                onPress={() => setSelectedLevel(level.id)}
+                style={styles.optionCardTouchable}
+                activeOpacity={0.7}
               >
-                <Text style={styles.optionIcon}>{level.icon}</Text>
-              </View>
-              <View style={styles.textContainer}>
-                <Text
+                <Card
+                  padded={false}
+                  shadow={isSelected ? "xl" : "md"}
                   style={[
-                    styles.optionTitle,
-                    selectedLevel === level.id && styles.optionTitleSelected,
+                    styles.optionCard,
+                    isSelected && styles.optionCardSelected,
                   ]}
                 >
-                  {t(level.title)}
-                </Text>
-                <Text
-                  style={[
-                    styles.optionDescription,
-                    selectedLevel === level.id &&
-                      styles.optionDescriptionSelected,
-                  ]}
-                >
-                  {t(level.description)}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))}
+                  <View
+                    style={[
+                      styles.iconContainer,
+                      isSelected && styles.iconContainerSelected,
+                    ]}
+                  >
+                    <Text style={styles.optionIcon}>{level.icon}</Text>
+                  </View>
+                  <View style={styles.textContainer}>
+                    <Text
+                      style={[
+                        styles.optionTitle,
+                        isSelected && styles.optionTitleSelected,
+                      ]}
+                    >
+                      {t(level.title)}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.optionDescription,
+                        isSelected && styles.optionDescriptionSelected,
+                      ]}
+                    >
+                      {t(level.description)}
+                    </Text>
+                  </View>
+                </Card>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       </View>
     </PersonalizationLayout>
@@ -164,30 +173,19 @@ const makeFitnessLevelScreenStyles = (tokens: any, colors: any, brand: any) => {
       gap: toRN(tokens.spacing[4]),
       marginBottom: toRN(tokens.spacing[6]),
     },
-    optionCard: {
-      backgroundColor: colors.bg.surface,
+    optionCardTouchable: {
       borderRadius: toRN(tokens.borderRadius.xl),
+    },
+    optionCard: {
       padding: toRN(tokens.spacing[5]),
       flexDirection: "row" as const,
       alignItems: "center" as const,
-      borderWidth: 2,
-      borderColor: colors.border.default,
-      shadowColor: colors.shadow.default,
-      shadowOffset: {
-        width: 0,
-        height: 2,
-      },
-      shadowOpacity: 0.08,
-      shadowRadius: 8,
-      elevation: 2,
     },
     optionCardSelected: {
       borderColor: brand.primary,
       backgroundColor: brand.primary + "08",
-      shadowColor: brand.primary,
-      shadowOpacity: 0.15,
-      shadowRadius: 12,
-      elevation: 4,
+      borderWidth: 2,
+      borderRadius: toRN(tokens.borderRadius.xl),
     },
     iconContainer: {
       width: 64,

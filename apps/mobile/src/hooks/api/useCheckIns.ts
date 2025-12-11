@@ -1,11 +1,10 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   checkInsService,
   CreateCheckInRequest,
   UpdateCheckInRequest,
-  CheckInStats,
-  CheckInCalendar,
 } from "@/services/api";
+import { useAuthStore } from "@/stores/authStore";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 // Query Keys
 export const checkInsQueryKeys = {
@@ -29,7 +28,7 @@ export const useCheckIns = (goalId?: string) => {
   return useQuery({
     queryKey: checkInsQueryKeys.list(goalId),
     queryFn: () => checkInsService.getCheckIns(goalId),
-    staleTime: 1 * 60 * 1000, // 1 minute
+    staleTime: 0, // Refetch immediately when invalidated (realtime updates)
   });
 };
 
@@ -48,13 +47,91 @@ export const useCreateCheckIn = () => {
   return useMutation({
     mutationFn: (checkIn: CreateCheckInRequest) =>
       checkInsService.createCheckIn(checkIn),
-    onSuccess: (_, variables) => {
-      // Invalidate check-ins for the specific goal
-      queryClient.invalidateQueries({
-        queryKey: checkInsQueryKeys.list(variables.goal_id),
+    // Optimistic update for instant UI feedback
+    onMutate: async (newCheckIn) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: checkInsQueryKeys.all });
+      await queryClient.cancelQueries({ queryKey: checkInsQueryKeys.today() });
+      await queryClient.cancelQueries({
+        queryKey: checkInsQueryKeys.list(newCheckIn.goal_id),
       });
-      // Also invalidate all check-ins
-      queryClient.invalidateQueries({ queryKey: checkInsQueryKeys.all });
+
+      // Snapshot previous data
+      const previousTodayCheckIns = queryClient.getQueryData(
+        checkInsQueryKeys.today()
+      );
+      const previousGoalCheckIns = queryClient.getQueryData(
+        checkInsQueryKeys.list(newCheckIn.goal_id)
+      );
+
+      // Create optimistic check-in
+      const optimisticCheckIn = {
+        id: `temp-${Date.now()}`,
+        ...newCheckIn,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        is_checked_in: false,
+      };
+
+      // Add to today's check-ins
+      queryClient.setQueryData(checkInsQueryKeys.today(), (old: any) => {
+        if (!old?.data) return old;
+        return { ...old, data: [...old.data, optimisticCheckIn] };
+      });
+
+      // Add to goal's check-ins
+      queryClient.setQueryData(
+        checkInsQueryKeys.list(newCheckIn.goal_id),
+        (old: any) => {
+          if (!old?.data) return old;
+          return { ...old, data: [...old.data, optimisticCheckIn] };
+        }
+      );
+
+      return {
+        previousTodayCheckIns,
+        previousGoalCheckIns,
+        goalId: newCheckIn.goal_id,
+      };
+    },
+    onError: (err, newCheckIn, context) => {
+      // Rollback on error
+      if (context?.previousTodayCheckIns) {
+        queryClient.setQueryData(
+          checkInsQueryKeys.today(),
+          context.previousTodayCheckIns
+        );
+      }
+      if (context?.previousGoalCheckIns) {
+        queryClient.setQueryData(
+          checkInsQueryKeys.list(newCheckIn.goal_id),
+          context.previousGoalCheckIns
+        );
+      }
+    },
+    onSuccess: (response, variables) => {
+      // Replace optimistic with real data
+      const realCheckIn = response?.data;
+      if (realCheckIn) {
+        queryClient.setQueryData(checkInsQueryKeys.today(), (old: any) => {
+          if (!old?.data) return old;
+          const filtered = old.data.filter(
+            (c: any) => !c.id?.startsWith?.("temp-")
+          );
+          return { ...old, data: [...filtered, realCheckIn] };
+        });
+
+        queryClient.setQueryData(
+          checkInsQueryKeys.list(variables.goal_id),
+          (old: any) => {
+            if (!old?.data) return old;
+            const filtered = old.data.filter(
+              (c: any) => !c.id?.startsWith?.("temp-")
+            );
+            return { ...old, data: [...filtered, realCheckIn] };
+          }
+        );
+      }
     },
   });
 };
@@ -70,11 +147,99 @@ export const useUpdateCheckIn = () => {
       checkInId: string;
       updates: UpdateCheckInRequest;
     }) => checkInsService.updateCheckIn(checkInId, updates),
-    onSuccess: (_, { checkInId }) => {
-      queryClient.invalidateQueries({ queryKey: checkInsQueryKeys.all });
-      queryClient.invalidateQueries({
-        queryKey: checkInsQueryKeys.detail(checkInId),
+    // Optimistic update for instant UI feedback on check-in
+    onMutate: async ({ checkInId, updates }) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: checkInsQueryKeys.all });
+      await queryClient.cancelQueries({ queryKey: checkInsQueryKeys.today() });
+
+      // Snapshot previous data
+      const previousTodayCheckIns = queryClient.getQueryData(
+        checkInsQueryKeys.today()
+      );
+      const previousDetail = queryClient.getQueryData(
+        checkInsQueryKeys.detail(checkInId)
+      );
+
+      // Optimistically update today's check-ins
+      queryClient.setQueryData(checkInsQueryKeys.today(), (old: any) => {
+        if (!old?.data) return old;
+        return {
+          ...old,
+          data: old.data.map((c: any) =>
+            c.id === checkInId
+              ? {
+                  ...c,
+                  ...updates,
+                  is_checked_in: true,
+                  updated_at: new Date().toISOString(),
+                }
+              : c
+          ),
+        };
       });
+
+      // Update detail cache if it exists
+      queryClient.setQueryData(
+        checkInsQueryKeys.detail(checkInId),
+        (old: any) => {
+          if (!old?.data) return old;
+          return {
+            ...old,
+            data: {
+              ...old.data,
+              ...updates,
+              is_checked_in: true,
+              updated_at: new Date().toISOString(),
+            },
+          };
+        }
+      );
+
+      return { previousTodayCheckIns, previousDetail, checkInId };
+    },
+    onError: (err, { checkInId }, context) => {
+      // Rollback on error
+      if (context?.previousTodayCheckIns) {
+        queryClient.setQueryData(
+          checkInsQueryKeys.today(),
+          context.previousTodayCheckIns
+        );
+      }
+      if (context?.previousDetail) {
+        queryClient.setQueryData(
+          checkInsQueryKeys.detail(checkInId),
+          context.previousDetail
+        );
+      }
+    },
+    onSuccess: (response, { checkInId }) => {
+      // Update with real server response
+      const updatedCheckIn = response?.data;
+      if (updatedCheckIn) {
+        queryClient.setQueryData(checkInsQueryKeys.today(), (old: any) => {
+          if (!old?.data) return old;
+          return {
+            ...old,
+            data: old.data.map((c: any) =>
+              c.id === checkInId ? updatedCheckIn : c
+            ),
+          };
+        });
+
+        queryClient.setQueryData(
+          checkInsQueryKeys.detail(checkInId),
+          (old: any) => ({
+            ...old,
+            data: updatedCheckIn,
+          })
+        );
+      }
+
+      // Invalidate stats and progress data (these need real recalculation from server)
+      queryClient.invalidateQueries({ queryKey: checkInsQueryKeys.stats() });
+      queryClient.invalidateQueries({ queryKey: ["progress"] });
+      queryClient.invalidateQueries({ queryKey: ["user", "stats"] });
     },
   });
 };
@@ -84,17 +249,54 @@ export const useDeleteCheckIn = () => {
 
   return useMutation({
     mutationFn: (checkInId: string) => checkInsService.deleteCheckIn(checkInId),
+    // Optimistic update for instant UI feedback
+    onMutate: async (checkInId) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: checkInsQueryKeys.all });
+      await queryClient.cancelQueries({ queryKey: checkInsQueryKeys.today() });
+
+      // Snapshot previous data
+      const previousTodayCheckIns = queryClient.getQueryData(
+        checkInsQueryKeys.today()
+      );
+
+      // Optimistically remove from today's check-ins
+      queryClient.setQueryData(checkInsQueryKeys.today(), (old: any) => {
+        if (!old?.data) return old;
+        return {
+          ...old,
+          data: old.data.filter((c: any) => c.id !== checkInId),
+        };
+      });
+
+      return { previousTodayCheckIns };
+    },
+    onError: (err, checkInId, context) => {
+      // Rollback on error
+      if (context?.previousTodayCheckIns) {
+        queryClient.setQueryData(
+          checkInsQueryKeys.today(),
+          context.previousTodayCheckIns
+        );
+      }
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: checkInsQueryKeys.all });
+      // Invalidate stats for recalculation
+      queryClient.invalidateQueries({ queryKey: checkInsQueryKeys.stats() });
+      queryClient.invalidateQueries({ queryKey: ["progress"] });
+      queryClient.invalidateQueries({ queryKey: ["user", "stats"] });
     },
   });
 };
 
 export const useCheckInStats = (goalId?: string) => {
+  const { isAuthenticated } = useAuthStore();
+
   return useQuery({
     queryKey: checkInsQueryKeys.stats(goalId),
     queryFn: () => checkInsService.getCheckInStats(goalId),
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    enabled: isAuthenticated, // Only fetch when authenticated
+    staleTime: 0, // Refetch immediately when invalidated (realtime updates)
   });
 };
 
@@ -131,11 +333,14 @@ export const useCheckInsByDateRange = (
 };
 
 export const useTodayCheckIns = () => {
+  const { isAuthenticated } = useAuthStore();
+
   return useQuery({
     queryKey: checkInsQueryKeys.today(),
     queryFn: () => checkInsService.getTodayCheckIns(),
-    staleTime: 30 * 1000, // 30 seconds
-    refetchInterval: 60 * 1000, // Refetch every minute
+    enabled: isAuthenticated, // Only fetch when authenticated
+    staleTime: 0, // Refetch immediately when invalidated (realtime updates)
+    refetchInterval: isAuthenticated ? 60 * 1000 : false, // Only refetch when authenticated
   });
 };
 
@@ -143,7 +348,7 @@ export const useStreakData = (goalId?: string) => {
   return useQuery({
     queryKey: checkInsQueryKeys.streak(goalId),
     queryFn: () => checkInsService.getStreakData(goalId),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 0, // refetch immediately when invalidated (realtime updates)
   });
 };
 
@@ -163,6 +368,6 @@ export const useMoodTrends = (goalId?: string, days: number = 30) => {
   return useQuery({
     queryKey: checkInsQueryKeys.moodTrends(goalId, days),
     queryFn: () => checkInsService.getMoodTrends(goalId, days),
-    staleTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: 0, // refetch immediately when invalidated (realtime updates)
   });
 };

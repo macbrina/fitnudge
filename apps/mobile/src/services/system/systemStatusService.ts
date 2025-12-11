@@ -31,8 +31,15 @@ const buildReasonFromChecks = (checks: HealthCheckResult[] = []): string => {
     .join(" • ");
 };
 
-export const fetchBackendHealth = async (): Promise<void> => {
-  const healthUrl = `${resolveApiRootUrl()}/health`;
+type FetchHealthOptions = {
+  force?: boolean;
+};
+
+export const fetchBackendHealth = async (
+  options: FetchHealthOptions = {}
+): Promise<void> => {
+  const baseUrl = `${resolveApiRootUrl()}/health`;
+  const healthUrl = options.force ? `${baseUrl}?force=true` : baseUrl;
 
   try {
     const response = await fetch(healthUrl, {

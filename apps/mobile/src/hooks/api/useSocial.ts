@@ -52,9 +52,46 @@ export const useCreatePost = () => {
 
   return useMutation({
     mutationFn: (post: CreatePostRequest) => socialService.createPost(post),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: socialQueryKeys.feed });
-      queryClient.invalidateQueries({ queryKey: socialQueryKeys.posts.all });
+    // Optimistic update - add to feed instantly
+    onMutate: async (newPost) => {
+      await queryClient.cancelQueries({ queryKey: socialQueryKeys.feed });
+
+      const previousFeed = queryClient.getQueryData(socialQueryKeys.feed);
+
+      // Create optimistic post
+      const optimisticPost = {
+        id: `temp-${Date.now()}`,
+        ...newPost,
+        created_at: new Date().toISOString(),
+        likes_count: 0,
+        comments_count: 0,
+        is_liked: false,
+      };
+
+      // Prepend to feed
+      queryClient.setQueryData(socialQueryKeys.feed, (old: any) => {
+        if (!old?.data) return old;
+        return { ...old, data: [optimisticPost, ...old.data] };
+      });
+
+      return { previousFeed };
+    },
+    onError: (err, newPost, context) => {
+      if (context?.previousFeed) {
+        queryClient.setQueryData(socialQueryKeys.feed, context.previousFeed);
+      }
+    },
+    onSuccess: (response) => {
+      const realPost = response?.data;
+      if (realPost) {
+        queryClient.setQueryData(socialQueryKeys.feed, (old: any) => {
+          if (!old?.data) return old;
+          const filtered = old.data.filter(
+            (p: any) => !p.id?.startsWith?.("temp-")
+          );
+          return { ...old, data: [realPost, ...filtered] };
+        });
+      }
     },
   });
 };
@@ -64,9 +101,23 @@ export const useDeletePost = () => {
 
   return useMutation({
     mutationFn: (postId: string) => socialService.deletePost(postId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: socialQueryKeys.feed });
-      queryClient.invalidateQueries({ queryKey: socialQueryKeys.posts.all });
+    // Optimistic update - remove from feed instantly
+    onMutate: async (postId) => {
+      await queryClient.cancelQueries({ queryKey: socialQueryKeys.feed });
+
+      const previousFeed = queryClient.getQueryData(socialQueryKeys.feed);
+
+      queryClient.setQueryData(socialQueryKeys.feed, (old: any) => {
+        if (!old?.data) return old;
+        return { ...old, data: old.data.filter((p: any) => p.id !== postId) };
+      });
+
+      return { previousFeed };
+    },
+    onError: (err, postId, context) => {
+      if (context?.previousFeed) {
+        queryClient.setQueryData(socialQueryKeys.feed, context.previousFeed);
+      }
     },
   });
 };
@@ -76,11 +127,59 @@ export const useLikePost = () => {
 
   return useMutation({
     mutationFn: (postId: string) => socialService.likePost(postId),
-    onSuccess: (_, postId) => {
-      queryClient.invalidateQueries({ queryKey: socialQueryKeys.feed });
-      queryClient.invalidateQueries({
+    // Optimistic update - toggle like instantly
+    onMutate: async (postId) => {
+      await queryClient.cancelQueries({ queryKey: socialQueryKeys.feed });
+      await queryClient.cancelQueries({
         queryKey: socialQueryKeys.posts.detail(postId),
       });
+
+      const previousFeed = queryClient.getQueryData(socialQueryKeys.feed);
+      const previousPost = queryClient.getQueryData(
+        socialQueryKeys.posts.detail(postId)
+      );
+
+      // Update in feed
+      queryClient.setQueryData(socialQueryKeys.feed, (old: any) => {
+        if (!old?.data) return old;
+        return {
+          ...old,
+          data: old.data.map((p: any) =>
+            p.id === postId
+              ? { ...p, is_liked: true, likes_count: (p.likes_count || 0) + 1 }
+              : p
+          ),
+        };
+      });
+
+      // Update post detail
+      queryClient.setQueryData(
+        socialQueryKeys.posts.detail(postId),
+        (old: any) => {
+          if (!old?.data) return old;
+          return {
+            ...old,
+            data: {
+              ...old.data,
+              is_liked: true,
+              likes_count: (old.data.likes_count || 0) + 1,
+            },
+          };
+        }
+      );
+
+      return { previousFeed, previousPost };
+    },
+    onError: (err, postId, context) => {
+      if (context?.previousFeed) {
+        queryClient.setQueryData(socialQueryKeys.feed, context.previousFeed);
+      }
+      if (context?.previousPost) {
+        queryClient.setQueryData(
+          socialQueryKeys.posts.detail(postId),
+          context.previousPost
+        );
+      }
     },
   });
 };
@@ -90,11 +189,63 @@ export const useUnlikePost = () => {
 
   return useMutation({
     mutationFn: (postId: string) => socialService.unlikePost(postId),
-    onSuccess: (_, postId) => {
-      queryClient.invalidateQueries({ queryKey: socialQueryKeys.feed });
-      queryClient.invalidateQueries({
+    // Optimistic update - toggle unlike instantly
+    onMutate: async (postId) => {
+      await queryClient.cancelQueries({ queryKey: socialQueryKeys.feed });
+      await queryClient.cancelQueries({
         queryKey: socialQueryKeys.posts.detail(postId),
       });
+
+      const previousFeed = queryClient.getQueryData(socialQueryKeys.feed);
+      const previousPost = queryClient.getQueryData(
+        socialQueryKeys.posts.detail(postId)
+      );
+
+      // Update in feed
+      queryClient.setQueryData(socialQueryKeys.feed, (old: any) => {
+        if (!old?.data) return old;
+        return {
+          ...old,
+          data: old.data.map((p: any) =>
+            p.id === postId
+              ? {
+                  ...p,
+                  is_liked: false,
+                  likes_count: Math.max(0, (p.likes_count || 0) - 1),
+                }
+              : p
+          ),
+        };
+      });
+
+      // Update post detail
+      queryClient.setQueryData(
+        socialQueryKeys.posts.detail(postId),
+        (old: any) => {
+          if (!old?.data) return old;
+          return {
+            ...old,
+            data: {
+              ...old.data,
+              is_liked: false,
+              likes_count: Math.max(0, (old.data.likes_count || 0) - 1),
+            },
+          };
+        }
+      );
+
+      return { previousFeed, previousPost };
+    },
+    onError: (err, postId, context) => {
+      if (context?.previousFeed) {
+        queryClient.setQueryData(socialQueryKeys.feed, context.previousFeed);
+      }
+      if (context?.previousPost) {
+        queryClient.setQueryData(
+          socialQueryKeys.posts.detail(postId),
+          context.previousPost
+        );
+      }
     },
   });
 };
@@ -118,13 +269,71 @@ export const useCreateComment = () => {
   return useMutation({
     mutationFn: (comment: CreateCommentRequest) =>
       socialService.createComment(comment),
-    onSuccess: (_, { post_id }) => {
-      queryClient.invalidateQueries({
-        queryKey: socialQueryKeys.comments(post_id),
+    // Optimistic update - add comment instantly
+    onMutate: async (newComment) => {
+      await queryClient.cancelQueries({
+        queryKey: socialQueryKeys.comments(newComment.post_id),
       });
-      queryClient.invalidateQueries({
-        queryKey: socialQueryKeys.posts.detail(post_id),
-      });
+
+      const previousComments = queryClient.getQueryData(
+        socialQueryKeys.comments(newComment.post_id)
+      );
+
+      // Create optimistic comment
+      const optimisticComment = {
+        id: `temp-${Date.now()}`,
+        ...newComment,
+        created_at: new Date().toISOString(),
+      };
+
+      // Add to comments
+      queryClient.setQueryData(
+        socialQueryKeys.comments(newComment.post_id),
+        (old: any) => {
+          if (!old?.data) return old;
+          return { ...old, data: [...old.data, optimisticComment] };
+        }
+      );
+
+      // Increment comment count on post
+      queryClient.setQueryData(
+        socialQueryKeys.posts.detail(newComment.post_id),
+        (old: any) => {
+          if (!old?.data) return old;
+          return {
+            ...old,
+            data: {
+              ...old.data,
+              comments_count: (old.data.comments_count || 0) + 1,
+            },
+          };
+        }
+      );
+
+      return { previousComments, postId: newComment.post_id };
+    },
+    onError: (err, newComment, context) => {
+      if (context?.previousComments) {
+        queryClient.setQueryData(
+          socialQueryKeys.comments(newComment.post_id),
+          context.previousComments
+        );
+      }
+    },
+    onSuccess: (response, { post_id }) => {
+      const realComment = response?.data;
+      if (realComment) {
+        queryClient.setQueryData(
+          socialQueryKeys.comments(post_id),
+          (old: any) => {
+            if (!old?.data) return old;
+            const filtered = old.data.filter(
+              (c: any) => !c.id?.startsWith?.("temp-")
+            );
+            return { ...old, data: [...filtered, realComment] };
+          }
+        );
+      }
     },
   });
 };
@@ -133,9 +342,56 @@ export const useDeleteComment = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (commentId: string) => socialService.deleteComment(commentId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["social", "comments"] });
+    mutationFn: ({
+      commentId,
+      postId,
+    }: {
+      commentId: string;
+      postId: string;
+    }) => socialService.deleteComment(commentId),
+    // Optimistic update - remove comment instantly
+    onMutate: async ({ commentId, postId }) => {
+      await queryClient.cancelQueries({
+        queryKey: socialQueryKeys.comments(postId),
+      });
+
+      const previousComments = queryClient.getQueryData(
+        socialQueryKeys.comments(postId)
+      );
+
+      // Remove from comments
+      queryClient.setQueryData(socialQueryKeys.comments(postId), (old: any) => {
+        if (!old?.data) return old;
+        return {
+          ...old,
+          data: old.data.filter((c: any) => c.id !== commentId),
+        };
+      });
+
+      // Decrement comment count on post
+      queryClient.setQueryData(
+        socialQueryKeys.posts.detail(postId),
+        (old: any) => {
+          if (!old?.data) return old;
+          return {
+            ...old,
+            data: {
+              ...old.data,
+              comments_count: Math.max(0, (old.data.comments_count || 0) - 1),
+            },
+          };
+        }
+      );
+
+      return { previousComments, postId };
+    },
+    onError: (err, { postId }, context) => {
+      if (context?.previousComments) {
+        queryClient.setQueryData(
+          socialQueryKeys.comments(postId),
+          context.previousComments
+        );
+      }
     },
   });
 };
@@ -145,16 +401,41 @@ export const useFollowUser = () => {
 
   return useMutation({
     mutationFn: (userId: string) => socialService.followUser(userId),
-    onSuccess: (_, userId) => {
-      queryClient.invalidateQueries({
+    // Optimistic update - toggle follow instantly
+    onMutate: async (userId) => {
+      await queryClient.cancelQueries({
         queryKey: socialQueryKeys.users.profile(userId),
       });
-      queryClient.invalidateQueries({
-        queryKey: ["social", "users", "followers"],
-      });
-      queryClient.invalidateQueries({
-        queryKey: ["social", "users", "following"],
-      });
+
+      const previousProfile = queryClient.getQueryData(
+        socialQueryKeys.users.profile(userId)
+      );
+
+      // Update profile
+      queryClient.setQueryData(
+        socialQueryKeys.users.profile(userId),
+        (old: any) => {
+          if (!old?.data) return old;
+          return {
+            ...old,
+            data: {
+              ...old.data,
+              is_following: true,
+              followers_count: (old.data.followers_count || 0) + 1,
+            },
+          };
+        }
+      );
+
+      return { previousProfile };
+    },
+    onError: (err, userId, context) => {
+      if (context?.previousProfile) {
+        queryClient.setQueryData(
+          socialQueryKeys.users.profile(userId),
+          context.previousProfile
+        );
+      }
     },
   });
 };
@@ -164,16 +445,41 @@ export const useUnfollowUser = () => {
 
   return useMutation({
     mutationFn: (userId: string) => socialService.unfollowUser(userId),
-    onSuccess: (_, userId) => {
-      queryClient.invalidateQueries({
+    // Optimistic update - toggle unfollow instantly
+    onMutate: async (userId) => {
+      await queryClient.cancelQueries({
         queryKey: socialQueryKeys.users.profile(userId),
       });
-      queryClient.invalidateQueries({
-        queryKey: ["social", "users", "followers"],
-      });
-      queryClient.invalidateQueries({
-        queryKey: ["social", "users", "following"],
-      });
+
+      const previousProfile = queryClient.getQueryData(
+        socialQueryKeys.users.profile(userId)
+      );
+
+      // Update profile
+      queryClient.setQueryData(
+        socialQueryKeys.users.profile(userId),
+        (old: any) => {
+          if (!old?.data) return old;
+          return {
+            ...old,
+            data: {
+              ...old.data,
+              is_following: false,
+              followers_count: Math.max(0, (old.data.followers_count || 0) - 1),
+            },
+          };
+        }
+      );
+
+      return { previousProfile };
+    },
+    onError: (err, userId, context) => {
+      if (context?.previousProfile) {
+        queryClient.setQueryData(
+          socialQueryKeys.users.profile(userId),
+          context.previousProfile
+        );
+      }
     },
   });
 };

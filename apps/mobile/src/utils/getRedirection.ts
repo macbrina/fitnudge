@@ -23,20 +23,6 @@ export async function getRedirection(): Promise<string> {
       return MOBILE_ROUTES.ONBOARDING.PERSONALIZATION;
     }
 
-    const hasSeenSuggestedGoals = await storageUtil.getItem<boolean>(
-      STORAGE_KEYS.HAS_SEEN_SUGGESTED_GOALS
-    );
-    if (!hasSeenSuggestedGoals) {
-      return MOBILE_ROUTES.ONBOARDING.SUGGESTED_GOALS;
-    }
-
-    const hasSeenSubscription = await storageUtil.getItem<boolean>(
-      STORAGE_KEYS.HAS_SEEN_SUBSCRIPTION
-    );
-    if (!hasSeenSubscription) {
-      return MOBILE_ROUTES.ONBOARDING.SUBSCRIPTION;
-    }
-
     // All onboarding steps complete → home
     return MOBILE_ROUTES.MAIN.HOME;
   } catch (error) {

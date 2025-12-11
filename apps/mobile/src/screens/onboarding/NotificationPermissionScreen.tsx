@@ -1,26 +1,23 @@
-import React, { useState } from "react";
-import { View, Text, Alert, Image, TouchableOpacity } from "react-native";
-import { useTranslation } from "@/lib/i18n";
-import { fontFamily } from "@/lib/fonts";
-import { toRN } from "@/lib/units";
-import { useStyles } from "@/themes/makeStyles";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Button from "@/components/ui/Button";
-import { router } from "expo-router";
-import { tokens } from "@/themes/tokens";
-import { useTheme } from "@/themes";
 import { useNotificationPermissions } from "@/hooks/notifications/useNotificationPermissions";
 import { usePostHog } from "@/hooks/usePostHog";
-import { logger } from "@/services/logger";
+import { fontFamily } from "@/lib/fonts";
+import { useTranslation } from "@/lib/i18n";
 import { MOBILE_ROUTES } from "@/lib/routes";
-import { storageUtil, STORAGE_KEYS } from "@/utils/storageUtil";
+import { toRN } from "@/lib/units";
+import { logger } from "@/services/logger";
+import { useStyles } from "@/themes/makeStyles";
+import { STORAGE_KEYS, storageUtil } from "@/utils/storageUtil";
+import { router } from "expo-router";
+import { useState } from "react";
+import { Text, TouchableOpacity, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function NotificationPermissionScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const { t } = useTranslation();
   const styles = useStyles(makeNotificationPermissionScreenStyles);
   const insets = useSafeAreaInsets();
-  const { colors } = useTheme();
   const { requestPermissionsWithSoftPrompt } = useNotificationPermissions();
   const { capture } = usePostHog();
 

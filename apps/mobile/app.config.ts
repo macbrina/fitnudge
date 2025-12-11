@@ -44,6 +44,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         webClientId: webClientId || undefined,
       },
     ],
+    "expo-sqlite", // Required for Supabase localStorage polyfill
   ];
 
   return {

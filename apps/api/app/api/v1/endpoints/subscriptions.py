@@ -10,29 +10,18 @@ router = APIRouter(
 
 
 # Pydantic models
-class SubscriptionPlan(BaseModel):
-    id: str
-    name: str
-    price: float
-    currency: str
-    interval: str  # monthly, yearly
-    features: List[str]
-    product_id_ios: str
-    product_id_android: str
-
-
 class SubscriptionResponse(BaseModel):
-    id: str
+    id: Optional[str] = None  # None for free users
     user_id: str
     plan: str
     status: str
-    platform: str
-    product_id: str
-    purchase_date: str
-    expires_date: Optional[str]
-    auto_renew: bool
-    created_at: str
-    updated_at: str
+    platform: Optional[str] = None  # None for free users
+    product_id: Optional[str] = None  # None for free users
+    purchase_date: Optional[str] = None  # None or user.created_at for free users
+    expires_date: Optional[str] = None
+    auto_renew: bool = False  # Always False for free users
+    created_at: Optional[str] = None  # None for free users
+    updated_at: Optional[str] = None  # None for free users
 
 
 class AppleReceiptVerify(BaseModel):
@@ -50,64 +39,15 @@ class OfferCodeValidate(BaseModel):
     product_id: str
 
 
-@router.get("/plans", response_model=List[SubscriptionPlan])
-async def get_subscription_plans():
-    """Get available subscription plans"""
-    return [
-        {
-            "id": "free",
-            "name": "Free",
-            "price": 0.0,
-            "currency": "USD",
-            "interval": "monthly",
-            "features": [
-                "1 active goal",
-                "Basic AI motivation",
-                "Community access",
-                "Text posts",
-            ],
-            "product_id_ios": "",
-            "product_id_android": "",
-        },
-        {
-            "id": "pro",
-            "name": "Pro",
-            "price": 4.99,
-            "currency": "USD",
-            "interval": "monthly",
-            "features": [
-                "Unlimited goals",
-                "Voice posts & AI coaching",
-                "Advanced analytics",
-                "Priority support",
-            ],
-            "product_id_ios": "com.fitnudge.pro.monthly",
-            "product_id_android": "pro_monthly",
-        },
-        {
-            "id": "coach_plus",
-            "name": "Coach+",
-            "price": 9.99,
-            "currency": "USD",
-            "interval": "monthly",
-            "features": [
-                "All Pro features",
-                "AI memory & personalization",
-                "Integrations (Apple Health, Fitbit)",
-                "Custom coaching programs",
-            ],
-            "product_id_ios": "com.fitnudge.coach.monthly",
-            "product_id_android": "coach_monthly",
-        },
-    ]
-
-
 @router.get("/me", response_model=Optional[SubscriptionResponse])
 async def get_my_subscription(current_user: dict = Depends(get_current_user)):
-    """Get current user's subscription"""
+    """Get current user's subscription (or free plan info)"""
     from app.core.database import get_supabase_client
+    from app.core.subscriptions import get_user_effective_plan
 
     supabase = get_supabase_client()
+
+    # Check for paid subscription
     result = (
         supabase.table("subscriptions")
         .select("*")
@@ -120,40 +60,58 @@ async def get_my_subscription(current_user: dict = Depends(get_current_user)):
 
     if result.data:
         return result.data[0]
-    return None
+
+    # Return free plan info (users.plan is the source of truth for free users)
+    plan = get_user_effective_plan(
+        current_user["id"], current_user.get("plan"), supabase
+    )
+
+    return {
+        "id": None,  # No subscription ID for free users
+        "user_id": current_user["id"],
+        "plan": plan,
+        "status": "active",  # Free is always active
+        "platform": None,
+        "product_id": None,
+        "purchase_date": current_user.get("created_at"),
+        "expires_date": None,
+        "auto_renew": False,
+        "created_at": None,
+        "updated_at": None,
+    }
 
 
 @router.get("/features")
 async def get_available_features(current_user: dict = Depends(get_current_user)):
-    """Get features available for current user's plan"""
+    """Get features available for current user's plan using tier-based system"""
     from app.core.database import get_supabase_client
+    from app.core.subscriptions import get_user_features_by_tier
 
     supabase = get_supabase_client()
-    subscription = (
-        supabase.table("subscriptions")
-        .select("*")
-        .eq("user_id", current_user["id"])
-        .eq("status", "active")
-        .order("created_at", desc=True)
-        .limit(1)
-        .execute()
+
+    # Use centralized helper to get plan and features based on tier inheritance
+    user_plan = current_user.get("plan")
+    features_data = get_user_features_by_tier(
+        user_id=current_user["id"], user_plan=user_plan, supabase=supabase
     )
 
-    plan = current_user["plan"]
-    if subscription.data:
-        plan = subscription.data[0]["plan"]
+    # Transform features to a more usable format
+    features_dict = {}
+    for feature in features_data["features"]:
+        feature_key = feature["feature_key"]
+        if feature.get("feature_value") is not None:
+            features_dict[feature_key] = feature["feature_value"]
+        else:
+            features_dict[feature_key] = feature.get("is_enabled", False)
 
-    features = {
-        "goals_limit": 1 if plan == "free" else -1,  # -1 means unlimited
-        "voice_posts": plan in ["pro", "coach_plus"],
-        "ai_coaching": plan in ["pro", "coach_plus"],
-        "analytics": plan in ["pro", "coach_plus"],
-        "integrations": plan == "coach_plus",
-        "ai_memory": plan == "coach_plus",
-        "priority_support": plan in ["pro", "coach_plus"],
+    return {
+        "plan": features_data["plan"],
+        "tier": features_data["tier"],
+        "features": features_dict,
+        "features_list": features_data[
+            "features"
+        ],  # Full feature objects with metadata
     }
-
-    return {"plan": plan, "features": features}
 
 
 # Apple In-App Purchase endpoints
@@ -199,13 +157,13 @@ async def get_apple_products():
             },
             {
                 "product_id": "com.fitnudge.coach.monthly",
-                "name": "Coach+ Monthly",
+                "name": "Elite Monthly",
                 "price": 9.99,
                 "currency": "USD",
             },
             {
                 "product_id": "com.fitnudge.coach.annual",
-                "name": "Coach+ Annual",
+                "name": "Elite Annual",
                 "price": 99.99,
                 "currency": "USD",
             },
@@ -318,13 +276,13 @@ async def get_google_products():
             },
             {
                 "product_id": "coach_monthly",
-                "name": "Coach+ Monthly",
+                "name": "Elite Monthly",
                 "price": 9.99,
                 "currency": "USD",
             },
             {
                 "product_id": "coach_annual",
-                "name": "Coach+ Annual",
+                "name": "Elite Annual",
                 "price": 99.99,
                 "currency": "USD",
             },

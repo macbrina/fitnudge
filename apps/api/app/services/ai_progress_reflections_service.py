@@ -1,7 +1,7 @@
 """
 AI Progress Reflections Service
 
-Premium AI-powered progress reflections for Pro/Coach+ users.
+Premium AI-powered progress reflections for Pro/Elite users.
 Enhanced version of weekly recap with deeper insights and coaching.
 """
 
@@ -75,7 +75,7 @@ class AIProgressReflectionsService:
                 supabase.table("user_fitness_profiles")
                 .select("*")
                 .eq("user_id", user_id)
-                .single()
+                .maybe_single()
                 .execute()
             )
 
@@ -90,16 +90,21 @@ class AIProgressReflectionsService:
                     supabase.table("goals")
                     .select("*")
                     .eq("id", goal_id)
-                    .single()
+                    .maybe_single()
                     .execute()
                 )
                 goal_data = goal.data if goal.data else None
             else:
                 goal_data = None
 
-            # Generate AI reflection
+            # Get social context for enhanced reflections
+            social_context = await self._get_social_context(
+                supabase, user_id, goal_id, start_date, end_date
+            )
+
+            # Generate AI reflection with social context
             reflection_text = await self._generate_ai_reflection(
-                check_ins, stats, goal_data, profile_data, period
+                check_ins, stats, goal_data, profile_data, period, social_context
             )
 
             return {
@@ -119,6 +124,165 @@ class AIProgressReflectionsService:
                 {"error": str(e), "user_id": user_id, "goal_id": goal_id},
             )
             raise
+
+    async def _get_social_context(
+        self,
+        supabase,
+        user_id: str,
+        goal_id: Optional[str],
+        start_date: date,
+        end_date: date,
+    ) -> Dict[str, Any]:
+        """
+        Fetch social context for the user and goal.
+
+        Returns context about:
+        - Group goals and team members
+        - Challenge participation and ranking
+        - Accountability partners
+        """
+        social_context = {
+            "is_group_goal": False,
+            "group_members": [],
+            "group_total_progress": 0,
+            "is_challenge": False,
+            "challenge_rank": None,
+            "challenge_participants": 0,
+            "challenge_title": None,
+            "accountability_partner": None,
+            "partner_streak": None,
+        }
+
+        try:
+            # Check if this is a group goal
+            if goal_id:
+                group_members_result = (
+                    supabase.table("group_goal_members")
+                    .select("*, user:users(id, name)")
+                    .eq("goal_id", goal_id)
+                    .eq("is_active", True)
+                    .execute()
+                )
+
+                if group_members_result.data and len(group_members_result.data) > 1:
+                    social_context["is_group_goal"] = True
+                    social_context["group_members"] = [
+                        m.get("user", {}).get("name", "Unknown")
+                        for m in group_members_result.data
+                        if m.get("user", {}).get("id") != user_id
+                    ]
+
+                    # Get total check-ins for the group goal during this period
+                    group_checkins = (
+                        supabase.table("check_ins")
+                        .select("id", count="exact")
+                        .eq("goal_id", goal_id)
+                        .eq("completed", True)
+                        .gte("date", start_date.isoformat())
+                        .lte("date", end_date.isoformat())
+                        .execute()
+                    )
+                    social_context["group_total_progress"] = (
+                        group_checkins.count if hasattr(group_checkins, "count") else 0
+                    )
+
+            # Check if user is in a challenge related to this goal
+            if goal_id:
+                # Check if goal was converted to a challenge
+                goal_result = (
+                    supabase.table("goals")
+                    .select("converted_to_challenge_id")
+                    .eq("id", goal_id)
+                    .maybe_single()
+                    .execute()
+                )
+
+                challenge_id = (
+                    goal_result.data.get("converted_to_challenge_id")
+                    if goal_result.data
+                    else None
+                )
+
+                if challenge_id:
+                    # Get challenge info
+                    challenge_result = (
+                        supabase.table("challenges")
+                        .select("id, title")
+                        .eq("id", challenge_id)
+                        .maybe_single()
+                        .execute()
+                    )
+
+                    if challenge_result.data:
+                        social_context["is_challenge"] = True
+                        social_context["challenge_title"] = challenge_result.data.get(
+                            "title"
+                        )
+
+                        # Get participant count
+                        participants = (
+                            supabase.table("challenge_participants")
+                            .select("id", count="exact")
+                            .eq("challenge_id", challenge_id)
+                            .execute()
+                        )
+                        social_context["challenge_participants"] = (
+                            participants.count if hasattr(participants, "count") else 0
+                        )
+
+                        # Get user's rank from leaderboard
+                        rank_result = (
+                            supabase.table("challenge_leaderboard")
+                            .select("rank")
+                            .eq("challenge_id", challenge_id)
+                            .eq("user_id", user_id)
+                            .maybe_single()
+                            .execute()
+                        )
+                        if rank_result.data:
+                            social_context["challenge_rank"] = rank_result.data.get(
+                                "rank"
+                            )
+
+            # Check for accountability partner
+            partner_result = (
+                supabase.table("accountability_partners")
+                .select(
+                    "*, partner:users!accountability_partners_partner_user_id_fkey(id, name)"
+                )
+                .eq("user_id", user_id)
+                .eq("status", "accepted")
+                .limit(1)
+                .execute()
+            )
+
+            if partner_result.data:
+                partner = partner_result.data[0]
+                partner_info = partner.get("partner", {})
+                social_context["accountability_partner"] = partner_info.get("name")
+
+                # Get partner's current streak (if available)
+                partner_id = partner_info.get("id")
+                if partner_id:
+                    streak_result = (
+                        supabase.table("users")
+                        .select("current_streak")
+                        .eq("id", partner_id)
+                        .maybe_single()
+                        .execute()
+                    )
+                    if streak_result.data:
+                        social_context["partner_streak"] = streak_result.data.get(
+                            "current_streak"
+                        )
+
+        except Exception as e:
+            logger.warning(
+                f"Failed to fetch social context: {e}",
+                {"user_id": user_id, "goal_id": goal_id, "error": str(e)},
+            )
+
+        return social_context
 
     def _calculate_stats(
         self, check_ins: List[Dict[str, Any]], start_date: date, end_date: date
@@ -175,11 +339,52 @@ class AIProgressReflectionsService:
         goal_data: Optional[Dict[str, Any]],
         profile_data: Dict[str, Any],
         period: str,
+        social_context: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Generate AI-powered reflection text"""
         from datetime import datetime
 
-        prompt = f"""You are an expert fitness coach and accountability partner providing a deep, personalized progress reflection for a Pro/Coach+ user.
+        # Build social context section
+        social_section = ""
+        if social_context:
+            social_parts = []
+
+            if social_context.get("is_group_goal") and social_context.get(
+                "group_members"
+            ):
+                members = ", ".join(social_context["group_members"][:3])
+                if len(social_context["group_members"]) > 3:
+                    members += f" and {len(social_context['group_members']) - 3} others"
+                social_parts.append(f"- Team Members: {members}")
+                social_parts.append(
+                    f"- Team Total Check-ins: {social_context.get('group_total_progress', 0)}"
+                )
+
+            if social_context.get("is_challenge"):
+                social_parts.append(
+                    f"- Active Challenge: {social_context.get('challenge_title', 'Unknown')}"
+                )
+                rank = social_context.get("challenge_rank")
+                participants = social_context.get("challenge_participants", 0)
+                if rank:
+                    social_parts.append(
+                        f"- Current Rank: #{rank} out of {participants} participants"
+                    )
+                else:
+                    social_parts.append(f"- Challenge Participants: {participants}")
+
+            if social_context.get("accountability_partner"):
+                partner_info = f"- Accountability Partner: {social_context['accountability_partner']}"
+                if social_context.get("partner_streak"):
+                    partner_info += (
+                        f" (on a {social_context['partner_streak']}-day streak)"
+                    )
+                social_parts.append(partner_info)
+
+            if social_parts:
+                social_section = "\n\nSOCIAL CONTEXT:\n" + "\n".join(social_parts)
+
+        prompt = f"""You are an expert fitness coach and accountability partner providing a deep, personalized progress reflection for a premium subscriber.
 
 USER CONTEXT:
 - Primary Goal: {goal_data.get('title', 'General fitness') if goal_data else 'Multiple goals'}
@@ -192,7 +397,7 @@ PERFORMANCE DATA ({period}):
 - Total Check-ins: {stats['total_completed']} out of {stats['total_days']} days
 - Current Streak: {stats['current_streak']} days
 - Longest Streak: {stats['longest_streak']} days
-- Average Mood: {stats['average_mood'] if stats['average_mood'] else 'N/A'}
+- Average Mood: {stats['average_mood'] if stats['average_mood'] else 'N/A'}{social_section}
 
 INSTRUCTIONS:
 1. Provide a comprehensive, deep analysis (not just a summary)
@@ -202,14 +407,18 @@ INSTRUCTIONS:
 5. Connect their progress to their stated goals and challenges
 6. Use a {profile_data.get('motivation_style', 'friendly')} tone but be professional
 7. Write 4-5 paragraphs with specific insights
+8. If they have social context (team, challenge, partner), reference it meaningfully:
+   - For team goals: Comment on team dynamics and collaboration
+   - For challenges: Reference their ranking and competitive spirit
+   - For accountability partners: Mention the value of their partnership
 
 FORMAT:
 - Opening: Context and overall assessment
-- Strengths: What they're doing well
+- Strengths: What they're doing well (including social aspects if applicable)
 - Challenges: Areas for improvement
-- Insights: Pattern analysis and observations
+- Insights: Pattern analysis and observations (include team/challenge dynamics if relevant)
 - Recommendations: 2-3 specific, actionable next steps
-- Closing: Encouragement and motivation
+- Closing: Encouragement and motivation (reference partner/team if applicable)
 
 Generate the reflection now:"""
 

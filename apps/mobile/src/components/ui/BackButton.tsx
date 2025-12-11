@@ -36,23 +36,16 @@ export const BackButton: React.FC<BackButtonProps> = ({
   const textInputPosition = textInput?.position || "right";
 
   return (
-    <View
-      style={[
-        styles.container,
-        {
-          paddingTop: insets.top + toRN(tokens.spacing[4]),
-          paddingBottom: toRN(tokens.spacing[4]),
-        },
-        style,
-      ]}
-    >
+    <View style={styles.container}>
       <View style={styles.content}>
         <TouchableOpacity style={styles.backButton} onPress={onPress}>
           <ArrowBackIcon size={24} color={colors.text.primary} />
         </TouchableOpacity>
 
         {hasTitle && !titleCentered && (
-          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.title} numberOfLines={1} ellipsizeMode="tail">
+            {title}
+          </Text>
         )}
 
         {hasTextInput && textInputPosition === "left" && (
@@ -66,7 +59,13 @@ export const BackButton: React.FC<BackButtonProps> = ({
 
         {hasTitle && titleCentered && (
           <View style={styles.centeredTitleContainer}>
-            <Text style={[styles.title, styles.titleCentered]}>{title}</Text>
+            <Text
+              style={[styles.title, styles.titleCentered]}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {title}
+            </Text>
           </View>
         )}
 
@@ -91,6 +90,7 @@ const makeBackButtonStyles = (tokens: any, colors: any, brand: any) => {
   return {
     container: {
       paddingHorizontal: toRN(tokens.spacing[6]),
+      paddingVertical: toRN(tokens.spacing[4]),
       borderBottomWidth: 1,
       borderBottomColor: colors.border.default,
       marginBottom: toRN(tokens.spacing[4]),
@@ -132,8 +132,8 @@ const makeBackButtonStyles = (tokens: any, colors: any, brand: any) => {
     },
     centeredTitleContainer: {
       position: "absolute" as const,
-      left: 0,
-      right: 0,
+      left: 60, // Space for back button (48px) + gap (12px)
+      right: 60, // Symmetric padding
       alignItems: "center" as const,
       justifyContent: "center" as const,
       pointerEvents: "none" as const,

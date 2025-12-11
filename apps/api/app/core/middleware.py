@@ -2,73 +2,12 @@ from fastapi import Request, HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse, Response
 import time
-import redis
 import hashlib
 import json
 import re
 from typing import Optional, List
-from app.core.config import settings
 from app.core.database import get_supabase_client
-
-# Redis client for rate limiting and security
-# Lazy initialization to avoid blocking app startup if Redis is unavailable
-_redis_client = None
-
-
-def get_redis_client():
-    """Get or create Redis client with error handling"""
-    global _redis_client
-    if _redis_client is None:
-        try:
-            _redis_client = redis.from_url(settings.REDIS_URL)
-            # Test connection
-            _redis_client.ping()
-        except Exception as e:
-            print(f"⚠️ Redis connection failed: {e}. Some features may be unavailable.")
-
-            # Return a dummy client that no-ops for development
-            class DummyRedis:
-                def get(self, *args, **kwargs):
-                    return None
-
-                def setex(self, *args, **kwargs):
-                    pass
-
-                def incr(self, *args, **kwargs):
-                    return 1
-
-                def delete(self, *args, **kwargs):
-                    pass
-
-                def lpush(self, *args, **kwargs):
-                    pass
-
-                def ltrim(self, *args, **kwargs):
-                    pass
-
-                def exists(self, *args, **kwargs):
-                    return 0
-
-                def sadd(self, *args, **kwargs):
-                    pass
-
-                def expire(self, *args, **kwargs):
-                    pass
-
-                def smembers(self, *args, **kwargs):
-                    return set()
-
-                def srem(self, *args, **kwargs):
-                    pass
-
-                def ping(self, *args, **kwargs):
-                    pass
-
-            _redis_client = DummyRedis()
-    return _redis_client
-
-
-# Convenience function - call get_redis_client() in middleware
+from app.core.cache import get_redis_client
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -330,12 +269,17 @@ class SQLInjectionProtectionMiddleware(BaseHTTPMiddleware):
     """Basic SQL injection protection"""
 
     SQL_INJECTION_PATTERNS = [
-        r"(\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|UNION|SCRIPT)\b)",
-        r"(\b(OR|AND)\s+\d+\s*=\s*\d+)",
-        r"(--|#|\/\*|\*\/)",
-        r"(\b(UNION|UNION ALL)\b)",
-        r"(\b(SCRIPT|JAVASCRIPT|VBSCRIPT)\b)",
-        r"(\b(WAITFOR|DELAY|SLEEP)\b)",
+        r"\bSELECT\b\s+.+\bFROM\b",
+        r"\bINSERT\b\s+INTO\b",
+        r"\bUPDATE\b\s+\w+\s+SET\b",
+        r"\bDELETE\b\s+FROM\b",
+        r"\bDROP\b\s+(TABLE|DATABASE|FUNCTION|PROCEDURE)\b",
+        r"\bALTER\b\s+(TABLE|DATABASE|FUNCTION|PROCEDURE)\b",
+        r"\bCREATE\b\s+(TABLE|DATABASE|FUNCTION|PROCEDURE)\b",
+        r"\bUNION\b\s+SELECT\b",
+        r";--",
+        r"--\s",
+        r"/\*.*?\*/",
     ]
 
     async def dispatch(self, request: Request, call_next):
@@ -348,6 +292,16 @@ class SQLInjectionProtectionMiddleware(BaseHTTPMiddleware):
 
         # Check request body for POST/PUT requests
         if request.method in ["POST", "PUT", "PATCH"]:
+            content_type = request.headers.get("content-type", "")
+
+            # Skip binary/multipart requests (file uploads)
+            if (
+                "multipart/form-data" in content_type
+                or "application/octet-stream" in content_type
+            ):
+                response = await call_next(request)
+                return response
+
             body = await request.body()
             if body:
                 try:
@@ -358,12 +312,17 @@ class SQLInjectionProtectionMiddleware(BaseHTTPMiddleware):
                             detail="Invalid characters detected in request body",
                         )
                 except json.JSONDecodeError:
-                    # Check raw body for SQL injection
-                    if self._contains_sql_injection(body.decode()):
-                        raise HTTPException(
-                            status_code=400,
-                            detail="Invalid characters detected in request body",
-                        )
+                    # Check raw body for SQL injection (only for text content)
+                    try:
+                        body_text = body.decode("utf-8")
+                        if self._contains_sql_injection(body_text):
+                            raise HTTPException(
+                                status_code=400,
+                                detail="Invalid characters detected in request body",
+                            )
+                    except UnicodeDecodeError:
+                        # Binary data, skip SQL injection check
+                        pass
 
         response = await call_next(request)
         return response

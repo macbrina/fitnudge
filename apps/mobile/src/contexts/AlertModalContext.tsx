@@ -8,13 +8,13 @@ import React, {
   useState,
 } from "react";
 import {
-  Modal,
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   Animated,
   Easing,
+  Modal,
 } from "react-native";
 import { useTheme } from "@/themes";
 import { useStyles } from "@/themes/makeStyles";
@@ -31,6 +31,7 @@ export interface AlertOptions {
   confirmLabel?: string;
   cancelLabel?: string;
   showCancel?: boolean;
+  showCloseIcon?: boolean;
   dismissible?: boolean;
   autoCloseMs?: number;
   iconName?: keyof typeof Ionicons.glyphMap;
@@ -49,6 +50,9 @@ interface AlertModalContextValue {
     options: Omit<AlertOptions, "showCancel"> & { duration?: number }
   ) => void;
   dismiss: () => void;
+  // Internal state for AlertOverlay
+  currentAlert: AlertRequest | null;
+  handleResolve: (result: boolean) => void;
 }
 
 const AlertModalContext = createContext<AlertModalContextValue | undefined>(
@@ -62,6 +66,7 @@ const DEFAULT_OPTIONS: AlertOptions = {
   confirmLabel: "OK",
   cancelLabel: "Cancel",
   showCancel: false,
+  showCloseIcon: false,
   dismissible: true,
 };
 
@@ -124,89 +129,132 @@ const variantConfig: Record<
 
 const makeStyles = (tokens: any, colors: any, brandColors: any) => ({
   overlay: {
-    flex: 1,
-    backgroundColor: colors.bg.overlay,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: toRN(tokens.spacing[6]),
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.bg.overlayLight,
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+    paddingHorizontal: toRN(tokens.spacing[8]),
+    zIndex: 9999,
   },
   card: {
     width: "100%",
-    maxWidth: 340,
-    borderRadius: toRN(tokens.borderRadius["2xl"]),
+    maxWidth: 280,
+    borderRadius: toRN(tokens.borderRadius.xl),
     backgroundColor: colors.bg.canvas,
-    padding: toRN(tokens.spacing[6]),
-    shadowColor: colors.shadow.default,
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.18,
-    shadowRadius: 16,
+    paddingTop: toRN(tokens.spacing[5]),
+    paddingBottom: toRN(tokens.spacing[4]),
+    paddingHorizontal: toRN(tokens.spacing[5]),
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
     elevation: 12,
+    position: "relative" as const,
+  },
+  closeIconButton: {
+    position: "absolute" as const,
+    top: toRN(tokens.spacing[2]),
+    right: toRN(tokens.spacing[2]),
+    width: toRN(tokens.spacing[7]),
+    height: toRN(tokens.spacing[7]),
+    borderRadius: toRN(tokens.borderRadius.full),
+    backgroundColor: colors.bg.secondary,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    zIndex: 10,
   },
   illustrationContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: toRN(tokens.spacing[4]),
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    marginBottom: toRN(tokens.spacing[3]),
   },
   title: {
-    fontSize: toRN(tokens.typography.fontSize["2xl"]),
-    fontWeight: tokens.typography.fontWeight.bold,
-    fontFamily: fontFamily.groteskBold,
+    fontSize: toRN(tokens.typography.fontSize.lg),
+    fontWeight: tokens.typography.fontWeight.semibold,
+    fontFamily: fontFamily.groteskSemiBold,
     textAlign: "center" as const,
-    marginBottom: toRN(tokens.spacing[2]),
+    marginBottom: toRN(tokens.spacing[1]),
     color: colors.text.primary,
   },
   message: {
     fontSize: toRN(tokens.typography.fontSize.sm),
-    lineHeight: toRN(tokens.typography.fontSize.sm) * 1.4,
+    lineHeight: toRN(tokens.typography.fontSize.sm) * 1.35,
     textAlign: "center" as const,
     color: colors.text.secondary,
-    fontFamily: fontFamily.groteskRegular,
-    marginBottom: toRN(tokens.spacing[6]),
+    fontFamily: fontFamily.regular,
+    marginBottom: toRN(tokens.spacing[4]),
   },
   buttonRow: {
-    flexDirection: "row" as const,
-    justifyContent: "center" as const,
-    gap: toRN(tokens.spacing[4]),
+    flexDirection: "column" as const,
+    gap: toRN(tokens.spacing[2]),
+    width: "100%",
   },
   button: {
-    flex: 1,
-    borderRadius: toRN(tokens.borderRadius.full),
+    width: "100%",
+    borderRadius: toRN(tokens.borderRadius.lg),
     paddingVertical: toRN(tokens.spacing[3]),
+    paddingHorizontal: toRN(tokens.spacing[4]),
+    minHeight: 44,
     alignItems: "center" as const,
     justifyContent: "center" as const,
   },
   cancelButton: {
-    backgroundColor: colors.bg.muted,
+    backgroundColor: colors.bg.secondary,
   },
   buttonText: {
-    fontSize: toRN(tokens.typography.fontSize.base),
-    fontFamily: fontFamily.groteskSemiBold,
+    fontSize: toRN(tokens.typography.fontSize.sm),
+    fontFamily: fontFamily.semiBold,
   },
 });
 
-export const AlertModalProvider: React.FC<{ children: React.ReactNode }> = ({
-  children,
+interface AlertOverlayProps {
+  /**
+   * Controls whether the AlertOverlay is active and should show alerts.
+   * When false, the overlay is completely hidden regardless of alert state.
+   * Defaults to true for backward compatibility.
+   */
+  visible?: boolean;
+}
+
+/**
+ * AlertOverlay Component (OPTIONAL)
+ *
+ * NOTE: In most cases you DON'T need this component!
+ * The AlertModalProvider automatically renders alerts at the root level.
+ * Just call showAlert() or showConfirm() and it works.
+ *
+ * Only use AlertOverlay if you need alerts to appear INSIDE a specific Modal
+ * (where the global alert might be hidden behind the modal's overlay).
+ *
+ * Usage (only for special cases):
+ * ```tsx
+ * <Modal visible={visible}>
+ *   <View style={styles.container}>
+ *     {content}
+ *     <AlertOverlay visible={visible} />
+ *   </View>
+ * </Modal>
+ * ```
+ */
+export const AlertOverlay: React.FC<AlertOverlayProps> = ({
+  visible = true,
 }) => {
+  const context = useContext(AlertModalContext);
   const { tokens, colors, brandColors } = useTheme();
   const styles = useStyles(makeStyles);
-  const [queue, setQueue] = useState<AlertRequest[]>([]);
-  const [currentAlert, setCurrentAlert] = useState<AlertRequest | null>(null);
-  const [visible, setVisible] = useState(false);
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(20)).current;
-  const autoCloseTimer = useRef<NodeJS.Timeout | null>(null);
+
+  const currentAlert = context?.currentAlert;
+  const handleResolve = context?.handleResolve;
 
   useEffect(() => {
-    if (!currentAlert && queue.length > 0) {
-      const [next, ...rest] = queue;
-      setCurrentAlert(next);
-      setQueue(rest);
-      setVisible(true);
-    }
-  }, [queue, currentAlert]);
-
-  useEffect(() => {
-    if (visible) {
+    if (currentAlert && visible) {
+      // Animate in
+      opacity.setValue(0);
+      translateY.setValue(20);
       Animated.parallel([
         Animated.timing(opacity, {
           toValue: 1,
@@ -222,25 +270,154 @@ export const AlertModalProvider: React.FC<{ children: React.ReactNode }> = ({
           useNativeDriver: true,
         }),
       ]).start();
-    } else if (currentAlert) {
-      Animated.parallel([
-        Animated.timing(opacity, {
-          toValue: 0,
-          duration: 180,
-          easing: Easing.in(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.timing(translateY, {
-          toValue: 20,
-          duration: 180,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
-        setCurrentAlert(null);
-      });
     }
-  }, [visible, opacity, translateY, currentAlert]);
+  }, [currentAlert, visible, opacity, translateY]);
+
+  // Don't render if not visible or no alert
+  if (!visible || !context || !currentAlert || !handleResolve) {
+    return null;
+  }
+
+  const variant = currentAlert.variant ?? "info";
+  const variantStyle = variantConfig[variant];
+  const confirmColor = variantStyle.confirmColor({ colors, brandColors });
+  const confirmTextColor = variantStyle.confirmTextColor
+    ? variantStyle.confirmTextColor({ colors, brandColors })
+    : "#ffffff";
+  const iconColor =
+    currentAlert.iconColor ?? variantStyle.accentColor({ colors, brandColors });
+
+  const handleBackdropPress = () => {
+    if (currentAlert.dismissible) {
+      handleResolve(false);
+    }
+  };
+
+  return (
+    <Animated.View style={[styles.overlay, { opacity }]}>
+      <TouchableOpacity
+        activeOpacity={1}
+        style={StyleSheet.absoluteFill}
+        onPress={handleBackdropPress}
+      />
+      <Animated.View
+        style={[
+          styles.card,
+          {
+            transform: [{ translateY }],
+          },
+        ]}
+      >
+        {currentAlert.showCloseIcon && (
+          <TouchableOpacity
+            style={styles.closeIconButton}
+            onPress={() => handleResolve(false)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons
+              name="close"
+              size={toRN(tokens.typography.fontSize.lg)}
+              color={colors.text.primary}
+            />
+          </TouchableOpacity>
+        )}
+        <View style={styles.illustrationContainer}>
+          <View
+            style={{
+              width: 48,
+              height: 48,
+              borderRadius: 24,
+              backgroundColor: variantStyle.illustrationColor,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Ionicons
+              name={currentAlert.iconName ?? variantStyle.icon}
+              size={24}
+              color={iconColor}
+            />
+          </View>
+        </View>
+
+        <Text
+          style={[
+            styles.title,
+            {
+              color: variantStyle.textColor({ colors, brandColors }),
+            },
+          ]}
+        >
+          {currentAlert.title}
+        </Text>
+
+        {!!currentAlert.message && (
+          <Text style={styles.message}>{currentAlert.message}</Text>
+        )}
+
+        <View style={styles.buttonRow}>
+          {currentAlert.showCancel && (
+            <TouchableOpacity
+              style={[styles.button, styles.cancelButton]}
+              onPress={() => handleResolve(false)}
+            >
+              <Text style={[styles.buttonText, { color: colors.text.primary }]}>
+                {currentAlert.cancelLabel}
+              </Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={[
+              styles.button,
+              {
+                backgroundColor: confirmColor,
+              },
+            ]}
+            onPress={() => handleResolve(true)}
+          >
+            <Text
+              style={[
+                styles.buttonText,
+                {
+                  color: confirmTextColor,
+                },
+              ]}
+            >
+              {currentAlert.confirmLabel}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </Animated.View>
+    </Animated.View>
+  );
+};
+
+export const AlertModalProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
+  const [queue, setQueue] = useState<AlertRequest[]>([]);
+  const [currentAlert, setCurrentAlert] = useState<AlertRequest | null>(null);
+  const [visible, setVisible] = useState(false);
+  const autoCloseTimer = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (!currentAlert && queue.length > 0) {
+      const [next, ...rest] = queue;
+      setCurrentAlert(next);
+      setQueue(rest);
+      setVisible(true);
+    }
+  }, [queue, currentAlert]);
+
+  useEffect(() => {
+    if (!visible && currentAlert) {
+      // Small delay before clearing to allow animation
+      const timer = setTimeout(() => {
+        setCurrentAlert(null);
+      }, 200);
+      return () => clearTimeout(timer);
+    }
+  }, [visible, currentAlert]);
 
   useEffect(() => {
     if (currentAlert?.autoCloseMs) {
@@ -276,6 +453,7 @@ export const AlertModalProvider: React.FC<{ children: React.ReactNode }> = ({
       enqueueAlert({
         ...options,
         showCancel: true,
+        showCloseIcon: true,
         dismissible: false,
       }),
     [enqueueAlert]
@@ -310,149 +488,216 @@ export const AlertModalProvider: React.FC<{ children: React.ReactNode }> = ({
     [currentAlert]
   );
 
-  const handleBackdropPress = useCallback(() => {
-    if (currentAlert?.dismissible) {
-      handleResolve(false);
-    }
-  }, [currentAlert, handleResolve]);
-
   const value = useMemo<AlertModalContextValue>(
     () => ({
       showAlert,
       showConfirm,
       showToast,
       dismiss,
+      // Expose for AlertOverlay
+      currentAlert: visible ? currentAlert : null,
+      handleResolve,
     }),
-    [showAlert, showConfirm, showToast, dismiss]
+    [
+      showAlert,
+      showConfirm,
+      showToast,
+      dismiss,
+      currentAlert,
+      visible,
+      handleResolve,
+    ]
   );
-
-  const variant = currentAlert?.variant ?? "info";
-  const variantStyle = variantConfig[variant];
-  const confirmColor = variantStyle.confirmColor({
-    colors,
-    brandColors,
-  });
-  const confirmTextColor = variantStyle.confirmTextColor
-    ? variantStyle.confirmTextColor({ colors, brandColors })
-    : "#ffffff";
-  const iconColor =
-    currentAlert?.iconColor ??
-    variantStyle.accentColor({ colors, brandColors });
 
   return (
     <AlertModalContext.Provider value={value}>
       {children}
-      <Modal
-        transparent
-        statusBarTranslucent
-        visible={Boolean(currentAlert)}
-        animationType="none"
-        onRequestClose={handleBackdropPress}
-      >
-        <Animated.View
-          style={[
-            styles.overlay,
-            {
-              opacity,
-            },
-          ]}
-        >
-          <TouchableOpacity
-            activeOpacity={1}
-            style={StyleSheet.absoluteFill}
-            onPress={handleBackdropPress}
-          />
-          <Animated.View
-            style={[
-              styles.card,
-              {
-                transform: [{ translateY }],
-              },
-            ]}
-          >
-            <View style={styles.illustrationContainer}>
-              <View
-                style={{
-                  width: toRN(tokens.spacing[16]),
-                  height: toRN(tokens.spacing[16]),
-                  borderRadius: toRN(tokens.spacing[8]),
-                  backgroundColor: variantStyle.illustrationColor,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  marginBottom: toRN(tokens.spacing[4]),
-                }}
-              >
-                <Ionicons
-                  name={currentAlert?.iconName ?? variantStyle.icon}
-                  size={toRN(tokens.typography.fontSize["4xl"])}
-                  color={iconColor}
-                />
-              </View>
-            </View>
-
-            <Text
-              style={[
-                styles.title,
-                {
-                  color: variantStyle.textColor({
-                    colors,
-                    brandColors,
-                  }),
-                },
-              ]}
-            >
-              {currentAlert?.title}
-            </Text>
-
-            {!!currentAlert?.message && (
-              <Text style={styles.message}>{currentAlert.message}</Text>
-            )}
-
-            <View style={styles.buttonRow}>
-              {currentAlert?.showCancel && (
-                <TouchableOpacity
-                  style={[styles.button, styles.cancelButton]}
-                  onPress={() => handleResolve(false)}
-                >
-                  <Text
-                    style={[styles.buttonText, { color: colors.text.primary }]}
-                  >
-                    {currentAlert.cancelLabel}
-                  </Text>
-                </TouchableOpacity>
-              )}
-              <TouchableOpacity
-                style={[
-                  styles.button,
-                  {
-                    backgroundColor: confirmColor,
-                  },
-                ]}
-                onPress={() => handleResolve(true)}
-              >
-                <Text
-                  style={[
-                    styles.buttonText,
-                    {
-                      color: confirmTextColor,
-                    },
-                  ]}
-                >
-                  {currentAlert?.confirmLabel}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </Animated.View>
-        </Animated.View>
-      </Modal>
+      {/* Global Alert Modal - automatically shows alerts without needing AlertOverlay */}
+      <AlertModal
+        alert={visible ? currentAlert : null}
+        onResolve={handleResolve}
+      />
     </AlertModalContext.Provider>
   );
 };
 
-export const useAlertModal = (): AlertModalContextValue => {
+/**
+ * Internal Alert Modal Component
+ * Renders the alert UI inside a React Native Modal at the root level.
+ */
+const AlertModal: React.FC<{
+  alert: AlertRequest | null;
+  onResolve: (result: boolean) => void;
+}> = ({ alert, onResolve }) => {
+  const { tokens, colors, brandColors } = useTheme();
+  const styles = useStyles(makeStyles);
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(20)).current;
+
+  useEffect(() => {
+    if (alert) {
+      // Animate in
+      opacity.setValue(0);
+      translateY.setValue(20);
+      Animated.parallel([
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 180,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.spring(translateY, {
+          toValue: 0,
+          damping: 12,
+          mass: 0.6,
+          stiffness: 150,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [alert, opacity, translateY]);
+
+  if (!alert) {
+    return null;
+  }
+
+  const variant = alert.variant ?? "info";
+  const variantStyle = variantConfig[variant];
+  const confirmColor = variantStyle.confirmColor({ colors, brandColors });
+  const confirmTextColor = variantStyle.confirmTextColor
+    ? variantStyle.confirmTextColor({ colors, brandColors })
+    : "#ffffff";
+  const iconColor =
+    alert.iconColor ?? variantStyle.accentColor({ colors, brandColors });
+
+  const handleBackdropPress = () => {
+    if (alert.dismissible) {
+      onResolve(false);
+    }
+  };
+
+  return (
+    <Modal
+      visible={!!alert}
+      transparent
+      animationType="none"
+      statusBarTranslucent
+      onRequestClose={() => {
+        if (alert.dismissible) {
+          onResolve(false);
+        }
+      }}
+    >
+      <Animated.View style={[styles.overlay, { opacity }]}>
+        <TouchableOpacity
+          activeOpacity={1}
+          style={StyleSheet.absoluteFill}
+          onPress={handleBackdropPress}
+        />
+        <Animated.View
+          style={[
+            styles.card,
+            {
+              transform: [{ translateY }],
+            },
+          ]}
+        >
+          {alert.showCloseIcon && (
+            <TouchableOpacity
+              style={styles.closeIconButton}
+              onPress={() => onResolve(false)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons
+                name="close"
+                size={toRN(tokens.typography.fontSize.lg)}
+                color={colors.text.primary}
+              />
+            </TouchableOpacity>
+          )}
+          <View style={styles.illustrationContainer}>
+            <View
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: 24,
+                backgroundColor: variantStyle.illustrationColor,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Ionicons
+                name={alert.iconName ?? variantStyle.icon}
+                size={24}
+                color={iconColor}
+              />
+            </View>
+          </View>
+
+          <Text
+            style={[
+              styles.title,
+              {
+                color: variantStyle.textColor({ colors, brandColors }),
+              },
+            ]}
+          >
+            {alert.title}
+          </Text>
+
+          {!!alert.message && (
+            <Text style={styles.message}>{alert.message}</Text>
+          )}
+
+          <View style={styles.buttonRow}>
+            {alert.showCancel && (
+              <TouchableOpacity
+                style={[styles.button, styles.cancelButton]}
+                onPress={() => onResolve(false)}
+              >
+                <Text
+                  style={[styles.buttonText, { color: colors.text.primary }]}
+                >
+                  {alert.cancelLabel}
+                </Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={[
+                styles.button,
+                {
+                  backgroundColor: confirmColor,
+                },
+              ]}
+              onPress={() => onResolve(true)}
+            >
+              <Text
+                style={[
+                  styles.buttonText,
+                  {
+                    color: confirmTextColor,
+                  },
+                ]}
+              >
+                {alert.confirmLabel}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      </Animated.View>
+    </Modal>
+  );
+};
+
+export const useAlertModal = (): Omit<
+  AlertModalContextValue,
+  "currentAlert" | "handleResolve"
+> => {
   const context = useContext(AlertModalContext);
   if (!context) {
     throw new Error("useAlertModal must be used within an AlertModalProvider");
   }
-  return context;
+  // Only expose public API, not internal state
+  const { showAlert, showConfirm, showToast, dismiss } = context;
+  return { showAlert, showConfirm, showToast, dismiss };
 };

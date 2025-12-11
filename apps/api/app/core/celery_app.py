@@ -31,7 +31,7 @@ def _build_redis_ssl_options(url: str) -> Optional[Dict[str, int]]:
 
 
 # Create Celery app instance
-redis_url = settings.REDIS_URL
+redis_url = settings.redis_connection_url
 redis_ssl_options = _build_redis_ssl_options(redis_url)
 
 celery_app = Celery(
@@ -68,10 +68,59 @@ celery_app.conf.update(
             # Alternatively: use crontab for specific day/time
             # "schedule": crontab(hour=8, minute=0, day_of_week=1),  # Monday 8am
         },
+        "auto-create-daily-checkins": {
+            "task": "auto_create_daily_checkins",
+            "schedule": 60.0 * 60.0,  # Run HOURLY to catch midnight in all timezones
+            # Timezone-aware: creates check-ins at user's midnight
+        },
+        "send-scheduled-ai-motivations": {
+            "task": "send_scheduled_ai_motivations",
+            "schedule": 60.0,  # Run EVERY MINUTE to match reminder times
+            # Timezone-aware: sends AI motivations at user's reminder times
+            # Sends "Time for your workout!" at each reminder time
+        },
+        "send-checkin-prompts": {
+            "task": "send_checkin_prompts",
+            "schedule": 60.0,  # Run EVERY MINUTE to match prompt times
+            # Timezone-aware: sends "How did it go?" 30 min after LAST reminder
+            # Only sends if check-in NOT already completed
+        },
+        "send-reengagement-notifications": {
+            "task": "send_reengagement_notifications",
+            "schedule": 60.0 * 60.0 * 24.0,  # Run DAILY at midnight UTC
+            # Detects users inactive for 2+ days and sends re-engagement push
+            # Alternative: crontab(hour=10, minute=0) for 10 AM UTC daily
+        },
+        "refresh-analytics-views": {
+            "task": "refresh_analytics_views",
+            "schedule": 60.0 * 60.0,  # Run HOURLY
+            # Refreshes materialized views for analytics dashboards
+            # Performance: 280x faster queries with pre-computed data
+            # Alternative: crontab(minute=0) for every hour on the hour
+        },
+        "check-goal-completions": {
+            "task": "check_goal_completions",
+            "schedule": 60.0 * 60.0 * 24.0,  # Run DAILY
+            # Checks for completed time/target challenges and auto-completes them
+            # Sends celebration notifications to users who completed challenges
+        },
+        # Challenge lifecycle tasks
+        "check-ended-challenges": {
+            "task": "check_ended_challenges",
+            "schedule": 60.0 * 60.0,  # Run HOURLY
+            # Finds active challenges where end_date has passed
+            # Deactivates them, calculates final rankings, sends winner notifications
+        },
+        "check-challenges-ending-soon": {
+            "task": "check_challenges_ending_soon",
+            "schedule": 60.0 * 60.0 * 24.0,  # Run DAILY
+            # Sends reminders for challenges ending in 1-3 days
+            # Keeps participants engaged and aware of deadlines
+        },
     },
 )
 
 # Task routing (optional - can be used for task prioritization)
 celery_app.conf.task_routes = {
-    "app.services.tasks.generate_plan_task": {"queue": "plan_generation"},
+    "app.services.tasks.plan_tasks.generate_plan_task": {"queue": "plan_generation"},
 }

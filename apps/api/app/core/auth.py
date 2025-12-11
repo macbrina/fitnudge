@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -28,45 +28,76 @@ def get_password_hash(password: str) -> str:
 def create_access_token(
     data: Dict[str, Any], expires_delta: Optional[timedelta] = None
 ) -> str:
-    """Create JWT access token"""
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(
-            minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
-        )
+    """Create JWT access token compatible with Supabase Auth
 
-    to_encode.update({"exp": expire, "type": "access"})
+    Token structure follows Supabase conventions so it works with:
+    - FastAPI backend authentication
+    - Supabase Realtime (for RLS auth.uid() checks)
+    - Supabase client setSession()
+    """
+    # Use timezone-aware UTC datetime to avoid timestamp() issues
+    now = datetime.now(timezone.utc)
+    if expires_delta:
+        expire = now + expires_delta
+    else:
+        expire = now + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+
+    user_id = data.get("user_id")
+
+    # Create Supabase-compatible token structure
+    # This allows Supabase Realtime to use auth.uid() for RLS checks
+    to_encode = {
+        # Supabase required claims
+        "sub": user_id,  # Subject = user ID (Supabase uses this for auth.uid())
+        "aud": "authenticated",  # Audience
+        "role": "authenticated",  # Role for RLS
+        "iat": int(now.timestamp()),  # Issued at (UTC)
+        "exp": int(expire.timestamp()),  # Expiration (UTC)
+        # Our custom claims (backward compatible)
+        "user_id": user_id,
+        "type": "access",
+        # Optional: include email if available
+        "email": data.get("email"),
+    }
+
     encoded_jwt = jwt.encode(
         to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM
     )
+
     return encoded_jwt
 
 
 def create_refresh_token(
     data: Dict[str, Any], expires_delta: Optional[timedelta] = None
 ) -> str:
-    """Create JWT refresh token with rotation support"""
-    to_encode = data.copy()
+    """Create JWT refresh token with rotation support (Supabase-compatible)"""
+    # Use timezone-aware UTC datetime to avoid timestamp() issues
+    now = datetime.now(timezone.utc)
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = now + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+        expire = now + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
 
     # Add token family for rotation
     token_family = secrets.token_urlsafe(16)
     token_id = secrets.token_urlsafe(16)
+    user_id = data.get("user_id")
 
-    to_encode.update(
-        {
-            "exp": expire,
-            "type": "refresh",
-            "token_family": token_family,
-            "token_id": token_id,
-            "version": 1,
-        }
-    )
+    # Create Supabase-compatible token structure
+    to_encode = {
+        # Supabase required claims
+        "sub": user_id,
+        "aud": "authenticated",
+        "role": "authenticated",
+        "iat": int(now.timestamp()),  # UTC timestamp
+        "exp": int(expire.timestamp()),  # UTC timestamp
+        # Our custom claims
+        "user_id": user_id,
+        "type": "refresh",
+        "token_family": token_family,
+        "token_id": token_id,
+        "version": 1,
+    }
 
     encoded_jwt = jwt.encode(
         to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM
@@ -76,11 +107,11 @@ def create_refresh_token(
     supabase = get_supabase_client()
     supabase.table("refresh_tokens").insert(
         {
-            "user_id": data.get("user_id"),
+            "user_id": user_id,
             "token_family": token_family,
             "token_id": token_id,
             "is_active": True,
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": now.isoformat(),
             "expires_at": expire.isoformat(),
         }
     ).execute()
@@ -91,8 +122,12 @@ def create_refresh_token(
 def verify_token(token: str) -> Optional[Dict[str, Any]]:
     """Verify and decode JWT token"""
     try:
+        # Disable audience verification since we use custom audience "authenticated"
         payload = jwt.decode(
-            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+            token,
+            settings.SECRET_KEY,
+            algorithms=[settings.ALGORITHM],
+            options={"verify_aud": False},
         )
         return payload
     except JWTError:
@@ -192,7 +227,7 @@ async def generate_verification_code(user_id: str) -> Optional[str]:
         email_sent = email_service.send_verification_email(user_email, code)
         if not email_sent:
             logger.warning(
-                f"Verification code generated but email sending failed for user {user_id}",
+                f"Verification code generated but email sending failed for user {user_id} Code: {code}",
                 {"user_id": user_id, "email": user_email},
             )
 
@@ -209,11 +244,15 @@ async def generate_verification_code(user_id: str) -> Optional[str]:
 
 
 async def create_user(user_data: Dict[str, Any]) -> Dict[str, Any]:
-    """Create new user"""
+    """Create new user in both auth.users (for Supabase Realtime) and public.users"""
     supabase = get_supabase_client()
+
+    # Import logger for error handling
+    from app.services.logger import logger
 
     # Hash password if provided (email/password signup)
     password = user_data.pop("password", None)
+    raw_password = password  # Keep original for auth.users
     auth_provider = user_data.get("auth_provider", "email")
 
     if password:
@@ -230,7 +269,67 @@ async def create_user(user_data: Dict[str, Any]) -> Dict[str, Any]:
     if "timezone" not in user_data or not user_data.get("timezone"):
         user_data["timezone"] = "UTC"
 
-    # Insert user
+    email = user_data.get("email")
+
+    # Step 1: Create user in auth.users (for Supabase Realtime RLS to work)
+    # This allows auth.uid() to return the correct user ID
+    auth_user_id = None
+    try:
+        auth_user_data = {
+            "email": email,
+            "email_confirm": True,  # Auto-confirm since we handle verification ourselves
+            "user_metadata": {
+                "name": user_data.get("name"),
+                "auth_provider": auth_provider,
+            },
+        }
+
+        # Add password for email signups (required by Supabase Auth)
+        if raw_password:
+            auth_user_data["password"] = raw_password
+        else:
+            # For OAuth users, generate a random password (they won't use it)
+            auth_user_data["password"] = secrets.token_urlsafe(32)
+
+        auth_response = supabase.auth.admin.create_user(auth_user_data)
+
+        if auth_response and auth_response.user:
+            auth_user_id = str(auth_response.user.id)
+            logger.info(
+                f"Created auth.users entry for {email}", {"auth_user_id": auth_user_id}
+            )
+
+            # Use the same ID for public.users
+            user_data["id"] = auth_user_id
+        else:
+            logger.warning(f"auth.admin.create_user returned no user for {email}")
+
+    except Exception as e:
+        # Check if user already exists in auth.users
+        error_str = str(e).lower()
+        if "already" in error_str or "exists" in error_str or "duplicate" in error_str:
+            try:
+                # Try to find existing auth user by email
+                existing_auth_users = supabase.auth.admin.list_users()
+                for auth_user in existing_auth_users:
+                    if auth_user.email == email:
+                        auth_user_id = str(auth_user.id)
+                        user_data["id"] = auth_user_id
+                        logger.info(
+                            f"Found existing auth.users entry for {email}",
+                            {"auth_user_id": auth_user_id},
+                        )
+                        break
+            except Exception as lookup_error:
+                logger.warning(f"Failed to lookup existing auth user: {lookup_error}")
+        else:
+            # Log but don't fail - user can still be created in public.users
+            logger.warning(
+                f"Failed to create auth.users entry for {email} (Realtime INSERT/UPDATE may not work)",
+                {"error": str(e)},
+            )
+
+    # Step 2: Insert user in public.users
     result = supabase.table("users").insert(user_data).execute()
 
     if not result.data:
@@ -241,8 +340,11 @@ async def create_user(user_data: Dict[str, Any]) -> Dict[str, Any]:
     user = result.data[0]
     user_id = user["id"]
 
-    # Import logger for error handling
-    from app.services.logger import logger
+    # Log if IDs match (they should for Realtime to work correctly)
+    if auth_user_id and auth_user_id != user_id:
+        logger.warning(
+            f"User ID mismatch! auth.users={auth_user_id}, public.users={user_id}"
+        )
 
     # Create default notification_preferences
     try:
@@ -290,12 +392,7 @@ async def create_user(user_data: Dict[str, Any]) -> Dict[str, Any]:
     # Generate and send verification email for email/password users
     if user.get("auth_provider") == "email" and user.get("email"):
         try:
-            code = await generate_verification_code(user_id)
-            if code:
-                logger.info(
-                    f"Verification email sent to user {user_id}",
-                    {"user_id": user_id, "email": user.get("email")},
-                )
+            await generate_verification_code(user_id)
         except Exception as e:
             # Don't fail user creation if email sending fails
             logger.error(
@@ -304,6 +401,54 @@ async def create_user(user_data: Dict[str, Any]) -> Dict[str, Any]:
             )
 
     return user
+
+
+async def ensure_auth_user_exists(user: Dict[str, Any]) -> None:
+    """
+    Ensure a user exists in auth.users (for Supabase Realtime RLS to work).
+    Call this for existing users who might have been created before auth.users sync was added.
+    """
+    from app.services.logger import logger
+
+    supabase = get_supabase_client()
+    user_id = user.get("id")
+    email = user.get("email")
+
+    if not user_id or not email:
+        return
+
+    try:
+        # Check if user already exists in auth.users
+        existing_auth_users = supabase.auth.admin.list_users()
+        for auth_user in existing_auth_users:
+            if str(auth_user.id) == user_id:
+                # Already exists with same ID
+                return
+
+        # User doesn't exist in auth.users, create them
+        auth_response = supabase.auth.admin.create_user(
+            {
+                "id": user_id,
+                "email": email,
+                "email_confirm": True,
+                "password": secrets.token_urlsafe(32),
+                "user_metadata": {
+                    "name": user.get("name"),
+                    "auth_provider": user.get("auth_provider", "email"),
+                    "synced_from_existing_user": True,
+                },
+            }
+        )
+
+        if auth_response and auth_response.user:
+            logger.info(f"Created auth.users entry for existing user {email}")
+    except Exception as e:
+        error_str = str(e).lower()
+        if "already" in error_str or "exists" in error_str or "duplicate" in error_str:
+            # User already exists, that's fine
+            pass
+        else:
+            logger.warning(f"Could not ensure auth.users entry for {email}: {e}")
 
 
 async def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:

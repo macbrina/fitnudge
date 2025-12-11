@@ -65,7 +65,7 @@ class ChallengeService:
             result = supabase.table("challenges").insert(challenge).execute()
 
             if result.data:
-                logger.info(
+                print(
                     f"Created challenge '{title}' by user {user_id}",
                     {
                         "challenge_id": result.data[0]["id"],
@@ -107,7 +107,7 @@ class ChallengeService:
                 .select("*")
                 .eq("id", challenge_id)
                 .eq("is_active", True)
-                .single()
+                .maybe_single()
                 .execute()
             )
 
@@ -115,15 +115,29 @@ class ChallengeService:
                 raise ValueError("Challenge not found or not active")
 
             challenge_data = challenge.data
+            today = date.today()
 
-            # Check if challenge has started
+            # Check join deadline - users can only join before start_date or join_deadline
             challenge_start = date.fromisoformat(challenge_data["start_date"])
-            if date.today() < challenge_start:
-                raise ValueError("Challenge has not started yet")
+            join_deadline_str = challenge_data.get("join_deadline")
+
+            if join_deadline_str:
+                # If join_deadline is set, use it
+                join_deadline = date.fromisoformat(join_deadline_str)
+                if today > join_deadline:
+                    raise ValueError(
+                        "Join deadline has passed. You can no longer join this challenge."
+                    )
+            else:
+                # If no join_deadline, use start_date (lock after start)
+                if today > challenge_start:
+                    raise ValueError(
+                        "Challenge has already started. You can no longer join."
+                    )
 
             # Check if challenge has ended
             challenge_end = date.fromisoformat(challenge_data["end_date"])
-            if date.today() > challenge_end:
+            if today > challenge_end:
                 raise ValueError("Challenge has ended")
 
             # Check participant limit
@@ -169,7 +183,7 @@ class ChallengeService:
             )
 
             if result.data:
-                logger.info(
+                print(
                     f"User {user_id} joined challenge {challenge_id}",
                     {"challenge_id": challenge_id, "user_id": user_id},
                 )
@@ -209,7 +223,7 @@ class ChallengeService:
                 supabase.table("challenges")
                 .select("*")
                 .eq("id", challenge_id)
-                .single()
+                .maybe_single()
                 .execute()
             )
 
@@ -226,7 +240,7 @@ class ChallengeService:
                 .select("*")
                 .eq("challenge_id", challenge_id)
                 .eq("user_id", user_id)
-                .single()
+                .maybe_single()
                 .execute()
             )
 
@@ -388,7 +402,7 @@ class ChallengeService:
                     leaderboard_entries
                 ).execute()
 
-            logger.info(
+            print(
                 f"Updated leaderboard for challenge {challenge_id}",
                 {
                     "challenge_id": challenge_id,

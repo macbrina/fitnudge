@@ -8,10 +8,18 @@ export interface CheckIn {
   user_id: string;
   date: string;
   completed: boolean;
+  is_checked_in?: boolean; // True when user has responded (yes or no)
   reflection?: string;
   mood?: number;
+  photo_urls?: string[];
   created_at: string;
   updated_at: string;
+  goal?: {
+    id: string;
+    title: string;
+    category?: string;
+    frequency?: string;
+  };
 }
 
 export interface CreateCheckInRequest {
@@ -20,12 +28,15 @@ export interface CreateCheckInRequest {
   completed: boolean;
   reflection?: string;
   mood?: number;
+  photo_urls?: string[];
 }
 
 export interface UpdateCheckInRequest {
   completed?: boolean;
   reflection?: string;
   mood?: number;
+  photo_urls?: string[];
+  is_checked_in?: boolean;
 }
 
 export interface CheckInStats {
@@ -137,6 +148,21 @@ export class CheckInsService extends BaseApiService {
       ? ROUTES.CHECKINS.STREAK_BY_GOAL(goalId)
       : ROUTES.CHECKINS.STREAK;
     return this.get(endpoint);
+  }
+
+  async getStreakInfo(goalId?: string): Promise<
+    ApiResponse<{
+      current_streak: number;
+      longest_streak: number;
+      last_check_in?: string;
+      streak_start?: string;
+    }>
+  > {
+    const params = new URLSearchParams();
+    if (goalId) {
+      params.append("goal_id", goalId);
+    }
+    return this.get(`${ROUTES.CHECKINS.STREAK}?${params.toString()}`);
   }
 
   async bulkCreateCheckIns(

@@ -269,7 +269,6 @@ export default function ResetPasswordScreen() {
           style={{ flex: 1 }}
           contentContainerStyle={{
             flexGrow: 1,
-            paddingTop: insets.top,
             paddingBottom: insets.bottom,
           }}
           showsVerticalScrollIndicator={false}

@@ -59,7 +59,7 @@ The backend API for FitNudge, built with FastAPI and Python, providing authentic
 
 - Python 3.11+
 - Poetry (for dependency management)
-- Redis (for caching and queues)
+- Redis (for caching and queues) - See [Redis Setup Guide](docs/REDIS_SETUP.md)
 - Supabase account
 - OpenAI API key
 
@@ -81,6 +81,164 @@ cp .env.example .env
 # Start development server
 poetry run uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
+
+### Running Celery Worker for Background Tasks
+
+The API uses Celery for background tasks (like generating suggested goals). You need to run a Celery worker process in addition to the API server.
+
+#### 1. Verify Redis is Running
+
+First, make sure Redis is running locally:
+
+```bash
+# Check if Redis is running
+redis-cli ping
+# Should return: PONG
+
+# Or check with docker (if using Docker)
+docker ps | grep redis
+
+# Or check the process
+ps aux | grep redis-server
+```
+
+If Redis isn't running, start it (see [Redis Setup Guide](docs/REDIS_SETUP.md) for details):
+
+```bash
+# Using Homebrew (macOS)
+brew services start redis
+
+# Or using Docker
+docker run -d -p 6379:6379 redis:7-alpine
+
+# Or start Redis server directly
+redis-server
+```
+
+#### 2. Start Celery Worker
+
+In a **separate terminal** (keep the API server running in the first terminal), start the Celery worker:
+
+```bash
+# Navigate to apps/api directory
+cd apps/api
+
+# Activate Poetry environment (if not already)
+poetry shell
+
+# Start Celery worker
+poetry run celery -A celery_worker worker --loglevel=info
+
+# Note: Celery workers don't auto-reload code changes.
+# Restart the worker manually when you modify task code.
+```
+
+**What you should see:**
+
+```
+[INFO/MainProcess] Connected to redis://localhost:6379/0
+[INFO/MainProcess] celery@your-hostname ready.
+```
+
+#### 3. Verify Worker is Running
+
+You can verify the worker is connected to Redis and ready:
+
+**Option A: Using Redis CLI**
+
+```bash
+redis-cli
+> KEYS celery*
+> GET celery-task-meta-*
+```
+
+**Option B: Using Celery CLI**
+
+```bash
+# In another terminal, while worker is running
+poetry run celery -A celery_worker inspect active
+poetry run celery -A celery_worker inspect registered
+```
+
+**Option C: Check Health Endpoint**
+The API has a health check endpoint that verifies Celery workers:
+
+```bash
+curl http://localhost:8000/health
+```
+
+Look for the `celery` component in the response - it should show worker status.
+
+#### 4. Testing Task Execution
+
+When you call `requestSuggestedGoals()` from your mobile app, here's what happens:
+
+1. **API receives request** → Creates a "pending" record in `suggested_goals` table
+2. **Task queued** → Celery task `generate_suggested_goals_task` is enqueued to Redis
+3. **Worker picks up task** → You'll see log output in the Celery worker terminal:
+
+   ```
+   [INFO/MainProcess] Task generate_suggested_goals[task-id] received
+   [INFO/ForkPoolWorker-1] Starting suggested goals generation...
+   [INFO/ForkPoolWorker-1] Generated AI goals for user
+   [INFO/MainProcess] Task generate_suggested_goals[task-id] succeeded
+   ```
+
+4. **Task completes** → Status in database updates to "ready" or "failed"
+
+#### 5. Monitoring Task Status
+
+**Check task logs in worker terminal:**
+
+- Success: `Task generate_suggested_goals[...] succeeded`
+- Failure: `Task generate_suggested_goals[...] failed` (with error details)
+
+**Check database status:**
+
+```sql
+-- In Supabase SQL editor
+SELECT user_id, status, error_message, updated_at
+FROM suggested_goals
+WHERE user_id = 'your-user-id';
+```
+
+**Status values:**
+
+- `pending` - Task is queued, waiting for worker
+- `ready` - Task completed successfully, goals are available
+- `failed` - Task failed (check `error_message` field)
+
+#### 6. Troubleshooting
+
+**Problem: Tasks aren't being processed**
+
+- ✅ Check Redis is running: `redis-cli ping`
+- ✅ Check worker is running: Look for `celery@hostname ready` in worker logs
+- ✅ Check Redis connection: Worker logs should show `Connected to redis://...`
+- ✅ Verify environment variables: `REDIS_HOST`, `REDIS_PORT`, etc. match your Redis setup
+
+**Problem: Worker can't connect to Redis**
+
+- Check Redis is accessible: `redis-cli -h localhost -p 6379 ping`
+- Verify environment variables in `.env` file
+- Check for firewall/network issues
+
+**Problem: Tasks fail immediately**
+
+- Check worker logs for error messages
+- Verify all dependencies are installed: `poetry install`
+- Check API keys (OpenAI, etc.) are set correctly
+- Look for database connection issues
+
+**Problem: Worker shows tasks but doesn't execute**
+
+- Check if worker has the task registered: `celery -A celery_worker inspect registered`
+- Restart worker if you just added a new task
+- Verify task name matches exactly: `generate_suggested_goals`
+
+#### 7. Running Worker in Production
+
+For production, you'll want to run the worker as a service. See the [Deployment Guide](docs/Deployment.md) for details.
 
 ## 📊 Monitoring
 
@@ -229,8 +387,18 @@ BASE_URL=https://fitnudge.app  # For development: http://localhost:3000
 FCM_SERVER_KEY=...
 EXPO_ACCESS_TOKEN=...
 
-# Infrastructure
-REDIS_URL=redis://localhost:6379
+# Infrastructure - Redis Configuration
+# For local development (defaults shown - optional)
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=
+REDIS_DB=0
+REDIS_SSL=false
+
+# For production (or legacy URL format)
+# REDIS_URL=redis://:password@host:6379/0
+
+# See docs/REDIS_SETUP.md for detailed Redis setup instructions
 SENTRY_DSN=https://...
 ```
 

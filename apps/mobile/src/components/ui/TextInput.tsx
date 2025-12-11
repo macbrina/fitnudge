@@ -72,7 +72,7 @@ const makeTextInputStyles = (tokens: any, colors: any, brandColors: any) => {
     },
     inputFocused: {
       borderColor: brandColors.primary,
-      borderWidth: 2,
+      borderWidth: 1,
     },
     inputError: {
       borderColor: colors.feedback.error,
@@ -163,7 +163,7 @@ export const TextInput: React.FC<TextInputProps> = ({
           style={getInputStyle()}
           placeholder={placeholder}
           placeholderTextColor={
-            disabled ? colors.text.muted : colors.text.secondary
+            disabled ? colors.text.muted : colors.text.tertiary
           }
           value={value}
           onChangeText={onChangeText}

@@ -82,7 +82,7 @@ export default function PersonalizationWelcomeSkeleton() {
       </ScrollView>
 
       {/* Footer with Skeleton Button */}
-      <View style={[styles.footer, { paddingBottom: insets.bottom }]}>
+      <View style={styles.footer}>
         <SkeletonBox
           width="100%"
           height={48}

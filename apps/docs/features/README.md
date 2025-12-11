@@ -73,7 +73,7 @@ This directory contains detailed documentation for each feature in the FitNudge 
     - Goal association
 
 12. **[AI Progress Reflections](12-ai-progress-reflections.md)**
-    - Premium deep analysis (Pro/Coach+ only)
+    - Premium deep analysis (Pro/Elite only)
     - Weekly and monthly reflections
     - Actionable coaching recommendations
     - Pattern analysis
@@ -101,34 +101,34 @@ Each feature document includes:
 
 ### API Endpoints by Feature
 
-| Feature | Main Endpoints |
-|---------|---------------|
-| Onboarding | `POST /onboarding/profile`, `GET /onboarding/suggested-goals` |
-| Goals | `POST /goals`, `GET /goals`, `PUT /goals/{id}`, `DELETE /goals/{id}` |
-| Check-Ins | `POST /check-ins`, `GET /check-ins`, `GET /check-ins/stats` |
-| Progress | `GET /goals/{id}/stats`, `GET /goals/{id}/habit-chains` |
-| Motivation | `POST /motivation/generate`, `POST /motivation/schedule` |
-| Social | `GET /social/feed`, `POST /social/posts`, `POST /social/posts/{id}/like` |
-| Achievements | `GET /achievements/types`, `GET /achievements/me`, `POST /achievements/check` |
-| Recaps | `GET /recaps/weekly` |
-| Challenges | `GET /challenges`, `POST /challenges/{id}/join`, `GET /challenges/{id}/leaderboard` |
+| Feature        | Main Endpoints                                                                                                |
+| -------------- | ------------------------------------------------------------------------------------------------------------- |
+| Onboarding     | `POST /onboarding/profile`, `GET /onboarding/suggested-goals`                                                 |
+| Goals          | `POST /goals`, `GET /goals`, `PUT /goals/{id}`, `DELETE /goals/{id}`                                          |
+| Check-Ins      | `POST /check-ins`, `GET /check-ins`, `GET /check-ins/stats`                                                   |
+| Progress       | `GET /goals/{id}/stats`, `GET /goals/{id}/habit-chains`                                                       |
+| Motivation     | `POST /motivation/generate`, `POST /motivation/schedule`                                                      |
+| Social         | `GET /social/feed`, `POST /social/posts`, `POST /social/posts/{id}/like`                                      |
+| Achievements   | `GET /achievements/types`, `GET /achievements/me`, `POST /achievements/check`                                 |
+| Recaps         | `GET /recaps/weekly`                                                                                          |
+| Challenges     | `GET /challenges`, `POST /challenges/{id}/join`, `GET /challenges/{id}/leaderboard`                           |
 | Accountability | `POST /social-accountability/goals/{id}/share`, `POST /social-accountability/accountability-partners/request` |
-| Meals | `POST /meals`, `GET /meals/nutrition/summary/{date}` |
-| Reflections | `GET /progress-reflections/weekly`, `GET /progress-reflections/monthly` |
+| Meals          | `POST /meals`, `GET /meals/nutrition/summary/{date}`                                                          |
+| Reflections    | `GET /progress-reflections/weekly`, `GET /progress-reflections/monthly`                                       |
 
 ### Database Tables by Feature
 
-| Feature | Main Tables |
-|---------|------------|
-| Onboarding | `user_fitness_profiles`, `goals` |
-| Check-Ins | `check_ins`, `progress_photos` |
-| Progress | `habit_chains` |
-| Motivation | `motivations` |
-| Social | `posts`, `comments`, `likes`, `follows`, `feed_preferences` |
-| Achievements | `achievement_types`, `user_achievements` |
-| Challenges | `challenges`, `challenge_participants`, `challenge_leaderboard` |
-| Accountability | `goal_shares`, `accountability_partners`, `group_goals` |
-| Meals | `meal_logs`, `daily_nutrition_summaries` |
+| Feature        | Main Tables                                                     |
+| -------------- | --------------------------------------------------------------- |
+| Onboarding     | `user_fitness_profiles`, `goals`                                |
+| Check-Ins      | `check_ins`, `progress_photos`                                  |
+| Progress       | `habit_chains`                                                  |
+| Motivation     | `motivations`                                                   |
+| Social         | `posts`, `comments`, `likes`, `follows`, `feed_preferences`     |
+| Achievements   | `achievement_types`, `user_achievements`                        |
+| Challenges     | `challenges`, `challenge_participants`, `challenge_leaderboard` |
+| Accountability | `goal_shares`, `accountability_partners`, `group_goals`         |
+| Meals          | `meal_logs`, `daily_nutrition_summaries`                        |
 
 ## Contributing
 
@@ -146,4 +146,3 @@ When adding new features:
 - API endpoints may evolve; refer to [API-Spec.md](../API-Spec.md) for latest details
 - Database schema may change; refer to [DataModels.md](../DataModels.md) for current schema
 - Frontend integration details are at the screen/component level
-

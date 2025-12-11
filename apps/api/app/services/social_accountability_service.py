@@ -41,7 +41,7 @@ class SocialAccountabilityService:
                 .select("id, user_id, title")
                 .eq("id", goal_id)
                 .eq("user_id", owner_user_id)
-                .single()
+                .maybe_single()
                 .execute()
             )
 
@@ -88,7 +88,7 @@ class SocialAccountabilityService:
                 "id", goal_id
             ).execute()
 
-            logger.info(
+            print(
                 f"Goal {goal_id} shared with user {shared_with_user_id}",
                 {
                     "goal_id": goal_id,
@@ -133,7 +133,7 @@ class SocialAccountabilityService:
                 .select("id")
                 .eq("id", goal_id)
                 .eq("user_id", owner_user_id)
-                .single()
+                .maybe_single()
                 .execute()
             )
 
@@ -145,7 +145,7 @@ class SocialAccountabilityService:
                 "goal_id", goal_id
             ).eq("shared_with_user_id", shared_with_user_id).execute()
 
-            logger.info(
+            print(
                 f"Goal {goal_id} unshared with user {shared_with_user_id}",
                 {"goal_id": goal_id, "shared_with_user_id": shared_with_user_id},
             )
@@ -269,7 +269,7 @@ class SocialAccountabilityService:
                 .execute()
             )
 
-            logger.info(
+            print(
                 f"Accountability partnership requested: {user_id} <-> {partner_user_id}",
                 {"user_id": user_id, "partner_user_id": partner_user_id},
             )
@@ -313,7 +313,7 @@ class SocialAccountabilityService:
                 f"user_id.eq.{partner_user_id},partner_user_id.eq.{user_id}",
             ).execute()
 
-            logger.info(
+            print(
                 f"Accountability partnership accepted: {user_id} <-> {partner_user_id}",
                 {"user_id": user_id, "partner_user_id": partner_user_id},
             )
@@ -357,7 +357,7 @@ class SocialAccountabilityService:
                 .select("id, user_id")
                 .eq("id", goal_id)
                 .eq("user_id", owner_user_id)
-                .single()
+                .maybe_single()
                 .execute()
             )
 
@@ -393,7 +393,7 @@ class SocialAccountabilityService:
                 "id", goal_id
             ).execute()
 
-            logger.info(
+            print(
                 f"Group goal created: {goal_id} with {len(group_goal_data)} members",
                 {"goal_id": goal_id, "owner_user_id": owner_user_id},
             )
@@ -436,7 +436,7 @@ class SocialAccountabilityService:
                 .eq("goal_id", goal_id)
                 .eq("user_id", admin_user_id)
                 .in_("role", ["owner", "admin"])
-                .single()
+                .maybe_single()
                 .execute()
             )
 

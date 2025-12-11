@@ -132,6 +132,9 @@ importers:
       '@react-native-community/cli-server-api':
         specifier: ^20.0.2
         version: 20.0.2
+      '@react-native-community/datetimepicker':
+        specifier: ^8.5.1
+        version: 8.5.1(expo@54.0.23)(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
       '@react-native-google-signin/google-signin':
         specifier: ^16.0.0
         version: 16.0.0(expo@54.0.23)(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
@@ -147,6 +150,9 @@ importers:
       '@sentry/react-native':
         specifier: ^7.2.0
         version: 7.2.0(expo@54.0.23)(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
+      '@supabase/supabase-js':
+        specifier: ^2.86.0
+        version: 2.86.0
       '@tanstack/react-query':
         specifier: ^5.90.5
         version: 5.90.5(react@19.1.0)
@@ -180,6 +186,9 @@ importers:
       expo-font:
         specifier: ~14.0.9
         version: 14.0.9(expo@54.0.23)(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
+      expo-image-picker:
+        specifier: ~17.0.8
+        version: 17.0.8(expo@54.0.23)
       expo-linking:
         specifier: ~8.0.8
         version: 8.0.8(expo@54.0.23)(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
@@ -192,6 +201,9 @@ importers:
       expo-router:
         specifier: ~6.0.14
         version: 6.0.14(ecev3qnvsom2tw4msdpsm5et2i)
+      expo-sqlite:
+        specifier: ~16.0.9
+        version: 16.0.9(expo@54.0.23)(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
       expo-status-bar:
         specifier: ~3.0.8
         version: 3.0.8(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
@@ -237,6 +249,9 @@ importers:
       react-native-gesture-handler:
         specifier: ~2.28.0
         version: 2.28.0(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
+      react-native-purchases:
+        specifier: ^9.6.9
+        version: 9.6.9(react-native-web@0.21.2(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
       react-native-reanimated:
         specifier: ~4.1.3
         version: 4.1.3(@babel/core@7.28.5)(react-native-worklets@0.5.1(@babel/core@7.28.5)(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0))(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
@@ -252,6 +267,9 @@ importers:
       react-native-svg-transformer:
         specifier: ^1.5.1
         version: 1.5.1(react-native-svg@15.12.1(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0))(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(typescript@5.9.3)
+      react-native-url-polyfill:
+        specifier: ^3.0.0
+        version: 3.0.0(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))
       react-native-web:
         specifier: ~0.21.0
         version: 0.21.2(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
@@ -1895,6 +1913,19 @@ packages:
   '@react-native-community/cli-tools@20.0.2':
     resolution: {integrity: sha512-bPYhRYggW9IIM8pvrZF/0r6HaxCyEWDn6zfPQPMWlkQUwkzFZ8GBY/M7yiHgDzozWKPT4DqZPumrq806Vcksow==}
 
+  '@react-native-community/datetimepicker@8.5.1':
+    resolution: {integrity: sha512-TuwM1ORbxCjOp1GOtONj0QnpDpVfq0F4UlfKZYPxL/vmriaLHt2Kgvw63Bv0Bpep4eOkslVVSS1IRfRI6d392g==}
+    peerDependencies:
+      expo: '>=52.0.0'
+      react: 19.1.0
+      react-native: '*'
+      react-native-windows: '*'
+    peerDependenciesMeta:
+      expo:
+        optional: true
+      react-native-windows:
+        optional: true
+
   '@react-native-google-signin/google-signin@16.0.0':
     resolution: {integrity: sha512-jVuzPo8odREekFc0b4RK3YsqCvedtLIM2P6NSszFr9cYyhKrUNikffPapL6LmkL9qkb8K6pDeb5CXg4qALOc0g==}
     peerDependencies:
@@ -2036,6 +2067,15 @@ packages:
     resolution: {integrity: sha512-famxyD5emrGGpFuUlgOP6fVW2h/ZaF405G5KDi3zPHzyjAWys/8W6NAVJtNbkCkhedmvL0xOhvt8feGXyXaw5w==}
     peerDependencies:
       react: 19.1.0
+
+  '@revenuecat/purchases-js-hybrid-mappings@17.21.2':
+    resolution: {integrity: sha512-bUVtF95Rl6bsD/Abw9lotTCdi1JV1e4qLHWPoLhi1P5Ay1zAUZdX9PCxQ1rIQar207+8dM1AGmT9vFcYAJW2hA==}
+
+  '@revenuecat/purchases-js@1.18.4':
+    resolution: {integrity: sha512-Fygh0NHzKDg94Soib6BpJMoK4AyTsomeo/NyM3OQqDMAc0zpZfJc3Bvo+TnnZa0KeYMUR9dCmlYVxGc5U4IdeQ==}
+
+  '@revenuecat/purchases-typescript-internal@17.21.2':
+    resolution: {integrity: sha512-zsGlzUCO91oMPMz9RNXSzJiFemxGZ6ir2YFobWlkRPjP6dXOHcex6i1HPY0vsL6v6a75Tbv+c2Fo4N76PF5EFg==}
 
   '@rtsao/scc@1.1.0':
     resolution: {integrity: sha512-zt6OdqaDoOnJ1ZYsCYGt9YmWzDXl4vQdKTyJev62gFhRGKdx7mcT54V9KIjg+d2wi9EXsPvAPKe7i7WjfVWB8g==}
@@ -2201,6 +2241,30 @@ packages:
 
   '@sinonjs/fake-timers@10.3.0':
     resolution: {integrity: sha512-V4BG07kuYSUkTCSBHG8G8TNhM+F19jXFWnQtzj+we8DrkpSBCee9Z3Ms8yiGer/dlmhe35/Xdgyo3/0rQKg7YA==}
+
+  '@supabase/auth-js@2.86.0':
+    resolution: {integrity: sha512-3xPqMvBWC6Haqpr6hEWmSUqDq+6SA1BAEdbiaHdAZM9QjZ5uiQJ+6iD9pZOzOa6MVXZh4GmwjhC9ObIG0K1NcA==}
+    engines: {node: '>=20.0.0'}
+
+  '@supabase/functions-js@2.86.0':
+    resolution: {integrity: sha512-AlOoVfeaq9XGlBFIyXTmb+y+CZzxNO4wWbfgRM6iPpNU5WCXKawtQYSnhivi3UVxS7GA0rWovY4d6cIAxZAojA==}
+    engines: {node: '>=20.0.0'}
+
+  '@supabase/postgrest-js@2.86.0':
+    resolution: {integrity: sha512-QVf+wIXILcZJ7IhWhWn+ozdf8B+oO0Ulizh2AAPxD/6nQL+x3r9lJ47a+fpc/jvAOGXMbkeW534Kw6jz7e8iIA==}
+    engines: {node: '>=20.0.0'}
+
+  '@supabase/realtime-js@2.86.0':
+    resolution: {integrity: sha512-dyS8bFoP29R/sj5zLi0AP3JfgG8ar1nuImcz5jxSx7UIW7fbFsXhUCVrSY2Ofo0+Ev6wiATiSdBOzBfWaiFyPA==}
+    engines: {node: '>=20.0.0'}
+
+  '@supabase/storage-js@2.86.0':
+    resolution: {integrity: sha512-PM47jX/Mfobdtx7NNpoj9EvlrkapAVTQBZgGGslEXD6NS70EcGjhgRPBItwHdxZPM5GwqQ0cGMN06uhjeY2mHQ==}
+    engines: {node: '>=20.0.0'}
+
+  '@supabase/supabase-js@2.86.0':
+    resolution: {integrity: sha512-BaC9sv5+HGNy1ulZwY8/Ev7EjfYYmWD4fOMw9bDBqTawEj6JHAiOHeTwXLRzVaeSay4p17xYLN2NSCoGgXMQnw==}
+    engines: {node: '>=20.0.0'}
 
   '@svgr/babel-plugin-add-jsx-attribute@8.0.0':
     resolution: {integrity: sha512-b9MIk7yhdS1pMCZM8VeNfUlSKVRhsHZNMl5O9SfaX0l0t5wjdgu4IDzGB8bpnGBBOjGST3rRFVsaaEtI4W6f7g==}
@@ -2439,6 +2503,9 @@ packages:
   '@types/node@24.9.1':
     resolution: {integrity: sha512-QoiaXANRkSXK6p0Duvt56W208du4P9Uye9hWLWgGMDTEoKPhuenzNcC4vGUmrNkiOKTlIrBoyNQYNpSwfEZXSg==}
 
+  '@types/phoenix@1.6.6':
+    resolution: {integrity: sha512-PIzZZlEppgrpoT2QgbnDU+MMzuR6BbCjllj0bM70lWoejMeNJAxCchxnv7J3XFkI8MpygtRpzXrIlmWUBclP5A==}
+
   '@types/react-dom@19.1.11':
     resolution: {integrity: sha512-3BKc/yGdNTYQVVw4idqHtSOcFsgGuBbMveKCOgF8wQ5QtrYOc3jDIlzg3jef04zcXFIHLelyGlj0T+BJ8+KN+w==}
     peerDependencies:
@@ -2461,6 +2528,9 @@ packages:
 
   '@types/stack-utils@2.0.3':
     resolution: {integrity: sha512-9aEbYZ3TbYMznPdcdr3SmIrLXwC/AKZXQeCf9Pgao5CKb8CyHuEX5jzWPTkvregvhRJHcpRO6BFoGW9ycaOkYw==}
+
+  '@types/ws@8.18.1':
+    resolution: {integrity: sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg==}
 
   '@types/yargs-parser@21.0.3':
     resolution: {integrity: sha512-I4q9QU9MQv4oEOz4tAHJtNz1cwuLxn2F3xcc2iV5WdqLPpUnj30aUuxt1mAxYTG+oe8CZMV/+6rU4S4gRDzqtQ==}
@@ -2796,6 +2866,9 @@ packages:
   available-typed-arrays@1.0.7:
     resolution: {integrity: sha512-wvUjBtSGN7+7SjNpq/9M2Tg350UZD3q62IFZLbRAR1bSMlCo1ZaeW+BJ+D090e4hIIZLBcTDWe4Mh4jvUDajzQ==}
     engines: {node: '>= 0.4'}
+
+  await-lock@2.2.2:
+    resolution: {integrity: sha512-aDczADvlvTGajTDjcjpJMqRkOF6Qdz3YbPZm/PyW6tKPkx2hlYBzxMhEywM/tU72HrVZjgl5VCdRuMlA7pZ8Gw==}
 
   axe-core@4.11.0:
     resolution: {integrity: sha512-ilYanEU8vxxBexpJd8cWM4ElSQq4QctCLKih0TSfjIfCQTeyH/6zVrmIJfLPrKTKJRbiG+cfnZbQIjAlJmF1jQ==}
@@ -3674,6 +3747,16 @@ packages:
       react: 19.1.0
       react-native: '*'
 
+  expo-image-loader@6.0.0:
+    resolution: {integrity: sha512-nKs/xnOGw6ACb4g26xceBD57FKLFkSwEUTDXEDF3Gtcu3MqF3ZIYd3YM+sSb1/z9AKV1dYT7rMSGVNgsveXLIQ==}
+    peerDependencies:
+      expo: '*'
+
+  expo-image-picker@17.0.8:
+    resolution: {integrity: sha512-489ByhVs2XPoAu9zodivAKLv7hG4S/FOe8hO/C2U6jVxmRjpAKakKNjMml0IwWjf1+c/RYBqm1XxKaZ+vq/fDQ==}
+    peerDependencies:
+      expo: '*'
+
   expo-json-utils@0.15.0:
     resolution: {integrity: sha512-duRT6oGl80IDzH2LD2yEFWNwGIC2WkozsB6HF3cDYNoNNdUvFk6uN3YiwsTsqVM/D0z6LEAQ01/SlYvN+Fw0JQ==}
 
@@ -3768,6 +3851,13 @@ packages:
   expo-server@1.0.4:
     resolution: {integrity: sha512-IN06r3oPxFh3plSXdvBL7dx0x6k+0/g0bgxJlNISs6qL5Z+gyPuWS750dpTzOeu37KyBG0RcyO9cXUKzjYgd4A==}
     engines: {node: '>=20.16.0'}
+
+  expo-sqlite@16.0.9:
+    resolution: {integrity: sha512-pMT52pTko539yZZQUZYfGiAYxQvpTUZIp/dwi2+IidSjPWB2wJi96ByaoNAzxmucarsYZN1F46C1Le6eT2VLkA==}
+    peerDependencies:
+      expo: '*'
+      react: 19.1.0
+      react-native: '*'
 
   expo-status-bar@3.0.8:
     resolution: {integrity: sha512-L248XKPhum7tvREoS1VfE0H6dPCaGtoUWzRsUv7hGKdiB4cus33Rc0sxkWkoQ77wE8stlnUlL5lvmT0oqZ3ZBw==}
@@ -4159,6 +4249,10 @@ packages:
 
   i18next@23.16.8:
     resolution: {integrity: sha512-06r/TitrM88Mg5FdUXAKL96dJMzgqLE5dv3ryBAra4KCwD9mJ4ndOTS95ZuymIGoE+2hzfdaMak2X11/es7ZWg==}
+
+  iceberg-js@0.8.0:
+    resolution: {integrity: sha512-kmgmea2nguZEvRqW79gDqNXyxA3OS5WIgMVffrHpqXV4F/J4UmNIw2vstixioLTNSkd5rFB8G0s3Lwzogm6OFw==}
+    engines: {node: '>=20.0.0'}
 
   iconv-lite@0.4.24:
     resolution: {integrity: sha512-v3MXnZAcvnywkTUEZomIActle7RXXeedOR31wwl7VlyoXO4Qi9arvSenNQWne1TcRwhCL1HwLI21bEqdpj8/rA==}
@@ -5010,6 +5104,7 @@ packages:
   next@15.5.6:
     resolution: {integrity: sha512-zTxsnI3LQo3c9HSdSf91O1jMNsEzIXDShXd4wVdg9y5shwLqBXi4ZtUUJyB86KGVSJLZx0PFONvO54aheGX8QQ==}
     engines: {node: ^18.18.0 || ^19.8.0 || >= 20.0.0}
+    deprecated: This version has a security vulnerability. Please upgrade to a patched version. See https://nextjs.org/blog/CVE-2025-66478 for more details.
     hasBin: true
     peerDependencies:
       '@opentelemetry/api': ^1.1.0
@@ -5031,6 +5126,7 @@ packages:
   next@16.0.0:
     resolution: {integrity: sha512-nYohiNdxGu4OmBzggxy9rczmjIGI+TpR5vbKTsE1HqYwNm1B+YSiugSrFguX6omMOKnDHAmBPY4+8TNJk0Idyg==}
     engines: {node: '>=20.9.0'}
+    deprecated: This version has a security vulnerability. Please upgrade to a patched version. See https://nextjs.org/blog/CVE-2025-66478 for more details.
     hasBin: true
     peerDependencies:
       '@opentelemetry/api': ^1.1.0
@@ -5614,6 +5710,16 @@ packages:
       react: 19.1.0
       react-native: '*'
 
+  react-native-purchases@9.6.9:
+    resolution: {integrity: sha512-Fk5ZpMKPE0H0wNjpDjizLP1QcO+erh2uv54B6lXn6+ZKZJsHzFuUq9HUPwykT3j2yzMZ0Zd+i/tvwTpLedWmMg==}
+    peerDependencies:
+      react: 19.1.0
+      react-native: '>= 0.73.0'
+      react-native-web: '*'
+    peerDependenciesMeta:
+      react-native-web:
+        optional: true
+
   react-native-reanimated@4.1.3:
     resolution: {integrity: sha512-GP8wsi1u3nqvC1fMab/m8gfFwFyldawElCcUSBJQgfrXeLmsPPUOpDw44lbLeCpcwUuLa05WTVePdTEwCLTUZg==}
     peerDependencies:
@@ -5644,6 +5750,11 @@ packages:
     resolution: {integrity: sha512-vCuZJDf8a5aNC2dlMovEv4Z0jjEUET53lm/iILFnFewa15b4atjVxU6Wirm6O9y6dEsdjDZVD7Q3QM4T1wlI8g==}
     peerDependencies:
       react: 19.1.0
+      react-native: '*'
+
+  react-native-url-polyfill@3.0.0:
+    resolution: {integrity: sha512-aA5CiuUCUb/lbrliVCJ6lZ17/RpNJzvTO/C7gC/YmDQhTUoRD5q5HlJfwLWcxz4VgAhHwXKzhxH+wUN24tAdqg==}
+    peerDependencies:
       react-native: '*'
 
   react-native-web@0.21.2:
@@ -8699,6 +8810,14 @@ snapshots:
       prompts: 2.4.2
       semver: 7.7.3
 
+  '@react-native-community/datetimepicker@8.5.1(expo@54.0.23)(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)':
+    dependencies:
+      invariant: 2.2.4
+      react: 19.1.0
+      react-native: 0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0)
+    optionalDependencies:
+      expo: 54.0.23(@babel/core@7.28.5)(@expo/metro-runtime@6.1.2)(expo-router@6.0.14)(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
+
   '@react-native-google-signin/google-signin@16.0.0(expo@54.0.23)(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)':
     dependencies:
       react: 19.1.0
@@ -8973,6 +9092,14 @@ snapshots:
     dependencies:
       react: 19.1.0
 
+  '@revenuecat/purchases-js-hybrid-mappings@17.21.2':
+    dependencies:
+      '@revenuecat/purchases-js': 1.18.4
+
+  '@revenuecat/purchases-js@1.18.4': {}
+
+  '@revenuecat/purchases-typescript-internal@17.21.2': {}
+
   '@rtsao/scc@1.1.0': {}
 
   '@sentry-internal/browser-utils@10.12.0':
@@ -9129,6 +9256,44 @@ snapshots:
   '@sinonjs/fake-timers@10.3.0':
     dependencies:
       '@sinonjs/commons': 3.0.1
+
+  '@supabase/auth-js@2.86.0':
+    dependencies:
+      tslib: 2.8.1
+
+  '@supabase/functions-js@2.86.0':
+    dependencies:
+      tslib: 2.8.1
+
+  '@supabase/postgrest-js@2.86.0':
+    dependencies:
+      tslib: 2.8.1
+
+  '@supabase/realtime-js@2.86.0':
+    dependencies:
+      '@types/phoenix': 1.6.6
+      '@types/ws': 8.18.1
+      tslib: 2.8.1
+      ws: 8.18.3
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
+
+  '@supabase/storage-js@2.86.0':
+    dependencies:
+      iceberg-js: 0.8.0
+      tslib: 2.8.1
+
+  '@supabase/supabase-js@2.86.0':
+    dependencies:
+      '@supabase/auth-js': 2.86.0
+      '@supabase/functions-js': 2.86.0
+      '@supabase/postgrest-js': 2.86.0
+      '@supabase/realtime-js': 2.86.0
+      '@supabase/storage-js': 2.86.0
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
 
   '@svgr/babel-plugin-add-jsx-attribute@8.0.0(@babel/core@7.28.5)':
     dependencies:
@@ -9363,6 +9528,8 @@ snapshots:
     dependencies:
       undici-types: 7.16.0
 
+  '@types/phoenix@1.6.6': {}
+
   '@types/react-dom@19.1.11(@types/react@19.1.17)':
     dependencies:
       '@types/react': 19.1.17
@@ -9393,6 +9560,10 @@ snapshots:
       csstype: 3.1.3
 
   '@types/stack-utils@2.0.3': {}
+
+  '@types/ws@8.18.1':
+    dependencies:
+      '@types/node': 22.18.12
 
   '@types/yargs-parser@21.0.3': {}
 
@@ -9749,6 +9920,8 @@ snapshots:
   available-typed-arrays@1.0.7:
     dependencies:
       possible-typed-array-names: 1.1.0
+
+  await-lock@2.2.2: {}
 
   axe-core@4.11.0: {}
 
@@ -10928,6 +11101,15 @@ snapshots:
       react: 19.1.0
       react-native: 0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0)
 
+  expo-image-loader@6.0.0(expo@54.0.23):
+    dependencies:
+      expo: 54.0.23(@babel/core@7.28.5)(@expo/metro-runtime@6.1.2)(expo-router@6.0.14)(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
+
+  expo-image-picker@17.0.8(expo@54.0.23):
+    dependencies:
+      expo: 54.0.23(@babel/core@7.28.5)(@expo/metro-runtime@6.1.2)(expo-router@6.0.14)(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
+      expo-image-loader: 6.0.0(expo@54.0.23)
+
   expo-json-utils@0.15.0: {}
 
   expo-keep-awake@15.0.7(expo@54.0.20)(react@19.1.0):
@@ -11109,6 +11291,13 @@ snapshots:
   expo-server@1.0.2: {}
 
   expo-server@1.0.4: {}
+
+  expo-sqlite@16.0.9(expo@54.0.23)(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0):
+    dependencies:
+      await-lock: 2.2.2
+      expo: 54.0.23(@babel/core@7.28.5)(@expo/metro-runtime@6.1.2)(expo-router@6.0.14)(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
+      react: 19.1.0
+      react-native: 0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0)
 
   expo-status-bar@3.0.8(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0):
     dependencies:
@@ -11548,6 +11737,8 @@ snapshots:
   i18next@23.16.8:
     dependencies:
       '@babel/runtime': 7.28.4
+
+  iceberg-js@0.8.0: {}
 
   iconv-lite@0.4.24:
     dependencies:
@@ -13132,6 +13323,15 @@ snapshots:
       react-native: 0.81.5(@babel/core@7.28.5)(@types/react@19.2.2)(react@19.1.0)
     optional: true
 
+  react-native-purchases@9.6.9(react-native-web@0.21.2(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0):
+    dependencies:
+      '@revenuecat/purchases-js-hybrid-mappings': 17.21.2
+      '@revenuecat/purchases-typescript-internal': 17.21.2
+      react: 19.1.0
+      react-native: 0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0)
+    optionalDependencies:
+      react-native-web: 0.21.2(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+
   react-native-reanimated@4.1.3(@babel/core@7.28.5)(react-native-worklets@0.5.1(@babel/core@7.28.5)(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0))(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0):
     dependencies:
       '@babel/core': 7.28.5
@@ -13198,6 +13398,11 @@ snapshots:
       react: 19.1.0
       react-native: 0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0)
       warn-once: 0.1.1
+
+  react-native-url-polyfill@3.0.0(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0)):
+    dependencies:
+      react-native: 0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0)
+      whatwg-url-without-unicode: 8.0.0-3
 
   react-native-web@0.21.2(react-dom@19.1.0(react@19.1.0))(react@19.1.0):
     dependencies:

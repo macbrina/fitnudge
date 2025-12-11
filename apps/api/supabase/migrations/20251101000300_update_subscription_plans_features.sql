@@ -15,26 +15,26 @@ CREATE INDEX IF NOT EXISTS idx_subscription_plans_ios_annual ON subscription_pla
 CREATE INDEX IF NOT EXISTS idx_subscription_plans_android_monthly ON subscription_plans(product_id_android_monthly);
 CREATE INDEX IF NOT EXISTS idx_subscription_plans_android_annual ON subscription_plans(product_id_android_annual);
 
--- Update existing plans with product IDs
+-- Update existing plans with product IDs (same IDs for iOS and Android)
 UPDATE subscription_plans SET
     product_id_ios_monthly = 'com.fitnudge.starter.monthly',
     product_id_ios_annual = 'com.fitnudge.starter.annual',
-    product_id_android_monthly = 'starter_monthly',
-    product_id_android_annual = 'starter_annual'
+    product_id_android_monthly = 'com.fitnudge.starter.monthly',
+    product_id_android_annual = 'com.fitnudge.starter.annual'
 WHERE id = 'starter';
 
 UPDATE subscription_plans SET
     product_id_ios_monthly = 'com.fitnudge.pro.monthly',
     product_id_ios_annual = 'com.fitnudge.pro.annual',
-    product_id_android_monthly = 'pro_monthly',
-    product_id_android_annual = 'pro_annual'
+    product_id_android_monthly = 'com.fitnudge.pro.monthly',
+    product_id_android_annual = 'com.fitnudge.pro.annual'
 WHERE id = 'pro';
 
 UPDATE subscription_plans SET
     product_id_ios_monthly = 'com.fitnudge.coach.monthly',
     product_id_ios_annual = 'com.fitnudge.coach.annual',
-    product_id_android_monthly = 'coach_monthly',
-    product_id_android_annual = 'coach_annual'
+    product_id_android_monthly = 'com.fitnudge.coach.monthly',
+    product_id_android_annual = 'com.fitnudge.coach.annual'
 WHERE id = 'coach_plus';
 
 -- Update plan features with new feature allocations
@@ -90,7 +90,7 @@ SELECT 'pro', 'ai_progress_reflections', 'AI Progress Reflections', 'Premium dee
 WHERE NOT EXISTS (SELECT 1 FROM plan_features WHERE plan_id = 'pro' AND feature_key = 'ai_progress_reflections');
 
 INSERT INTO plan_features (plan_id, feature_key, feature_name, feature_description, feature_value, is_enabled, sort_order)
-SELECT 'pro', 'group_goals', 'Group Goals', 'Create and manage collaborative group goals', null, true, 6
+SELECT 'pro', 'group_goals', 'Group Goals', 'Create and manage collaborative group goals', 3, true, 6
 WHERE NOT EXISTS (SELECT 1 FROM plan_features WHERE plan_id = 'pro' AND feature_key = 'group_goals');
 
 INSERT INTO plan_features (plan_id, feature_key, feature_name, feature_description, feature_value, is_enabled, sort_order)

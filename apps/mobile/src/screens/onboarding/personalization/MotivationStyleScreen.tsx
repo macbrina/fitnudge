@@ -8,6 +8,7 @@ import { tokens, lineHeight } from "@/themes/tokens";
 import { useTheme } from "@/themes";
 import PersonalizationLayout from "./PersonalizationLayout";
 import { useOnboardingStore } from "@/stores/onboardingStore";
+import { Card } from "@/components/ui/Card";
 
 interface MotivationStyleScreenProps {
   onContinue: (motivationStyle: string) => void;
@@ -59,7 +60,6 @@ export default function MotivationStyleScreen({
   );
   const { t } = useTranslation();
   const styles = useStyles(makeMotivationStyleScreenStyles);
-  const { colors, brand } = useTheme();
 
   // Sync with store when component mounts or store value changes
   useEffect(() => {
@@ -96,48 +96,55 @@ export default function MotivationStyleScreen({
         </Text>
 
         <View style={styles.optionsContainer}>
-          {MOTIVATION_STYLES.map((motivationStyle) => (
-            <TouchableOpacity
-              key={motivationStyle.id}
-              onPress={() => setSelectedStyle(motivationStyle.id)}
-              style={[
-                styles.optionCard,
-                selectedStyle === motivationStyle.id &&
-                  styles.optionCardSelected,
-              ]}
-              activeOpacity={0.7}
-            >
-              <View
-                style={[
-                  styles.iconContainer,
-                  selectedStyle === motivationStyle.id &&
-                    styles.iconContainerSelected,
-                ]}
+          {MOTIVATION_STYLES.map((motivationStyle) => {
+            const isSelected = selectedStyle === motivationStyle.id;
+            return (
+              <TouchableOpacity
+                key={motivationStyle.id}
+                onPress={() => setSelectedStyle(motivationStyle.id)}
+                style={styles.optionCardTouchable}
+                activeOpacity={0.7}
               >
-                <Text style={styles.optionIcon}>{motivationStyle.icon}</Text>
-              </View>
-              <View style={styles.textContainer}>
-                <Text
+                <Card
+                  padded={false}
+                  shadow={isSelected ? "xl" : "md"}
                   style={[
-                    styles.optionTitle,
-                    selectedStyle === motivationStyle.id &&
-                      styles.optionTitleSelected,
+                    styles.optionCard,
+                    isSelected && styles.optionCardSelected,
                   ]}
                 >
-                  {t(motivationStyle.title)}
-                </Text>
-                <Text
-                  style={[
-                    styles.optionDescription,
-                    selectedStyle === motivationStyle.id &&
-                      styles.optionDescriptionSelected,
-                  ]}
-                >
-                  {t(motivationStyle.description)}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))}
+                  <View
+                    style={[
+                      styles.iconContainer,
+                      isSelected && styles.iconContainerSelected,
+                    ]}
+                  >
+                    <Text style={styles.optionIcon}>
+                      {motivationStyle.icon}
+                    </Text>
+                  </View>
+                  <View style={styles.textContainer}>
+                    <Text
+                      style={[
+                        styles.optionTitle,
+                        isSelected && styles.optionTitleSelected,
+                      ]}
+                    >
+                      {t(motivationStyle.title)}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.optionDescription,
+                        isSelected && styles.optionDescriptionSelected,
+                      ]}
+                    >
+                      {t(motivationStyle.description)}
+                    </Text>
+                  </View>
+                </Card>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       </View>
     </PersonalizationLayout>
@@ -182,30 +189,19 @@ const makeMotivationStyleScreenStyles = (
       gap: toRN(tokens.spacing[4]),
       marginBottom: toRN(tokens.spacing[6]),
     },
-    optionCard: {
-      backgroundColor: colors.bg.surface,
+    optionCardTouchable: {
       borderRadius: toRN(tokens.borderRadius.xl),
+    },
+    optionCard: {
       padding: toRN(tokens.spacing[5]),
       flexDirection: "row" as const,
       alignItems: "center" as const,
-      borderWidth: 2,
-      borderColor: colors.border.default,
-      shadowColor: colors.shadow.default,
-      shadowOffset: {
-        width: 0,
-        height: 2,
-      },
-      shadowOpacity: 0.08,
-      shadowRadius: 8,
-      elevation: 2,
     },
     optionCardSelected: {
       borderColor: brand.primary,
       backgroundColor: brand.primary + "08",
-      shadowColor: brand.primary,
-      shadowOpacity: 0.15,
-      shadowRadius: 12,
-      elevation: 4,
+      borderWidth: 2,
+      borderRadius: toRN(tokens.borderRadius.xl),
     },
     iconContainer: {
       width: 64,

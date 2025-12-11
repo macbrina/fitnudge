@@ -21,7 +21,11 @@ interface PricingState {
   reset: () => void;
 }
 
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+// 30 minutes - subscription plans rarely change
+const CACHE_DURATION = 30 * 60 * 1000;
+
+// Track in-flight request promise for deduplication
+let fetchPromise: Promise<void> | null = null;
 
 export const usePricingStore = create<PricingState>((set, get) => ({
   // Initial state
@@ -32,44 +36,52 @@ export const usePricingStore = create<PricingState>((set, get) => ({
 
   // Actions
   fetchPlans: async () => {
-    const { lastFetched, isLoading } = get();
+    const { lastFetched, plans } = get();
 
-    // Check if we have recent data
-    if (lastFetched && Date.now() - lastFetched < CACHE_DURATION) {
+    // Check if we have recent data - return immediately without touching isLoading
+    if (
+      lastFetched &&
+      Date.now() - lastFetched < CACHE_DURATION &&
+      plans.length > 0
+    ) {
       return;
     }
 
-    // Prevent multiple simultaneous requests
-    if (isLoading) {
-      return;
+    // If a request is already in flight, wait for it instead of starting a new one
+    if (fetchPromise) {
+      return fetchPromise;
     }
 
     set({ isLoading: true, error: null });
 
-    try {
-      const plans = await subscriptionPlansApi.getPlans();
+    fetchPromise = (async () => {
+      try {
+        const plans = await subscriptionPlansApi.getPlans();
 
-      set({
-        plans,
-        isLoading: false,
-        error: null,
-        lastFetched: Date.now(),
-      });
+        set({
+          plans,
+          isLoading: false,
+          error: null,
+          lastFetched: Date.now(),
+        });
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
 
-      logger.info(`Fetched ${plans.length} subscription plans`);
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+        logger.error("Failed to fetch subscription plans", {
+          error: errorMessage,
+        });
 
-      logger.error("Failed to fetch subscription plans", {
-        error: errorMessage,
-      });
+        set({
+          isLoading: false,
+          error: errorMessage,
+        });
+      } finally {
+        fetchPromise = null;
+      }
+    })();
 
-      set({
-        isLoading: false,
-        error: errorMessage,
-      });
-    }
+    return fetchPromise;
   },
 
   getPlanById: (id: string) => {

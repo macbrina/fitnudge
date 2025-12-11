@@ -61,7 +61,7 @@ class WeeklyRecapService:
                     .select("*")
                     .eq("id", goal_id)
                     .eq("user_id", user_id)
-                    .single()
+                    .maybe_single()
                     .execute()
                 )
                 goal = goal_result.data if goal_result.data else None
@@ -89,7 +89,7 @@ class WeeklyRecapService:
                 supabase.table("user_fitness_profiles")
                 .select("*")
                 .eq("user_id", user_id)
-                .single()
+                .maybe_single()
                 .execute()
             )
             user_profile = profile_result.data if profile_result.data else None
@@ -109,7 +109,7 @@ class WeeklyRecapService:
                 "generated_at": datetime.now().isoformat(),
             }
 
-            logger.info(
+            print(
                 f"Generated weekly recap for user {user_id}",
                 {
                     "user_id": user_id,

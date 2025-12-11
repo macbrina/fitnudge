@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import {
   View,
   Text,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -19,6 +18,7 @@ import { router } from "expo-router";
 import { tokens, lineHeight } from "@/themes/tokens";
 import { MOBILE_ROUTES } from "@/lib/routes";
 import { useChangePassword } from "@/hooks/api/useAuth";
+import { useAlertModal } from "@/contexts/AlertModalContext";
 
 export default function ChangePasswordScreen() {
   const [currentPassword, setCurrentPassword] = useState("");
@@ -34,6 +34,7 @@ export default function ChangePasswordScreen() {
   const styles = useStyles(makeChangePasswordScreenStyles);
   const insets = useSafeAreaInsets();
   const changePasswordMutation = useChangePassword();
+  const { showAlert, showToast } = useAlertModal();
 
   const validateForm = () => {
     const newErrors: typeof errors = {};
@@ -81,19 +82,16 @@ export default function ChangePasswordScreen() {
         new_password: newPassword,
       },
       {
-        onSuccess: () => {
-          Alert.alert(
-            t("auth.change_password.success_title"),
-            t("auth.change_password.success_message"),
-            [
-              {
-                text: t("common.done"),
-                onPress: () => router.back(),
-              },
-            ]
-          );
+        onSuccess: async () => {
+          showToast({
+            title: t("auth.change_password.success_title"),
+            message: t("auth.change_password.success_message"),
+            variant: "success",
+            duration: 2000,
+          });
+          setTimeout(() => router.back(), 500);
         },
-        onError: (error: any) => {
+        onError: async (error: any) => {
           console.error("Change password error:", error);
           const errorMessage =
             error?.error ||
@@ -109,7 +107,12 @@ export default function ChangePasswordScreen() {
               ),
             }));
           } else {
-            Alert.alert(t("common.error"), errorMessage);
+            await showAlert({
+              title: t("common.error"),
+              message: errorMessage,
+              variant: "error",
+              confirmLabel: t("common.ok"),
+            });
           }
         },
       }
@@ -126,7 +129,6 @@ export default function ChangePasswordScreen() {
           style={{ flex: 1 }}
           contentContainerStyle={{
             flexGrow: 1,
-            paddingTop: insets.top,
             paddingBottom: insets.bottom,
           }}
           showsVerticalScrollIndicator={false}

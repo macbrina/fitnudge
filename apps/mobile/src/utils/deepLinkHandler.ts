@@ -100,8 +100,29 @@ export function handleDeepLink(url: string): void {
         }
         break;
 
-      // Default: go to home
+      // Check-ins (from push notifications)
+      case "/checkin":
+        if (queryParams?.goalId) {
+          router.push(
+            `${MOBILE_ROUTES.MAIN.HOME}?openCheckinGoalId=${queryParams.goalId}`
+          );
+        } else {
+          router.push(MOBILE_ROUTES.MAIN.HOME);
+        }
+        break;
+
+      // Default: handle dynamic paths or go to home
       default:
+        // Handle /checkin/{goalId} format (from push notifications)
+        if (normalizedPath.startsWith("/checkin/")) {
+          const goalId = normalizedPath.replace("/checkin/", "");
+          if (goalId) {
+            router.push(
+              `${MOBILE_ROUTES.MAIN.HOME}?openCheckinGoalId=${goalId}`
+            );
+            break;
+          }
+        }
         router.push(MOBILE_ROUTES.MAIN.HOME);
         break;
     }

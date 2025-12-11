@@ -2,14 +2,14 @@
 Onboarding API endpoints for user personalization and goal suggestions
 """
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field, validator
-from uuid import uuid4
+from pydantic import BaseModel, Field
 from app.core.flexible_auth import get_current_user
 from app.core.database import get_supabase_client
 from app.services.logger import logger
-from app.services.openai_service import OpenAIService
+from app.models.suggested_goals import SuggestedGoalItem, SuggestedGoalsRecord
+from app.services.tasks import generate_suggested_goals_task
 
 router = APIRouter(
     redirect_slashes=False
@@ -42,144 +42,13 @@ class FitnessProfileResponse(BaseModel):
     completed_at: str
 
 
-class SuggestedGoal(BaseModel):
-    id: str
-    title: str  # Changed from 'name' to match goals table
-    description: str
-    category: str  # Will be validated against goal_category enum
-    frequency: str  # Will be validated against goal_frequency enum
-    target_days: Optional[int]
-    reminder_times: List[str]
-    match_reason: str  # For UI display only
-
-    @validator("category")
-    def validate_category(cls, v):
-        valid_categories = [
-            "fitness",
-            "nutrition",
-            "wellness",
-            "mindfulness",
-            "sleep",
-            "custom",
-        ]
-        if v not in valid_categories:
-            raise ValueError(f"Category must be one of: {valid_categories}")
-        return v
-
-    @validator("frequency")
-    def validate_frequency(cls, v):
-        valid_frequencies = ["daily", "weekly", "monthly", "custom"]
-        if v not in valid_frequencies:
-            raise ValueError(f"Frequency must be one of: {valid_frequencies}")
-        return v
-
-
-# AI goal suggestion logic (fallback to database templates)
-def get_suggested_goals_from_db(
-    profile: Dict[str, Any], supabase
-) -> List[Dict[str, Any]]:
-    """
-    Generate AI-suggested goals based on user profile using database templates
-    """
-    suggestions = []
-
-    # Get goal templates from database
-    templates_result = supabase.table("goal_templates").select("*").execute()
-
-    if not templates_result.data:
-        logger.error("No goal templates found in database")
-        return []
-
-    base_templates = templates_result.data
-
-    # AI matching logic based on profile
-    fitness_level = profile.get("fitness_level", "")
-    primary_goal = profile.get("primary_goal", "")
-    current_frequency = profile.get("current_frequency", "")
-    preferred_location = profile.get("preferred_location", "")
-    available_time = profile.get("available_time", "")
-
-    for template in base_templates:
-        match_reason = ""
-        score = 0
-
-        # Use template's existing match_reason as base
-        if template.get("match_reason"):
-            match_reason += template["match_reason"] + " "
-            score += 1
-
-        # Match based on fitness level
-        if (
-            fitness_level == "beginner"
-            and template["category"] == "fitness"
-            and template["frequency"] == "weekly"
-        ):
-            match_reason += "Perfect for beginners. "
-            score += 3
-        elif fitness_level == "intermediate" and template["category"] == "fitness":
-            match_reason += "Great for intermediate level. "
-            score += 3
-        elif fitness_level in ["advanced", "athlete"]:
-            match_reason += "Challenging for advanced users. "
-            score += 3
-
-        # Match based on primary goal
-        if (
-            primary_goal == "lose_weight"
-            and template["category"] == "fitness"
-            and "weight" in template["title"].lower()
-        ):
-            match_reason += "Designed for weight loss. "
-            score += 4
-        elif primary_goal == "build_muscle" and "strength" in template["title"].lower():
-            match_reason += "Focused on muscle building. "
-            score += 4
-        elif primary_goal == "stay_active" and template["frequency"] == "daily":
-            match_reason += "Keeps you consistently active. "
-            score += 3
-
-        # Match based on current frequency
-        if current_frequency == "never" and template["frequency"] == "weekly":
-            match_reason += "Good starting point for beginners. "
-            score += 2
-        elif (
-            current_frequency in ["1-2x_week", "3-4x_week"]
-            and template["frequency"] == "daily"
-        ):
-            match_reason += "Helps increase your frequency. "
-            score += 2
-
-        # Match based on preferred location
-        if preferred_location == "gym" and "gym" in template["title"].lower():
-            match_reason += "Gym-based workout. "
-            score += 2
-        elif preferred_location == "home" and template["frequency"] == "daily":
-            match_reason += "Can be done at home. "
-            score += 2
-        elif preferred_location == "outdoor" and "run" in template["title"].lower():
-            match_reason += "Outdoor activity. "
-            score += 2
-
-        # Match based on available time
-        if available_time == "less_30min" and template["frequency"] == "daily":
-            match_reason += "Quick and effective. "
-            score += 2
-        elif (
-            available_time in ["30-60min", "1-2hrs"]
-            and template["frequency"] == "weekly"
-        ):
-            match_reason += "Perfect for your time availability. "
-            score += 2
-
-        # Only include if it has a reasonable match score
-        if score >= 2:  # Lowered threshold since we're using database templates
-            template["match_reason"] = match_reason.strip()
-            template["score"] = score
-            suggestions.append(template)
-
-    # Sort by score (descending) and return top 5
-    suggestions.sort(key=lambda x: x.get("score", 0), reverse=True)
-    return suggestions[:5]
+class SuggestedGoalsStatusResponse(BaseModel):
+    status: Literal["not_started", "pending", "ready", "failed"]
+    goals: Optional[List[SuggestedGoalItem]] = None
+    error: Optional[str] = None
+    updated_at: Optional[str] = None
+    regeneration_count: Optional[int] = 0
+    goal_type: Optional[str] = "habit"  # The type of goals requested
 
 
 @router.post("/profile", response_model=FitnessProfileResponse)
@@ -238,14 +107,6 @@ async def save_fitness_profile(
             )
 
         if result.data:
-            logger.info(
-                f"Fitness profile saved for user {user_id}",
-                {
-                    "user_id": user_id,
-                    "fitness_level": profile_data.fitness_level,
-                    "primary_goal": profile_data.primary_goal,
-                },
-            )
             return FitnessProfileResponse(**result.data[0])
         else:
             logger.error(
@@ -291,6 +152,7 @@ async def get_fitness_profile(
     except HTTPException:
         raise
     except Exception as e:
+        print(f"[Onboarding] Error getting fitness profile: {type(e).__name__}: {e}")
         logger.error(
             f"Error getting fitness profile for user {current_user.get('id')}",
             {"error": str(e), "user_id": current_user.get("id")},
@@ -301,178 +163,301 @@ async def get_fitness_profile(
         )
 
 
-@router.get("/suggested-goals", response_model=List[SuggestedGoal])
-async def get_suggested_goals(
+def _record_to_response(record: Dict[str, Any]) -> SuggestedGoalsStatusResponse:
+    try:
+        parsed = SuggestedGoalsRecord(**record)
+        return SuggestedGoalsStatusResponse(
+            status=parsed.status,
+            goals=parsed.goals,
+            error=parsed.error_message,
+            updated_at=parsed.updated_at.isoformat(),
+            regeneration_count=record.get("regeneration_count", 0),
+            goal_type=record.get("goal_type", "habit"),
+        )
+    except Exception as exc:
+        logger.error(
+            "Failed to parse suggested goals record",
+            {"error": str(exc), "record": record},
+        )
+        return SuggestedGoalsStatusResponse(
+            status="failed",
+            goals=None,
+            error="Unable to parse suggested goals record.",
+            updated_at=record.get("updated_at"),
+            regeneration_count=record.get("regeneration_count", 0),
+            goal_type=record.get("goal_type", "habit"),
+        )
+
+
+class SuggestedGoalsRequest(BaseModel):
+    goal_type: str = Field(
+        default="habit",
+        description="Type of goals to generate: habit, time_challenge, target_challenge, or mixed",
+    )
+
+
+@router.post(
+    "/suggested-goals",
+    response_model=SuggestedGoalsStatusResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def request_suggested_goals_generation(
+    request: SuggestedGoalsRequest = SuggestedGoalsRequest(),
     current_user: Dict[str, Any] = Depends(get_current_user),
     supabase=Depends(get_supabase_client),
 ):
-    """Get AI-suggested goals with fallback to database templates"""
-    try:
-        user_id = current_user["id"]
+    """
+    Kick off initial generation of suggested goals for the current user.
+    Checks if user already has goals and respects regeneration limits.
 
-        # Get user's fitness profile
-        profile_result = (
-            supabase.table("user_fitness_profiles")
+    Free users: 2 total generations allowed (feature_value = 2)
+    Starter+: Unlimited (feature_value = NULL)
+
+    Args:
+        goal_type: Type of goals - "habit" (default), "time_challenge",
+                   "target_challenge", or "mixed"
+    """
+    from app.core.subscriptions import get_user_features_by_tier
+
+    user_id = current_user["id"]
+    user_plan = current_user.get("plan", "free")
+    goal_type = request.goal_type
+
+    # Check premium access for non-habit goal types
+    # "habit" is free, everything else requires premium (challenge_create or group_goals feature)
+    if goal_type != "habit":
+        features_data = get_user_features_by_tier(user_id, user_plan, supabase)
+        has_challenge_access = any(
+            f.get("feature_key") in ("challenge_create", "group_goals")
+            and f.get("is_enabled")
+            for f in features_data.get("features", [])
+        )
+        if not has_challenge_access:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Challenge goals require a premium subscription. Upgrade to access {goal_type} goals.",
+            )
+
+    try:
+        # Check if user already has suggested goals
+        existing_record = (
+            supabase.table("suggested_goals")
             .select("*")
             .eq("user_id", user_id)
             .execute()
         )
 
-        if not profile_result.data:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Fitness profile not found. Complete onboarding first.",
-            )
+        current_count = 0
+        if existing_record.data:
+            current_count = existing_record.data[0].get("regeneration_count", 0)
 
-        profile = profile_result.data[0]
+            # Get user's feature limit for AI goal generations
+            features_data = get_user_features_by_tier(user_id, user_plan, supabase)
+            generation_limit = None  # Default to unlimited
 
-        # Get user's subscription plan for feature-aware AI suggestions
-        user_plan = current_user.get("plan", "free")
+            for feature in features_data.get("features", []):
+                if feature.get("feature_key") == "ai_goal_generations":
+                    generation_limit = feature.get("feature_value")
+                    break
 
-        # Try OpenAI first
-        openai_service = OpenAIService()
-        ai_goals = await openai_service.generate_goal_suggestions(
-            profile, user_plan=user_plan
-        )
-
-        if ai_goals and len(ai_goals) > 0:
-            logger.info(
-                f"Generated {len(ai_goals)} AI goals for user {user_id}",
-                {
-                    "user_id": user_id,
-                    "fitness_level": profile.get("fitness_level"),
-                    "primary_goal": profile.get("primary_goal"),
-                    "source": "ai",
-                },
-            )
-
-            # Transform AI goals to SuggestedGoal format
-            suggested_goals = []
-            for goal in ai_goals:
-                try:
-                    suggested_goal = SuggestedGoal(
-                        id=str(uuid4()),  # Generate temporary ID for AI goals
-                        title=goal.get("title", ""),
-                        description=goal.get("description", ""),
-                        category=goal.get("category", "fitness"),
-                        frequency=goal.get("frequency", "weekly"),
-                        target_days=goal.get("target_days"),
-                        reminder_times=goal.get("reminder_times") or [],
-                        match_reason=goal.get("match_reason", "Based on your profile"),
+            # If free user has reached limit, return existing goals
+            if generation_limit is not None and current_count >= generation_limit:
+                # Return existing goals if status is ready
+                if existing_record.data[0].get("status") == "ready":
+                    return _record_to_response(existing_record.data[0])
+                else:
+                    # If not ready but limit reached, return error
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail=f"You've used all {generation_limit} AI goal generations. Upgrade to Starter+ for unlimited generations.",
                     )
-                    suggested_goals.append(suggested_goal)
-                except Exception as e:
-                    logger.warning(
-                        f"Failed to transform AI goal to SuggestedGoal format: {e}",
-                        {"goal": goal, "error": str(e)},
-                    )
-                    continue
 
-            if suggested_goals:
-                return suggested_goals
-            else:
-                logger.warning("No valid AI goals could be transformed")
-                # Fall through to database fallback
-
-        # Fallback to database template matching
-        logger.warning(f"OpenAI failed, using database fallback for user {user_id}")
-        suggested_goals_raw = get_suggested_goals_from_db(profile, supabase)
-
-        # Transform database templates to SuggestedGoal format
-        suggested_goals = []
-        for goal in suggested_goals_raw:
-            try:
-                # Map database fields to SuggestedGoal model
-                suggested_goal = SuggestedGoal(
-                    id=goal.get("id", ""),
-                    title=goal.get("title")
-                    or goal.get("name", ""),  # Support both 'title' and 'name'
-                    description=goal.get("description", ""),
-                    category=goal.get("category", "fitness"),
-                    frequency=goal.get("frequency", "weekly"),
-                    target_days=goal.get("target_days"),
-                    reminder_times=goal.get("reminder_times")
-                    or [],  # Ensure it's a list
-                    match_reason=goal.get("match_reason", "Based on your profile"),
-                )
-                suggested_goals.append(suggested_goal)
-            except Exception as e:
-                logger.warning(
-                    f"Failed to transform goal template {goal.get('id')} to SuggestedGoal format: {e}",
-                    {"goal_id": goal.get("id"), "error": str(e)},
-                )
-                # Skip invalid goals instead of failing completely
-                continue
-
-        logger.info(
-            f"Generated {len(suggested_goals)} database goals for user {user_id}",
+        # Create/update pending record with goal_type
+        supabase.table("suggested_goals").upsert(
             {
                 "user_id": user_id,
-                "fitness_level": profile.get("fitness_level"),
-                "primary_goal": profile.get("primary_goal"),
-                "source": "database",
+                "status": "pending",
+                "goals": None,
+                "error_message": None,
+                "regeneration_count": current_count,  # Keep current, will increment on success
+                "goal_type": goal_type,  # Store the requested goal type for retries
+                "updated_at": "now()",
             },
-        )
-
-        if not suggested_goals:
-            logger.warning(
-                f"No valid goals could be generated from database templates for user {user_id}"
-            )
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Unable to generate goal suggestions. Please try again later.",
-            )
-
-        return suggested_goals
+            on_conflict="user_id",
+        ).execute()
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as exc:
         logger.error(
-            f"Error in goal suggestions for user {current_user.get('id')}",
-            {"error": str(e), "user_id": current_user.get("id")},
+            f"Failed to create pending suggested goals record: {exc}",
+            {"user_id": user_id, "error": str(exc)},
         )
-        # Last resort: return database templates
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to queue suggested goals generation.",
+        )
+
+    # Enqueue Celery task to generate suggestions asynchronously
+    generate_suggested_goals_task.delay(user_id=user_id, goal_type=goal_type)
+
+    return SuggestedGoalsStatusResponse(
+        status="pending", regeneration_count=current_count, goal_type=goal_type
+    )
+
+
+@router.get(
+    "/suggested-goals",
+    response_model=SuggestedGoalsStatusResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def get_suggested_goals_status(
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    supabase=Depends(get_supabase_client),
+):
+    """Retrieve the current status (and results, if ready) of suggested goals generation."""
+    user_id = current_user["id"]
+
+    # Retry once on transient failures
+    result = None
+    last_error = None
+    for attempt in range(2):
         try:
-            suggested_goals_raw = get_suggested_goals_from_db(profile, supabase)
-
-            # Transform database templates to SuggestedGoal format
-            suggested_goals = []
-            for goal in suggested_goals_raw:
-                try:
-                    suggested_goal = SuggestedGoal(
-                        id=goal.get("id", ""),
-                        title=goal.get("title") or goal.get("name", ""),
-                        description=goal.get("description", ""),
-                        category=goal.get("category", "fitness"),
-                        frequency=goal.get("frequency", "weekly"),
-                        target_days=goal.get("target_days"),
-                        reminder_times=goal.get("reminder_times") or [],
-                        match_reason=goal.get("match_reason", "Based on your profile"),
-                    )
-                    suggested_goals.append(suggested_goal)
-                except Exception as transform_error:
-                    logger.warning(
-                        f"Failed to transform goal template {goal.get('id')}: {transform_error}",
-                        {"goal_id": goal.get("id"), "error": str(transform_error)},
-                    )
-                    continue
-
-            if suggested_goals:
-                return suggested_goals
-            else:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Failed to generate goal suggestions",
+            result = (
+                supabase.table("suggested_goals")
+                .select("*")
+                .eq("user_id", user_id)
+                .execute()
+            )
+            break  # Success, exit retry loop
+        except Exception as exc:
+            last_error = exc
+            if attempt == 0:
+                logger.warning(
+                    "Retrying suggested goals status fetch",
+                    {"user_id": user_id, "error": str(exc)},
                 )
-        except HTTPException:
-            raise
-        except Exception as fallback_error:
+                continue
             logger.error(
-                f"Failed to get suggested goals from database fallback: {fallback_error}",
-                {"error": str(fallback_error), "user_id": current_user.get("id")},
+                "Failed to read suggested goals status after retry",
+                {"user_id": user_id, "error": str(exc)},
             )
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to get suggested goals",
+                detail="Unable to fetch suggested goals status.",
             )
+
+    if not result or not result.data:
+        return SuggestedGoalsStatusResponse(status="not_started")
+
+    return _record_to_response(result.data[0])
+
+
+@router.put(
+    "/suggested-goals/regenerate",
+    response_model=SuggestedGoalsStatusResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def regenerate_suggested_goals(
+    request: SuggestedGoalsRequest = SuggestedGoalsRequest(),
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    supabase=Depends(get_supabase_client),
+):
+    """
+    Regenerate suggested goals for the current user.
+
+    Free users: 2 total generations allowed (feature_value = 2)
+    Starter+: Unlimited (feature_value = NULL)
+
+    Args:
+        goal_type: Type of goals - "habit" (default), "time_challenge",
+                   "target_challenge", or "mixed"
+    """
+    from app.core.subscriptions import get_user_features_by_tier
+
+    user_id = current_user["id"]
+    user_plan = current_user.get("plan", "free")
+    goal_type = request.goal_type
+
+    # Get user features once for all checks
+    features_data = get_user_features_by_tier(user_id, user_plan, supabase)
+
+    # Check premium access for non-habit goal types
+    # "habit" is free, everything else requires premium (challenge_create or group_goals feature)
+    if goal_type != "habit":
+        has_challenge_access = any(
+            f.get("feature_key") in ("challenge_create", "group_goals")
+            and f.get("is_enabled")
+            for f in features_data.get("features", [])
+        )
+        if not has_challenge_access:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Challenge goals require a premium subscription. Upgrade to access {goal_type} goals.",
+            )
+
+    try:
+        # Get existing record to check regeneration count
+        existing_record = (
+            supabase.table("suggested_goals")
+            .select("regeneration_count")
+            .eq("user_id", user_id)
+            .maybe_single()
+            .execute()
+        )
+
+        current_count = 0
+        if existing_record and existing_record.data:
+            current_count = existing_record.data.get("regeneration_count", 0)
+
+        # Get user's feature limit for AI goal generations
+        generation_limit = None  # Default to unlimited
+
+        for feature in features_data.get("features", []):
+            if feature.get("feature_key") == "ai_goal_generations":
+                generation_limit = feature.get("feature_value")
+                break
+
+        # Check if user has reached their limit
+        # generation_limit = 2 for free users, NULL for paid users
+        if generation_limit is not None and current_count >= generation_limit:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"You've used all {generation_limit} AI goal generations. Upgrade to Starter+ for unlimited generations.",
+            )
+
+        # Clear goals and set to pending with goal_type
+        # Count will be incremented by Celery on successful completion
+        supabase.table("suggested_goals").upsert(
+            {
+                "user_id": user_id,
+                "status": "pending",
+                "goals": None,
+                "error_message": None,
+                "regeneration_count": current_count,  # Keep current, will increment on success
+                "goal_type": goal_type,  # Store the requested goal type for retries
+                "updated_at": "now()",
+            },
+            on_conflict="user_id",
+        ).execute()
+
+        # Enqueue Celery task to generate new suggestions
+        generate_suggested_goals_task.delay(user_id=user_id, goal_type=goal_type)
+
+        return SuggestedGoalsStatusResponse(
+            status="pending",
+            regeneration_count=current_count,
+            goal_type=goal_type,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(
+            "Failed to regenerate suggested goals",
+            {"user_id": user_id, "error": str(exc), "goal_type": goal_type},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to regenerate suggested goals.",
+        )

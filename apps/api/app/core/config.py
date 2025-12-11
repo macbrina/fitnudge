@@ -1,26 +1,46 @@
 from pydantic_settings import BaseSettings
-from typing import List
+from typing import List, Optional
 from dotenv import load_dotenv
+from pathlib import Path
 import os
 
-load_dotenv()
+# Get the directory where config.py lives (apps/api/app/core/)
+# Then go up to apps/api/ to find .env files
+CONFIG_DIR = Path(__file__).resolve().parent  # apps/api/app/core/
+API_DIR = CONFIG_DIR.parent.parent  # apps/api/
+
+# Load .env.local first, then .env as fallback (using absolute paths)
+env_local = API_DIR / ".env.local"
+env_file = API_DIR / ".env"
+
+if env_local.exists():
+    load_dotenv(env_local)
+    print(f"✅ Loaded env from: {env_local}")
+elif env_file.exists():
+    load_dotenv(env_file)
+    print(f"✅ Loaded env from: {env_file}")
+else:
+    print(f"⚠️ No .env file found in {API_DIR}")
 
 
 class Settings(BaseSettings):
     # Environment
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
-    DEBUG: bool = os.getenv("DEBUG", True)
+    DEBUG: bool = os.getenv("DEBUG", "true").lower() == "true"
 
     # Database
     DATABASE_URL: str = os.getenv("DATABASE_URL", "")
     SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
     SUPABASE_SERVICE_KEY: str = os.getenv("SUPABASE_SERVICE_KEY", "")
 
-    # JWT
-    SECRET_KEY: str = os.getenv("SECRET_KEY", "")
+    # JWT - Use Supabase JWT secret for compatibility with Supabase Realtime
+    # Get your SUPABASE_JWT_SECRET from: Supabase Dashboard → Settings → API → JWT Secret
+    SECRET_KEY: str = os.getenv("SUPABASE_JWT_SECRET", os.getenv("SECRET_KEY", ""))
     ALGORITHM: str = os.getenv("ALGORITHM", "HS256")
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 15)
-    REFRESH_TOKEN_EXPIRE_DAYS: int = os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", 7)
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = int(
+        os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "15")
+    )
+    REFRESH_TOKEN_EXPIRE_DAYS: int = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
 
     # CORS
     ALLOWED_ORIGINS: str = os.getenv("ALLOWED_ORIGINS", "*")
@@ -38,8 +58,34 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     ELEVENLABS_API_KEY: str = os.getenv("ELEVENLABS_API_KEY", "")
 
-    # Redis
-    REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379")
+    # Redis Configuration
+    REDIS_HOST: str = os.getenv("REDIS_HOST", "localhost")
+    REDIS_PORT: int = int(os.getenv("REDIS_PORT", "6379"))
+    REDIS_PASSWORD: str = os.getenv("REDIS_PASSWORD", "")
+    REDIS_DB: int = int(os.getenv("REDIS_DB", "0"))
+    REDIS_SSL: bool = os.getenv("REDIS_SSL", "false").lower() == "true"
+
+    # Legacy support: If REDIS_URL is provided, use it (for backward compatibility)
+    REDIS_URL: Optional[str] = os.getenv("REDIS_URL", None)
+
+    @property
+    def redis_connection_url(self) -> str:
+        """Build Redis connection URL from individual components."""
+        # Legacy support: If REDIS_URL is provided, use it
+        if self.REDIS_URL:
+            return self.REDIS_URL
+
+        protocol = "rediss" if self.REDIS_SSL else "redis"
+
+        if self.REDIS_PASSWORD:
+            url = f"{protocol}://:{self.REDIS_PASSWORD}@{self.REDIS_HOST}:{self.REDIS_PORT}"
+        else:
+            url = f"{protocol}://{self.REDIS_HOST}:{self.REDIS_PORT}"
+
+        if self.REDIS_DB != 0:
+            url = f"{url}/{self.REDIS_DB}"
+
+        return url
 
     # Cloudflare R2 Storage
     CLOUDFLARE_ACCOUNT_ID: str = os.getenv("CLOUDFLARE_ACCOUNT_ID", "")
@@ -47,6 +93,30 @@ class Settings(BaseSettings):
     CLOUDFLARE_SECRET_ACCESS_KEY: str = os.getenv("CLOUDFLARE_SECRET_ACCESS_KEY", "")
     CLOUDFLARE_BUCKET_NAME: str = os.getenv("CLOUDFLARE_BUCKET_NAME", "")
     CLOUDFLARE_PUBLIC_URL: str = os.getenv("CLOUDFLARE_PUBLIC_URL", "")
+
+    # Cloudflare R2 - Alias names used by media service
+    @property
+    def CLOUDFLARE_R2_ENDPOINT_URL(self) -> str:
+        """R2 S3-compatible endpoint URL"""
+        if self.CLOUDFLARE_ACCOUNT_ID:
+            return f"https://{self.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
+        return ""
+
+    @property
+    def CLOUDFLARE_R2_ACCESS_KEY_ID(self) -> str:
+        return self.CLOUDFLARE_ACCESS_KEY_ID
+
+    @property
+    def CLOUDFLARE_R2_SECRET_ACCESS_KEY(self) -> str:
+        return self.CLOUDFLARE_SECRET_ACCESS_KEY
+
+    @property
+    def CLOUDFLARE_R2_BUCKET_NAME(self) -> str:
+        return self.CLOUDFLARE_BUCKET_NAME
+
+    @property
+    def CLOUDFLARE_R2_PUBLIC_URL(self) -> str:
+        return self.CLOUDFLARE_PUBLIC_URL
 
     # Apple OAuth
     APPLE_CLIENT_IDS: str = os.getenv("APPLE_CLIENT_IDS", "")
@@ -99,11 +169,11 @@ class Settings(BaseSettings):
         return unique_ids
 
     # Rate Limiting
-    RATE_LIMIT_PER_MINUTE: int = os.getenv("RATE_LIMIT_PER_MINUTE", 100)
+    RATE_LIMIT_PER_MINUTE: int = int(os.getenv("RATE_LIMIT_PER_MINUTE", "100"))
 
     # Email (Namecheap Private Email)
     SMTP_HOST: str = os.getenv("SMTP_HOST", "mail.privateemail.com")
-    SMTP_PORT: int = os.getenv("SMTP_PORT", 587)
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
     SMTP_USERNAME: str = os.getenv("SMTP_USERNAME", "")
     SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
     REPLY_TO_EMAIL: str = os.getenv("REPLY_TO_EMAIL", "hello@fitnudge.app")

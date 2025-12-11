@@ -19,11 +19,14 @@ export const ROUTES = {
 
   // Goals routes
   GOALS: {
+    BASE: "/goals",
     LIST: "/goals/",
     ARCHIVE: (id: string) => `/goals/${id}/archive`,
     UNARCHIVE: (id: string) => `/goals/${id}/unarchive`,
     ACTIVATE: (id: string) => `/goals/${id}/activate`,
+    DEACTIVATE: (id: string) => `/goals/${id}/deactivate`,
     DUPLICATE_GOAL: (id: string) => `/goals/${id}/duplicate`,
+    SHARE_AS_CHALLENGE: (id: string) => `/goals/${id}/share-as-challenge`,
     GET_GOALS_BY_CATEGORY: (category: string) => `/goals/?category=${category}`,
     GET_ACTIVE_GOALS: "/goals/?is_active=true",
     GET_COMPLETED_GOALS: "/goals/?is_active=false",
@@ -36,6 +39,51 @@ export const ROUTES = {
     TEMPLATES: "/goals/templates/",
     GET_STATS: (id: string) => `/goals/${id}/stats`,
     STATS: "/goals/stats",
+    PLAN_STATUS: (id: string) => `/goals/${id}/plan-status`,
+    PLAN: (id: string) => `/goals/${id}/plan`,
+    PLAN_RETRY: (id: string) => `/goals/${id}/plan/retry`,
+  },
+
+  // Challenges routes
+  CHALLENGES: {
+    BASE: "/challenges",
+    LIST: "/challenges",
+    GET: (id: string) => `/challenges/${id}`,
+    CREATE: "/challenges",
+    UPDATE: (id: string) => `/challenges/${id}`,
+    DELETE: (id: string) => `/challenges/${id}`,
+    JOIN: (id: string) => `/challenges/${id}/join`,
+    LEAVE: (id: string) => `/challenges/${id}/leave`,
+    CHECK_IN: (id: string) => `/challenges/${id}/check-in`,
+    CHECK_INS: (id: string) => `/challenges/${id}/check-ins`,
+    MY_CHECK_INS: (id: string) => `/challenges/${id}/my-check-ins`,
+    LEADERBOARD: (id: string) => `/challenges/${id}/leaderboard`,
+    PARTICIPANTS: (id: string) => `/challenges/${id}/participants`,
+    PUBLIC: "/challenges/public",
+  },
+
+  // Nudges routes (social motivation)
+  NUDGES: {
+    BASE: "/nudges",
+    LIST: "/nudges",
+    SENT: "/nudges/sent",
+    UNREAD_COUNT: "/nudges/unread-count",
+    SEND: "/nudges",
+    MARK_READ: (id: string) => `/nudges/${id}/read`,
+    MARK_ALL_READ: "/nudges/read-all",
+    DELETE: (id: string) => `/nudges/${id}`,
+  },
+
+  // Accountability Partners routes
+  PARTNERS: {
+    BASE: "/partners",
+    LIST: "/partners",
+    PENDING: "/partners/pending",
+    REQUEST: "/partners/request",
+    ACCEPT: (id: string) => `/partners/${id}/accept`,
+    REJECT: (id: string) => `/partners/${id}/reject`,
+    REMOVE: (id: string) => `/partners/${id}`,
+    SEARCH_USERS: "/partners/search",
   },
 
   // Motivation routes
@@ -46,6 +94,16 @@ export const ROUTES = {
     GET: (id: string) => `/motivation/${id}`,
     SEND: (id: string) => `/motivation/${id}/send`,
     DELETE: (id: string) => `/motivation/${id}`,
+  },
+
+  // Daily Motivations routes
+  DAILY_MOTIVATIONS: {
+    BASE: "/daily-motivations",
+    TODAY: "/daily-motivations/today",
+    LIST: "/daily-motivations",
+    GET: (id: string) => `/daily-motivations/${id}`,
+    SHARE: (id: string) => `/daily-motivations/${id}/share`,
+    REGENERATE: "/daily-motivations/regenerate",
   },
 
   // Social routes
@@ -81,7 +139,6 @@ export const ROUTES = {
 
   // Subscription routes
   SUBSCRIPTIONS: {
-    PLANS: "/subscriptions/plans",
     ME: "/subscriptions/me",
     FEATURES: "/subscriptions/features",
     SYNC: "/subscriptions/sync",
@@ -163,6 +220,7 @@ export const ROUTES = {
   MEDIA: {
     UPLOAD: "/media/upload",
     DELETE: (id: string) => `/media/${id}`,
+    DELETE_BY_URL: "/media/delete-by-url",
   },
 
   // Analytics routes
@@ -187,6 +245,14 @@ export const ROUTES = {
   ONBOARDING: {
     PROFILE: "/onboarding/profile",
     SUGGESTED_GOALS: "/onboarding/suggested-goals",
+  },
+
+  // Achievements routes
+  ACHIEVEMENTS: {
+    TYPES: "/achievements/types",
+    MY_ACHIEVEMENTS: "/achievements/me",
+    CHECK: "/achievements/check",
+    STATS: "/achievements/stats",
   },
 } as const;
 
@@ -268,6 +334,13 @@ export const MOBILE_ROUTES = {
     PERSONALIZATION: "/(user)/(onboarding)/personalization",
     SUGGESTED_GOALS: "/(user)/(onboarding)/suggested-goals",
     SUBSCRIPTION: "/(user)/(onboarding)/subscription",
+  },
+
+  // Challenges
+  CHALLENGES: {
+    LIST: "/(user)/challenges",
+    DETAILS: (id: string) => `/(user)/challenges/${id}` as const,
+    CREATE: "/(user)/challenges/create",
   },
 } as const;
 

@@ -20,7 +20,17 @@ export interface RegisterDeviceResponse {
 }
 
 export interface NotificationPreferencesResponse {
-  preferences: NotificationPreferences;
+  enabled: boolean;
+  push_notifications: boolean;
+  email_notifications: boolean;
+  ai_motivation: boolean;
+  reminders: boolean;
+  social: boolean;
+  achievements: boolean;
+  reengagement: boolean;
+  quiet_hours_enabled: boolean;
+  quiet_hours_start: string;
+  quiet_hours_end: string;
 }
 
 export interface ScheduledNotificationsResponse {

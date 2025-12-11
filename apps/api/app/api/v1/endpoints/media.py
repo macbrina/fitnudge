@@ -1,7 +1,8 @@
-from fastapi import APIRouter, HTTPException, status, Depends, UploadFile, File
+from fastapi import APIRouter, HTTPException, status, Depends, UploadFile, File, Query
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Literal
 from app.core.flexible_auth import get_current_user
+from datetime import datetime
 
 try:
     import magic
@@ -10,6 +11,7 @@ try:
 except ImportError:
     MAGIC_AVAILABLE = False
 import hashlib
+import json
 import os
 import tempfile
 from PIL import Image
@@ -19,14 +21,18 @@ router = APIRouter(
     redirect_slashes=False
 )  # Disable redirects to preserve Authorization header
 
+# Media types - determines if we store in database
+MediaType = Literal["post", "checkin", "profile", "other"]
+
 
 # Pydantic models
 class MediaUploadResponse(BaseModel):
-    id: str
+    id: Optional[str] = None  # Only present for post media
     url: str
     filename: str
     file_size: int
     content_type: str
+    duration: Optional[int] = None  # For audio/video
     created_at: str
 
 
@@ -34,20 +40,74 @@ class MediaDeleteResponse(BaseModel):
     message: str
 
 
+def get_media_duration(file_content: bytes, file_extension: str) -> Optional[int]:
+    """Get duration in seconds for audio/video files using ffprobe"""
+    try:
+        with tempfile.NamedTemporaryFile(
+            suffix=file_extension, delete=False
+        ) as temp_file:
+            temp_file.write(file_content)
+            temp_file.flush()
+            temp_path = temp_file.name
+
+        result = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "quiet",
+                "-print_format",
+                "json",
+                "-show_format",
+                temp_path,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+
+        os.unlink(temp_path)
+
+        if result.returncode == 0:
+            data = json.loads(result.stdout)
+            duration_str = data.get("format", {}).get("duration")
+            if duration_str:
+                return int(float(duration_str))
+    except (
+        subprocess.TimeoutExpired,
+        FileNotFoundError,
+        json.JSONDecodeError,
+        Exception,
+    ):
+        pass
+
+    return None
+
+
 @router.post(
     "/upload", response_model=MediaUploadResponse, status_code=status.HTTP_201_CREATED
 )
 async def upload_media(
     file: UploadFile = File(...),
+    media_type: MediaType = Query(
+        default="other", description="Type of media: post, checkin, profile, other"
+    ),
+    post_id: Optional[str] = Query(
+        default=None, description="Post ID if media is for a post"
+    ),
     current_user: dict = Depends(get_current_user),
 ):
-    """Upload media file (image, video, audio)"""
+    """
+    Upload media file (image, video, audio).
+
+    - media_type='post': Stores in media_uploads table (requires post_id)
+    - media_type='checkin': Just uploads to R2, URL stored in check-in's photo_urls
+    - media_type='profile': Just uploads to R2
+    - media_type='other': Just uploads to R2
+    """
     from app.core.database import get_supabase_client
     from app.core.config import settings
     import boto3
     import uuid
-    import os
-    from datetime import datetime
 
     # Read file content
     file_content = await file.read()
@@ -59,9 +119,27 @@ async def upload_media(
             status_code=status.HTTP_400_BAD_REQUEST, detail=validation_result["error"]
         )
 
+    detected_mime = validation_result.get("detected_mime", file.content_type)
+
     # Generate unique filename
-    file_extension = os.path.splitext(file.filename)[1]
+    file_extension = os.path.splitext(file.filename)[1].lower()
     unique_filename = f"{uuid.uuid4()}{file_extension}"
+    r2_key = f"media/{current_user['id']}/{unique_filename}"
+
+    # Get duration for audio/video files
+    duration = None
+    if detected_mime.startswith("audio/") or detected_mime.startswith("video/"):
+        duration = get_media_duration(file_content, file_extension)
+
+    # Determine file type category
+    if detected_mime.startswith("image/"):
+        file_type = "image"
+    elif detected_mime.startswith("video/"):
+        file_type = "video"
+    elif detected_mime.startswith("audio/"):
+        file_type = "audio"
+    else:
+        file_type = "other"
 
     # Upload to Cloudflare R2
     try:
@@ -73,17 +151,14 @@ async def upload_media(
             region_name="auto",
         )
 
-        # Upload file
         s3_client.put_object(
             Bucket=settings.CLOUDFLARE_R2_BUCKET_NAME,
-            Key=f"media/{current_user['id']}/{unique_filename}",
+            Key=r2_key,
             Body=file_content,
-            ContentType=file.content_type,
-            ACL="public-read",
+            ContentType=detected_mime,
         )
 
-        # Generate public URL
-        file_url = f"{settings.CLOUDFLARE_R2_PUBLIC_URL}/media/{current_user['id']}/{unique_filename}"
+        file_url = f"{settings.CLOUDFLARE_R2_PUBLIC_URL}/{r2_key}"
 
     except Exception as e:
         raise HTTPException(
@@ -91,43 +166,65 @@ async def upload_media(
             detail=f"Failed to upload file: {str(e)}",
         )
 
-    # Store media record in database
-    supabase = get_supabase_client()
-    media_record = {
-        "user_id": current_user["id"],
-        "filename": file.filename,
-        "file_path": f"media/{current_user['id']}/{unique_filename}",
-        "url": file_url,
-        "file_size": len(file_content),
-        "content_type": file.content_type,
-        "bucket": settings.CLOUDFLARE_R2_BUCKET_NAME,
-    }
+    # Only store in database for post media
+    media_id = None
+    created_at = datetime.utcnow().isoformat() + "Z"
 
-    result = supabase.table("media").insert(media_record).execute()
-    media_data = result.data[0]
+    if media_type == "post":
+        supabase = get_supabase_client()
+        media_record = {
+            "user_id": current_user["id"],
+            "post_id": post_id,
+            "cloudflare_r2_key": r2_key,
+            "cloudflare_r2_url": file_url,
+            "file_type": file_type,
+            "file_size": len(file_content),
+            "duration": duration,
+        }
+
+        result = supabase.table("media_uploads").insert(media_record).execute()
+        if result.data:
+            media_id = result.data[0]["id"]
+            created_at = result.data[0]["created_at"]
 
     return MediaUploadResponse(
-        id=media_data["id"],
+        id=media_id,
         url=file_url,
         filename=file.filename,
         file_size=len(file_content),
-        content_type=file.content_type,
-        created_at=media_data["created_at"],
+        content_type=detected_mime,
+        duration=duration,
+        created_at=created_at,
     )
+
+
+def extract_r2_key_from_url(url: str, public_url_base: str) -> Optional[str]:
+    """Extract the R2 key from a full URL"""
+    if not url or not public_url_base:
+        return None
+
+    # Remove trailing slash from base URL
+    base = public_url_base.rstrip("/")
+
+    if url.startswith(base):
+        # Extract the path after the base URL
+        key = url[len(base) :].lstrip("/")
+        return key if key else None
+
+    return None
 
 
 @router.delete("/{media_id}", response_model=MediaDeleteResponse)
 async def delete_media(media_id: str, current_user: dict = Depends(get_current_user)):
-    """Delete media file"""
+    """Delete media file by ID - for post media stored in database"""
     from app.core.database import get_supabase_client
-    from app.core.config import settings
-    import boto3
+    from app.services.tasks import delete_media_from_r2_task
 
     supabase = get_supabase_client()
 
     # Get media record
     result = (
-        supabase.table("media")
+        supabase.table("media_uploads")
         .select("*")
         .eq("id", media_id)
         .eq("user_id", current_user["id"])
@@ -140,29 +237,62 @@ async def delete_media(media_id: str, current_user: dict = Depends(get_current_u
         )
 
     media_data = result.data[0]
+    r2_key = media_data["cloudflare_r2_key"]
 
-    # Delete from Cloudflare R2
-    try:
-        s3_client = boto3.client(
-            "s3",
-            endpoint_url=settings.CLOUDFLARE_R2_ENDPOINT_URL,
-            aws_access_key_id=settings.CLOUDFLARE_R2_ACCESS_KEY_ID,
-            aws_secret_access_key=settings.CLOUDFLARE_R2_SECRET_ACCESS_KEY,
-            region_name="auto",
-        )
+    # Delete from database immediately
+    supabase.table("media_uploads").delete().eq("id", media_id).execute()
 
-        s3_client.delete_object(
-            Bucket=settings.CLOUDFLARE_R2_BUCKET_NAME, Key=media_data["file_path"]
-        )
-
-    except Exception as e:
-        # Log error but don't fail the request
-        print(f"Failed to delete file from R2: {str(e)}")
-
-    # Delete from database
-    supabase.table("media").delete().eq("id", media_id).execute()
+    # Queue background task to delete from Cloudflare R2
+    delete_media_from_r2_task.delay(
+        file_path=r2_key,
+        media_id=media_id,
+    )
 
     return MediaDeleteResponse(message="Media deleted successfully")
+
+
+class MediaDeleteByUrlRequest(BaseModel):
+    url: str
+
+
+@router.post("/delete-by-url", response_model=MediaDeleteResponse)
+async def delete_media_by_url(
+    request: MediaDeleteByUrlRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Delete media file by URL - for check-in/profile media not stored in database.
+    Validates that the URL belongs to the current user before deleting.
+    """
+    from app.core.config import settings
+    from app.services.tasks import delete_media_from_r2_task
+
+    url = request.url
+
+    # Extract R2 key from URL
+    r2_key = extract_r2_key_from_url(url, settings.CLOUDFLARE_R2_PUBLIC_URL)
+
+    if not r2_key:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid media URL",
+        )
+
+    # Validate the URL belongs to this user (check user_id in path)
+    expected_prefix = f"media/{current_user['id']}/"
+    if not r2_key.startswith(expected_prefix):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only delete your own media",
+        )
+
+    # Queue background task to delete from Cloudflare R2
+    delete_media_from_r2_task.delay(
+        file_path=r2_key,
+        media_id=f"url-delete-{current_user['id']}",
+    )
+
+    return MediaDeleteResponse(message="Media deletion queued")
 
 
 @router.get("/my-media")
@@ -178,7 +308,7 @@ async def get_my_media(
     offset = (page - 1) * limit
 
     result = (
-        supabase.table("media")
+        supabase.table("media_uploads")
         .select("*")
         .eq("user_id", current_user["id"])
         .order("created_at", desc=True)
@@ -229,7 +359,7 @@ async def get_media_info(media_id: str, current_user: dict = Depends(get_current
     supabase = get_supabase_client()
 
     result = (
-        supabase.table("media")
+        supabase.table("media_uploads")
         .select("*")
         .eq("id", media_id)
         .eq("user_id", current_user["id"])
@@ -304,7 +434,9 @@ async def validate_file_security(file: UploadFile, file_content: bytes) -> dict:
             "error": f"File extension {file_extension} not allowed",
         }
 
-    # Check for malicious file signatures
+    # Check file header for malicious content (only first 1KB to avoid false positives in binary data)
+    # Binary image/video/audio data can contain random byte sequences that match text patterns
+    file_header = file_content[:1024].lower()
     malicious_signatures = [
         b"<script",
         b"javascript:",
@@ -312,21 +444,10 @@ async def validate_file_security(file: UploadFile, file_content: bytes) -> dict:
         b"data:text/html",
         b"<?php",
         b"<%",
-        b"<%=",
-        b"<script language=",
-        b"<iframe",
-        b"<object",
-        b"<embed",
-        b"<link",
-        b"exec(",
-        b"eval(",
-        b"Function(",
-        b"setTimeout(",
     ]
 
-    file_content_lower = file_content.lower()
     for signature in malicious_signatures:
-        if signature in file_content_lower:
+        if signature in file_header:
             return {
                 "is_valid": False,
                 "error": "File contains potentially malicious content",

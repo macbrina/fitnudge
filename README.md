@@ -162,7 +162,7 @@ FitNudge uses a comprehensive design system with:
 ## 💳 Monetization
 
 - **In-App Purchases**: Apple IAP and Google Play Billing
-- **Subscription Tiers**: Free, Pro ($4.99/month), Coach+ ($9.99/month)
+- **Subscription Tiers**: Free, Pro ($4.99/month), Elite ($9.99/month)
 - **Platform Compliance**: Full App Store and Play Store compliance
 
 ## 🌍 Localization

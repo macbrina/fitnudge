@@ -8,6 +8,7 @@ import { tokens, lineHeight } from "@/themes/tokens";
 import { useTheme } from "@/themes";
 import PersonalizationLayout from "./PersonalizationLayout";
 import { useOnboardingStore } from "@/stores/onboardingStore";
+import { Card } from "@/components/ui/Card";
 
 interface AvailableTimeScreenProps {
   onContinue: (availableTime: string) => void;
@@ -85,45 +86,53 @@ export default function AvailableTimeScreen({
         </Text>
 
         <View style={styles.optionsContainer}>
-          {TIME_OPTIONS.map((option) => (
-            <TouchableOpacity
-              key={option.id}
-              onPress={() => setSelectedTime(option.id)}
-              style={[
-                styles.optionCard,
-                selectedTime === option.id && styles.optionCardSelected,
-              ]}
-              activeOpacity={0.7}
-            >
-              <View
-                style={[
-                  styles.iconContainer,
-                  selectedTime === option.id && styles.iconContainerSelected,
-                ]}
+          {TIME_OPTIONS.map((option) => {
+            const isSelected = selectedTime === option.id;
+            return (
+              <TouchableOpacity
+                key={option.id}
+                onPress={() => setSelectedTime(option.id)}
+                style={styles.optionCardTouchable}
+                activeOpacity={0.7}
               >
-                <Text style={styles.optionIcon}>{option.icon}</Text>
-              </View>
-              <View style={styles.textContainer}>
-                <Text
+                <Card
+                  padded={false}
+                  shadow={isSelected ? "xl" : "md"}
                   style={[
-                    styles.optionTitle,
-                    selectedTime === option.id && styles.optionTitleSelected,
+                    styles.optionCard,
+                    isSelected && styles.optionCardSelected,
                   ]}
                 >
-                  {t(option.title)}
-                </Text>
-                <Text
-                  style={[
-                    styles.optionDescription,
-                    selectedTime === option.id &&
-                      styles.optionDescriptionSelected,
-                  ]}
-                >
-                  {t(option.description)}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))}
+                  <View
+                    style={[
+                      styles.iconContainer,
+                      isSelected && styles.iconContainerSelected,
+                    ]}
+                  >
+                    <Text style={styles.optionIcon}>{option.icon}</Text>
+                  </View>
+                  <View style={styles.textContainer}>
+                    <Text
+                      style={[
+                        styles.optionTitle,
+                        isSelected && styles.optionTitleSelected,
+                      ]}
+                    >
+                      {t(option.title)}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.optionDescription,
+                        isSelected && styles.optionDescriptionSelected,
+                      ]}
+                    >
+                      {t(option.description)}
+                    </Text>
+                  </View>
+                </Card>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       </View>
     </PersonalizationLayout>
@@ -168,30 +177,19 @@ const makeAvailableTimeScreenStyles = (
       gap: toRN(tokens.spacing[4]),
       marginBottom: toRN(tokens.spacing[6]),
     },
-    optionCard: {
-      backgroundColor: colors.bg.surface,
+    optionCardTouchable: {
       borderRadius: toRN(tokens.borderRadius.xl),
+    },
+    optionCard: {
       padding: toRN(tokens.spacing[5]),
       flexDirection: "row" as const,
       alignItems: "center" as const,
-      borderWidth: 2,
-      borderColor: colors.border.default,
-      shadowColor: colors.shadow.default,
-      shadowOffset: {
-        width: 0,
-        height: 2,
-      },
-      shadowOpacity: 0.08,
-      shadowRadius: 8,
-      elevation: 2,
     },
     optionCardSelected: {
       borderColor: brand.primary,
       backgroundColor: brand.primary + "08",
-      shadowColor: brand.primary,
-      shadowOpacity: 0.15,
-      shadowRadius: 12,
-      elevation: 4,
+      borderWidth: 2,
+      borderRadius: toRN(tokens.borderRadius.xl),
     },
     iconContainer: {
       width: 64,

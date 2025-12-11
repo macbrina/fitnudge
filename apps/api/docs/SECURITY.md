@@ -319,9 +319,9 @@ curl -X GET "http://localhost:8000/api/v1/goals?search='; DROP TABLE users; --"
 
 ### Emergency Contacts
 
-- **Security Team**: security@fitnudge.com
-- **Development Team**: dev@fitnudge.com
-- **Infrastructure Team**: infra@fitnudge.com
+- **Security Team**: security@fitnudge.app
+- **Development Team**: dev@fitnudge.app
+- **Infrastructure Team**: infra@fitnudge.app
 
 ---
 

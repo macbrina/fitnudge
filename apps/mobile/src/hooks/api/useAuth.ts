@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { authService, LoginRequest, SignupRequest } from "@/services/api";
+import { AppleLoginPayload } from "@/services/api/auth";
 
 // Query Keys
 export const authQueryKeys = {
@@ -115,7 +116,8 @@ export const useLoginWithApple = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (appleToken: string) => authService.loginWithApple(appleToken),
+    mutationFn: (appleToken: AppleLoginPayload) =>
+      authService.loginWithApple(appleToken),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["user"] });
       queryClient.invalidateQueries({

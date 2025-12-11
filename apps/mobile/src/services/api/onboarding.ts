@@ -27,13 +27,33 @@ export interface FitnessProfileResponse {
 
 export interface SuggestedGoal {
   id: string;
-  title: string; // Changed from 'name' to match goals table
+  title: string;
   description: string;
   category: string;
   frequency: string;
   target_days?: number;
+  days_of_week?: number[];
   reminder_times: string[];
-  match_reason: string;
+  match_reason?: string;
+  // Goal type fields
+  goal_type?: "habit" | "time_challenge" | "target_challenge";
+  duration_days?: number; // For time_challenge
+  target_checkins?: number; // For target_challenge
+}
+
+export type SuggestedGoalsStatus =
+  | "not_started"
+  | "pending"
+  | "ready"
+  | "failed";
+
+export interface SuggestedGoalsStatusResponse {
+  status: SuggestedGoalsStatus;
+  goals?: SuggestedGoal[];
+  error?: string;
+  updated_at?: string;
+  regeneration_count?: number;
+  goal_type?: "habit" | "time_challenge" | "target_challenge" | "mixed";
 }
 
 class OnboardingApiService extends BaseApiService {
@@ -84,23 +104,83 @@ class OnboardingApiService extends BaseApiService {
   }
 
   /**
-   * Get AI-suggested goals based on user profile
-   * Uses extended timeout (60s) to allow for AI generation
+   * Trigger background generation of suggested goals.
+   * @param goalType - Type of goals to generate: "habit" (default), "time_challenge", "target_challenge", or "mixed"
    */
-  async getSuggestedGoals(): Promise<ApiResponse<SuggestedGoal[]>> {
+  async requestSuggestedGoals(
+    goalType:
+      | "habit"
+      | "time_challenge"
+      | "target_challenge"
+      | "mixed" = "habit"
+  ): Promise<SuggestedGoalsStatusResponse> {
     try {
-      // Fetching goals - tracked via PostHog in component
-      // The base timeout (60s) is sufficient for AI generation
-      const response = await this.get<SuggestedGoal[]>(
+      const response = await this.post<SuggestedGoalsStatusResponse>(
+        ROUTES.ONBOARDING.SUGGESTED_GOALS,
+        { goal_type: goalType }
+      );
+      return response.data!;
+    } catch (error) {
+      logger.error("Failed to request suggested goals generation", {
+        error: error instanceof Error ? error.message : String(error),
+        goalType,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Fetch the current status (and payload, if ready) of suggested goals.
+   */
+  async getSuggestedGoalsStatus(): Promise<SuggestedGoalsStatusResponse> {
+    try {
+      const response = await this.get<SuggestedGoalsStatusResponse>(
         ROUTES.ONBOARDING.SUGGESTED_GOALS
       );
-
-      // Goals fetched successfully - tracked via PostHog in component
-      return response;
+      return response.data!;
     } catch (error) {
-      logger.error("Failed to fetch suggested goals", {
+      logger.error("Failed to fetch suggested goals status", {
         error: error instanceof Error ? error.message : String(error),
       });
+      throw error;
+    }
+  }
+
+  /**
+   * Regenerate suggested goals for the current user.
+   * This increments the regeneration count and generates new suggestions.
+   * Free users: Limited to 1 regeneration
+   * Starter+: Unlimited regenerations
+   * @param goalType - Type of goals to generate: "habit" (default), "time_challenge", "target_challenge", or "mixed"
+   */
+  async regenerateSuggestedGoals(
+    goalType:
+      | "habit"
+      | "time_challenge"
+      | "target_challenge"
+      | "mixed" = "habit"
+  ): Promise<SuggestedGoalsStatusResponse> {
+    try {
+      const response = await this.put<SuggestedGoalsStatusResponse>(
+        `${ROUTES.ONBOARDING.SUGGESTED_GOALS}/regenerate`,
+        { goal_type: goalType }
+      );
+      return response.data!;
+    } catch (error) {
+      // Check if it's a 403 (regeneration limit reached) - this is expected behavior
+      const is403 =
+        error instanceof Error &&
+        (error.message.includes("403") ||
+          error.message.includes("Upgrade") ||
+          error.message.includes("AI goal generations"));
+
+      if (!is403) {
+        // Expected limit-reached scenario - just log info, don't log as error
+        logger.error("Failed to regenerate suggested goals", {
+          error: error instanceof Error ? error.message : String(error),
+          goalType,
+        });
+      }
       throw error;
     }
   }

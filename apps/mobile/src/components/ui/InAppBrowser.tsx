@@ -1,6 +1,25 @@
 import React, { useState } from "react";
-import { Alert, Linking, Platform } from "react-native";
+import { Linking, Platform } from "react-native";
 import * as WebBrowser from "expo-web-browser";
+import { useAlertModal } from "@/contexts/AlertModalContext";
+import { useTranslation } from "@/lib/i18n";
+
+interface AlertCallbacks {
+  showAlert: (options: {
+    title: string;
+    message: string;
+    variant?: "success" | "warning" | "error" | "info";
+    confirmLabel?: string;
+  }) => Promise<boolean>;
+  showConfirm: (options: {
+    title: string;
+    message: string;
+    variant?: "success" | "warning" | "error" | "info";
+    confirmLabel?: string;
+    cancelLabel?: string;
+  }) => Promise<boolean>;
+  t?: (key: string) => string; // Translation function (optional)
+}
 
 interface InAppBrowserOptions {
   /**
@@ -43,6 +62,10 @@ interface InAppBrowserOptions {
    * Whether to show in recent apps (Android only)
    */
   showInRecents?: boolean;
+  /**
+   * Optional alert callbacks for error handling (from useAlertModal)
+   */
+  alertCallbacks?: AlertCallbacks;
 }
 
 /**
@@ -102,20 +125,30 @@ export const InAppBrowser = {
       console.error("Error opening in-app browser:", error);
 
       // Fallback to external browser if in-app browser fails
-      if (showOpenInBrowser) {
-        Alert.alert(
-          "Open Link",
-          "Unable to open in-app browser. Would you like to open in external browser?",
-          [
-            { text: "Cancel", style: "cancel" },
-            {
-              text: "Open in Browser",
-              onPress: () => Linking.openURL(url),
-            },
-          ]
-        );
+      if (showOpenInBrowser && options.alertCallbacks) {
+        // Get translated strings from callbacks if available
+        const t = options.alertCallbacks.t || ((key: string) => key);
+        const confirmed = await options.alertCallbacks.showConfirm({
+          title: t("browser.open_link"),
+          message: t("browser.unable_to_open_in_app"),
+          variant: "warning",
+          confirmLabel: t("browser.open_in_browser"),
+          cancelLabel: t("common.cancel"),
+        });
+        if (confirmed) {
+          await Linking.openURL(url);
+        }
+      } else if (options.alertCallbacks) {
+        const t = options.alertCallbacks.t || ((key: string) => key);
+        await options.alertCallbacks.showAlert({
+          title: t("common.error"),
+          message: t("browser.unable_to_open_link"),
+          variant: "error",
+          confirmLabel: t("common.ok"),
+        });
       } else {
-        Alert.alert("Error", "Unable to open the link");
+        // Fallback to console if no alert callbacks provided
+        console.error("Unable to open the link:", error);
       }
     }
   },
@@ -126,17 +159,30 @@ export const InAppBrowser = {
   openWithChoice: async (options: InAppBrowserOptions): Promise<void> => {
     const { url, title } = options;
 
-    Alert.alert(title || "Open Link", "How would you like to open this link?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "In App",
-        onPress: () => InAppBrowser.open(options),
-      },
-      {
-        text: "External Browser",
-        onPress: () => Linking.openURL(url),
-      },
-    ]);
+    // Note: Action sheet with multiple options requires a different UI pattern
+    // For now, this defaults to opening in-app browser
+    // A proper action sheet component should be created for multiple-choice dialogs
+    if (options.alertCallbacks) {
+      const t = options.alertCallbacks.t || ((key: string) => key);
+      const choice = await options.alertCallbacks.showConfirm({
+        title: title || t("browser.open_link"),
+        message: t("browser.would_like_external"),
+        variant: "info",
+        confirmLabel: t("browser.external_browser"),
+        cancelLabel: t("browser.in_app"),
+      });
+      if (choice) {
+        await Linking.openURL(url);
+      } else {
+        await InAppBrowser.open({
+          ...options,
+          alertCallbacks: options.alertCallbacks,
+        });
+      }
+    } else {
+      // Fallback: just open in-app
+      await InAppBrowser.open(options);
+    }
   },
 
   /**
@@ -148,11 +194,13 @@ export const InAppBrowser = {
       if (supported) {
         await Linking.openURL(url);
       } else {
-        Alert.alert("Error", "Cannot open this URL");
+        // Note: This function doesn't receive alertCallbacks, so we just throw
+        // Callers should catch and handle errors
+        throw new Error("Cannot open this URL");
       }
     } catch (error) {
       console.error("Error opening external browser:", error);
-      Alert.alert("Error", "Unable to open the link");
+      throw error; // Re-throw for caller to handle
     }
   },
 
@@ -169,15 +217,23 @@ export const InAppBrowser = {
 };
 
 /**
- * Hook for using InAppBrowser with state management
+ * Hook for using InAppBrowser with state management and AlertModalContext
  */
 export const useInAppBrowser = () => {
   const [isLoading, setIsLoading] = useState(false);
+  const { showAlert, showConfirm } = useAlertModal();
+  const { t } = useTranslation();
+
+  const alertCallbacks: AlertCallbacks = {
+    showAlert,
+    showConfirm,
+    t,
+  };
 
   const openBrowser = async (options: InAppBrowserOptions) => {
     setIsLoading(true);
     try {
-      await InAppBrowser.open(options);
+      await InAppBrowser.open({ ...options, alertCallbacks });
     } finally {
       setIsLoading(false);
     }
@@ -186,7 +242,7 @@ export const useInAppBrowser = () => {
   const openWithChoice = async (options: InAppBrowserOptions) => {
     setIsLoading(true);
     try {
-      await InAppBrowser.openWithChoice(options);
+      await InAppBrowser.openWithChoice({ ...options, alertCallbacks });
     } finally {
       setIsLoading(false);
     }
@@ -196,6 +252,16 @@ export const useInAppBrowser = () => {
     setIsLoading(true);
     try {
       await InAppBrowser.openExternal(url);
+    } catch (error) {
+      await showAlert({
+        title: t("common.error"),
+        message:
+          error instanceof Error
+            ? error.message
+            : t("browser.unable_to_open_link"),
+        variant: "error",
+        confirmLabel: t("common.ok"),
+      });
     } finally {
       setIsLoading(false);
     }

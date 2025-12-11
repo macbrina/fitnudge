@@ -1,26 +1,18 @@
-import React, { useState, useEffect } from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  Switch,
-  TouchableOpacity,
-  Alert,
-} from "react-native";
-import { useTranslation } from "react-i18next";
-import { useStyles } from "@/themes/makeStyles";
-import { toRN } from "@/lib/units";
+import { useAlertModal } from "@/contexts/AlertModalContext";
 import { fontFamily } from "@/lib/fonts";
-import { tokens } from "@/themes/tokens";
-import { useTheme } from "@/themes";
-import { notificationService } from "@/services/notifications/notificationService";
+import { toRN } from "@/lib/units";
 import { notificationApi } from "@/services/api/notifications";
+import { notificationService } from "@/services/notifications/notificationService";
 import { NotificationPreferences } from "@/services/notifications/notificationTypes";
+import { useStyles } from "@/themes/makeStyles";
+import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { ScrollView, Switch, Text, TouchableOpacity, View } from "react-native";
 
 export const NotificationSettingsScreen: React.FC = () => {
   const { t } = useTranslation();
   const styles = useStyles(makeNotificationSettingsStyles);
-  const { colors } = useTheme();
+  const { showAlert, showToast } = useAlertModal();
 
   const [preferences, setPreferences] = useState<NotificationPreferences>({
     enabled: true,
@@ -88,13 +80,20 @@ export const NotificationSettingsScreen: React.FC = () => {
         goalId: "test",
         message: "This is a test notification from FitNudge!",
       });
-      Alert.alert(
-        t("notifications.settings.test_sent"),
-        "Check your notification panel to see the test notification."
-      );
+      showToast({
+        title: t("notifications.settings.test_sent"),
+        message: "Check your notification panel to see the test notification.",
+        variant: "success",
+        duration: 2000,
+      });
     } catch (error) {
       console.error("Failed to send test notification:", error);
-      Alert.alert(t("common.error"), t("notifications.settings.test_failed"));
+      await showAlert({
+        title: t("common.error"),
+        message: t("notifications.settings.test_failed"),
+        variant: "error",
+        confirmLabel: t("common.ok"),
+      });
     } finally {
       setIsLoading(false);
     }

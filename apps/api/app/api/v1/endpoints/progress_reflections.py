@@ -1,13 +1,14 @@
 """
 AI Progress Reflections API endpoints
 
-Premium AI-powered progress reflections for Pro/Coach+ users.
+Premium AI-powered progress reflections (requires ai_progress_reflections feature).
 """
 
 from fastapi import APIRouter, HTTPException, status, Depends, Query
 from pydantic import BaseModel
 from typing import Optional
 from app.core.flexible_auth import get_current_user
+from app.core.subscriptions import check_user_has_feature
 from app.services.logger import logger
 from app.services.ai_progress_reflections_service import ai_progress_reflections_service
 
@@ -31,13 +32,16 @@ async def get_progress_reflection(
     goal_id: Optional[str] = Query(None),
     period: str = Query("weekly", regex="^(weekly|monthly)$"),
 ):
-    """Get AI-powered progress reflection (Pro/Coach+ only)"""
-    # Check if user has Pro or Coach+ plan
+    """Get AI-powered progress reflection (requires ai_progress_reflections feature)"""
+    # Check if user has access to ai_progress_reflections feature via minimum_tier
     user_plan = current_user.get("plan", "free")
-    if user_plan not in ["pro", "coach_plus"]:
+    has_access = check_user_has_feature(
+        current_user["id"], "ai_progress_reflections", user_plan
+    )
+    if not has_access:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="AI Progress Reflections are available for Pro and Coach+ users only",
+            detail="AI Progress Reflections require a higher tier subscription. Please upgrade to access this feature.",
         )
 
     try:

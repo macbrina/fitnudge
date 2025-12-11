@@ -31,9 +31,13 @@ class TaskQueue:
         goal_id: str,
         goal_data: Dict[str, Any],
         user_profile: Optional[Dict[str, Any]] = None,
+        user_plan: Optional[str] = None,
         background_tasks: Optional[
             Any
         ] = None,  # Not used with Celery, kept for API compatibility
+        activation_context: Optional[
+            Dict[str, Any]
+        ] = None,  # For activating goal when plan is ready
     ) -> bool:
         """
         Queue a plan generation task for a goal.
@@ -42,7 +46,13 @@ class TaskQueue:
             goal_id: The goal ID to generate a plan for
             goal_data: The goal data dictionary
             user_profile: Optional user profile for personalization
+            user_plan: User's subscription plan (free, starter, pro, elite)
             background_tasks: FastAPI BackgroundTasks instance (optional)
+            activation_context: Context for activating goal when plan is ready
+                - can_activate: Whether user has room for more active goals
+                - user_timezone: User's timezone for check-in creation
+                - frequency: Goal frequency (daily/weekly)
+                - days_of_week: Days of week for weekly goals
 
         Returns:
             True if task was queued successfully
@@ -73,13 +83,20 @@ class TaskQueue:
                 goal_id=goal_id,
                 goal_data=goal_data,
                 user_profile=user_profile,
+                user_plan=user_plan,
+                activation_context=activation_context,
             )
 
-            logger.info(
+            print(
                 f"Queued plan generation for goal {goal_id} with Celery",
                 {
                     "plan_id": plan_id,
                     "task_id": task_result.id,
+                    "can_activate": (
+                        activation_context.get("can_activate")
+                        if activation_context
+                        else None
+                    ),
                 },
             )
             return True
@@ -108,11 +125,11 @@ class TaskQueue:
                 supabase.table("actionable_plans")
                 .select("*")
                 .eq("goal_id", goal_id)
-                .single()
+                .maybe_single()
                 .execute()
             )
 
-            if result.data:
+            if result and result.data:
                 return result.data
             return None
 
@@ -141,11 +158,11 @@ class TaskQueue:
                 .select("*")
                 .eq("goal_id", goal_id)
                 .eq("status", "completed")
-                .single()
+                .maybe_single()
                 .execute()
             )
 
-            if result.data:
+            if result and result.data:
                 return result.data
             return None
 

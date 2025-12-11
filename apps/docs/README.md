@@ -25,7 +25,7 @@ FitNudge is an AI-powered motivation and accountability app that helps users sta
 - **Progress Tracking**: Goal setting, check-ins, and streak tracking
 - **Social Features**: Community posts, comments, likes, and following
 - **Smart Reminders**: Scheduled notifications and "AI calls"
-- **Subscription Tiers**: Free, Pro, and Coach+ plans with In-App Purchases
+- **Subscription Tiers**: Free, Pro, and Elite plans with In-App Purchases
 
 ## 🏗️ Architecture
 
@@ -162,7 +162,7 @@ pnpm turbo dev
 
 - **Free**: 1 goal, basic motivation, community access
 - **Pro ($4.99/month)**: Multiple goals, voice posts, analytics
-- **Coach+ ($9.99/month)**: All Pro features + AI memory, integrations
+- **Elite ($9.99/month)**: All Pro features + AI memory, integrations
 
 ### In-App Purchases
 

@@ -27,7 +27,7 @@ def initialize_posthog():
             host=settings.POSTHOG_HOST,
             enable_exception_autocapture=settings.POSTHOG_ENABLE_EXCEPTION_AUTOCAPTURE,
         )
-        logger.info("PostHog analytics initialized successfully")
+        print("PostHog analytics initialized successfully")
         return posthog
     except Exception as e:
         logger.error(f"Failed to initialize PostHog: {e}")
@@ -183,6 +183,5 @@ def shutdown_posthog():
         try:
             posthog.shutdown()
             posthog = None
-            logger.info("PostHog client shutdown")
         except Exception as e:
             logger.error(f"Failed to shutdown PostHog: {e}")

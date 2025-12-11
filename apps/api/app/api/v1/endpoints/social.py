@@ -164,15 +164,21 @@ async def create_post(
 ):
     """Create a new post"""
     from app.core.database import get_supabase_client
+    from app.core.subscriptions import check_user_has_feature
 
     supabase = get_supabase_client()
 
-    # Check if user has permission for voice posts (Pro/Coach+ only)
-    if post_data.media_type == "voice" and current_user["plan"] == "free":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Voice posts are available for Pro and Coach+ users only",
+    # Check if user has permission for voice posts via feature access
+    if post_data.media_type == "voice":
+        user_plan = current_user.get("plan", "free")
+        has_voice_access = check_user_has_feature(
+            current_user["id"], "voice_posts", user_plan
         )
+        if not has_voice_access:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Voice posts require a higher tier subscription. Please upgrade to access this feature.",
+            )
 
     post = {
         "user_id": current_user["id"],

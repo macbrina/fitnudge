@@ -1,0 +1,82 @@
+"""
+Celery Tasks Package
+
+Re-exports all tasks for Celery autodiscovery.
+All tasks are organized into domain-specific modules:
+
+- plan_tasks: AI plan generation and goal suggestions
+- goal_tasks: Check-in creation and goal completion checks
+- achievement_tasks: Achievement unlocking and challenge progress
+- challenge_tasks: Challenge lifecycle (ending, winners, reminders)
+- notification_tasks: Push notifications (AI motivations, re-engagement, check-in prompts)
+- analytics_tasks: Weekly recaps and materialized view refresh
+- media_tasks: R2 media file deletion
+"""
+
+# Plan generation tasks
+from app.services.tasks.plan_tasks import (
+    generate_plan_task,
+    generate_suggested_goals_task,
+)
+
+# Goal-related tasks
+from app.services.tasks.goal_tasks import (
+    auto_create_daily_checkins_task,
+    check_goal_completions_task,
+)
+
+# Achievement tasks
+from app.services.tasks.achievement_tasks import (
+    check_achievements_task,
+    update_challenge_progress_task,
+)
+
+# Challenge lifecycle tasks
+from app.services.tasks.challenge_tasks import (
+    check_ended_challenges_task,
+    send_challenge_reminder_task,
+    check_challenges_ending_soon_task,
+)
+
+# Notification tasks
+from app.services.tasks.notification_tasks import (
+    send_scheduled_ai_motivations_task,
+    send_reengagement_notifications_task,
+    send_checkin_prompts_task,
+)
+
+# Analytics tasks
+from app.services.tasks.analytics_tasks import (
+    generate_weekly_recaps_task,
+    refresh_analytics_views_task,
+)
+
+# Media tasks
+from app.services.tasks.media_tasks import (
+    delete_media_from_r2_task,
+)
+
+__all__ = [
+    # Plan tasks
+    "generate_plan_task",
+    "generate_suggested_goals_task",
+    # Goal tasks
+    "auto_create_daily_checkins_task",
+    "check_goal_completions_task",
+    # Achievement tasks
+    "check_achievements_task",
+    "update_challenge_progress_task",
+    # Challenge lifecycle tasks
+    "check_ended_challenges_task",
+    "send_challenge_reminder_task",
+    "check_challenges_ending_soon_task",
+    # Notification tasks
+    "send_scheduled_ai_motivations_task",
+    "send_reengagement_notifications_task",
+    "send_checkin_prompts_task",
+    # Analytics tasks
+    "generate_weekly_recaps_task",
+    "refresh_analytics_views_task",
+    # Media tasks
+    "delete_media_from_r2_task",
+]

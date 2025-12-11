@@ -72,9 +72,9 @@ SENTRY_DSN=https://your-sentry-dsn@sentry.io/project-id
 # Email Service (Namecheap Private Email)
 SMTP_HOST=mail.privateemail.com
 SMTP_PORT=587
-SMTP_USERNAME=noreply@fitnudge.com
+SMTP_USERNAME=noreply@fitnudge.app
 SMTP_PASSWORD=your-email-password
-FROM_EMAIL=noreply@fitnudge.com
+FROM_EMAIL=noreply@fitnudge.app
 
 # Feature Flags
 LAUNCHDARKLY_SDK_KEY=your-launchdarkly-sdk-key
@@ -347,26 +347,26 @@ CLOUDFLARE_PUBLIC_URL=https://your-bucket.your-account.r2.cloudflarestorage.com
 
 1. **Create Namecheap Account**
    - Sign up at [Namecheap](https://namecheap.com)
-   - Purchase domain (e.g., fitnudge.com)
+   - Purchase domain (e.g., fitnudge.app)
 
 2. **Set Up Private Email**
    - Go to Domain List → Manage → Private Email
-   - Create email account: `noreply@fitnudge.com`
+   - Create email account: `noreply@fitnudge.app`
    - Set up email password
 
 3. **Configure SMTP Settings**
    - **SMTP Host**: `mail.privateemail.com`
    - **SMTP Port**: `587` (TLS) or `465` (SSL)
-   - **Username**: `noreply@fitnudge.com`
+   - **Username**: `noreply@fitnudge.app`
    - **Password**: Your email password
 
 4. **Configure Backend**
    ```bash
    SMTP_HOST=mail.privateemail.com
    SMTP_PORT=587
-   SMTP_USERNAME=noreply@fitnudge.com
+   SMTP_USERNAME=noreply@fitnudge.app
    SMTP_PASSWORD=your-email-password
-   FROM_EMAIL=noreply@fitnudge.com
+   FROM_EMAIL=noreply@fitnudge.app
    ```
 
 **Benefits**:
@@ -492,7 +492,7 @@ pnpm dev
 
 ```bash
 # Email/Password User
-Email: test@fitnudge.com
+Email: test@fitnudge.app
 Password: Test123!
 
 # OAuth Test Users
