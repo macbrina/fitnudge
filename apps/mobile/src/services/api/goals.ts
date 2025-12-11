@@ -1,6 +1,10 @@
 import { BaseApiService, ApiResponse } from "./base";
 import { ROUTES } from "@/lib/routes";
 
+// Goal type literals
+export type GoalType = "habit" | "time_challenge" | "target_challenge";
+export type CompletionReason = "duration" | "target" | "manual";
+
 // Goals Types
 export interface Goal {
   id: string;
@@ -14,12 +18,21 @@ export interface Goal {
     | "mindfulness"
     | "sleep"
     | "custom";
-  frequency: "daily" | "weekly" | "monthly" | "custom";
+  frequency: "daily" | "weekly";
   target_days: number;
+  days_of_week?: number[]; // Array of day numbers (0-6): 0=Sunday, 1=Monday, ..., 6=Saturday
   reminder_times: string[];
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  // Goal type fields
+  goal_type?: GoalType;
+  challenge_id?: string; // Links to shared challenge
+  target_checkins?: number; // For target_challenge
+  challenge_start_date?: string; // For time_challenge
+  challenge_end_date?: string; // For time_challenge
+  completed_at?: string; // When challenge was completed
+  completion_reason?: CompletionReason;
 }
 
 export interface CreateGoalRequest {
@@ -28,8 +41,14 @@ export interface CreateGoalRequest {
   category: Goal["category"];
   frequency: Goal["frequency"];
   target_days: number;
+  days_of_week?: number[];
   reminder_times: string[];
   is_active?: boolean;
+  // Goal type fields
+  goal_type?: GoalType;
+  target_checkins?: number; // For target_challenge
+  challenge_duration_days?: number; // For time_challenge (30, 60, 90)
+  challenge_id?: string; // Link to shared challenge
 }
 
 export interface UpdateGoalRequest {
@@ -38,8 +57,41 @@ export interface UpdateGoalRequest {
   category?: Goal["category"];
   frequency?: Goal["frequency"];
   target_days?: number;
+  days_of_week?: number[];
   reminder_times?: string[];
   is_active?: boolean;
+  // Goal type fields (mostly immutable)
+  goal_type?: GoalType;
+  target_checkins?: number;
+  completed_at?: string;
+  completion_reason?: CompletionReason;
+}
+
+// Goal Type Suggestion Types
+export interface GoalTypeSuggestionRequest {
+  goal_type: GoalType | "mixed";
+  duration_days?: 30 | 60 | 90; // For time_challenge
+  target_range?: "small" | "medium" | "ambitious"; // For target_challenge
+}
+
+export interface GoalTypeSuggestion {
+  id: string;
+  title: string;
+  description: string;
+  category: Goal["category"];
+  frequency: Goal["frequency"];
+  target_days?: number;
+  days_of_week?: number[];
+  reminder_times?: string[];
+  goal_type: GoalType;
+  duration_days?: number; // For time_challenge
+  target_checkins?: number; // For target_challenge
+  match_reason?: string;
+}
+
+export interface GoalTypeSuggestionResponse {
+  goal_type: GoalType | "mixed";
+  suggestions: GoalTypeSuggestion[];
 }
 
 export interface GoalTemplate {
@@ -118,6 +170,10 @@ export class GoalsService extends BaseApiService {
     return this.post<Goal>(ROUTES.GOALS.ACTIVATE(goalId), {});
   }
 
+  async deactivateGoal(goalId: string): Promise<ApiResponse<Goal>> {
+    return this.post<Goal>(ROUTES.GOALS.DEACTIVATE(goalId), {});
+  }
+
   async duplicateGoal(goalId: string): Promise<ApiResponse<Goal>> {
     return this.post<Goal>(ROUTES.GOALS.DUPLICATE_GOAL(goalId), {});
   }
@@ -134,6 +190,18 @@ export class GoalsService extends BaseApiService {
 
   async getCompletedGoals(): Promise<ApiResponse<Goal[]>> {
     return this.get<Goal[]>(ROUTES.GOALS.GET_COMPLETED_GOALS);
+  }
+
+  /**
+   * Get AI-powered goal suggestions based on goal type
+   */
+  async getSuggestionsByType(
+    request: GoalTypeSuggestionRequest
+  ): Promise<ApiResponse<GoalTypeSuggestionResponse>> {
+    return this.post<GoalTypeSuggestionResponse>(
+      `${ROUTES.GOALS.LIST}/suggestions-by-type`,
+      request
+    );
   }
 }
 

@@ -1,5 +1,5 @@
 create table if not exists system_health_history (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   created_at timestamptz not null default timezone('utc', now()),
   status text not null check (status in ('degraded','critical')),
   environment text not null,

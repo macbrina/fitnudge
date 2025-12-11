@@ -42,7 +42,7 @@ export default function PersonalizationLayout({
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
+      <View style={styles.header}>
         {currentStep > 1 && onBack && (
           <TouchableOpacity onPress={onBack} style={styles.backButton}>
             <ArrowBackIcon size={24} color={colors.text.primary} />
@@ -75,7 +75,7 @@ export default function PersonalizationLayout({
       </ScrollView>
 
       {/* Footer */}
-      <View style={[styles.footer, { paddingBottom: insets.bottom }]}>
+      <View style={styles.footer}>
         <Button
           title={
             isLoading
@@ -128,7 +128,7 @@ const makePersonalizationLayoutStyles = (
     progressBar: {
       width: "100%",
       height: 6,
-      backgroundColor: colors.bg.muted,
+      backgroundColor: colors.bg.secondary,
       borderRadius: 3,
       overflow: "hidden" as const,
       shadowColor: colors.shadow.default,

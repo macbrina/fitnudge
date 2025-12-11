@@ -8,6 +8,7 @@ import { tokens, lineHeight } from "@/themes/tokens";
 import { useTheme } from "@/themes";
 import PersonalizationLayout from "./PersonalizationLayout";
 import { useOnboardingStore } from "@/stores/onboardingStore";
+import { Card } from "@/components/ui/Card";
 
 interface CurrentHabitsScreenProps {
   onContinue: (currentFrequency: string) => void;
@@ -91,47 +92,53 @@ export default function CurrentHabitsScreen({
         </Text>
 
         <View style={styles.optionsContainer}>
-          {FREQUENCY_OPTIONS.map((option) => (
-            <TouchableOpacity
-              key={option.id}
-              onPress={() => setSelectedFrequency(option.id)}
-              style={[
-                styles.optionCard,
-                selectedFrequency === option.id && styles.optionCardSelected,
-              ]}
-              activeOpacity={0.7}
-            >
-              <View
-                style={[
-                  styles.iconContainer,
-                  selectedFrequency === option.id &&
-                    styles.iconContainerSelected,
-                ]}
+          {FREQUENCY_OPTIONS.map((option) => {
+            const isSelected = selectedFrequency === option.id;
+            return (
+              <TouchableOpacity
+                key={option.id}
+                onPress={() => setSelectedFrequency(option.id)}
+                style={styles.optionCardTouchable}
+                activeOpacity={0.7}
               >
-                <Text style={styles.optionIcon}>{option.icon}</Text>
-              </View>
-              <View style={styles.textContainer}>
-                <Text
+                <Card
+                  padded={false}
+                  shadow={isSelected ? "xl" : "md"}
                   style={[
-                    styles.optionTitle,
-                    selectedFrequency === option.id &&
-                      styles.optionTitleSelected,
+                    styles.optionCard,
+                    isSelected && styles.optionCardSelected,
                   ]}
                 >
-                  {t(option.title)}
-                </Text>
-                <Text
-                  style={[
-                    styles.optionDescription,
-                    selectedFrequency === option.id &&
-                      styles.optionDescriptionSelected,
-                  ]}
-                >
-                  {t(option.description)}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))}
+                  <View
+                    style={[
+                      styles.iconContainer,
+                      isSelected && styles.iconContainerSelected,
+                    ]}
+                  >
+                    <Text style={styles.optionIcon}>{option.icon}</Text>
+                  </View>
+                  <View style={styles.textContainer}>
+                    <Text
+                      style={[
+                        styles.optionTitle,
+                        isSelected && styles.optionTitleSelected,
+                      ]}
+                    >
+                      {t(option.title)}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.optionDescription,
+                        isSelected && styles.optionDescriptionSelected,
+                      ]}
+                    >
+                      {t(option.description)}
+                    </Text>
+                  </View>
+                </Card>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       </View>
     </PersonalizationLayout>
@@ -176,30 +183,19 @@ const makeCurrentHabitsScreenStyles = (
       gap: toRN(tokens.spacing[4]),
       marginBottom: toRN(tokens.spacing[6]),
     },
-    optionCard: {
-      backgroundColor: colors.bg.surface,
+    optionCardTouchable: {
       borderRadius: toRN(tokens.borderRadius.xl),
+    },
+    optionCard: {
       padding: toRN(tokens.spacing[5]),
       flexDirection: "row" as const,
       alignItems: "center" as const,
-      borderWidth: 2,
-      borderColor: colors.border.default,
-      shadowColor: colors.shadow.default,
-      shadowOffset: {
-        width: 0,
-        height: 2,
-      },
-      shadowOpacity: 0.08,
-      shadowRadius: 8,
-      elevation: 2,
     },
     optionCardSelected: {
       borderColor: brand.primary,
       backgroundColor: brand.primary + "08",
-      shadowColor: brand.primary,
-      shadowOpacity: 0.15,
-      shadowRadius: 12,
-      elevation: 4,
+      borderWidth: 2,
+      borderRadius: toRN(tokens.borderRadius.xl),
     },
     iconContainer: {
       width: 64,

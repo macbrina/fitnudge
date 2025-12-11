@@ -24,6 +24,7 @@ class CheckInUpdate(BaseModel):
     reflection: Optional[str] = None
     mood: Optional[int] = None
     photo_urls: Optional[List[str]] = None  # Array of photo URLs
+    is_checked_in: Optional[bool] = None  # True when user responds (yes or no)
 
 
 class CheckInResponse(BaseModel):
@@ -35,8 +36,9 @@ class CheckInResponse(BaseModel):
     reflection: Optional[str]
     mood: Optional[int]
     photo_urls: Optional[List[str]]  # Array of photo URLs
+    is_checked_in: Optional[bool] = None  # True when user has responded
     created_at: str
-    updated_at: str
+    updated_at: Optional[str] = None  # May not exist in older records
     goal: dict  # Goal info
 
 
@@ -62,16 +64,15 @@ class BulkCheckInCreate(BaseModel):
     check_ins: List[CheckInCreate]
 
 
-@router.get("/", response_model=List[CheckInResponse])
-async def get_check_ins(
-    current_user: dict = Depends(get_current_user),
-    goal_id: Optional[str] = Query(None),
-    start_date: Optional[date] = Query(None),
-    end_date: Optional[date] = Query(None),
-    page: int = Query(1, ge=1),
-    limit: int = Query(20, ge=1, le=100),
+async def _get_check_ins_data(
+    current_user: dict,
+    goal_id: Optional[str] = None,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    page: int = 1,
+    limit: int = 20,
 ):
-    """Get user's check-ins with optional filtering"""
+    """Helper function to get check-ins data"""
     from app.core.database import get_supabase_client
 
     supabase = get_supabase_client()
@@ -100,31 +101,19 @@ async def get_check_ins(
     return result.data
 
 
-@router.get("/{checkin_id}", response_model=CheckInResponse)
-async def get_check_in(checkin_id: str, current_user: dict = Depends(get_current_user)):
-    """Get specific check-in by ID"""
-    from app.core.database import get_supabase_client
-
-    supabase = get_supabase_client()
-    result = (
-        supabase.table("check_ins")
-        .select(
-            """
-        *,
-        goal:goals(id, title, category, frequency)
-        """
-        )
-        .eq("id", checkin_id)
-        .eq("user_id", current_user["id"])
-        .execute()
+@router.get("/", response_model=List[CheckInResponse])
+async def get_check_ins(
+    current_user: dict = Depends(get_current_user),
+    goal_id: Optional[str] = Query(None),
+    start_date: Optional[date] = Query(None),
+    end_date: Optional[date] = Query(None),
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+):
+    """Get user's check-ins with optional filtering"""
+    return await _get_check_ins_data(
+        current_user, goal_id, start_date, end_date, page, limit
     )
-
-    if not result.data:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Check-in not found"
-        )
-
-    return result.data[0]
 
 
 @router.post("/", response_model=CheckInResponse, status_code=status.HTTP_201_CREATED)
@@ -236,7 +225,13 @@ async def update_check_in(
         )
 
     update_data = {k: v for k, v in checkin_data.dict().items() if v is not None}
+
+    # Automatically set is_checked_in to True when user responds (yes or no)
+    if "completed" in update_data:
+        update_data["is_checked_in"] = True
+
     if update_data:
+        # updated_at is handled by database trigger
         supabase.table("check_ins").update(update_data).eq("id", checkin_id).execute()
 
     # Get updated check-in with goal info
@@ -259,8 +254,10 @@ async def update_check_in(
 async def delete_check_in(
     checkin_id: str, current_user: dict = Depends(get_current_user)
 ):
-    """Delete a check-in"""
+    """Delete a check-in and cleanup associated photos"""
     from app.core.database import get_supabase_client
+    from app.core.config import settings
+    from app.services.tasks import delete_media_from_r2_task
 
     supabase = get_supabase_client()
 
@@ -277,7 +274,22 @@ async def delete_check_in(
             status_code=status.HTTP_404_NOT_FOUND, detail="Check-in not found"
         )
 
+    checkin_data = existing_checkin.data[0]
+    photo_urls = checkin_data.get("photo_urls") or []
+
+    # Delete the check-in
     supabase.table("check_ins").delete().eq("id", checkin_id).execute()
+
+    # Queue background tasks to delete photos from R2
+    public_url_base = settings.CLOUDFLARE_R2_PUBLIC_URL.rstrip("/")
+    for url in photo_urls:
+        if url.startswith(public_url_base):
+            r2_key = url[len(public_url_base) :].lstrip("/")
+            delete_media_from_r2_task.delay(
+                file_path=r2_key,
+                media_id=f"checkin-delete-{checkin_id}",
+            )
+
     return {"message": "Check-in deleted successfully"}
 
 
@@ -359,14 +371,6 @@ async def get_check_in_stats(
     )
 
 
-@router.get("/stats", response_model=CheckInStats)
-async def get_check_in_stats_by_goal(
-    goal_id: str, current_user: dict = Depends(get_current_user)
-):
-    """Get check-in statistics for a specific goal"""
-    return await get_check_in_stats(current_user, goal_id)
-
-
 @router.get("/calendar")
 async def get_check_in_calendar(
     current_user: dict = Depends(get_current_user),
@@ -416,16 +420,17 @@ async def get_check_ins_by_date_range(
     current_user: dict = Depends(get_current_user),
     start_date: date = Query(...),
     end_date: date = Query(...),
+    goal_id: Optional[str] = Query(None),
 ):
-    """Get check-ins within a date range"""
-    return await get_check_ins(current_user, None, start_date, end_date)
+    """Get check-ins within a date range, optionally filtered by goal_id"""
+    return await _get_check_ins_data(current_user, goal_id, start_date, end_date)
 
 
 @router.get("/today")
 async def get_today_check_ins(current_user: dict = Depends(get_current_user)):
     """Get today's check-ins"""
     today = date.today()
-    return await get_check_ins(current_user, None, today, today)
+    return await _get_check_ins_data(current_user, None, today, today)
 
 
 @router.get("/streak", response_model=StreakInfo)
@@ -433,7 +438,7 @@ async def get_streak_info(
     current_user: dict = Depends(get_current_user),
     goal_id: Optional[str] = Query(None),
 ):
-    """Get streak information"""
+    """Get streak information - calculates consecutive completed check-ins"""
     from app.core.database import get_supabase_client
 
     supabase = get_supabase_client()
@@ -446,25 +451,38 @@ async def get_streak_info(
     result = query.order("date", desc=True).execute()
     check_ins = result.data
 
-    # Calculate streaks
+    if not check_ins:
+        return StreakInfo(
+            current_streak=0,
+            longest_streak=0,
+            last_check_in=None,
+            streak_start=None,
+        )
+
+    # Sort check-ins by date (newest first)
+    sorted_checkins = sorted(check_ins, key=lambda x: x["date"], reverse=True)
+
+    # Calculate streaks - same logic as /users/me/stats
     current_streak = 0
     longest_streak = 0
     temp_streak = 0
     last_check_in = None
     streak_start = None
 
-    for checkin in check_ins:
+    for checkin in sorted_checkins:
         if checkin["completed"]:
             temp_streak += 1
-            if current_streak == 0:  # First streak calculation
-                current_streak = temp_streak
+            current_streak = max(current_streak, temp_streak)
+            # Track the most recent completed check-in
+            if last_check_in is None:
                 last_check_in = checkin["date"]
-                streak_start = checkin["date"]
+            # Track the start of the current streak
+            streak_start = checkin["date"]
         else:
             longest_streak = max(longest_streak, temp_streak)
             temp_streak = 0
 
-    longest_streak = max(longest_streak, temp_streak)
+    longest_streak = max(longest_streak, temp_streak, current_streak)
 
     return StreakInfo(
         current_streak=current_streak,
@@ -472,14 +490,6 @@ async def get_streak_info(
         last_check_in=last_check_in,
         streak_start=streak_start,
     )
-
-
-@router.get("/streak", response_model=StreakInfo)
-async def get_streak_info_by_goal(
-    goal_id: str, current_user: dict = Depends(get_current_user)
-):
-    """Get streak information for a specific goal"""
-    return await get_streak_info(current_user, goal_id)
 
 
 @router.post("/bulk", status_code=status.HTTP_201_CREATED)
@@ -527,9 +537,10 @@ async def bulk_create_check_ins(
 @router.get("/mood-trends")
 async def get_mood_trends(
     current_user: dict = Depends(get_current_user),
-    days: int = Query(30, ge=7, le=365),
+    goal_id: Optional[str] = Query(None),
+    days: int = Query(7, ge=1, le=365),
 ):
-    """Get mood trends over time"""
+    """Get daily mood trends over time - returns array of daily averages"""
     from app.core.database import get_supabase_client
 
     supabase = get_supabase_client()
@@ -537,42 +548,65 @@ async def get_mood_trends(
     # Get check-ins with mood from the last N days
     start_date = (datetime.now() - timedelta(days=days)).date()
 
-    result = (
+    query = (
         supabase.table("check_ins")
         .select("date, mood")
         .eq("user_id", current_user["id"])
         .gte("date", start_date.isoformat())
         .not_.is_("mood", "null")
-        .order("date")
-        .execute()
     )
 
-    # Group by week for trend analysis
-    mood_trends = {}
+    if goal_id:
+        query = query.eq("goal_id", goal_id)
+
+    result = query.order("date").execute()
+
+    # Group by day for daily trend analysis
+    daily_moods = {}
     for checkin in result.data:
-        checkin_date = datetime.fromisoformat(checkin["date"]).date()
-        week_start = checkin_date - timedelta(days=checkin_date.weekday())
-        week_key = week_start.isoformat()
+        checkin_date = checkin["date"].split("T")[0]  # Get just the date part
 
-        if week_key not in mood_trends:
-            mood_trends[week_key] = []
-        mood_trends[week_key].append(checkin["mood"])
+        if checkin_date not in daily_moods:
+            daily_moods[checkin_date] = []
+        daily_moods[checkin_date].append(checkin["mood"])
 
-    # Calculate weekly averages
-    weekly_averages = []
-    for week, moods in mood_trends.items():
-        weekly_averages.append(
+    # Calculate daily averages - return as array for mobile compatibility
+    daily_averages = []
+    for day, moods in sorted(daily_moods.items()):
+        daily_averages.append(
             {
-                "week": week,
+                "date": day,
                 "average_mood": sum(moods) / len(moods),
-                "count": len(moods),
+                "check_ins_count": len(moods),
             }
         )
 
-    return {
-        "period_days": days,
-        "weekly_averages": weekly_averages,
-        "overall_average": (
-            sum(c["mood"] for c in result.data) / len(result.data) if result.data else 0
-        ),
-    }
+    return daily_averages
+
+
+# Parameterized routes must come AFTER all specific routes
+@router.get("/{checkin_id}", response_model=CheckInResponse)
+async def get_check_in(checkin_id: str, current_user: dict = Depends(get_current_user)):
+    """Get specific check-in by ID"""
+    from app.core.database import get_supabase_client
+
+    supabase = get_supabase_client()
+    result = (
+        supabase.table("check_ins")
+        .select(
+            """
+        *,
+        goal:goals(id, title, category, frequency)
+        """
+        )
+        .eq("id", checkin_id)
+        .eq("user_id", current_user["id"])
+        .execute()
+    )
+
+    if not result.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Check-in not found"
+        )
+
+    return result.data[0]

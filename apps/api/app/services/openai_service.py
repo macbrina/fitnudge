@@ -39,8 +39,9 @@ REQUIRED JSON FORMAT:
       "title": "Specific, engaging goal title (e.g., 'Complete 30-Day Push-Up Challenge' NOT 'Workout 3x week')",
       "description": "Compelling description that highlights benefits, mentions accountability features, and explains what makes this exciting. Write like a personal coach speaking directly to them.",
       "category": "fitness|nutrition|wellness|mindfulness|sleep|custom",
-      "frequency": "daily|weekly|monthly|custom",
+      "frequency": "daily|weekly",
       "target_days": 7,
+      "days_of_week": [1, 3, 5],  // Required for weekly goals: array of day numbers (0-6, 0=Sunday, 6=Saturday). Omit or null for daily goals.
       "reminder_times": ["07:00", "19:00"],
       "match_reason": "SPECIFIC, NON-REPETITIVE explanation directly referencing their profile data (fitness level, challenge, preferences). Must explain WHY this solves their specific challenge. No generic phrases."
     }
@@ -78,11 +79,13 @@ CRITICAL GUIDELINES FOR COMPELLING GOALS:
    - Connect to their motivation style (e.g., "As someone motivated by data, you'll love tracking...")
    - Avoid generic phrases like "Great for beginners" or "Good starting point"
 
-5. QUALITY OVER QUANTITY:
-   - Generate 3-7 goals (prioritize 5-6 excellent goals over 7 mediocre ones)
+5. REQUIRED QUANTITY (MINIMUM 5 GOALS):
+   - You MUST generate AT LEAST 5 goals, ideally 6-7 goals
+   - Returning fewer than 5 goals is unacceptable and will be rejected
    - Each goal should feel exciting and achievable
    - Mix different categories if appropriate for the user
    - Vary intensity and commitment levels
+   - QUALITY AND QUANTITY: Both are required!
 
 6. REALISTIC AND ACHIEVABLE:
    - Consider their available time, fitness level, and current habits
@@ -97,6 +100,7 @@ EXAMPLE OF A COMPELLING GOAL:
   "category": "fitness",
   "frequency": "weekly",
   "target_days": 4,
+  "days_of_week": [1, 3, 5, 6],  // Monday, Wednesday, Friday, Saturday
   "reminder_times": ["06:30", "19:00"],
   "match_reason": "Since you're a beginner wanting to lose weight and struggle with staying consistent, this goal gives you a structured routine that fits your under-30-minute time window. The 4x weekly frequency builds accountability without overwhelming you, and our AI will check in daily to help you maintain consistency - directly addressing your biggest challenge."
 }
@@ -116,7 +120,7 @@ class OpenAIService:
 
         Args:
             profile: User's fitness profile dictionary
-            user_plan: User's subscription plan (free, starter, pro, coach_plus)
+            user_plan: User's subscription plan (free, starter, pro, elite)
         """
         try:
             user_prompt = self._build_goal_suggestion_prompt(
@@ -173,24 +177,69 @@ class OpenAIService:
             result = json.loads(output_text)
             goals = result.get("goals", [])
 
-            # Validate the response
+            # Validate the response format
             if not goals or not isinstance(goals, list):
                 logger.warning("OpenAI returned invalid goals format")
                 return None
 
+            # Log what AI generated before validation
+            logger.info(
+                f"OpenAI generated {len(goals)} goals before validation",
+                {"user_plan": "unknown", "goal_count": len(goals)},
+            )
+
             # Validate each goal has required fields
             validated_goals = []
-            for goal in goals:
+            invalid_goals = []
+            for idx, goal in enumerate(goals):
                 if self._validate_goal(goal):
                     validated_goals.append(goal)
                 else:
-                    logger.warning(f"Invalid goal structure: {goal}")
+                    invalid_goals.append(
+                        {
+                            "index": idx,
+                            "title": goal.get("title", "N/A"),
+                            "missing_fields": [
+                                field
+                                for field in [
+                                    "title",
+                                    "description",
+                                    "category",
+                                    "frequency",
+                                    "target_days",
+                                    "reminder_times",
+                                    "match_reason",
+                                ]
+                                if field not in goal
+                            ],
+                        }
+                    )
+                    logger.warning(
+                        f"Invalid goal #{idx + 1}: {goal.get('title', 'N/A')}",
+                        {"goal": goal, "validation_failed": True},
+                    )
 
-            if not validated_goals:
-                logger.warning("No valid goals returned from OpenAI")
+            # Check minimum requirement (at least 3 valid goals)
+            if len(validated_goals) < 3:
+                logger.warning(
+                    f"OpenAI returned only {len(validated_goals)} valid goals (minimum 3 required). "
+                    f"Total generated: {len(goals)}, Invalid: {len(invalid_goals)}",
+                    {
+                        "valid_count": len(validated_goals),
+                        "invalid_count": len(invalid_goals),
+                        "invalid_goals": invalid_goals,
+                    },
+                )
                 return None
 
-            logger.info(f"Generated {len(validated_goals)} valid AI goals")
+            logger.info(
+                f"Successfully validated {len(validated_goals)} goals",
+                {
+                    "valid_count": len(validated_goals),
+                    "invalid_count": len(invalid_goals),
+                },
+            )
+
             return validated_goals
 
         except asyncio.TimeoutError:
@@ -361,7 +410,13 @@ EXAMPLES OF CREATIVE, SPECIFIC GOALS (not generic "workout 3x week"):
 - "Run Your First 5K in 8 Weeks" (milestone goal)
 - "Get 7+ Hours of Sleep 5 Nights Per Week" (recovery goal)
 
-Generate 5-7 goals that would make this person excited to start their fitness journey. Each goal should feel like it was personally crafted for them, addressing their specific challenge and preferences."""
+CRITICAL - MINIMUM REQUIREMENT:
+You MUST generate AT LEAST 5 goals, ideally 6-7 goals.
+Returning fewer than 5 goals is unacceptable and will be rejected.
+
+Generate 5-7 goals that would make this person excited to start their fitness journey. Each goal should feel like it was personally crafted for them, addressing their specific challenge and preferences.
+
+REMEMBER: Return a JSON object with a "goals" array containing AT LEAST 5 goal objects."""
 
         return prompt
 
@@ -393,7 +448,7 @@ Generate 5-7 goals that would make this person excited to start their fitness jo
             "sleep",
             "custom",
         ]
-        valid_frequencies = ["daily", "weekly", "monthly", "custom"]
+        valid_frequencies = ["daily", "weekly"]
 
         if goal["category"] not in valid_categories:
             return False
@@ -403,6 +458,18 @@ Generate 5-7 goals that would make this person excited to start their fitness jo
         # Validate target_days is reasonable
         if goal["target_days"] < 1 or goal["target_days"] > 7:
             return False
+
+        # Validate days_of_week for weekly goals
+        if goal["frequency"] == "weekly":
+            if "days_of_week" not in goal or not isinstance(goal["days_of_week"], list):
+                return False
+            if len(goal["days_of_week"]) == 0:
+                return False
+            if len(goal["days_of_week"]) > goal["target_days"]:
+                return False
+            for day in goal["days_of_week"]:
+                if not isinstance(day, int) or day < 0 or day > 6:
+                    return False
 
         # Validate reminder_times format
         if not isinstance(goal["reminder_times"], list):

@@ -1434,10 +1434,10 @@ async def handle_spam_report(event: dict):
 v=spf1 include:_spf.sendgrid.net ~all
 
 ; DKIM record
-default._domainkey.fitnudge.com. IN TXT "v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC..."
+default._domainkey.fitnudge.app. IN TXT "v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC..."
 
 ; DMARC record
-_dmarc.fitnudge.com. IN TXT "v=DMARC1; p=quarantine; rua=mailto:dmarc@fitnudge.com; ruf=mailto:dmarc@fitnudge.com; fo=1"
+_dmarc.fitnudge.app. IN TXT "v=DMARC1; p=quarantine; rua=mailto:dmarc@fitnudge.app; ruf=mailto:dmarc@fitnudge.app; fo=1"
 ```
 
 **Email Authentication:**
@@ -1775,7 +1775,7 @@ Examples:
 
 Voice Message (Pro)
 
-If the user is on Pro or Coach+, ElevenLabs generates voice message:
+If the user is on Pro or Elite, ElevenLabs generates voice message:
 
 POST /ai/voice
 {
@@ -1859,7 +1859,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://fitnudge.app", "https://app.fitnudge.com"],
+    allow_origins=["https://fitnudge.app", "https://app.fitnudge.app"],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["Authorization", "Content-Type"],
@@ -2496,7 +2496,7 @@ class UserTargeting:
 
         # Plan-based targeting
         if feature_key == "advanced-analytics":
-            return user_data['plan'] in ['pro', 'coach+']
+            return user_data['plan'] in ['pro', 'elite']
 
         # Geographic targeting
         if feature_key == "local-gym-integration":
@@ -3611,7 +3611,7 @@ export let options = {
 };
 
 export default function () {
-  let response = http.get("https://api.fitnudge.com/api/v1/health");
+  let response = http.get("https://api.fitnudge.app/api/v1/health");
   check(response, {
     "status is 200": (r) => r.status === 200,
     "response time < 500ms": (r) => r.timings.duration < 500,

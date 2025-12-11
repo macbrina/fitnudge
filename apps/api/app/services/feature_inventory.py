@@ -1,12 +1,23 @@
 """
 Feature Inventory Service
 
-Defines which features are implemented, which are planned, and how they map to subscription tiers.
-This is used by the AI to ensure goal suggestions only mention features that exist.
+Fetches ALL feature data from the database (plan_features table).
+No hardcoded feature keys - everything comes from the database.
+
+Database is the source of truth for:
+- Feature keys, names, descriptions
+- AI descriptions for prompts
+- Which plans have access to which features
+- Whether a feature is enabled/implemented (is_enabled)
+- Feature values/limits (feature_value)
 """
 
-from typing import Dict, List, Set, Any
+from typing import Dict, List, Any, Optional
 from enum import Enum
+import logging
+import time
+
+logger = logging.getLogger(__name__)
 
 
 class FeatureStatus(Enum):
@@ -15,6 +26,7 @@ class FeatureStatus(Enum):
     IMPLEMENTED = "implemented"
     PLANNED = "planned"
     NOT_PLANNED = "not_planned"
+    FUTURE_PENDING = "future_pending"
 
 
 class FeatureAccess(Enum):
@@ -23,168 +35,188 @@ class FeatureAccess(Enum):
     FREE = "free"
     STARTER = "starter"
     PRO = "pro"
-    COACH_PLUS = "coach_plus"
+    ELITE = "elite"  # formerly COACH_PLUS
     ALL = "all"  # Available to all plans
 
 
-# Feature definitions with status and access
-FEATURE_DEFINITIONS: Dict[str, Dict[str, Any]] = {
-    # ==================== IMPLEMENTED FEATURES ====================
-    # Free features (available to all)
-    "daily_checkins": {
-        "status": FeatureStatus.IMPLEMENTED,
-        "access": [FeatureAccess.ALL],
-        "name": "Daily Check-Ins",
-        "description": "Simple yes/no check-ins with optional reflection text",
-        "ai_description": "daily check-ins (yes/no with optional reflection)",
-    },
-    "streak_tracking": {
-        "status": FeatureStatus.IMPLEMENTED,
-        "access": [FeatureAccess.ALL],
-        "name": "Streak Tracking",
-        "description": "Track consecutive days of completing goals",
-        "ai_description": "streak tracking to see your consistency",
-    },
-    "progress_visualization": {
-        "status": FeatureStatus.IMPLEMENTED,
-        "access": [FeatureAccess.ALL],
-        "name": "Progress Visualization",
-        "description": "Visual progress charts and summary cards",
-        "ai_description": "progress visualization showing your consistency",
-    },
-    "basic_reminders": {
-        "status": FeatureStatus.IMPLEMENTED,
-        "access": [FeatureAccess.ALL],
-        "name": "Basic Reminders",
-        "description": "Scheduled notification reminders",
-        "ai_description": "smart reminders at your chosen times",
-    },
-    "social_feed": {
-        "status": FeatureStatus.IMPLEMENTED,
-        "access": [FeatureAccess.ALL],
-        "name": "Social Feed",
-        "description": "Community feed with posts and interactions",
-        "ai_description": "community feed to share your journey",
-    },
-    "text_motivation": {
-        "status": FeatureStatus.IMPLEMENTED,
-        "access": [FeatureAccess.ALL],
-        "name": "Text Motivation",
-        "description": "AI-powered text motivation messages",
-        "ai_description": "AI-powered motivation messages",
-    },
-    "mood_tracking": {
-        "status": FeatureStatus.IMPLEMENTED,
-        "access": [FeatureAccess.ALL],
-        "name": "Mood Tracking",
-        "description": "Track mood with check-ins (1-5 scale)",
-        "ai_description": "mood tracking to understand your emotional patterns",
-    },
-    # Premium features
-    "multiple_goals": {
-        "status": FeatureStatus.IMPLEMENTED,
-        "access": [FeatureAccess.STARTER, FeatureAccess.PRO, FeatureAccess.COACH_PLUS],
-        "name": "Multiple Goals",
-        "description": "Create multiple goals (Starter: 3, Pro/Coach+: unlimited)",
-        "ai_description": "multiple goals to track different aspects of your fitness",
-        "limits": {"free": 1, "starter": 3, "pro": None, "coach_plus": None},
-    },
-    "voice_motivation": {
-        "status": FeatureStatus.IMPLEMENTED,
-        "access": [FeatureAccess.PRO, FeatureAccess.COACH_PLUS],
-        "name": "Voice Motivation",
-        "description": "AI-generated voice motivation messages",
-        "ai_description": "AI voice motivation calls",
-    },
-    "advanced_analytics": {
-        "status": FeatureStatus.IMPLEMENTED,
-        "access": [FeatureAccess.PRO, FeatureAccess.COACH_PLUS],
-        "name": "Advanced Analytics",
-        "description": "Detailed progress and performance analytics",
-        "ai_description": "advanced analytics for deep insights",
-    },
-    # ==================== IMPLEMENTED FEATURES (continued) ====================
-    "progress_photos": {
-        "status": FeatureStatus.IMPLEMENTED,
-        "access": [FeatureAccess.ALL],
-        "name": "Progress Photos",
-        "description": "Photo uploads with check-ins",
-        "ai_description": "progress photos to track visual changes",
-    },
-    "achievement_badges": {
-        "status": FeatureStatus.IMPLEMENTED,
-        "access": [FeatureAccess.ALL],
-        "name": "Achievement Badges",
-        "description": "Unlock badges for milestones",
-        "ai_description": "achievement badges to celebrate milestones",
-    },
-    "weekly_recap": {
-        "status": FeatureStatus.IMPLEMENTED,
-        "access": [FeatureAccess.STARTER, FeatureAccess.PRO, FeatureAccess.COACH_PLUS],
-        "name": "Weekly Recap",
-        "description": "AI-generated weekly progress summaries",
-        "ai_description": "weekly recap summaries of your progress",
-    },
-    "challenge_mode": {
-        "status": FeatureStatus.IMPLEMENTED,
-        "access": [FeatureAccess.ALL],
-        "name": "Challenge Mode",
-        "description": "Community challenges with leaderboards",
-        "ai_description": "community challenges to stay motivated",
-    },
-    "custom_reminders": {
-        "status": FeatureStatus.IMPLEMENTED,
-        "access": [FeatureAccess.ALL],
-        "name": "Custom Reminder Messages",
-        "description": "Personalize reminder messages",
-        "ai_description": "custom reminder messages tailored to you",
-    },
-    "meal_tracking": {
-        "status": FeatureStatus.IMPLEMENTED,
-        "access": [
-            FeatureAccess.ALL
-        ],  # Basic available to all, enhanced features Starter+
-        "name": "Meal Tracking",
-        "description": "Log meals with basic info (Free), nutritional data & summaries (Starter+)",
-        "ai_description": "meal tracking with nutritional information",
-    },
-    "habit_chains": {
-        "status": FeatureStatus.IMPLEMENTED,
-        "access": [FeatureAccess.ALL],
-        "name": "Habit Chains",
-        "description": "Visual chain visualization for streaks",
-        "ai_description": "habit chain visualization to see your consistency",
-    },
-    "social_accountability": {
-        "status": FeatureStatus.IMPLEMENTED,
-        "access": [FeatureAccess.ALL],  # Basic available to all, group goals Pro+
-        "name": "Social Accountability",
-        "description": "Share goals with friends for accountability",
-        "ai_description": "share goals with friends for accountability",
-    },
-    "ai_progress_reflections": {
-        "status": FeatureStatus.IMPLEMENTED,
-        "access": [FeatureAccess.PRO, FeatureAccess.COACH_PLUS],
-        "name": "AI Progress Reflections",
-        "description": "Premium AI coach summaries with deep insights",
-        "ai_description": "AI progress reflections and coaching insights",
-    },
-    # ==================== NOT PLANNED (Do not mention) ====================
-    "workout_templates": {
-        "status": FeatureStatus.NOT_PLANNED,
-        "access": [],
-        "name": "Workout Templates",
-        "description": "Structured workout plans with exercises",
-        "ai_description": "",  # Empty - should not be mentioned
-    },
-    "detailed_session_logging": {
-        "status": FeatureStatus.NOT_PLANNED,
-        "access": [],
-        "name": "Detailed Session Logging",
-        "description": "Detailed workout session logging with exercises, sets, reps",
-        "ai_description": "",  # Empty - use check-ins instead
-    },
+# Plan tier hierarchy (higher number = higher tier)
+PLAN_TIERS = {
+    "free": 0,
+    "starter": 1,
+    "pro": 2,
+    "elite": 3,  # formerly elite
 }
+
+# Cache for database features
+_features_cache: Optional[Dict[str, Dict[str, Any]]] = None
+_cache_timestamp: float = 0
+CACHE_TTL_SECONDS = 3600  # 1 hour (features rarely change)
+
+
+def _get_supabase_client():
+    """Get Supabase client - lazy import to avoid circular dependencies"""
+    from app.core.database import get_supabase_client
+
+    return get_supabase_client()
+
+
+def _fetch_features_from_database() -> Dict[str, Dict[str, Any]]:
+    """
+    Fetch ALL features from the plan_features table.
+    No hardcoded keys - everything comes from the database.
+
+    Returns:
+        Dictionary mapping feature_key to feature data
+    """
+    try:
+        supabase = _get_supabase_client()
+
+        # Fetch all plan features with their plan info
+        response = (
+            supabase.table("plan_features")
+            .select(
+                "feature_key, feature_name, feature_description, ai_description, "
+                "feature_value, is_enabled, minimum_tier, plan_id"
+            )
+            .execute()
+        )
+
+        if not response.data:
+            logger.warning("No features found in database")
+            return {}
+
+        # Group features by feature_key and collect which plans have access
+        features: Dict[str, Dict[str, Any]] = {}
+
+        for row in response.data:
+            feature_key = row["feature_key"]
+            plan_id = row["plan_id"]
+            is_enabled = row.get("is_enabled", True)
+            minimum_tier = row.get("minimum_tier", 0)
+
+            if feature_key not in features:
+                features[feature_key] = {
+                    "name": row["feature_name"],
+                    "description": row.get("feature_description", ""),
+                    "ai_description": row.get("ai_description", ""),
+                    "plans": set(),  # Plans that have this feature
+                    "is_enabled": is_enabled,
+                    "minimum_tier": minimum_tier,
+                    "feature_value": row.get("feature_value"),  # For limits
+                }
+            else:
+                # Update if this row has a value and existing doesn't
+                if row.get("feature_value") and not features[feature_key].get(
+                    "feature_value"
+                ):
+                    features[feature_key]["feature_value"] = row["feature_value"]
+
+            # Add this plan to the feature's access list if enabled
+            if is_enabled:
+                features[feature_key]["plans"].add(plan_id)
+
+            # Track the minimum tier across all entries
+            if minimum_tier < features[feature_key]["minimum_tier"]:
+                features[feature_key]["minimum_tier"] = minimum_tier
+
+        # Convert plans set to access list and determine status
+        for feature_key, feature_data in features.items():
+            plans = feature_data["plans"]
+
+            # Determine access based on which plans have this feature
+            if "free" in plans:
+                # If free plan has it, check if all plans have it
+                if all(p in plans for p in ["free", "starter", "pro", "elite"]):
+                    feature_data["access"] = [FeatureAccess.ALL]
+                else:
+                    feature_data["access"] = [FeatureAccess.FREE]
+                    if "starter" in plans:
+                        feature_data["access"].append(FeatureAccess.STARTER)
+                    if "pro" in plans:
+                        feature_data["access"].append(FeatureAccess.PRO)
+                    if "elite" in plans:
+                        feature_data["access"].append(FeatureAccess.ELITE)
+            else:
+                # Build access list based on which plans have it
+                feature_data["access"] = []
+                if "starter" in plans:
+                    feature_data["access"].append(FeatureAccess.STARTER)
+                if "pro" in plans:
+                    feature_data["access"].append(FeatureAccess.PRO)
+                if "elite" in plans:
+                    feature_data["access"].append(FeatureAccess.ELITE)
+
+            # Determine status based on is_enabled
+            if feature_data["is_enabled"]:
+                feature_data["status"] = FeatureStatus.IMPLEMENTED
+            else:
+                feature_data["status"] = FeatureStatus.PLANNED
+
+            # Clean up temporary fields
+            del feature_data["plans"]
+            del feature_data["is_enabled"]
+
+        logger.info(f"Loaded {len(features)} features from database")
+        return features
+
+    except Exception as e:
+        logger.error(f"Failed to fetch features from database: {e}")
+        return {}
+
+
+def _get_cached_features() -> Dict[str, Dict[str, Any]]:
+    """
+    Get features from cache or fetch from database if cache is stale.
+
+    Returns:
+        Dictionary of feature definitions
+    """
+    global _features_cache, _cache_timestamp
+
+    current_time = time.time()
+
+    # Check if cache is valid
+    if (
+        _features_cache is not None
+        and (current_time - _cache_timestamp) < CACHE_TTL_SECONDS
+    ):
+        return _features_cache
+
+    # Fetch from database
+    db_features = _fetch_features_from_database()
+
+    if db_features:
+        _features_cache = db_features
+        _cache_timestamp = current_time
+        return _features_cache
+
+    # If database fetch failed and we have old cache, use it
+    if _features_cache is not None:
+        logger.warning("Using stale feature cache due to database fetch failure")
+        return _features_cache
+
+    # Last resort: return empty dict (functions will handle gracefully)
+    logger.error("No feature data available - database fetch failed and no cache")
+    return {}
+
+
+def refresh_feature_cache() -> None:
+    """Force refresh of the feature cache from database."""
+    global _features_cache, _cache_timestamp
+    _features_cache = None
+    _cache_timestamp = 0
+    _get_cached_features()  # Trigger fresh fetch
+    logger.info("Feature cache refreshed")
+
+
+def get_all_features() -> Dict[str, Dict[str, Any]]:
+    """
+    Get all feature definitions from database.
+
+    Returns:
+        Dictionary of feature key to feature data
+    """
+    return _get_cached_features()
 
 
 def get_features_for_plan(plan: str) -> List[Dict[str, Any]]:
@@ -192,42 +224,65 @@ def get_features_for_plan(plan: str) -> List[Dict[str, Any]]:
     Get all implemented features available for a subscription plan.
 
     Args:
-        plan: User's subscription plan (free, starter, pro, coach_plus)
+        plan: User's subscription plan (free, starter, pro, elite)
 
     Returns:
         List of feature definitions available to this plan
     """
+    features = _get_cached_features()
     plan_access = _plan_to_access(plan)
+    plan_tier = PLAN_TIERS.get(plan.lower(), 0)
 
-    features = []
-    for feature_key, feature_def in FEATURE_DEFINITIONS.items():
-        if feature_def["status"] != FeatureStatus.IMPLEMENTED:
+    available_features = []
+
+    for feature_key, feature_data in features.items():
+        # Skip non-implemented features
+        if feature_data.get("status") != FeatureStatus.IMPLEMENTED:
             continue
 
-        access_levels = feature_def["access"]
-        if FeatureAccess.ALL in access_levels or plan_access in access_levels:
-            features.append(
+        access_levels = feature_data.get("access", [])
+        minimum_tier = feature_data.get("minimum_tier", 0)
+
+        # Check if plan has access
+        has_access = False
+
+        # ALL means everyone has access
+        if FeatureAccess.ALL in access_levels:
+            has_access = True
+        # Check if plan is in access list
+        elif plan_access in access_levels:
+            has_access = True
+        # Check tier-based access (higher tiers inherit lower tier features)
+        elif plan_tier >= minimum_tier and minimum_tier > 0:
+            has_access = True
+
+        if has_access:
+            available_features.append(
                 {
                     "key": feature_key,
-                    **feature_def,
+                    "name": feature_data.get("name", feature_key),
+                    "description": feature_data.get("description", ""),
+                    "ai_description": feature_data.get("ai_description", ""),
+                    "feature_value": feature_data.get("feature_value"),
                     "access": [a.value for a in access_levels],
                 }
             )
 
-    return features
+    return available_features
 
 
 def get_implemented_feature_names(plan: str) -> List[str]:
     """
-    Get list of implemented feature names for AI prompt.
+    Get list of implemented feature AI descriptions for AI prompt.
 
     Args:
         plan: User's subscription plan
 
     Returns:
-        List of feature descriptions that can be mentioned
+        List of AI descriptions that can be mentioned
     """
     features = get_features_for_plan(plan)
+    # Only return features with non-empty ai_description
     return [f["ai_description"] for f in features if f.get("ai_description")]
 
 
@@ -273,28 +328,19 @@ def get_plan_restrictions(plan: str) -> List[str]:
     """
     restrictions = []
 
-    # Goal limits
-    goal_limits = {
-        "free": 1,
-        "starter": 3,
-        "pro": None,  # unlimited
-        "coach_plus": None,  # unlimited
-    }
+    # Get goal limit from database
+    goal_limit = _get_goal_limit_for_plan(plan)
 
-    limit = goal_limits.get(plan, 1)
-    if limit == 1:
+    if goal_limit == 1:
         restrictions.append("Free users can only have 1 active goal at a time.")
-    elif limit:
-        restrictions.append(f"{plan.capitalize()} users can have up to {limit} goals.")
+    elif goal_limit:
+        restrictions.append(
+            f"{plan.capitalize()} users can have up to {goal_limit} goals."
+        )
 
-    # Feature restrictions
-    if plan == "free":
-        restrictions.append(
-            "Voice motivation messages are only available on Pro/Coach+ plans."
-        )
-        restrictions.append(
-            "Advanced analytics are only available on Pro/Coach+ plans."
-        )
+    # Feature restrictions based on plan
+    if plan.lower() == "free":
+        restrictions.append("Advanced analytics are only available on Pro/Elite plans.")
 
     return restrictions
 
@@ -305,7 +351,7 @@ def _plan_to_access(plan: str) -> FeatureAccess:
         "free": FeatureAccess.FREE,
         "starter": FeatureAccess.STARTER,
         "pro": FeatureAccess.PRO,
-        "coach_plus": FeatureAccess.COACH_PLUS,
+        "elite": FeatureAccess.ELITE,
     }
     return mapping.get(plan.lower(), FeatureAccess.FREE)
 
@@ -321,25 +367,36 @@ def can_mention_feature(feature_key: str, plan: str) -> bool:
     Returns:
         True if feature can be mentioned, False otherwise
     """
-    if feature_key not in FEATURE_DEFINITIONS:
+    features = _get_cached_features()
+
+    if feature_key not in features:
         return False
 
-    feature = FEATURE_DEFINITIONS[feature_key]
+    feature = features[feature_key]
 
-    # Never mention non-planned features
-    if feature["status"] == FeatureStatus.NOT_PLANNED:
+    # Only mention implemented features
+    if feature.get("status") != FeatureStatus.IMPLEMENTED:
         return False
 
-    # Only mention implemented features (for now)
-    # Planned features should not be mentioned until implemented
-    if feature["status"] == FeatureStatus.PLANNED:
+    # Don't mention features with empty ai_description
+    if not feature.get("ai_description"):
         return False
 
     # Check access
     plan_access = _plan_to_access(plan)
-    access_levels = feature["access"]
+    plan_tier = PLAN_TIERS.get(plan.lower(), 0)
+    access_levels = feature.get("access", [])
+    minimum_tier = feature.get("minimum_tier", 0)
 
-    return FeatureAccess.ALL in access_levels or plan_access in access_levels
+    # Check if plan has access
+    if FeatureAccess.ALL in access_levels:
+        return True
+    if plan_access in access_levels:
+        return True
+    if plan_tier >= minimum_tier and minimum_tier > 0:
+        return True
+
+    return False
 
 
 def get_feature_context_for_ai(plan: str) -> Dict[str, Any]:
@@ -361,12 +418,61 @@ def get_feature_context_for_ai(plan: str) -> Dict[str, Any]:
     }
 
 
-def _get_goal_limit_for_plan(plan: str) -> int | None:
-    """Get goal limit for a plan (None means unlimited)"""
-    limits = {
+def _get_goal_limit_for_plan(plan: str) -> Optional[int]:
+    """
+    Get goal limit for a plan from database (None means unlimited).
+
+    Looks for the "goals" feature and its feature_value.
+    """
+    features = _get_cached_features()
+    plan_lower = plan.lower()
+
+    # Check for unlimited_goals feature for pro/coach+
+    if plan_lower in ["pro", "elite"]:
+        if "unlimited_goals" in features:
+            return None
+
+    # Look for "goals" feature with feature_value for this plan's tier
+    goals_feature = features.get("goals", {})
+    if goals_feature.get("feature_value"):
+        return goals_feature["feature_value"]
+
+    # Fallback: Check based on plan tier
+    # Free = 1, Starter = 3, Pro/Elite = unlimited
+    defaults = {
         "free": 1,
         "starter": 3,
         "pro": None,
-        "coach_plus": None,
+        "elite": None,
     }
-    return limits.get(plan.lower(), 1)
+    return defaults.get(plan_lower, 1)
+
+
+def get_feature_info(feature_key: str) -> Optional[Dict[str, Any]]:
+    """
+    Get information about a specific feature.
+
+    Args:
+        feature_key: The feature key to look up
+
+    Returns:
+        Feature dictionary or None if not found
+    """
+    features = _get_cached_features()
+    return features.get(feature_key)
+
+
+def is_feature_enabled(feature_key: str) -> bool:
+    """
+    Check if a feature is enabled (implemented) in the system.
+
+    Args:
+        feature_key: The feature key to check
+
+    Returns:
+        True if feature is implemented and enabled
+    """
+    feature = get_feature_info(feature_key)
+    if not feature:
+        return False
+    return feature.get("status") == FeatureStatus.IMPLEMENTED

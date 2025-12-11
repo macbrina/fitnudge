@@ -199,7 +199,6 @@ export default function LoginScreen() {
       },
       {
         onSuccess: async (response) => {
-          console.log("response", response);
           if (response.data) {
             // Login the user with the returned data
             await login(
@@ -427,7 +426,6 @@ export default function LoginScreen() {
           style={{ flex: 1 }}
           contentContainerStyle={{
             flexGrow: 1,
-            paddingTop: insets.top,
             paddingBottom: insets.bottom,
           }}
           showsVerticalScrollIndicator={false}

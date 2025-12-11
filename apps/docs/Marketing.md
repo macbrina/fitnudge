@@ -4,40 +4,1088 @@
 
 ## 💰 Pricing Strategy & Subscription Tiers
 
-### 🎯 Current Structure Analysis
+### 📊 FINAL Pricing Structure (Locked for 2 Years)
 
-**Existing Plans:**
+> **Last Updated**: December 2024
+> **Price Lock Period**: Until December 2026
+> **Rationale**: Value-based pricing - AI-personalized motivation is premium. Positioned at Fitbod/Strava level ($12.99) with unique AI Chat Motivation feature. (Voice AI planned for future release)
 
-- **Free**: $0/month - 1 goal, text motivation, basic tracking
-- **Pro**: $4.99/month - Multiple goals, voice messages, analytics, social features
-- **Coach+**: $9.99/month - AI memory, integrations, priority support
+| Tier        | Monthly    | Annual      | Monthly Equiv | Savings | Target User                 |
+| ----------- | ---------- | ----------- | ------------- | ------- | --------------------------- |
+| **Free**    | $0         | $0          | -             | -       | Trial users, casual fitness |
+| **Starter** | **$6.99**  | **$54.99**  | $4.58/mo      | 34%     | Committed beginners         |
+| **Pro**     | **$12.99** | **$99.99**  | $8.33/mo      | 36%     | Serious fitness enthusiasts |
+| **Elite**   | **$19.99** | **$159.99** | $13.33/mo     | 33%     | Fitness professionals       |
 
-### 🚀 Recommended Improvements
+### 🎁 Exit Intent Offer Pricing (PRO ONLY - 50% Off Annual)
 
-#### **1. Add Annual Plans (30% Discount)**
+> **Strategy**: Pro-only exit offer for maximum conversion
+>
+> - One clear choice = no decision paralysis
+> - AI Chat Motivation is the hook that creates long-term stickiness
+> - Users who experience AI coaching are more likely to renew
+> - Discount percentage calculated dynamically from database prices
+> - Note: Voice AI is a future feature (not implemented yet)
 
-- **Pro Annual**: $41.88/year ($3.49/month - save 30%)
-- **Coach+ Annual**: $83.88/year ($6.99/month - save 30%)
+| Tier    | Regular Annual | Exit Offer | Monthly Equiv | Savings |
+| ------- | -------------- | ---------- | ------------- | ------- |
+| **Pro** | $99.99         | **$49.99** | $4.17/mo      | $50/yr  |
 
-#### **2. Introduce "Starter" Tier ($2.99/month)**
+### 🎯 Feature Matrix by Tier
 
-Bridge the gap between Free and Pro:
+| Feature                     | Free | Starter | Pro | Elite |
+| --------------------------- | ---- | ------- | --- | ----- |
+| Active Goals                | 1    | 3       | ∞   | ∞     |
+| Text Motivation             | ✅   | ✅      | ✅  | ✅    |
+| Voice Motivation            | ❌   | ❌      | ✅  | ✅    |
+| Basic Analytics             | ❌   | ✅      | ✅  | ✅    |
+| Advanced Analytics          | ❌   | ❌      | ✅  | ✅    |
+| Social Features             | ✅   | ✅      | ✅  | ✅    |
+| AI Memory & Personalization | ❌   | ❌      | ❌  | ✅    |
+| API Integrations            | ❌   | ❌      | ❌  | ✅    |
+| Priority Support            | ❌   | ❌      | ❌  | ✅    |
+| Ad-Free Experience          | ❌   | ✅      | ✅  | ✅    |
 
-- **Starter**: $2.99/month
-  - 3 goals max
-  - Text motivation (unlimited)
-  - Full social features
-  - Basic analytics
-  - **No voice messages** (save AI costs)
+---
 
-### 📊 Final Pricing Structure
+## 💵 Cost Analysis & Profit Margins
 
-| Tier        | Monthly | Annual | Key Features                                        | Target User                 |
-| ----------- | ------- | ------ | --------------------------------------------------- | --------------------------- |
-| **Free**    | $0      | $0     | 1 goal, text motivation, basic social               | Trial users, casual fitness |
-| **Starter** | $2.99   | $29.99 | 3 goals, full social, basic analytics               | Committed beginners         |
-| **Pro**     | $4.99   | $49.99 | Unlimited goals, voice messages, advanced analytics | Serious fitness enthusiasts |
-| **Coach+**  | $9.99   | $99.99 | AI memory, API integrations, priority support       | Fitness professionals       |
+### Platform Commissions (Unavoidable)
+
+| Platform       | Year 1 | Year 2+ | Notes                               |
+| -------------- | ------ | ------- | ----------------------------------- |
+| **Apple**      | 30%    | 15%     | 15% for Small Business Program <$1M |
+| **Google**     | 15%    | 15%     | Flat rate for subscriptions         |
+| **RevenueCat** | 0-1%   | 1%      | Free up to $2.5K MTR, then 1%       |
+
+**Blended Average Commission**: ~23-25% (iOS/Android mix)
+
+### AI Costs per Active User (OpenAI)
+
+| Tier    | Features Used             | Est. Cost/User/Month |
+| ------- | ------------------------- | -------------------- |
+| Free    | Limited text motivation   | ~$0.02               |
+| Starter | Unlimited text motivation | ~$0.08               |
+| Pro     | Text + Voice (TTS HD)     | ~$0.45               |
+| Elite   | Text + Voice + AI Memory  | ~$0.65               |
+
+### Infrastructure Costs (Monthly Fixed)
+
+| Service         | Cost/Month | Notes                   |
+| --------------- | ---------- | ----------------------- |
+| Supabase Pro    | $25        | Database, Auth, Storage |
+| Vercel/Railway  | $20        | API Hosting             |
+| Redis           | $0         | Self-hosted             |
+| Sentry          | $26        | Error tracking          |
+| Domain/SSL      | $2         | Annual amortized        |
+| **Total Fixed** | **~$75**   |                         |
+
+### Profit Margin Analysis
+
+**Starter ($6.99/month)**
+
+```
+Gross Revenue:                    $6.99
+- Platform Commission (25%):     -$1.75
+- RevenueCat (1%):               -$0.07
+- AI Costs:                      -$0.08
+─────────────────────────────────────────
+Net Profit:                       $5.09 (73% margin) ✅
+```
+
+**Pro ($12.99/month) ⭐ PRIMARY REVENUE DRIVER**
+
+```
+Gross Revenue:                    $12.99
+- Platform Commission (25%):     -$3.25
+- RevenueCat (1%):               -$0.13
+- AI Costs:                      -$0.45
+─────────────────────────────────────────
+Net Profit:                       $9.16 (71% margin) ✅
+```
+
+**Elite ($19.99/month)**
+
+```
+Gross Revenue:                    $19.99
+- Platform Commission (25%):     -$5.00
+- RevenueCat (1%):               -$0.20
+- AI Costs:                      -$0.65
+─────────────────────────────────────────
+Net Profit:                       $14.14 (71% margin) ✅
+```
+
+---
+
+## 🛠️ IAP Setup Guide: RevenueCat + Apple + Google
+
+### 📋 Product ID Naming Convention
+
+Use consistent naming across all platforms:
+
+| Tier    | Period  | iOS Product ID                 | Android Product ID             |
+| ------- | ------- | ------------------------------ | ------------------------------ |
+| Starter | Monthly | `com.fitnudge.starter.monthly` | `com.fitnudge.starter.monthly` |
+| Starter | Annual  | `com.fitnudge.starter.annual`  | `com.fitnudge.starter.annual`  |
+| Pro     | Monthly | `com.fitnudge.pro.monthly`     | `com.fitnudge.pro.monthly`     |
+| Pro     | Annual  | `com.fitnudge.pro.annual`      | `com.fitnudge.pro.annual`      |
+| Elite   | Monthly | `com.fitnudge.elite.monthly`   | `com.fitnudge.elite.monthly`   |
+| Elite   | Annual  | `com.fitnudge.elite.annual`    | `com.fitnudge.elite.annual`    |
+
+### 🍎 App Store Connect Setup (iOS)
+
+#### Step 1: Create Subscription Group
+
+1. Go to **App Store Connect** → **My Apps** → **FitNudge**
+2. Click **Subscriptions** in the sidebar
+3. Click **+** next to "Subscription Groups"
+4. **Name**: `FitNudge Premium`
+5. **Reference Name**: `fitnudge_premium_subscriptions`
+
+#### Step 2: Create Subscription Products
+
+For each subscription, create in App Store Connect:
+
+**Starter Monthly ($6.99)**
+
+```
+Reference Name: Starter Monthly
+Product ID: com.fitnudge.starter.monthly
+Subscription Duration: 1 Month
+Price: Tier 7 ($6.99 USD)
+```
+
+**Starter Annual ($54.99)**
+
+```
+Reference Name: Starter Annual
+Product ID: com.fitnudge.starter.annual
+Subscription Duration: 1 Year
+Price: Tier 55 ($54.99 USD)
+```
+
+**Pro Monthly ($12.99)**
+
+```
+Reference Name: Pro Monthly
+Product ID: com.fitnudge.pro.monthly
+Subscription Duration: 1 Month
+Price: Tier 13 ($12.99 USD)
+Introductory Offer: 3-day FREE TRIAL (try before you buy)
+```
+
+**Pro Annual ($99.99)**
+
+```
+Reference Name: Pro Annual
+Product ID: com.fitnudge.pro.annual
+Subscription Duration: 1 Year
+Price: Tier 80 ($99.99 USD)
+Introductory Offer: 50% OFF first year ($49.99) - Pay Up Front
+```
+
+> **Strategy**: Trial on Monthly (low commitment try), Discount on Yearly (maximize LTV).
+> Users can try Pro monthly with free trial, then we upsell to annual with 50% off.
+
+**Elite Monthly ($19.99)**
+
+```
+Reference Name: Elite Monthly
+Product ID: com.fitnudge.elite.monthly
+Subscription Duration: 1 Month
+Price: Tier 20 ($19.99 USD)
+```
+
+**Elite Annual ($159.99)**
+
+```
+Reference Name: Elite Annual
+Product ID: com.fitnudge.elite.annual
+Subscription Duration: 1 Year
+Price: Tier 128 ($159.99 USD)
+```
+
+#### Step 3: Add Localization (Required for Review)
+
+For **each** subscription product, add:
+
+**Display Name Examples:**
+
+- Starter Monthly: "Starter Plan"
+- Pro Monthly: "Pro Plan"
+- Elite Monthly: "Elite Plan"
+
+**Description Examples:**
+
+**Starter Plan:**
+
+```
+Unlock your fitness potential with FitNudge Starter:
+• Track up to 3 fitness goals
+• Unlimited AI text motivation messages
+• Full social community access
+• Basic progress analytics
+• Ad-free experience
+
+Perfect for committed beginners ready to build lasting habits.
+```
+
+**Pro Plan:**
+
+```
+Take your fitness journey to the next level with FitNudge Pro:
+• Unlimited fitness goals
+• AI Chat Motivation (our signature feature!)
+• Advanced analytics and insights
+• Full social features
+• Priority goal suggestions
+• Ad-free experience
+
+The complete toolkit for serious fitness enthusiasts.
+```
+
+**Elite Plan:**
+
+```
+The ultimate AI fitness coaching experience:
+• Everything in Pro, plus:
+• AI memory - your coach remembers your journey
+• Smart API integrations (Apple Health, Google Fit)
+• Priority customer support
+• Early access to new features
+• Personalized workout recommendations
+
+For fitness professionals and dedicated athletes.
+```
+
+#### Step 4: Screenshots for Review (iOS Requires This)
+
+**Required Screenshots** (upload in App Store Connect for each subscription):
+
+1. **Subscription Screen Screenshot** - Shows all plan options with pricing
+2. **Feature Comparison Screenshot** - Shows what each tier includes
+3. **In-App Usage Screenshot** - Shows the feature being used (e.g., voice message playing)
+
+**Screenshot Specifications:**
+
+- Format: PNG or JPEG
+- Size: 640x920 pixels (minimum)
+- Must clearly show pricing
+- Must show what user gets
+
+#### Step 5: Review Notes for Apple (IMPORTANT)
+
+Add these notes when submitting for review:
+
+**Review Notes Template:**
+
+```
+SUBSCRIPTION INFORMATION:
+
+FitNudge is an AI-powered fitness motivation app. Our subscription unlocks premium features:
+
+TEST ACCOUNT (if needed):
+Email: review@fitnudge.app
+Password: [Provided separately or use sandbox account]
+
+SUBSCRIPTION TIERS:
+1. Starter ($3.99/mo, $29.99/yr) - 3 goals, text AI motivation, basic analytics
+2. Pro ($7.99/mo, $59.99/yr) - Unlimited goals, AI VOICE motivation, advanced analytics
+3. Elite ($14.99/mo, $109.99/yr) - AI memory, integrations, priority support
+
+KEY DIFFERENTIATOR:
+Our Pro plan includes AI Chat Motivation - personalized AI coaching conversations that provide encouragement, guidance, and strategies based on user's fitness goals and progress. This is a unique, high-value feature that justifies the premium pricing. (Voice motivation is planned for a future release)
+
+HOW TO TEST:
+1. Create account or use test account above
+2. Complete onboarding (personalization questions)
+3. Navigate to Profile → Subscription
+4. Select any plan to see the subscription flow
+5. For voice messages (Pro+): Create a goal and wait for daily motivation
+
+CONTENT DELIVERY:
+- Text motivations: Generated via OpenAI GPT-4
+- Voice messages: Generated via OpenAI TTS (Text-to-Speech)
+- All content is dynamically generated and personalized
+
+CANCELLATION:
+Users can cancel anytime via iOS Settings → Subscriptions.
+
+Thank you for reviewing FitNudge!
+```
+
+### 🤖 Google Play Console Setup (Android)
+
+#### Step 1: Create Subscription Products
+
+1. Go to **Google Play Console** → **FitNudge** → **Monetize** → **Subscriptions**
+2. Click **Create subscription**
+
+For each subscription:
+
+**Starter Monthly**
+
+```
+Product ID: com.fitnudge.starter.monthly
+Name: Starter Plan (Monthly)
+Description: [Same as iOS]
+Default price: $6.99 USD
+Billing period: Monthly
+```
+
+**Starter Annual**
+
+```
+Product ID: com.fitnudge.starter.annual
+Name: Starter Plan (Annual)
+Description: [Same as iOS]
+Default price: $54.99 USD
+Billing period: Yearly
+```
+
+**Pro Monthly**
+
+```
+Product ID: com.fitnudge.pro.monthly
+Name: Pro Plan (Monthly)
+Description: [Same as iOS]
+Default price: $12.99 USD
+Billing period: Monthly
+Introductory Offer: 3-day FREE TRIAL
+```
+
+**Pro Annual**
+
+```
+Product ID: com.fitnudge.pro.annual
+Name: Pro Plan (Annual)
+Description: [Same as iOS]
+Default price: $99.99 USD
+Billing period: Yearly
+Introductory Offer: 50% OFF first year ($49.99) - Pay Up Front
+```
+
+**Elite Monthly**
+
+```
+Product ID: com.fitnudge.elite.monthly
+Name: Elite Plan (Monthly)
+Description: [Same as iOS]
+Default price: $19.99 USD
+Billing period: Monthly
+```
+
+**Elite Annual**
+
+```
+Product ID: com.fitnudge.elite.annual
+Name: Elite Plan (Annual)
+Description: [Same as iOS]
+Default price: $159.99 USD
+Billing period: Yearly
+```
+
+#### Step 2: Base Plans and Offers
+
+For each subscription, create a **Base Plan**:
+
+```
+Base Plan ID: standard
+Price: [as above]
+Renewal type: Auto-renewing
+Grace period: 7 days
+Account hold: 30 days
+```
+
+For **Pro Monthly**, add a **Free Trial Offer**:
+
+```
+Offer ID: free-trial
+Offer type: Free trial
+Duration: 3 days
+Eligibility: New customers only
+```
+
+For **Pro Annual**, add a **Discounted Intro Offer** (for Exit Intent):
+
+```
+Offer ID: intro-50-off
+Offer type: Pay Up Front
+Duration: 1 Year
+Price: $49.99 (50% off)
+Eligibility: New customers only
+```
+
+#### Step 3: Link to RevenueCat
+
+After creating products in Google Play:
+
+1. Note all Product IDs
+2. Enable **Real-time developer notifications**
+3. Create a **Service Account** for RevenueCat
+4. Grant service account access to Play Console
+
+### 🐱 RevenueCat Setup
+
+#### Step 1: Create RevenueCat Account
+
+1. Go to https://app.revenuecat.com
+2. Sign up / Log in
+3. Create new project: "FitNudge"
+
+#### Step 2: Configure Apps
+
+**iOS App:**
+
+```
+App Name: FitNudge iOS
+Bundle ID: com.fitnudge.app
+App Store Connect API Key: [Generate in App Store Connect]
+```
+
+**Android App:**
+
+```
+App Name: FitNudge Android
+Package Name: com.fitnudge.app
+Service Account JSON: [Upload from Google Cloud]
+```
+
+#### Step 3: Create Entitlements
+
+Entitlements define what features users unlock:
+
+| Entitlement ID   | Description                     |
+| ---------------- | ------------------------------- |
+| `starter_access` | Access to Starter tier features |
+| `pro_access`     | Access to Pro tier features     |
+| `elite_access`   | Access to Elite tier features   |
+
+#### Step 4: Create Products in RevenueCat
+
+After creating your products in App Store Connect and Google Play Console, you need to add them to RevenueCat.
+
+**Step 4a: Navigate to Products**
+
+1. Go to **RevenueCat Dashboard** → **Project Settings** → **Products**
+2. Click **+ New** to add a product
+
+**Step 4b: Add iOS Products**
+
+For each iOS subscription, create a product:
+
+| App Store Product ID           | Entitlement      | Display Name    |
+| ------------------------------ | ---------------- | --------------- |
+| `com.fitnudge.starter.monthly` | `starter_access` | Starter Monthly |
+| `com.fitnudge.starter.annual`  | `starter_access` | Starter Annual  |
+| `com.fitnudge.pro.monthly`     | `pro_access`     | Pro Monthly     |
+| `com.fitnudge.pro.annual`      | `pro_access`     | Pro Annual      |
+| `com.fitnudge.elite.monthly`   | `elite_access`   | Elite Monthly   |
+| `com.fitnudge.elite.annual`    | `elite_access`   | Elite Annual    |
+
+**How to add each product:**
+
+```
+1. Click "+ New"
+2. Select "App Store" as the store
+3. Enter Product Identifier: e.g., "com.fitnudge.pro.monthly"
+4. Click "Create"
+5. In the product details, click "Attach to an Entitlement"
+6. Select the appropriate entitlement (e.g., "pro_access")
+7. Click "Save"
+```
+
+**Step 4c: Add Android Products**
+
+For Android, product IDs include the base plan:
+
+| Google Play Product ID         | Entitlement      | Display Name    |
+| ------------------------------ | ---------------- | --------------- |
+| `com.fitnudge.starter.monthly` | `starter_access` | Starter Monthly |
+| `com.fitnudge.starter.annual`  | `starter_access` | Starter Annual  |
+| `com.fitnudge.pro.monthly`     | `pro_access`     | Pro Monthly     |
+| `com.fitnudge.pro.annual`      | `pro_access`     | Pro Annual      |
+| `com.fitnudge.elite.monthly`   | `elite_access`   | Elite Monthly   |
+| `com.fitnudge.elite.annual`    | `elite_access`   | Elite Annual    |
+
+> **Note**: Using same product IDs for both iOS and Android for simplicity.
+
+**How to add each Android product:**
+
+```
+1. Click "+ New"
+2. Select "Play Store" as the store
+3. Enter Product Identifier: e.g., "com.fitnudge.pro.monthly:pro-monthly"
+4. Click "Create"
+5. In the product details, click "Attach to an Entitlement"
+6. Select the appropriate entitlement (e.g., "pro_access")
+7. Click "Save"
+```
+
+**Step 4d: Verify Products Import (Optional)**
+
+RevenueCat can auto-import products if your API credentials are set up correctly:
+
+1. Go to **Project Settings** → **Apps** → Select your app
+2. Click **"Import Products"**
+3. RevenueCat will fetch all products from the connected store
+4. Review and attach entitlements to any new products
+
+**Product Status Check:**
+
+After adding products, verify they show the correct status:
+
+| Status     | Meaning                                       |
+| ---------- | --------------------------------------------- |
+| ✅ Active  | Product is live and purchasable               |
+| ⏳ Pending | Waiting for store approval                    |
+| ❌ Missing | Product not found in store (check Product ID) |
+
+#### Step 5: Create Offerings
+
+Offerings are groups of packages that you show to users. You can have multiple offerings for A/B testing or special promotions.
+
+**Step 5a: Create Default Offering**
+
+1. Go to **RevenueCat Dashboard** → **Project Settings** → **Offerings**
+2. Click **+ New** to create an offering
+3. Fill in the details:
+
+```
+Offering Identifier: default
+Display Name: Standard Pricing
+Description: Default pricing shown to all users
+☑️ Make this the current offering (checked)
+```
+
+4. Click **Create**
+
+**Step 5b: Add Packages to Default Offering**
+
+After creating the offering, add packages (products grouped by duration):
+
+1. Click on the "default" offering
+2. Click **+ Add Package**
+3. Create each package:
+
+| Package ID      | Display Name    | Product (iOS & Android)        |
+| --------------- | --------------- | ------------------------------ |
+| `$rc_monthly`   | Starter Monthly | `com.fitnudge.starter.monthly` |
+| `$rc_annual`    | Starter Annual  | `com.fitnudge.starter.annual`  |
+| `pro_monthly`   | Pro Monthly     | `com.fitnudge.pro.monthly`     |
+| `pro_annual`    | Pro Annual      | `com.fitnudge.pro.annual`      |
+| `elite_monthly` | Elite Monthly   | `com.fitnudge.elite.monthly`   |
+| `elite_annual`  | Elite Annual    | `com.fitnudge.elite.annual`    |
+
+> **Note**: `$rc_monthly` and `$rc_annual` are RevenueCat's default package identifiers. You can use custom IDs for additional packages.
+
+**How to add each package:**
+
+```
+1. Click "+ Add Package"
+2. Enter Package Identifier: e.g., "pro_monthly"
+3. Enter Display Name: e.g., "Pro Monthly"
+4. Under "Products", click "+ Add Product"
+5. Select the iOS product for this package
+6. Click "+ Add Product" again
+7. Select the Android product for this package
+8. Click "Save"
+```
+
+**Step 5c: Create Exit Offer Offering (Pro Only)**
+
+1. Create new offering:
+
+```
+Offering Identifier: exit_offer
+Display Name: Special Exit Offer
+Description: 50% off Pro annual (shown during exit intent)
+☐ Make this the current offering (unchecked)
+```
+
+2. Add single package:
+
+| Package ID        | Display Name       | Product (iOS)                                        | Product (Android)                                     |
+| ----------------- | ------------------ | ---------------------------------------------------- | ----------------------------------------------------- |
+| `pro_annual_exit` | Pro Annual 50% Off | `com.fitnudge.pro.annual` (with promo `pro_exit_50`) | `com.fitnudge.pro.annual` (with exit offer base plan) |
+
+> **Note**: For iOS, you'll use promotional offers. For Android, you'll use a separate base plan with discounted pricing.
+
+**Step 5d: Verify Offerings in App**
+
+In your React Native code, fetch offerings to verify:
+
+```typescript
+import Purchases from "react-native-purchases";
+
+const checkOfferings = async () => {
+  const offerings = await Purchases.getOfferings();
+  console.log("Current offering:", offerings.current);
+  console.log("All offerings:", offerings.all);
+
+  // Access specific offering
+  const exitOffer = offerings.all["exit_offer"];
+  if (exitOffer) {
+    console.log("Exit offer packages:", exitOffer.availablePackages);
+  }
+};
+```
+
+#### Step 6: Configure Environment Variables
+
+Add RevenueCat API keys to your app:
+
+**For React Native (Expo):**
+
+```bash
+# .env or app.config.ts
+REVENUECAT_API_KEY_IOS=appl_xxxxxxxxxxxxxxxxxx
+REVENUECAT_API_KEY_ANDROID=goog_xxxxxxxxxxxxxxxxxx
+```
+
+**Where to find API keys:**
+
+1. Go to **RevenueCat Dashboard** → **Project Settings** → **API Keys**
+2. Copy the **Public API Key** for each platform
+3. Never expose these in client code directly - use environment variables
+
+#### Step 7: Test Your Setup
+
+**RevenueCat Sandbox Testing:**
+
+1. Create a **Sandbox Test User** in App Store Connect / Google Play Console
+2. In RevenueCat Dashboard, enable **Sandbox Mode** for testing
+3. Use `Purchases.setLogLevel(LOG_LEVEL.DEBUG)` during development
+4. Make test purchases - they won't charge real money
+
+**Verify in RevenueCat Dashboard:**
+
+After a test purchase:
+
+1. Go to **Customers** → Search for your test user
+2. Verify the subscription appears with correct entitlement
+3. Check **Events** tab for purchase events
+
+---
+
+### 🎁 Exit Offer Implementation (iOS & Android)
+
+The exit offer shows 50% off annual pricing when users try to leave the subscription screen. Here's how to set this up on both platforms:
+
+#### ⚠️ IMPORTANT: Introductory Offers vs Promotional Offers
+
+Before setting up your exit offer, understand the difference:
+
+| Type                   | Target Audience                                    | Setup Complexity                         | Eligibility                 |
+| ---------------------- | -------------------------------------------------- | ---------------------------------------- | --------------------------- |
+| **Introductory Offer** | **NEW subscribers only** (never subscribed before) | Simple - configure in App Store Connect  | Apple handles automatically |
+| **Promotional Offer**  | **Existing/lapsed subscribers** (win-back)         | Complex - requires server-side signature | Must check manually         |
+
+**For Exit Intent (targeting new users who haven't subscribed):**
+
+- ✅ **Use Introductory Offer** - simpler setup, Apple handles eligibility
+- ❌ Promotional Offer will show "User is ineligible" for new users
+
+**For Win-Back Campaigns (targeting users who cancelled):**
+
+- ✅ **Use Promotional Offer** - specifically designed for lapsed subscribers
+- ❌ Introductory Offer won't work for returning users
+
+---
+
+#### Option A: Introductory Offers (Recommended for Exit Intent - NEW Users)
+
+Introductory offers are **automatically available** to first-time subscribers. Apple handles all eligibility checks - no server-side signature required.
+
+##### 🍎 iOS: Introductory Offers in App Store Connect
+
+> **Strategy**: Trial on Monthly, Discount on Annual
+>
+> - Pro Monthly → Free Trial (low commitment to try)
+> - Pro Annual → 50% off first year (maximize LTV via exit intent)
+
+**Step 1: Create FREE TRIAL for Pro Monthly**
+
+1. Go to **App Store Connect** → **My Apps** → **FitNudge** → **Subscriptions**
+2. Click on `com.fitnudge.pro.monthly`
+3. Scroll to **Introductory Offers** section
+4. Click **+** to add offer
+5. Configure:
+
+```
+Offer Type: Free Trial
+Duration: 3 days
+Countries: All territories
+```
+
+**Step 2: Create 50% OFF for Pro Annual (Exit Intent Offer)**
+
+1. Click on `com.fitnudge.pro.annual`
+2. Scroll to **Introductory Offers** section
+3. Click **+** to add offer
+4. Configure:
+
+```
+Offer Type: Pay Up Front (one-time discounted price)
+Duration: 1 Year
+Price: Tier 50 ($49.99 USD) - 50% off $99.99
+Countries: All territories
+```
+
+> **Result**: New users see 50% off on annual in Exit Intent Modal. If they choose monthly instead, they get free trial.
+
+**Step 2: RevenueCat Automatically Detects Introductory Offers**
+
+RevenueCat SDK automatically:
+
+- Detects if user is eligible for introductory offer
+- Shows the discounted price in the product info
+- Applies the offer during purchase (no extra code needed)
+
+**Step 3: Check Eligibility in Code**
+
+```typescript
+import Purchases, { PurchasesPackage } from "react-native-purchases";
+
+const checkIntroEligibility = async (pkg: PurchasesPackage) => {
+  // RevenueCat provides eligibility info on the product
+  const product = pkg.product;
+
+  // Check if user is eligible for intro offer
+  const isEligible = product.introPrice !== null;
+
+  if (isEligible) {
+    console.log("Intro price:", product.introPrice?.priceString);
+    console.log("Regular price:", product.priceString);
+  }
+
+  return isEligible;
+};
+```
+
+**Step 4: Display Intro Price in Exit Intent Modal**
+
+```typescript
+// In ExitIntentModal, show the intro price if available
+const getDisplayPrice = (pkg: PurchasesPackage) => {
+  const product = pkg.product;
+
+  // If intro offer available, show that price
+  if (product.introPrice) {
+    return {
+      discountedPrice: product.introPrice.price,
+      originalPrice: product.price,
+      isIntroOffer: true,
+    };
+  }
+
+  // No intro offer - user not eligible (already subscribed before)
+  return {
+    discountedPrice: product.price,
+    originalPrice: product.price,
+    isIntroOffer: false,
+  };
+};
+```
+
+##### 🤖 Android: Introductory Offers in Google Play Console
+
+**Step 1: Create FREE TRIAL for Pro Monthly**
+
+1. Go to **Google Play Console** → **FitNudge** → **Monetize** → **Subscriptions**
+2. Click on `com.fitnudge.pro.monthly`
+3. Click on your base plan → **Add offer** → **Free trial**
+
+```
+Offer ID: free-trial-3d
+Phases:
+  - Phase 1: Free Trial
+  - Duration: 3 days
+Eligibility: New customers only (default)
+```
+
+**Step 2: Create 50% OFF for Pro Annual (Exit Intent)**
+
+1. Click on `com.fitnudge.pro.annual`
+2. Click on your base plan → **Add offer** → **Introductory offer**
+
+```
+Offer ID: intro-50-off
+Phases:
+  - Phase 1: Pay Up Front
+  - Duration: 1 Year
+  - Price: $49.99 USD
+Eligibility: New customers only (default)
+```
+
+**Step 3: Same Code Works for Android**
+
+The RevenueCat SDK handles Android intro offers the same way as iOS.
+
+---
+
+#### Option B: Promotional Offers (For Win-Back Campaigns - LAPSED Users)
+
+> ⚠️ **Only use this for users who PREVIOUSLY subscribed and cancelled.**
+> New users will get "User is ineligible" error with promotional offers.
+
+##### 🍎 iOS: Promotional Offers in App Store Connect
+
+**Step 1: Generate Subscription Keys**
+
+1. Go to **App Store Connect** → **Users and Access** → **Integrations** → **In-App Purchase**
+2. Click **Generate In-App Purchase Key**
+3. Download the `.p8` key file and note the **Key ID**
+4. Note your **Issuer ID** from the same page
+5. Store these securely - you'll need them for server-side signature generation
+
+**Step 2: Create Promotional Offers for Each Subscription**
+
+For each annual subscription, create a promotional offer:
+
+1. Go to **App Store Connect** → **My Apps** → **FitNudge** → **Subscriptions**
+2. Click on a subscription (e.g., `com.fitnudge.starter.annual`)
+3. Scroll to **Promotional Offers** section
+4. Click **+** to add a new offer
+
+**Pro Annual Exit Offer (Only One Needed):**
+
+```
+Reference Name: Pro Exit Offer 50% Off
+Promotional Offer ID: pro_exit_50
+Offer Type: Pay Up Front
+Duration: 1 Year
+Price: Tier 50 ($49.99 USD) - 50% off $99.99
+```
+
+> **Note**: Only create exit offer for Pro plan. The exit intent modal only shows Pro to maximize conversion with a single, clear choice.
+
+**Step 3: RevenueCat Handles Signature Generation (No Backend Code Needed!)**
+
+> ⚠️ **IMPORTANT**: Since we're using RevenueCat, you do NOT need to implement `generate_promotional_offer_signature` on your backend. RevenueCat handles all the JWT signing automatically once configured.
+
+RevenueCat handles promotional offers automatically if you configure them:
+
+1. Go to **RevenueCat Dashboard** → **Project** → **iOS App**
+2. Navigate to **Subscription Offers**
+3. Upload your `.p8` key file
+4. Enter your **Key ID** and **Issuer ID**
+5. RevenueCat will now automatically generate signatures
+
+**In-App Code (React Native with RevenueCat):**
+
+```typescript
+// Fetch promotional offer from RevenueCat
+const purchaseWithPromoOffer = async (
+  packageToPurchase: PurchasesPackage,
+  promoOfferId: string
+) => {
+  try {
+    // RevenueCat handles signature generation automatically
+    const { customerInfo } = await Purchases.purchasePackage(
+      packageToPurchase,
+      {
+        promotionalOffer: {
+          identifier: promoOfferId, // e.g., "pro_exit_50"
+        },
+      }
+    );
+    return customerInfo;
+  } catch (error) {
+    console.error("Promo offer purchase failed:", error);
+    throw error;
+  }
+};
+```
+
+##### 🤖 Android: Offer Tags in Google Play Console
+
+Android uses a different approach - **Offer Tags** on base plans.
+
+**Step 1: Create Discounted Base Plans**
+
+For each annual subscription, you'll create an additional base plan with discounted pricing:
+
+1. Go to **Google Play Console** → **FitNudge** → **Monetize** → **Subscriptions**
+2. Click on a subscription (e.g., `com.fitnudge.starter.annual`)
+3. Click **Add base plan**
+
+**Pro Annual Exit Offer Base Plan (Only One Needed):**
+
+```
+Base Plan ID: pro-annual-exit-offer
+Tag: exit_offer
+Price: $49.99 USD
+Renewal type: Auto-renewing
+Eligibility: Use offer tags to control visibility
+```
+
+> **Note**: Only create exit offer for Pro plan. The exit intent modal only shows Pro to maximize conversion with a single, clear choice.
+
+**Step 2: Configure Offer Tags**
+
+1. In each exit offer base plan, add the tag `exit_offer`
+2. This allows you to filter and show these specific offers programmatically
+
+**Step 3: RevenueCat Integration for Android**
+
+In RevenueCat, the exit offer uses the same product ID but with a discounted base plan:
+
+```
+Product ID: com.fitnudge.pro.annual
+Base Plan: pro-annual-exit-offer (50% off pricing)
+Entitlement: pro_access
+```
+
+> **Note**: Only Pro exit offer is needed. The exit intent modal only shows Pro plan.
+
+**Step 4: Create Exit Offer Offering in RevenueCat**
+
+1. Go to **RevenueCat** → **Offerings**
+2. Create new offering: `exit_offer`
+3. Add packages pointing to the discounted base plans/promo offers
+
+---
+
+#### Option B: Display-Only Discount (Simpler Alternative)
+
+If you don't want to manage promotional offers server-side, you can:
+
+1. **Show discounted price in UI** - Display "~~$99.99~~ $49.99" in the exit modal
+2. **Charge regular price** - The actual IAP charges the regular annual price
+3. **Apply credit via backend** - Your backend credits the user's account for the difference
+
+**Pros:** No App Store/Play Store promotional offer setup required
+**Cons:** User sees full price in IAP confirmation dialog (may cause confusion)
+
+**NOT RECOMMENDED** - Users may feel deceived when the IAP shows full price.
+
+---
+
+#### Exit Offer Product IDs Summary (Pro Only)
+
+| Tier | Platform | Product ID                | Exit Offer Method                |
+| ---- | -------- | ------------------------- | -------------------------------- |
+| Pro  | iOS      | `com.fitnudge.pro.annual` | Promotional Offer: `pro_exit_50` |
+| Pro  | Android  | `com.fitnudge.pro.annual` | Discounted Base Plan (50% off)   |
+
+> **Strategy**: Only Pro plan has exit offer. AI Chat Motivation is the hook that creates long-term stickiness.
+
+---
+
+#### Exit Offer Flow Implementation
+
+```
+User Flow:
+1. User opens Subscription Screen
+2. User tries to close/dismiss
+3. Check eligibility:
+   - Not already subscribed
+   - Shown < 3 times total
+   - Last shown > 7 days ago
+4. Show Exit Intent Modal with:
+   - 15-minute countdown timer
+   - PRO PLAN ONLY at 50% off ($49.99/year)
+   - Highlights AI Chat Motivation as key feature
+   - Discount % calculated dynamically from database
+5. If user taps "Claim Offer":
+   - iOS: Purchase with promotional offer ID (pro_exit_50)
+   - Android: Purchase discounted base plan (pro-annual-exit-offer)
+6. If user taps "No thanks":
+   - Record dismissal
+   - Close modal
+   - Floating button appears on HomeScreen with countdown
+```
+
+**Why Pro Only:**
+
+- AI Chat Motivation creates stickiness (users who try it, stay)
+- One choice = higher conversion (no decision paralysis)
+- Better margins than Starter exit offer
+
+---
+
+#### Step 6: Environment Variables
+
+Add to your `.env` file:
+
+```bash
+# RevenueCat API Keys
+EXPO_PUBLIC_REVENUECAT_API_KEY_IOS=appl_xxxxxxxxxxxxx
+EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID=goog_xxxxxxxxxxxxx
+```
+
+Get these keys from:
+
+- RevenueCat Dashboard → Project → API Keys
+
+### 📸 Screenshot Requirements Summary
+
+#### For iOS App Review:
+
+| Screenshot          | Purpose           | What to Show                         |
+| ------------------- | ----------------- | ------------------------------------ |
+| Subscription Screen | Price display     | All tiers with Monthly/Annual toggle |
+| Feature Comparison  | Value proposition | What each tier unlocks               |
+| Voice Message UI    | Pro feature demo  | AI voice message playing             |
+| Analytics Screen    | Pro feature demo  | Charts and insights                  |
+| Goal Creation       | Core feature      | Creating a fitness goal              |
+
+**File naming convention:**
+
+```
+review_screenshot_1_subscription.png
+review_screenshot_2_features.png
+review_screenshot_3_voice_message.png
+```
+
+#### For Google Play:
+
+Google typically doesn't require additional screenshots for subscription review, but include subscription UI in your main app screenshots.
+
+### ✅ Pre-Submission Checklist
+
+**App Store Connect:**
+
+- [ ] All 6 subscription products created
+- [ ] Localization added for each product
+- [ ] Screenshots uploaded for each product
+- [ ] Subscription group created
+- [ ] **Promotional offers created for exit intent (3 offers)**
+- [ ] **In-App Purchase Key generated (.p8 file)**
+- [ ] Review notes prepared
+- [ ] Sandbox test account ready
+
+**Google Play Console:**
+
+- [ ] All 6 subscription products created
+- [ ] Base plans configured
+- [ ] Free trial offers set for Pro tier
+- [ ] **Exit offer base plans created (3 discounted plans)**
+- [ ] **Offer tags configured (`exit_offer`)**
+- [ ] Service account created
+- [ ] Real-time notifications enabled
+
+**RevenueCat:**
+
+- [ ] Project created
+- [ ] iOS and Android apps configured
+- [ ] Entitlements created (3)
+- [ ] Products mapped to entitlements
+- [ ] Default offering configured
+- [ ] **Exit offer offering configured**
+- [ ] **iOS promotional offer key uploaded (.p8)**
+- [ ] API keys added to app
+
+**App Code:**
+
+- [ ] RevenueCat SDK installed
+- [ ] API keys in environment variables
+- [ ] Subscription screen shows correct prices
+- [ ] **Exit intent modal shows promotional pricing**
+- [ ] **Promotional offer purchase flow working**
+- [ ] Purchase flow tested in sandbox
+- [ ] Restore purchases working
 
 ---
 
@@ -62,34 +1110,56 @@ Bridge the gap between Free and Pro:
 6. **First Goal Creation** → User selects and customizes their first goal
 7. **Subscription Screen** → All 4 plans with Monthly/Annual toggle + exit intent
 
-### 🎯 Free Trial Strategy
+### 🎯 Free Trial & Discount Strategy
 
-**Pro Plan Only**: 3-day free trial
+**Pro Monthly**: 3-day FREE TRIAL
+**Pro Annual**: 50% OFF first year ($49.99)
 
-- **Why Pro?**: Gives users time to experience voice motivation (the killer feature)
-- **Why not Starter?**: Low price point ($2.99) = low friction, trial not needed
-- **Why not Coach+?**: Advanced users know what they want, ready to commit
+> **Why split?** Apple only allows ONE introductory offer per subscription.
+> Trial on monthly = low commitment try. Discount on annual = maximize LTV.
+
+- **Why Pro Monthly Trial?**: Gives users time to experience AI Chat Motivation
+- **Why Pro Annual Discount?**: Converts exit intent users directly to annual (higher LTV)
+- **Why not Starter?**: Starter at $6.99 = still affordable impulse buy, trial not needed
+- **Why not Elite?**: Advanced users know what they want, ready to commit
 - **Why 3 days?**: Long enough to create habit, short enough to create urgency
 
-**Trial Conversion Tactics:**
+**Trial Conversion Tactics (Pro Monthly):**
 
-- Day 1: Welcome email + "Try voice motivation now"
+- Day 1: Welcome email + "Try AI Chat Motivation now"
 - Day 2: Push notification: "2 days left in your trial"
-- Day 3: Final email: "Trial ends today - Continue for just $4.99/mo"
+- Day 3: Final email: "Trial ends today - Continue for just $12.99/mo"
 
-**Post-Trial:**
+**Exit Intent Flow (Pro Annual):**
+
+- User tries to close subscription screen
+- Show Exit Intent Modal with 50% off annual ($49.99)
+- Intro offer applies automatically for new users
+
+**Post-Trial/Purchase:**
 
 - Auto-convert to paid subscription (standard IAP behavior)
-- If cancelled: Win-back offer (50% off annual)
+- If cancelled: Win-back offer via Promotional Offer (different from intro)
 
 ### 🎁 Exit Intent Offers
 
-**50% Off Annual Plans (First-time users only):**
+**PRO PLAN ONLY - 50% Off Annual ($49.99/year):**
 
-- Triggered when user tries to skip subscription screen
-- Shows once per user (tracked in AsyncStorage)
-- Offers: Starter $14.99/year, Pro $24.99/year + trial, Coach+ $49.99/year
-- "One-time offer, won't see again" messaging
+- Triggered when user tries to close subscription screen
+- Shows once per 7 days, maximum 3 times total
+- Only for non-subscribers
+- Includes 15-minute countdown timer for urgency
+- **Single offer: Pro at $49.99/year** (50% off $99.99)
+- Highlights AI Chat Motivation as the key feature (the hook!)
+- Discount percentage calculated dynamically from database prices
+- "Limited time offer" messaging with countdown
+
+**Why Pro Only (not all tiers):**
+
+- AI Chat Motivation is the killer feature that differentiates FitNudge
+- One clear choice = higher conversion rate (no decision paralysis)
+- Users who experience AI coaching are more likely to renew
+- Better unit economics than discounting Starter ($27.49 = only $1.50 net profit)
 
 ### 🔒 Strategic Feature Gating
 
@@ -109,7 +1179,7 @@ Bridge the gap between Free and Pro:
 
 **C. Perfect Upgrade Moments:**
 
-- After 7-day streak: "Unlock voice motivation to celebrate!"
+- After 7-day streak: "Unlock AI Chat Motivation to celebrate!"
 - When creating 2nd goal: "Pro users can set unlimited goals"
 - On analytics page: "See your full progress insights with Pro"
 - After 5th social post: "Share voice posts to inspire even more"
@@ -131,7 +1201,7 @@ Bridge the gap between Free and Pro:
 
 **A. Success Stories:**
 
-- "Sarah lost 15lbs with Pro's voice motivation"
+- "Sarah lost 15lbs with Pro's AI coaching"
 - "Join 50,000+ users achieving their goals"
 - "Our community checked in 1M times this month!"
 - Real user testimonials with photos
@@ -147,7 +1217,7 @@ Bridge the gap between Free and Pro:
 **Program Structure:**
 
 - "Give 1 month free, Get 1 month free"
-- Pro users: "Refer 3 friends, get Coach+ free for 3 months"
+- Pro users: "Refer 3 friends, get Elite free for 3 months"
 - Track in-app: Leaderboard for top referrers
 - Social sharing: "I just hit my 30-day streak with FitNudge!"
 
@@ -270,7 +1340,7 @@ Bridge the gap between Free and Pro:
 - Complete 10 check-ins → Unlock custom AI tones
 - 30-day streak → Unlock exclusive voice messages
 - 100 social interactions → Unlock advanced analytics
-- Refer 5 friends → Unlock Coach+ features for 1 month
+- Refer 5 friends → Unlock Elite features for 1 month
 
 ### 📈 Smart Upselling
 
@@ -279,7 +1349,7 @@ Bridge the gap between Free and Pro:
 - **After 2-week streak (Free)**: "Your consistency is amazing! Upgrade to track unlimited goals"
 - **When posting 5th social post**: "Pro users get voice posts to inspire even more"
 - **After viewing analytics 3 times**: "Unlock weekly AI insights with Pro"
-- **When creating 3rd goal**: "Starter plan lets you set 3 goals for just $2.99"
+- **When creating 3rd goal**: "Starter plan lets you set 3 goals for just $6.99/month"
 
 ### 🔄 Win-Back Campaigns
 
@@ -378,7 +1448,7 @@ Bridge the gap between Free and Pro:
 - Tips for maintaining consistency
 - What happens next
 
-**Day 7**: Trial ending soon - upgrade to Pro for voice motivation
+**Day 7**: Trial ending soon - upgrade to Pro for AI Chat Motivation
 
 - Voice message demo
 - Pro features overview
@@ -400,7 +1470,7 @@ Bridge the gap between Free and Pro:
 
 **Milestone Celebrations:**
 
-- "Congratulations on [X] days! Here's 20% off Coach+"
+- "Congratulations on [X] days! Here's 20% off Elite"
 - Exclusive rewards for long-term users
 - Referral opportunities
 
@@ -462,7 +1532,7 @@ Bridge the gap between Free and Pro:
 - **Free to Paid Conversion Rate**: Target 5-10%
 - **Trial to Paid Conversion**: Target 40-60%
 - **Starter to Pro Upgrade**: Target 15-25%
-- **Pro to Coach+ Upgrade**: Target 5-10%
+- **Pro to Elite Upgrade**: Target 5-10%
 
 ### 📈 Retention Metrics
 
@@ -487,7 +1557,7 @@ Bridge the gap between Free and Pro:
 
 ---
 
-## 💰 Revenue Projections
+## 💰 Revenue Projections (Option B Pricing)
 
 ### 📊 Conservative Year 1 Projections
 
@@ -497,58 +1567,66 @@ Bridge the gap between Free and Pro:
 - Month 6: 5,000 users
 - Month 12: 10,000 users
 
-**Distribution at 10,000 Users:**
+**Distribution at 10,000 Users (with Option B pricing):**
 
 - **Free**: 6,000 users (60%)
-- **Starter**: 2,000 users (20%) @ $2.99 = $5,980/month
-- **Pro**: 1,500 users (15%) @ $4.99 = $7,485/month
-- **Coach+**: 500 users (5%) @ $9.99 = $4,995/month
+- **Starter**: 2,000 users (20%) @ $6.99 = $13,980/month
+- **Pro**: 1,500 users (15%) @ $12.99 = $19,485/month
+- **Elite**: 500 users (5%) @ $19.99 = $9,995/month
 
-**Monthly Recurring Revenue (MRR)**: ~$18,460
-**Annual Run Rate (ARR)**: ~$221,520
+**Gross Monthly Recurring Revenue (MRR)**: ~$43,460
+**Gross Annual Run Rate (ARR)**: ~$521,520
 
-### Platform Commission Impact
+### Platform Commission & Cost Impact
 
 **Commission Structure:**
 
-- iOS Year 1: 30% to Apple
+- iOS Year 1: 30% to Apple (15% if <$1M via Small Business Program)
 - iOS Year 2+: 15% to Apple (for retained subscribers)
 - Android: 15% to Google
-- Average: ~25% commission
+- RevenueCat: 1% (after $2.5K MTR)
+- Average: ~25% total commission
 
-**Revised Net Revenue (10,000 users):**
+**Net Revenue Calculation (10,000 users):**
 
-- Gross MRR: $18,460
-- Platform Commissions (25%): -$4,615
-- **Net MRR: $13,845**
-- **Net ARR: $166,140**
+```
+Gross MRR:                        $43,460
+- Platform Commissions (25%):    -$10,865
+- RevenueCat (1%):               -$435
+- AI Costs (~$0.35 avg/user):    -$1,400
+- Infrastructure:                -$75
+─────────────────────────────────────────
+Net MRR:                          $30,685 (71% margin)
+Net ARR:                          $368,220
+```
 
-### 🚀 Optimistic Scenario (Year 1)
+### 📈 Scenario Projections
 
-**With 30% on annual plans and better conversion:**
+| Scenario | Year 1 Users | Paid % | Gross ARR | Net ARR  |
+| -------- | ------------ | ------ | --------- | -------- |
+| Slow     | 5,000        | 15%    | $130,000  | $92,000  |
+| Medium   | 10,000       | 20%    | $350,000  | $248,000 |
+| Good     | 15,000       | 22%    | $580,000  | $412,000 |
 
-- **Gross ARR**: $300,000-400,000
-- **Net ARR**: $225,000-300,000 (after 25% commission)
-- **User Base**: 15,000+ users
-- **Enterprise**: 5+ corporate clients
-
-### 📈 Year 2-3 Projections
+### 🚀 Year 2-3 Projections
 
 **Year 2:**
 
 - **Users**: 25,000+
-- **Gross ARR**: $750,000-1,000,000
-- **Net ARR**: $562,500-750,000 (after 25% commission)
-- **Enterprise**: 20+ corporate clients
-- **International**: 2-3 new markets
+- **Paid Conversion**: 22-25%
+- **Gross ARR**: $900,000-1,200,000
+- **Net ARR**: $640,000-850,000 (after all costs)
+- **Enterprise**: 10+ corporate clients
+- **Potential to hire**: 2-3 team members
 
 **Year 3:**
 
 - **Users**: 50,000+
-- **Gross ARR**: $1,500,000-2,000,000
-- **Net ARR**: $1,125,000-1,500,000 (after 25% commission)
-- **Enterprise**: 50+ corporate clients
-- **International**: 5+ markets
+- **Paid Conversion**: 25-28%
+- **Gross ARR**: $1,800,000-2,400,000
+- **Net ARR**: $1,280,000-1,700,000 (after all costs)
+- **Enterprise**: 30+ corporate clients
+- **Team**: 5-8 people
 
 ---
 
@@ -585,36 +1663,38 @@ Bridge the gap between Free and Pro:
 
 **Target Metrics:**
 
-- **CAC**: <$15 for Free to Paid conversion
-- **LTV**: >$45 for Pro users
-- **Payback Period**: <6 months
-- **ROI**: 3:1 minimum
+- **CAC**: <$25 for Free to Paid conversion
+- **LTV**: >$117 for Pro users (avg 9 months retention × $12.99)
+- **LTV**: >$160 for Elite users (avg 8 months retention × $19.99)
+- **Payback Period**: <3 months
+- **ROI**: 4:1 minimum
 
 ---
 
-## 🎯 Success Milestones
+## 🎯 Success Milestones (Option B Pricing)
 
 ### 📅 3-Month Goals
 
 - 2,500 total users
 - 200 paid subscribers
-- $1,000 MRR
-- 5% conversion rate
+- **$2,200 MRR** (avg $11/user)
+- 8% conversion rate
 
 ### 📅 6-Month Goals
 
 - 5,000 total users
-- 500 paid subscribers
-- $2,500 MRR
-- 10% conversion rate
+- 600 paid subscribers
+- **$6,600 MRR** (~$79K ARR)
+- 12% conversion rate
 
 ### 📅 12-Month Goals
 
 - 10,000 total users
-- 1,500 paid subscribers
-- $8,000 MRR
-- 15% conversion rate
-- 2 enterprise clients
+- 1,800 paid subscribers
+- **$19,800 MRR** (~$238K ARR gross)
+- 18% conversion rate
+- 3 enterprise clients
+- **Sustainable salary + growth budget**
 
 ---
 
@@ -703,9 +1783,9 @@ Bridge the gap between Free and Pro:
 
 **Examples:**
 
-- "First month $0.99, then $4.99/month"
+- "First month $4.99, then $12.99/month" (Pro)
 - "First 3 months 50% off"
-- "7-day free trial, then $4.99/month"
+- "3-day free trial, then $12.99/month" (Pro default)
 
 ### Win-Back Offers
 
@@ -744,4 +1824,112 @@ Bridge the gap between Free and Pro:
 
 ---
 
+## 📊 Competitor Pricing Comparison (December 2024)
+
+### High-End Fitness Apps
+
+| App                      | Monthly | Annual | Key Features                      |
+| ------------------------ | ------- | ------ | --------------------------------- |
+| **Noom**                 | $70     | $209   | Psychology coaching, meal plans   |
+| **Peloton App+**         | $28.99  | $240   | Video classes, celebrity trainers |
+| **MyFitnessPal Premium** | $19.99  | $79.99 | Nutrition tracking, huge database |
+
+### Mid-Tier Fitness Apps
+
+| App                 | Monthly | Annual | Key Features        |
+| ------------------- | ------- | ------ | ------------------- |
+| **Peloton App One** | $15.99  | $156   | Basic video classes |
+| **Fitbod**          | $12.99  | $79.99 | AI workout plans    |
+| **Strava Premium**  | $11.99  | $79.99 | Social + analytics  |
+
+### Budget Fitness Apps
+
+| App                    | Monthly | Annual | Key Features          |
+| ---------------------- | ------- | ------ | --------------------- |
+| **Strong**             | $4.99   | $29.99 | Simple workout logger |
+| **Nike Training Club** | FREE    | FREE   | Basic workouts        |
+
+### FitNudge Positioning (Option B)
+
+| Tier        | Monthly | Annual  | vs Competitors                     |
+| ----------- | ------- | ------- | ---------------------------------- |
+| **Starter** | $6.99   | $54.99  | Above Strong, AI text motivation   |
+| **Pro**     | $12.99  | $99.99  | At Strava/Fitbod level, + AI Chat  |
+| **Elite**   | $19.99  | $159.99 | Below Peloton, premium AI + memory |
+
+**Competitive Advantages:**
+
+- Only app with AI Chat Motivation (unique feature worth premium)
+- Priced at Fitbod/Strava level but with MORE AI features
+- Psychology-based motivation like Noom at 1/5th the price ($70 vs $12.99)
+- Social features + AI coaching combo (no competitor has this)
+- AI text motivation even at Starter tier (others charge $12+ for this)
+
+---
+
+## 🔧 Database Schema for Subscription Plans
+
+Update your `subscription_plans` table with final pricing (Option B):
+
+```sql
+-- Update subscription plans with Option B final pricing
+-- Note: Exit offer is PRO ONLY (AI Chat Motivation is the hook)
+
+UPDATE subscription_plans SET
+  monthly_price = 6.99,
+  annual_price = 54.99,
+  exit_offer_enabled = false,  -- No exit offer for Starter
+  exit_offer_monthly_price = NULL,
+  exit_offer_annual_price = NULL
+WHERE id = 'starter';
+
+UPDATE subscription_plans SET
+  monthly_price = 12.99,
+  annual_price = 99.99,
+  exit_offer_enabled = true,   -- PRO ONLY gets exit offer
+  exit_offer_monthly_price = 6.49,
+  exit_offer_annual_price = 49.99,  -- 50% off $99.99
+  trial_days = 3
+WHERE id = 'pro';
+
+UPDATE subscription_plans SET
+  monthly_price = 19.99,
+  annual_price = 159.99,
+  exit_offer_enabled = false,  -- No exit offer for Elite
+  exit_offer_monthly_price = NULL,
+  exit_offer_annual_price = NULL
+WHERE id = 'elite';
+
+-- Add product IDs for RevenueCat/Store integration
+ALTER TABLE subscription_plans ADD COLUMN IF NOT EXISTS product_id_ios_monthly VARCHAR;
+ALTER TABLE subscription_plans ADD COLUMN IF NOT EXISTS product_id_ios_annual VARCHAR;
+ALTER TABLE subscription_plans ADD COLUMN IF NOT EXISTS product_id_android_monthly VARCHAR;
+ALTER TABLE subscription_plans ADD COLUMN IF NOT EXISTS product_id_android_annual VARCHAR;
+
+UPDATE subscription_plans SET
+  product_id_ios_monthly = 'com.fitnudge.starter.monthly',
+  product_id_ios_annual = 'com.fitnudge.starter.annual',
+  product_id_android_monthly = 'com.fitnudge.starter.monthly',
+  product_id_android_annual = 'com.fitnudge.starter.annual'
+WHERE id = 'starter';
+
+UPDATE subscription_plans SET
+  product_id_ios_monthly = 'com.fitnudge.pro.monthly',
+  product_id_ios_annual = 'com.fitnudge.pro.annual',
+  product_id_android_monthly = 'com.fitnudge.pro.monthly',
+  product_id_android_annual = 'com.fitnudge.pro.annual'
+WHERE id = 'pro';
+
+UPDATE subscription_plans SET
+  product_id_ios_monthly = 'com.fitnudge.elite.monthly',
+  product_id_ios_annual = 'com.fitnudge.elite.annual',
+  product_id_android_monthly = 'com.fitnudge.elite.monthly',
+  product_id_android_annual = 'com.fitnudge.elite.annual'
+WHERE id = 'elite';
+```
+
+---
+
 _This marketing strategy is designed to grow FitNudge from 0 to 10,000+ users in Year 1, with a focus on sustainable growth, strong retention, and clear monetization paths while maintaining App Store compliance._
+
+**Pricing locked until December 2026.** 🔒

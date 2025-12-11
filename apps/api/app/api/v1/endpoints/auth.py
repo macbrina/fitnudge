@@ -12,6 +12,7 @@ from app.core.auth import (
     verify_token,
     generate_verification_code,
     get_user_by_id,
+    ensure_auth_user_exists,
 )
 from app.core.database import get_supabase_client
 from app.core.config import settings
@@ -341,17 +342,16 @@ async def verify_apple_identity_token(identity_token: str) -> Dict[str, Any]:
     for aud in audiences:
         if not aud:
             continue
-        try:
-            payload = jwt.decode(
-                identity_token,
-                matching_key,
-                algorithms=[headers.get("alg", "RS256")],
-                audience=aud,
-                issuer="https://appleid.apple.com",
-            )
-            break
-        except JWTError as error:
-            last_error = error
+    try:
+        payload = jwt.decode(
+            identity_token,
+            matching_key,
+            algorithms=[headers.get("alg", "RS256")],
+            audience=aud,
+            issuer="https://appleid.apple.com",
+        )
+    except JWTError as error:
+        last_error = error
 
     if payload is None:
         logger.warning(
@@ -396,18 +396,54 @@ async def signup(user_data: UserSignup):
             status_code=status.HTTP_400_BAD_REQUEST, detail="Username already taken"
         )
 
-    # Create user
-    user = await create_user(user_data.dict())
+    try:
+        # Create user (this should NOT fail even if email sending fails)
+        user = await create_user(user_data.dict())
 
-    # Create tokens
-    access_token = create_access_token({"user_id": user["id"]})
-    refresh_token = create_refresh_token({"user_id": user["id"]})
+        # Create tokens
+        access_token = create_access_token({"user_id": user["id"]})
+        refresh_token = create_refresh_token({"user_id": user["id"]})
 
-    return {
-        "access_token": access_token,
-        "refresh_token": refresh_token,
-        "user": serialize_user(user),
-    }
+        # Serialize user (might fail if oauth_accounts query fails)
+        try:
+            serialized_user = serialize_user(user)
+        except Exception as serialize_error:
+            # If serialization fails, create a minimal user object
+            logger.warning(
+                f"User serialization failed for {user['id']}, using minimal response",
+                {"error": str(serialize_error), "user_id": user["id"]},
+            )
+            serialized_user = {
+                "id": user["id"],
+                "email": user["email"],
+                "name": user.get("name"),
+                "username": user.get("username"),
+                "plan": user.get("plan", "free"),
+                "timezone": user.get("timezone", "UTC"),
+                "email_verified": user.get("email_verified", False),
+                "auth_provider": user.get("auth_provider", "email"),
+            }
+
+        return {
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "user": serialized_user,
+        }
+
+    except HTTPException:
+        # Re-raise HTTP exceptions (like validation errors)
+        raise
+    except Exception as e:
+        # If anything fails after user creation, log it but DON'T return "user already exists"
+        logger.error(
+            f"Signup error after user creation",
+            {"error": str(e), "email": user_data.email},
+        )
+        # Return a generic error, not "user already exists"
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Account created but there was an error completing registration. Please try logging in.",
+        )
 
 
 @router.post("/login")
@@ -434,6 +470,9 @@ async def login(credentials: UserLogin):
                 "status": user_status,
             },
         )
+
+    # Ensure existing user is in auth.users (for Realtime to work)
+    await ensure_auth_user_exists(user)
 
     # Create tokens with different expiration based on remember_me
     if credentials.remember_me:
@@ -546,6 +585,9 @@ async def google_oauth(oauth_data: GoogleOAuth):
             }
         )
     else:
+        # Ensure existing user is in auth.users (for Realtime to work)
+        await ensure_auth_user_exists(user)
+
         # Update email verification if Google confirms it
         if email_verified and not user.get("email_verified"):
             supabase.table("users").update({"email_verified": True}).eq(
@@ -670,6 +712,9 @@ async def apple_oauth(oauth_data: AppleOAuth):
             }
         )
     else:
+        # Ensure existing user is in auth.users (for Realtime to work)
+        await ensure_auth_user_exists(user)
+
         if email_verified and not user.get("email_verified"):
             supabase.table("users").update({"email_verified": True}).eq(
                 "id", user["id"]
@@ -1093,11 +1138,6 @@ async def forgot_password(reset_data: PasswordReset):
             {"user_id": user_id, "email": user["email"]},
         )
 
-    logger.info(
-        f"Password reset token generated for user {user_id}",
-        {"user_id": user_id, "email": user["email"]},
-    )
-
     return {"message": "If an account exists, a password reset email has been sent"}
 
 
@@ -1199,7 +1239,5 @@ async def reset_password(reset_data: PasswordResetConfirm):
     supabase.table("password_reset_tokens").update({"used": True}).eq(
         "id", reset_token["id"]
     ).execute()
-
-    logger.info(f"Password reset successful for user {user_id}", {"user_id": user_id})
 
     return {"message": "Password reset successfully"}

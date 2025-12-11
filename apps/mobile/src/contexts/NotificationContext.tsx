@@ -8,10 +8,7 @@ import React, {
 import { notificationService } from "@/services/notifications/notificationService";
 import { NotificationToast } from "@/components/notifications/NotificationToast";
 import { NotificationData } from "@/services/notifications/notificationTypes";
-import { useGoalNotifications } from "@/hooks/notifications/useGoalNotifications";
-import { useActiveGoals } from "@/hooks/api/useGoals";
 import { useAuthStore } from "@/stores/authStore";
-import { useUserTimezone } from "@/hooks/useUserTimezone";
 
 interface NotificationContextType {
   showToast: (title: string, body: string, data?: NotificationData) => void;
@@ -33,58 +30,16 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
   const [toastTitle, setToastTitle] = useState("");
   const [toastBody, setToastBody] = useState("");
   const [toastData, setToastData] = useState<NotificationData | undefined>();
-  const { isAuthenticated } = useAuthStore();
-  const { data: activeGoalsResponse } = useActiveGoals();
-  const { scheduleAllActiveGoals, isNotificationsEnabled } =
-    useGoalNotifications();
-  const userTimezone = useUserTimezone();
+  const { isAuthenticated, isVerifyingUser } = useAuthStore();
 
   useEffect(() => {
-    // Initialize notification service
-    notificationService.initializeNotifications();
-  }, []);
-
-  // Reschedule reminders for all active goals on app startup
-  useEffect(() => {
-    const rescheduleReminders = async () => {
-      if (!isAuthenticated || !isNotificationsEnabled) {
-        return;
-      }
-
-      if (
-        activeGoalsResponse?.data &&
-        Array.isArray(activeGoalsResponse.data)
-      ) {
-        const activeGoals = activeGoalsResponse.data.filter(
-          (goal: any) =>
-            goal.is_active &&
-            goal.reminder_times &&
-            goal.reminder_times.length > 0
-        );
-
-        if (activeGoals.length > 0) {
-          const goalsWithReminders = activeGoals.map((goal) => ({
-            id: goal.id,
-            title: goal.title,
-            reminderTimes: goal.reminder_times,
-            timezone: userTimezone,
-          }));
-
-          await scheduleAllActiveGoals(goalsWithReminders);
-        }
-      }
-    };
-
-    // Only reschedule if we have active goals data
-    if (activeGoalsResponse?.data !== undefined) {
-      rescheduleReminders();
+    // Only initialize notifications if user is authenticated and verified
+    // All scheduled notifications (check-ins, AI motivations, achievements, re-engagement)
+    // are now handled by the backend via Expo Push Notifications
+    if (isAuthenticated && !isVerifyingUser) {
+      notificationService.initializeNotifications();
     }
-  }, [
-    isAuthenticated,
-    isNotificationsEnabled,
-    activeGoalsResponse?.data,
-    scheduleAllActiveGoals,
-  ]);
+  }, [isAuthenticated, isVerifyingUser]);
 
   const showToast = (title: string, body: string, data?: NotificationData) => {
     setToastTitle(title);

@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.security import HTTPBearer
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 import uvicorn
 import os
 from dotenv import load_dotenv
@@ -27,7 +28,8 @@ from app.core.middleware import (
     SQLInjectionProtectionMiddleware,
     SessionManagementMiddleware,
 )
-from app.core.health import build_health_report, HealthStatus
+from app.core.health import HealthStatus
+from app.api.v1.endpoints.system_health import read_health
 
 # Load environment variables
 load_dotenv()
@@ -68,17 +70,16 @@ app.add_middleware(SessionManagementMiddleware)
 # Include API router
 app.include_router(api_router, prefix="/api/v1")
 
+# Mount static files for exercise GIFs and media
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Health check endpoint
-@app.get("/health")
-async def health_check():
-    report = await build_health_report(api_version=app.version)
-    status_code = (
-        status.HTTP_200_OK
-        if report.status != HealthStatus.CRITICAL
-        else status.HTTP_503_SERVICE_UNAVAILABLE
-    )
-    return JSONResponse(content=report.model_dump(mode="json"), status_code=status_code)
+# Health check endpoint (cached)
+app.add_api_route(
+    "/health",
+    read_health,
+    methods=["GET"],
+    summary="Cached backend health report",
+)
 
 
 # Startup event

@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { fetchBackendHealth } from "@/services/system/systemStatusService";
 
-const CHECK_INTERVAL = 60_000;
+const CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
 export const useBackendHealthMonitor = () => {
   useEffect(() => {

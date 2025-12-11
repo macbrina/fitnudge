@@ -9,7 +9,7 @@ import { getRedirection } from "@/utils/getRedirection";
 import { storageUtil, STORAGE_KEYS } from "@/utils/storageUtil";
 
 export default function Index() {
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, user, setVerifyingUser } = useAuthStore();
   const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
   const fontsLoaded = useAppFonts();
 
@@ -18,68 +18,85 @@ export default function Index() {
       // Cache tokens in memory on app startup for fast access
       await TokenManager.initializeCache();
 
-      // Restore tokens from TokenManager to authStore if user exists but tokens are missing
+      // CRITICAL: If user appears authenticated from storage, verify they actually exist
+      // This prevents wasted API calls from services if user was deleted
       if (isAuthenticated && user) {
         const accessToken = await TokenManager.getAccessToken();
         const refreshToken = await TokenManager.getRefreshToken();
 
-        // If tokens exist in storage but not in store, restore them
-        if (accessToken && refreshToken) {
-          const currentAccessToken = useAuthStore.getState().accessToken;
-          const currentRefreshToken = useAuthStore.getState().refreshToken;
-
-          if (!currentAccessToken || !currentRefreshToken) {
-            useAuthStore.setState({
-              accessToken,
-              refreshToken,
-            });
-          }
+        // If no tokens, user is not really authenticated
+        if (!accessToken || !refreshToken) {
+          console.log("[Index] No tokens found, clearing authentication");
+          useAuthStore.setState({
+            isAuthenticated: false,
+            user: null,
+          });
+          setRedirectUrl(MOBILE_ROUTES.AUTH.MAIN);
+          return;
         }
 
-        // Check user status on app startup
-        // Only check if we have tokens available (reuse accessToken from above)
-        if (accessToken) {
+        // Restore tokens to store if missing
+        const currentAccessToken = useAuthStore.getState().accessToken;
+        const currentRefreshToken = useAuthStore.getState().refreshToken;
+
+        if (!currentAccessToken || !currentRefreshToken) {
+          useAuthStore.setState({
+            accessToken,
+            refreshToken,
+          });
+        }
+
+        // VERIFY USER EXISTS before allowing authenticated access
+        // This prevents services from initializing if user was deleted
+        // base.ts will handle all error cases (404→logout, 401→refresh, 403→logout)
+        setVerifyingUser(true);
+        console.log("[Index] Verifying user exists...");
+        let isUserVerified = false;
+
+        try {
+          const { userService } = await import("@/services/api/user");
+          const response = await userService.getCurrentUser();
+
+          // base.ts already handled logout if needed (404/401/403)
+          // We just need to check if the call succeeded
+          if (response.status === 200 && response.data) {
+            isUserVerified = true;
+          } else {
+            // base.ts triggered logout, just log
+          }
+        } catch (error) {
+          setVerifyingUser(true);
+          // base.ts already handled logout if applicable
+          console.warn("[Index] User verification error:", error);
+        } finally {
+          // Always clear verification flag
+          setVerifyingUser(false);
+        }
+
+        // Only fetch background data if user was successfully verified
+        if (isUserVerified) {
+          // Fetch subscription, features, and pricing plans in the background (non-blocking)
+          // This runs after user verification, preventing wasted calls if user doesn't exist
           try {
-            const { userService } = await import("@/services/api/user");
-            // Make a lightweight API call to check user status
-            const response = await userService.getCurrentUser();
+            const [{ useSubscriptionStore }, { usePricingStore }] =
+              await Promise.all([
+                import("@/stores/subscriptionStore"),
+                import("@/stores/pricingStore"),
+              ]);
 
-            if (response.status === 403 && response.error) {
-              // User is disabled or suspended
-              // Handle both string and object error responses
-              const errorData =
-                typeof response.error === "string"
-                  ? { error: response.error }
-                  : (response.error as {
-                      error?: string;
-                      status?: string;
-                      [key: string]: any;
-                    });
-              const userStatus = errorData?.status;
-
-              if (userStatus === "disabled" || userStatus === "suspended") {
-                const { handleAutoLogout } = await import("@/utils/authUtils");
-                await handleAutoLogout(userStatus as "disabled" | "suspended");
-                return; // Exit early, auto-logout will redirect
-              }
-            } else if (response.status === 401) {
-              // Token expired, attempt refresh
-              const { authService } = await import("@/services/api/auth");
-              const refreshResponse = await authService.refreshToken();
-              // Only logout if refresh returns 404 (user not found)
-              // Other failures (expired token, network issues, etc.) should not trigger logout
-              if (refreshResponse.status === 404) {
-                const { handleAutoLogout } = await import("@/utils/authUtils");
-                await handleAutoLogout("not_found");
-                return;
-              }
-              // For other failures, just continue without logging out
-            }
+            // Fetch subscription data, features, and pricing plans in parallel
+            await Promise.all([
+              useSubscriptionStore.getState().fetchSubscription(),
+              useSubscriptionStore.getState().fetchFeatures(),
+              usePricingStore.getState().fetchPlans(), // Prefetch pricing plans
+            ]);
           } catch (error) {
-            // If status check fails, log but don't block app
-            console.warn("[Index] Status check failed:", error);
+            // If any fetch fails, log but don't block app
+            console.warn("[Index] Background data fetch failed:", error);
           }
         }
+      } else {
+        setVerifyingUser(false);
       }
 
       // Get redirect URL based on onboarding status
@@ -100,8 +117,9 @@ export default function Index() {
     initialize();
   }, [isAuthenticated, user]);
 
-  // Show loading while checking redirect status
-  if (redirectUrl === null || !fontsLoaded) {
+  // Show loading while verifying user or checking redirect status
+  const { isVerifyingUser } = useAuthStore();
+  if (redirectUrl === null || !fontsLoaded || isVerifyingUser) {
     return <LoadingContainer />;
   }
 

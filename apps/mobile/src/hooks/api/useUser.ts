@@ -34,8 +34,37 @@ export const useUpdateProfile = () => {
   return useMutation({
     mutationFn: (updates: UpdateUserRequest) =>
       userService.updateProfile(updates),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: userQueryKeys.currentUser });
+    // Optimistic update for instant UI feedback
+    onMutate: async (updates) => {
+      await queryClient.cancelQueries({ queryKey: userQueryKeys.currentUser });
+
+      const previousUser = queryClient.getQueryData(userQueryKeys.currentUser);
+
+      // Optimistically update user
+      queryClient.setQueryData(userQueryKeys.currentUser, (old: any) => {
+        if (!old?.data) return old;
+        return { ...old, data: { ...old.data, ...updates } };
+      });
+
+      return { previousUser };
+    },
+    onError: (err, updates, context) => {
+      if (context?.previousUser) {
+        queryClient.setQueryData(
+          userQueryKeys.currentUser,
+          context.previousUser
+        );
+      }
+    },
+    onSuccess: (response) => {
+      // Update with real server response
+      const realUser = response?.data;
+      if (realUser) {
+        queryClient.setQueryData(userQueryKeys.currentUser, (old: any) => ({
+          ...old,
+          data: realUser,
+        }));
+      }
     },
   });
 };
@@ -59,10 +88,13 @@ export const useExportData = () => {
 };
 
 export const useUserStats = (userId?: string) => {
+  const { isAuthenticated } = useAuthStore();
+
   return useQuery({
     queryKey: userQueryKeys.userStats(userId),
     queryFn: () => userService.getUserStats(userId),
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    enabled: isAuthenticated, // Only fetch when authenticated
+    staleTime: 0, // Refetch immediately when invalidated (realtime updates)
   });
 };
 
@@ -120,10 +152,34 @@ export const useUpdateNotificationSettings = () => {
       goal_reminders?: boolean;
       social_notifications?: boolean;
     }) => userService.updateNotificationSettings(settings),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
+    // Optimistic update for instant toggle feedback
+    onMutate: async (newSettings) => {
+      await queryClient.cancelQueries({
         queryKey: userQueryKeys.notificationSettings,
       });
+
+      const previousSettings = queryClient.getQueryData(
+        userQueryKeys.notificationSettings
+      );
+
+      // Optimistically update settings
+      queryClient.setQueryData(
+        userQueryKeys.notificationSettings,
+        (old: any) => {
+          if (!old?.data) return old;
+          return { ...old, data: { ...old.data, ...newSettings } };
+        }
+      );
+
+      return { previousSettings };
+    },
+    onError: (err, newSettings, context) => {
+      if (context?.previousSettings) {
+        queryClient.setQueryData(
+          userQueryKeys.notificationSettings,
+          context.previousSettings
+        );
+      }
     },
   });
 };

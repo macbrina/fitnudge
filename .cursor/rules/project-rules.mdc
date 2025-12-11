@@ -14,6 +14,7 @@ These are the core documentation files that should be referenced for all develop
 - **DataModels.md**: Complete database schema with OAuth support, tables, indexes, and relationships
 - **API-Spec.md**: All API endpoints with request/response examples, authentication, and error handling
 - **EnvironmentSetup.md**: Step-by-step setup guide with all credentials and configuration
+- **DESIGN_SYSTEM.md**: Design patterns.. 
 - **Marketing.md**: Pricing strategy, revenue projections, and growth tactics
 - **README.md**: Project overview and getting started guide
 
@@ -47,4 +48,14 @@ projectFiles:
   - README.md
 
 Always reference these files when making architectural decisions, implementing features, or answering questions about the project. Pay special attention to CLI-based package management and migration practices.
+
+## Logging Guidelines
+
+**CRITICAL**: Never use `logger.info()`. The logger is **only** meant for errors.
+
+- ✅ **Use `logger.error()`** only for critcial error that breaks code for error logging not normal erros like user exist.. etc
+- ✅ **Use `print()` or `console.log()`** for informational messages, debugging, or general output
+- ❌ **NEVER use `logger.info()`** - it should not be used anywhere in the codebase
+
+This ensures that error logs are properly tracked and separated from informational output.
 ---

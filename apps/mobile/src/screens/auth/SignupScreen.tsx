@@ -169,6 +169,7 @@ export default function SignupScreen() {
 
             // Check if email verification is required
             const user = response.data.user;
+            console.log("USER", user);
             if (
               user &&
               !user.email_verified &&
@@ -332,7 +333,6 @@ export default function SignupScreen() {
           style={{ flex: 1 }}
           contentContainerStyle={{
             flexGrow: 1,
-            paddingTop: insets.top,
             paddingBottom: insets.bottom,
           }}
           showsVerticalScrollIndicator={false}
@@ -441,7 +441,7 @@ export default function SignupScreen() {
                 </LinkText>
                 {" and "}
                 <LinkText
-                  url="https://fitnudge.com/privacy-policy"
+                  url="https://fitnudge.app/privacy-policy"
                   title={t("auth.signup.privacy_policy")}
                   style={styles.linkText}
                 >

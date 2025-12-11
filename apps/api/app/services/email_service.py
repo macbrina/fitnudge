@@ -59,10 +59,6 @@ class EmailService:
                 server.login(self.smtp_username, self.smtp_password)
                 server.sendmail(self.from_email, user_email, message.as_string())
 
-            logger.info(
-                "Verification email sent",
-                {"to": user_email, "code": code[:2] + "****"},
-            )
             return True
 
         except Exception as e:
@@ -108,10 +104,6 @@ class EmailService:
                 server.login(self.smtp_username, self.smtp_password)
                 server.sendmail(self.from_email, user_email, message.as_string())
 
-            logger.info(
-                "Password reset email sent",
-                {"to": user_email},
-            )
             return True
 
         except Exception as e:

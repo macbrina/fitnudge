@@ -60,7 +60,7 @@ After completing the profile, users receive AI-generated goal suggestions using 
 
 - Uses `OpenAIService` to generate suggestions
 - System prompt emphasizes accountability and personalization
-- Considers user's subscription plan (Free/Starter/Pro/Coach+) to suggest appropriate features
+- Considers user's subscription plan (Free/Starter/Pro/Elite) to suggest appropriate features
 - Timeout: 25 seconds
 - Fallback: If AI fails, returns empty list (user can create custom goal)
 
@@ -73,12 +73,10 @@ Users can:
 
 **API Endpoint**: `POST /api/v1/goals`
 
-**Goal Limits**:
-
 - **Free**: 1 goal total, 1 active
 - **Starter**: 3 goals total, 2 active
 - **Pro**: Unlimited goals, 3 active
-- **Coach+**: Unlimited goals, 3 active
+- **Elite**: Unlimited goals, 3 active
 
 **Implementation**: `apps/api/app/api/v1/endpoints/goals.py`
 

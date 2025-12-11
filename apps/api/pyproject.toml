@@ -33,6 +33,9 @@ pillow = "^10.0.0" # Image processing
 clamd = "^1.0.2" # ClamAV integration
 geoip2 = "^4.7.0" # GeoIP blocking
 user-agents = "^2.2.0" # User agent parsing
+pytz = "^2024.1" # Timezone support for check-ins
+exponent-server-sdk = "^2.2.0"
+boto3 = "^1.42.4"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.4.2"

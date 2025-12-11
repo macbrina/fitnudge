@@ -3,8 +3,8 @@ import { tokens } from "./tokens";
 
 export const semanticLight = {
   bg: {
-    canvas: tokens.colors.light.background, // #ffffff
-    card: tokens.colors.light.background, // #ffffff
+    canvas: tokens.colors.light.background, // #f4f5f7
+    card: tokens.colors.light.secondary, // #ffffff
     primary: tokens.colors.light.primary, // #2563eb
     secondary: tokens.colors.light.secondary, // #f1f5f9
     muted: tokens.colors.light.muted, // #f8fafc
@@ -14,12 +14,15 @@ export const semanticLight = {
     success: tokens.colors.light.success, // #10b981
     warning: tokens.colors.light.warning, // #f59e0b
     overlay: "rgba(0, 0, 0, 0.5)", // Modal overlay
+    overlayLight: "rgba(0, 0, 0, 0.1)", // Modal overlay
+    overlayTransparent: "rgba(0, 0, 0, 0.0)", // Modal overlay
   },
   text: {
     primary: tokens.colors.light.foreground, // #0f172a
     secondary: tokens.colors.light.secondaryForeground, // #0f172a
     muted: tokens.colors.light.mutedForeground, // #f8fafc
     onPrimary: tokens.colors.light.primaryForeground, // #ffffff
+    tertiary: tokens.colors.light.mutedForeground, // #64748b
     onSecondary: tokens.colors.light.secondaryForeground, // #0f172a
     onAccent: tokens.colors.light.accentForeground, // #0f172a
     onDestructive: tokens.colors.light.destructiveForeground, // #ffffff
@@ -28,6 +31,7 @@ export const semanticLight = {
   },
   border: {
     default: tokens.colors.light.border, // #e2e8f0
+    subtle: tokens.colors.light.borderSubtle, // #e2e8f0
     input: tokens.colors.light.input, // #e2e8f0
     ring: tokens.colors.light.ring, // #2563eb
   },
@@ -48,7 +52,7 @@ export const semanticLight = {
 export const semanticDark = {
   bg: {
     canvas: tokens.colors.dark.background, // #0f172a
-    card: tokens.colors.dark.background, // #0f172a
+    card: tokens.colors.dark.secondary, // #1e293b
     primary: tokens.colors.dark.primary, // #3b82f6
     secondary: tokens.colors.dark.secondary, // #1e293b
     muted: tokens.colors.dark.muted, // #1e293b
@@ -58,9 +62,12 @@ export const semanticDark = {
     success: tokens.colors.dark.success, // #34d399
     warning: tokens.colors.dark.warning, // #fbbf24
     overlay: "rgba(0, 0, 0, 0.7)", // Modal overlay
+    overlayLight: "rgba(0, 0, 0, 0.1)", // Modal overlay
+    overlayTransparent: "rgba(0, 0, 0, 0.0)", // Modal overlay
   },
   text: {
     primary: tokens.colors.dark.foreground, // #f8fafc
+    tertiary: tokens.colors.dark.mutedForeground, // #64748b
     secondary: tokens.colors.dark.secondaryForeground, // #f8fafc
     muted: tokens.colors.dark.mutedForeground, // #94a3b8
     onPrimary: tokens.colors.dark.primaryForeground, // #ffffff
@@ -72,6 +79,7 @@ export const semanticDark = {
   },
   border: {
     default: tokens.colors.dark.border, // #334155
+    subtle: tokens.colors.dark.borderSubtle, // #334155
     input: tokens.colors.dark.input, // #334155
     ring: tokens.colors.dark.ring, // #3b82f6
   },

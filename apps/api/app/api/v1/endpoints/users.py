@@ -235,13 +235,24 @@ async def update_profile(
 
 @router.delete("/delete")
 async def delete_account(current_user: dict = Depends(get_current_user)):
-    """Delete user account"""
+    """Delete user account from both public.users and auth.users"""
     from app.core.database import get_supabase_client
+    from app.services.logger import logger
 
     supabase = get_supabase_client()
+    user_id = current_user["id"]
 
-    # Delete user and all related data (cascade should handle this)
-    supabase.table("users").delete().eq("id", current_user["id"]).execute()
+    # Step 1: Delete from public.users FIRST (cascade deletes all related data)
+    supabase.table("users").delete().eq("id", user_id).execute()
+    print(f"Deleted user {user_id} from public.users (cascade handled related data)")
+
+    # Step 2: Delete from auth.users (for Supabase Auth/Realtime cleanup)
+    try:
+        supabase.auth.admin.delete_user(user_id)
+        print(f"Deleted user {user_id} from auth.users")
+    except Exception as e:
+        # Log but don't fail - public.users is the source of truth
+        logger.warning(f"Failed to delete user {user_id} from auth.users: {e}")
 
     return {"message": "Account deleted successfully"}
 

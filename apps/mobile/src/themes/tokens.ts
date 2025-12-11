@@ -5,13 +5,13 @@ export const tokens = {
   colors: {
     // Light mode colors
     light: {
-      background: "#ffffff",
+      background: "#f9fafc",
       foreground: "#0f172a",
       primary: "#2563eb",
       primaryForeground: "#ffffff",
-      secondary: "#f1f5f9",
+      secondary: "#ffffff",
       secondaryForeground: "#0f172a",
-      muted: "#f4f5f7",
+      muted: "#f1f5f9",
       mutedForeground: "#64748b",
       accent: "#f1f5f9",
       accentForeground: "#0f172a",
@@ -22,6 +22,7 @@ export const tokens = {
       warning: "#f59e0b",
       warningForeground: "#ffffff",
       border: "#e2e8f0",
+      borderSubtle: "#f1f5f9",
       input: "#e2e8f0",
       ring: "#2563eb",
     },
@@ -44,6 +45,7 @@ export const tokens = {
       warning: "#fbbf24",
       warningForeground: "#78350f",
       border: "#334155",
+      borderSubtle: "#1e293b",
       input: "#334155",
       ring: "#3b82f6",
     },

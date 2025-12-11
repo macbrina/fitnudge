@@ -90,11 +90,6 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
           isCompleted: true, // Profile exists, so it's been completed
         });
 
-        logger.info("Fitness profile loaded into store", {
-          fitness_level: profile.fitness_level,
-          primary_goal: profile.primary_goal,
-        });
-
         return true; // Profile exists
       }
 

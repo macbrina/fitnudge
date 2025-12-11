@@ -11,8 +11,8 @@ import { lineHeight } from "@/themes/tokens";
 import { getRedirection } from "@/utils/getRedirection";
 import { router } from "expo-router";
 import { useRef, useState } from "react";
+import { useAlertModal } from "@/contexts/AlertModalContext";
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -136,6 +136,7 @@ export default function VerifyEmailScreen() {
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
   const verifyEmailMutation = useVerifyEmail();
   const resendVerificationMutation = useResendVerification();
+  const { showAlert, showToast } = useAlertModal();
 
   const handleCodeChange = (index: number, value: string) => {
     // Only allow digits
@@ -244,10 +245,12 @@ export default function VerifyEmailScreen() {
       );
 
       if (response.data) {
-        Alert.alert(
-          t("auth.verify_email.success_title"),
-          t("auth.verify_email.success_message")
-        );
+        showToast({
+          title: t("auth.verify_email.success_title"),
+          message: t("auth.verify_email.success_message"),
+          variant: "success",
+          duration: 2000,
+        });
 
         // Start countdown (2 minutes between requests)
         setResendCountdown(120); // 2 minutes in seconds
@@ -261,17 +264,24 @@ export default function VerifyEmailScreen() {
           });
         }, 1000);
       } else {
-        Alert.alert(
-          t("auth.verify_email.error_title"),
-          response.error || t("auth.verify_email.error_resend_failed")
-        );
+        await showAlert({
+          title: t("auth.verify_email.error_title"),
+          message: response.error || t("auth.verify_email.error_resend_failed"),
+          variant: "error",
+          confirmLabel: t("common.ok"),
+        });
       }
     } catch (error: any) {
       const errorMessage =
         error?.response?.data?.detail ||
         error?.message ||
         t("auth.verify_email.error_resend_failed");
-      Alert.alert(t("auth.verify_email.error_title"), errorMessage);
+      await showAlert({
+        title: t("auth.verify_email.error_title"),
+        message: errorMessage,
+        variant: "error",
+        confirmLabel: t("common.ok"),
+      });
     }
   };
 

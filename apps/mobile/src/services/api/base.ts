@@ -4,6 +4,17 @@ import * as Device from "expo-device";
 import { STORAGE_KEYS, storageUtil } from "../../utils/storageUtil";
 import { useSystemStatusStore } from "@/stores/systemStatusStore";
 
+// Global flag to prevent API calls during logout
+let isLoggingOut = false;
+
+export function setLoggingOut(value: boolean) {
+  isLoggingOut = value;
+}
+
+// Global flag and promise to prevent multiple simultaneous refresh attempts
+let isRefreshing = false;
+let refreshPromise: Promise<any> | null = null;
+
 // Types
 export interface ApiResponse<T = any> {
   data?: T;
@@ -290,6 +301,11 @@ export abstract class BaseApiService {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
+    // Skip all API requests if logout is in progress
+    if (isLoggingOut && !isPublicEndpoint(endpoint)) {
+      throw new ApiError(401, null, "Logout in progress");
+    }
+
     const url = `${this.baseURL}${endpoint}`;
 
     // Use global token cache for fast, reliable access
@@ -299,13 +315,10 @@ export abstract class BaseApiService {
         ? global.accessToken
         : await TokenManager.getAccessToken();
 
-    if (!token && !isPublicEndpoint(endpoint)) {
-      if (__DEV__) {
-        console.debug(
-          `[API] Skipping request to ${endpoint} because user is not authenticated`
-        );
-      }
+    // console.log("accessToken", token);
 
+    if (!token && !isPublicEndpoint(endpoint)) {
+      // Silently skip unauthenticated requests (hooks should have enabled: isAuthenticated)
       throw new ApiError(401, null, "Not authenticated");
     }
 
@@ -384,94 +397,132 @@ export abstract class BaseApiService {
           !endpoint.includes("/auth/login") &&
           !endpoint.includes("/auth/signup")
         ) {
-          console.log(`[API] Token expired, attempting to refresh...`);
-
-          // Import authService dynamically to avoid circular dependency
-          const { authService } = await import("./auth");
-          const refreshResponse = await authService.refreshToken();
-
-          if (refreshResponse.data && refreshResponse.data.access_token) {
-            console.log(
-              `[API] Token refreshed successfully, retrying original request...`
-            );
-
-            // Update headers with new token from global cache
-            // TokenManager.setTokens() already updated global.accessToken
-            const newToken =
-              global.accessToken || refreshResponse.data.access_token;
-            headersObj["Authorization"] = `Bearer ${newToken}`;
-
-            // Retry the request with the new token
-            const retryResponse = await fetch(url, {
-              ...config,
-              headers: headersObj,
-              signal: controller.signal,
-            });
-
-            clearTimeout(timeoutId);
-
-            // Parse retry response
-            const retryContentType =
-              retryResponse.headers.get("content-type") || "";
-            let retryData: any = null;
-            try {
-              if (retryContentType.includes("application/json")) {
-                retryData = await retryResponse.json();
-              } else {
-                const text = await retryResponse.text();
-                retryData = text ? { message: text } : null;
+          // If already refreshing, wait for that refresh to complete
+          if (isRefreshing && refreshPromise) {
+            console.log(`[API] Token refresh already in progress, waiting...`);
+            await refreshPromise;
+            // After refresh completes, retry with new token
+            const newToken = global.accessToken;
+            if (newToken) {
+              headersObj["Authorization"] = `Bearer ${newToken}`;
+              const retryResponse = await fetch(url, {
+                ...config,
+                headers: headersObj,
+              });
+              const retryData = await retryResponse.json();
+              if (retryResponse.ok) {
+                return {
+                  status: retryResponse.status,
+                  data: retryData as T,
+                  error: undefined,
+                };
               }
-            } catch (parseErr) {
-              try {
-                const text = await retryResponse.text();
-                retryData = text ? { message: text } : null;
-              } catch {}
             }
-
-            // Return retry response
-            if (!retryResponse.ok) {
-              throw new ApiError(
-                retryResponse.status,
-                retryData,
-                `Request failed with status ${retryResponse.status}`
-              );
-            }
-
-            return {
-              status: retryResponse.status,
-              data: retryData as T,
-              error: undefined,
-            };
+            // If still failing after refresh, fall through to error handling
           } else {
-            console.log(
-              `[API] Token refresh failed, returning ${refreshResponse.status}`,
-              refreshResponse
-            );
-            // Logout if refresh returns 404 (user not found) or 500 (Internal Server Error - user likely deleted)
-            // Check error message to determine if it's a user-related issue
-            const refreshError = refreshResponse.error || "";
-            const errorLower = refreshError.toLowerCase();
-            const isUserNotFound =
-              refreshResponse.status === 404 ||
-              (refreshResponse.status === 500 &&
-                errorLower.includes("internal server error")) ||
-              errorLower.includes("user not found");
+            console.log(`[API] Token expired, attempting to refresh...`);
 
-            // Logout on 404 or 500 (user deleted - foreign key constraint violation)
-            // Backend now returns 404 when user not found, but may still return 500 in some edge cases
-            if (
-              isUserNotFound ||
-              refreshResponse.status === 404 ||
-              refreshResponse.status === 500
-            ) {
+            // Mark as refreshing
+            isRefreshing = true;
+
+            // Import authService dynamically to avoid circular dependency
+            const { authService } = await import("./auth");
+            refreshPromise = authService.refreshToken();
+            const refreshResponse = await refreshPromise;
+
+            // Reset refresh flag
+            isRefreshing = false;
+            refreshPromise = null;
+
+            if (refreshResponse.data && refreshResponse.data.access_token) {
+              console.log(
+                `[API] Token refreshed successfully, retrying original request...`
+              );
+
+              // Update headers with new token from global cache
+              // TokenManager.setTokens() already updated global.accessToken
+              const newToken =
+                global.accessToken || refreshResponse.data.access_token;
+              headersObj["Authorization"] = `Bearer ${newToken}`;
+
+              // Retry the request with the new token
+              const retryResponse = await fetch(url, {
+                ...config,
+                headers: headersObj,
+                signal: controller.signal,
+              });
+
+              clearTimeout(timeoutId);
+
+              // Parse retry response
+              const retryContentType =
+                retryResponse.headers.get("content-type") || "";
+              let retryData: any = null;
               try {
-                const { handleAutoLogout } = await import("@/utils/authUtils");
-                await handleAutoLogout("not_found");
-              } catch (error) {
-                console.error("[API] Failed to handle auto-logout:", error);
+                if (retryContentType.includes("application/json")) {
+                  retryData = await retryResponse.json();
+                } else {
+                  const text = await retryResponse.text();
+                  retryData = text ? { message: text } : null;
+                }
+              } catch (parseErr) {
+                try {
+                  const text = await retryResponse.text();
+                  retryData = text ? { message: text } : null;
+                } catch {}
               }
+
+              // Return retry response
+              if (!retryResponse.ok) {
+                throw new ApiError(
+                  retryResponse.status,
+                  retryData,
+                  `Request failed with status ${retryResponse.status}`
+                );
+              }
+
+              return {
+                status: retryResponse.status,
+                data: retryData as T,
+                error: undefined,
+              };
+            } else {
+              // Reset refresh flag
+              isRefreshing = false;
+              refreshPromise = null;
+
+              console.log(
+                `[API] Token refresh failed, returning ${refreshResponse.status}`,
+                refreshResponse
+              );
+              // Logout if refresh returns 404 (user not found) or 500 (Internal Server Error - user likely deleted)
+              // Check error message to determine if it's a user-related issue
+              const refreshError = refreshResponse.error || "";
+              const errorLower = refreshError.toLowerCase();
+              const isUserNotFound =
+                refreshResponse.status === 404 ||
+                (refreshResponse.status === 500 &&
+                  errorLower.includes("internal server error")) ||
+                errorLower.includes("user not found");
+
+              // Logout on 404 or 500 (user deleted - foreign key constraint violation)
+              // Backend now returns 404 when user not found, but may still return 500 in some edge cases
+              if (
+                isUserNotFound ||
+                refreshResponse.status === 404 ||
+                refreshResponse.status === 500
+              ) {
+                try {
+                  const { handleAutoLogout } = await import(
+                    "@/utils/authUtils"
+                  );
+                  await handleAutoLogout("not_found");
+                } catch (error) {
+                  console.error("[API] Failed to handle auto-logout:", error);
+                }
+              }
+              // For other failures (network issues, etc.), just return the error without logging out
             }
-            // For other failures (network issues, etc.), just return the error without logging out
           }
         }
 
@@ -493,8 +544,15 @@ export abstract class BaseApiService {
           }
         }
 
-        if (response.status === 401 && data) {
-          console.log(`Session expired, triggering auto-logout`);
+        // Only trigger auto-logout if user was authenticated
+        // Don't trigger on login/signup failures (user isn't logged in yet)
+        const wasAuthenticated = !!token && !isPublicEndpoint(endpoint);
+
+        if (
+          (response.status === 401 && data && wasAuthenticated) ||
+          (response.status === 401 && endpoint.includes("/auth/refresh"))
+        ) {
+          console.log(`[API] Session expired, triggering auto-logout`);
           try {
             const { handleAutoLogout } = await import("@/utils/authUtils");
             await handleAutoLogout("expired_session");
@@ -502,7 +560,34 @@ export abstract class BaseApiService {
             console.error("[API] Failed to handle auto-logout:", error);
           }
         }
-        console.log("response", response.status, data);
+
+        // Special case: If refresh endpoint returns 404, user was deleted
+        // Even though refresh is a "public" endpoint, 404 means user doesn't exist
+        if (response.status === 404 && endpoint.includes("/auth/refresh")) {
+          console.log(
+            `[API] User not found during refresh, triggering auto-logout`
+          );
+          try {
+            const { handleAutoLogout } = await import("@/utils/authUtils");
+            await handleAutoLogout("not_found");
+          } catch (error) {
+            console.error("[API] Failed to handle auto-logout:", error);
+          }
+        } else if (
+          response.status === 404 &&
+          wasAuthenticated &&
+          endpoint.includes("/users/profile")
+        ) {
+          // Only trigger user deletion logout for user profile endpoints
+          // Don't trigger for resource 404s (goals, plans, etc.)
+          console.log(`[API] User profile not found, triggering auto-logout`);
+          try {
+            const { handleAutoLogout } = await import("@/utils/authUtils");
+            await handleAutoLogout("not_found");
+          } catch (error) {
+            console.error("[API] Failed to handle auto-logout:", error);
+          }
+        }
 
         if (response.status === 503) {
           useSystemStatusStore
@@ -590,6 +675,16 @@ export abstract class BaseApiService {
 
   protected async delete<T>(endpoint: string): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, { method: "DELETE" });
+  }
+
+  protected async patch<T>(
+    endpoint: string,
+    data?: any
+  ): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, {
+      method: "PATCH",
+      body: data ? JSON.stringify(data) : undefined,
+    });
   }
 
   // Utility methods

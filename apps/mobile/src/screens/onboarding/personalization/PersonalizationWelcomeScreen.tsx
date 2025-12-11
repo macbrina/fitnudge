@@ -5,6 +5,7 @@ import { useStyles } from "@/themes/makeStyles";
 import { lineHeight } from "@/themes/tokens";
 import { Image, Text, View } from "react-native";
 import PersonalizationLayout from "./PersonalizationLayout";
+import { Card } from "@/components/ui/Card";
 
 interface PersonalizationWelcomeScreenProps {
   onContinue: () => void;
@@ -48,30 +49,30 @@ export default function PersonalizationWelcomeScreen({
 
         {/* Benefits Cards */}
         <View style={styles.benefitsContainer}>
-          <View style={styles.benefitCard}>
+          <Card padded={false} shadow="lg" style={styles.benefitCard}>
             <View style={styles.benefitIconContainer}>
               <Text style={styles.benefitIcon}>🎯</Text>
             </View>
             <Text style={styles.benefitText}>
               {t("onboarding.personalization.welcome.benefit_goals")}
             </Text>
-          </View>
-          <View style={styles.benefitCard}>
+          </Card>
+          <Card padded={false} shadow="lg" style={styles.benefitCard}>
             <View style={styles.benefitIconContainer}>
               <Text style={styles.benefitIcon}>🤖</Text>
             </View>
             <Text style={styles.benefitText}>
               {t("onboarding.personalization.welcome.benefit_ai")}
             </Text>
-          </View>
-          <View style={styles.benefitCard}>
+          </Card>
+          <Card padded={false} shadow="lg" style={styles.benefitCard}>
             <View style={styles.benefitIconContainer}>
               <Text style={styles.benefitIcon}>📊</Text>
             </View>
             <Text style={styles.benefitText}>
               {t("onboarding.personalization.welcome.benefit_tracking")}
             </Text>
-          </View>
+          </Card>
         </View>
       </View>
     </PersonalizationLayout>
@@ -99,7 +100,7 @@ const makePersonalizationWelcomeScreenStyles = (
       width: 120,
       height: 120,
       borderRadius: 60,
-      backgroundColor: colors.bg.surface,
+      backgroundColor: colors.bg.card,
       alignItems: "center" as const,
       justifyContent: "center" as const,
       shadowColor: colors.shadow.default,
@@ -151,23 +152,15 @@ const makePersonalizationWelcomeScreenStyles = (
     benefitCard: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
-      backgroundColor: colors.bg.surface,
-      paddingHorizontal: toRN(tokens.spacing[5]),
+      paddingHorizontal: toRN(tokens.spacing[4]),
+      paddingVertical: toRN(tokens.spacing[4]),
       borderRadius: toRN(tokens.borderRadius.lg),
-      shadowColor: colors.shadow.default,
-      shadowOffset: {
-        width: 0,
-        height: 2,
-      },
-      shadowOpacity: 0.08,
-      shadowRadius: 8,
-      elevation: 2,
     },
     benefitIconContainer: {
       width: 48,
       height: 48,
       borderRadius: 24,
-      backgroundColor: colors.bg.muted,
+      backgroundColor: colors.bg.card,
       alignItems: "center" as const,
       justifyContent: "center" as const,
       marginRight: toRN(tokens.spacing[4]),

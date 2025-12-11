@@ -8,6 +8,7 @@ import { tokens, lineHeight } from "@/themes/tokens";
 import { useTheme } from "@/themes";
 import PersonalizationLayout from "./PersonalizationLayout";
 import { useOnboardingStore } from "@/stores/onboardingStore";
+import { Card } from "@/components/ui/Card";
 
 interface PrimaryGoalScreenProps {
   onContinue: (primaryGoal: string) => void;
@@ -91,45 +92,53 @@ export default function PrimaryGoalScreen({
         </Text>
 
         <View style={styles.optionsContainer}>
-          {PRIMARY_GOALS.map((goal) => (
-            <TouchableOpacity
-              key={goal.id}
-              onPress={() => setSelectedGoal(goal.id)}
-              style={[
-                styles.optionCard,
-                selectedGoal === goal.id && styles.optionCardSelected,
-              ]}
-              activeOpacity={0.7}
-            >
-              <View
-                style={[
-                  styles.iconContainer,
-                  selectedGoal === goal.id && styles.iconContainerSelected,
-                ]}
+          {PRIMARY_GOALS.map((goal) => {
+            const isSelected = selectedGoal === goal.id;
+            return (
+              <TouchableOpacity
+                key={goal.id}
+                onPress={() => setSelectedGoal(goal.id)}
+                style={styles.optionCardTouchable}
+                activeOpacity={0.7}
               >
-                <Text style={styles.optionIcon}>{goal.icon}</Text>
-              </View>
-              <View style={styles.textContainer}>
-                <Text
+                <Card
+                  padded={false}
+                  shadow={isSelected ? "xl" : "md"}
                   style={[
-                    styles.optionTitle,
-                    selectedGoal === goal.id && styles.optionTitleSelected,
+                    styles.optionCard,
+                    isSelected && styles.optionCardSelected,
                   ]}
                 >
-                  {t(goal.title)}
-                </Text>
-                <Text
-                  style={[
-                    styles.optionDescription,
-                    selectedGoal === goal.id &&
-                      styles.optionDescriptionSelected,
-                  ]}
-                >
-                  {t(goal.description)}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))}
+                  <View
+                    style={[
+                      styles.iconContainer,
+                      isSelected && styles.iconContainerSelected,
+                    ]}
+                  >
+                    <Text style={styles.optionIcon}>{goal.icon}</Text>
+                  </View>
+                  <View style={styles.textContainer}>
+                    <Text
+                      style={[
+                        styles.optionTitle,
+                        isSelected && styles.optionTitleSelected,
+                      ]}
+                    >
+                      {t(goal.title)}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.optionDescription,
+                        isSelected && styles.optionDescriptionSelected,
+                      ]}
+                    >
+                      {t(goal.description)}
+                    </Text>
+                  </View>
+                </Card>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       </View>
     </PersonalizationLayout>
@@ -170,30 +179,19 @@ const makePrimaryGoalScreenStyles = (tokens: any, colors: any, brand: any) => {
       gap: toRN(tokens.spacing[4]),
       marginBottom: toRN(tokens.spacing[6]),
     },
-    optionCard: {
-      backgroundColor: colors.bg.surface,
+    optionCardTouchable: {
       borderRadius: toRN(tokens.borderRadius.xl),
+    },
+    optionCard: {
       padding: toRN(tokens.spacing[5]),
       flexDirection: "row" as const,
       alignItems: "center" as const,
-      borderWidth: 2,
-      borderColor: colors.border.default,
-      shadowColor: colors.shadow.default,
-      shadowOffset: {
-        width: 0,
-        height: 2,
-      },
-      shadowOpacity: 0.08,
-      shadowRadius: 8,
-      elevation: 2,
     },
     optionCardSelected: {
       borderColor: brand.primary,
       backgroundColor: brand.primary + "08",
-      shadowColor: brand.primary,
-      shadowOpacity: 0.15,
-      shadowRadius: 12,
-      elevation: 4,
+      borderWidth: 2,
+      borderRadius: toRN(tokens.borderRadius.xl),
     },
     iconContainer: {
       width: 64,

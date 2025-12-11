@@ -3,6 +3,7 @@ import { View } from "react-native";
 import { router } from "expo-router";
 import { useTranslation } from "@/lib/i18n";
 import { usePostHog } from "@/hooks/usePostHog";
+import { onboardingApi } from "@/services/api/onboarding";
 import { logger } from "@/services/logger";
 import { MOBILE_ROUTES } from "@/lib/routes";
 import { useOnboardingStore } from "@/stores/onboardingStore";
@@ -133,13 +134,22 @@ export default function PersonalizationFlow() {
         total_steps: STEPS.length,
       });
 
+      try {
+        // Default to "habit" for onboarding - users can regenerate with different types later
+        await onboardingApi.requestSuggestedGoals("habit");
+      } catch (error) {
+        logger.warn("Failed to queue suggested goals generation", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+
       // Personalization completed - tracked via PostHog above
 
       // Mark step as seen
-      // await storageUtil.setItem(STORAGE_KEYS.HAS_SEEN_PERSONALIZATION, true);
+      await storageUtil.setItem(STORAGE_KEYS.HAS_SEEN_PERSONALIZATION, true);
 
-      // Navigate to suggested goals
-      router.push(MOBILE_ROUTES.ONBOARDING.SUGGESTED_GOALS);
+      // Navigate directly to subscription while goals generate in background
+      router.push(MOBILE_ROUTES.MAIN.HOME);
     } catch (error) {
       logger.error("Error submitting personalization profile", {
         error: error instanceof Error ? error.message : String(error),

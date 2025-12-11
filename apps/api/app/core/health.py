@@ -21,9 +21,20 @@ import redis
 from fastapi import status
 from pydantic import BaseModel, Field
 
+from supabase import create_client, Client
+
 from app.core.celery_app import celery_app
 from app.core.config import settings
 from app.core.database import get_supabase_client
+
+
+def _create_fresh_supabase_client() -> Client:
+    """Create a fresh Supabase client to avoid stale SSL sessions.
+
+    This is used for health checks to prevent SSL session resumption errors
+    that can occur when connections are proxied through Cloudflare tunnels.
+    """
+    return create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
 
 
 class HealthStatus(str, Enum):
@@ -107,7 +118,8 @@ async def _check_supabase() -> HealthCheckResult:
             details="Supabase credentials are not set",
         )
 
-    supabase = get_supabase_client()
+    # Use a fresh client to avoid stale SSL sessions (Cloudflare tunnel issue)
+    supabase = _create_fresh_supabase_client()
 
     try:
         response = await asyncio.to_thread(
@@ -118,6 +130,7 @@ async def _check_supabase() -> HealthCheckResult:
         )
 
         if getattr(response, "error", None):
+            print(f"[Health] Supabase: Error response - {response.error}")
             return HealthCheckResult(
                 component=component,
                 status=HealthStatus.CRITICAL,
@@ -138,6 +151,7 @@ async def _check_supabase() -> HealthCheckResult:
             metadata=metadata,
         )
     except Exception as exc:  # pragma: no cover - network failures
+        print(f"[Health] Supabase: Exception - {type(exc).__name__}: {exc}")
         return HealthCheckResult(
             component=component,
             status=HealthStatus.CRITICAL,
@@ -150,16 +164,17 @@ async def _check_redis() -> HealthCheckResult:
     component = "redis"
     start = time.perf_counter()
 
-    if not settings.REDIS_URL:
+    redis_url = settings.redis_connection_url
+    if not redis_url:
         return HealthCheckResult(
             component=component,
             status=HealthStatus.NOT_CONFIGURED,
-            details="Redis URL is not configured",
+            details="Redis is not configured",
         )
 
     try:
         client = redis.from_url(
-            settings.REDIS_URL,
+            redis_url,
             socket_connect_timeout=2,
             socket_timeout=2,
             decode_responses=True,
@@ -173,10 +188,13 @@ async def _check_redis() -> HealthCheckResult:
             latency_ms=_elapsed_ms(start),
         )
     except Exception as exc:  # pragma: no cover - network failures
+        # Redis is optional (caching layer) - DEGRADED not CRITICAL
+        # App can still function without caching, just slower
+        print(f"[Health] Redis: Exception - {type(exc).__name__}: {exc}")
         return HealthCheckResult(
             component=component,
-            status=HealthStatus.CRITICAL,
-            details=f"Redis unreachable: {exc}",
+            status=HealthStatus.DEGRADED,
+            details=f"Redis unreachable (caching disabled): {exc}",
             latency_ms=_elapsed_ms(start),
         )
 
@@ -189,6 +207,7 @@ async def _check_celery() -> HealthCheckResult:
         result = await asyncio.to_thread(lambda: celery_app.control.ping(timeout=1.0))
 
         if not result:
+            print(f"[Health] Celery: No workers responded (result={result})")
             return HealthCheckResult(
                 component=component,
                 status=HealthStatus.DEGRADED,
@@ -203,6 +222,7 @@ async def _check_celery() -> HealthCheckResult:
             latency_ms=_elapsed_ms(start),
         )
     except Exception as exc:  # pragma: no cover - network failures
+        print(f"[Health] Celery: Exception - {type(exc).__name__}: {exc}")
         return HealthCheckResult(
             component=component,
             status=HealthStatus.DEGRADED,
@@ -250,6 +270,7 @@ async def _check_smtp() -> HealthCheckResult:
             metadata={"host": host, "port": port},
         )
     except Exception as exc:  # pragma: no cover - network failures
+        print(f"[Health] SMTP: Exception - {type(exc).__name__}: {exc}")
         return HealthCheckResult(
             component=component,
             status=HealthStatus.DEGRADED,
@@ -360,10 +381,26 @@ async def gather_health_checks() -> List[HealthCheckResult]:
 
 
 def _aggregate_status(checks: List[HealthCheckResult]) -> HealthStatus:
+    # Log any non-OK checks for debugging 503s
+    non_ok_checks = [
+        c
+        for c in checks
+        if c.status not in (HealthStatus.OK, HealthStatus.NOT_CONFIGURED)
+    ]
+    if non_ok_checks:
+        for check in non_ok_checks:
+            print(
+                f"[Health] ⚠️ {check.component}: {check.status.value} - {check.details}"
+            )
+
     if any(check.status == HealthStatus.CRITICAL for check in checks):
+        critical = [c for c in checks if c.status == HealthStatus.CRITICAL]
+        print(f"[Health] 🔴 CRITICAL status due to: {[c.component for c in critical]}")
         return HealthStatus.CRITICAL
 
     if any(check.status == HealthStatus.DEGRADED for check in checks):
+        degraded = [c for c in checks if c.status == HealthStatus.DEGRADED]
+        print(f"[Health] 🟡 DEGRADED status due to: {[c.component for c in degraded]}")
         return HealthStatus.DEGRADED
 
     if all(check.status == HealthStatus.NOT_CONFIGURED for check in checks):

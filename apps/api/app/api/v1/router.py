@@ -3,6 +3,7 @@ from app.api.v1.endpoints import (
     auth,
     goals,
     motivation,
+    daily_motivations,
     social,
     subscriptions,
     blog,
@@ -22,6 +23,9 @@ from app.api.v1.endpoints import (
     meals,
     progress_reflections,
     system_health,
+    webhooks,
+    nudges,
+    partners,
 )
 
 # Create main API router
@@ -34,6 +38,9 @@ api_router.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 api_router.include_router(goals.router, prefix="/goals", tags=["Goals"])
 api_router.include_router(
     motivation.router, prefix="/motivation", tags=["AI Motivation"]
+)
+api_router.include_router(
+    daily_motivations.router, prefix="/daily-motivations", tags=["Daily Motivations"]
 )
 api_router.include_router(social.router, prefix="/social", tags=["Social Features"])
 api_router.include_router(
@@ -73,4 +80,19 @@ api_router.include_router(
     system_health.router,
     prefix="/system/health",
     tags=["System Health"],
+)
+api_router.include_router(
+    webhooks.router,
+    prefix="/webhooks",
+    tags=["Webhooks"],
+)
+api_router.include_router(
+    nudges.router,
+    prefix="/nudges",
+    tags=["Social Nudges"],
+)
+api_router.include_router(
+    partners.router,
+    prefix="/partners",
+    tags=["Accountability Partners"],
 )

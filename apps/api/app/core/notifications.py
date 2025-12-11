@@ -30,7 +30,7 @@ async def send_push_notification(
 
         # Send message
         response = messaging.send(message)
-        logger.info(f"Successfully sent message: {response}")
+        print(f"Successfully sent message: {response}")
 
         return {"success": True, "message_id": response}
 
@@ -63,7 +63,7 @@ async def send_bulk_notifications(
 
         # Send message
         response = messaging.send_multicast(message)
-        logger.info(f"Successfully sent {response.success_count} messages")
+        print(f"Successfully sent {response.success_count} messages")
 
         return {
             "success": True,
@@ -83,7 +83,7 @@ async def schedule_notification(
     try:
         # In a real implementation, you'd use a job queue like Celery
         # For now, we'll just log the scheduled notification
-        logger.info(f"Scheduled notification for user {user_id} at {scheduled_time}")
+        print(f"Scheduled notification for user {user_id} at {scheduled_time}")
 
         return {"success": True, "scheduled_at": scheduled_time}
 

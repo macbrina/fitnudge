@@ -11,24 +11,26 @@ export default function UserLayout() {
 
   return (
     <Stack>
-      <Stack.Screen
-        name="(tabs)"
-        options={{
-          headerShown: false,
-        }}
-      />
-      <Stack.Screen
-        name="(onboarding)"
-        options={{
-          headerShown: false,
-        }}
-      />
-      <Stack.Screen
-        name="(goals)"
-        options={{
-          headerShown: false,
-        }}
-      />
+      <Stack.Protected guard={isAuthenticated}>
+        <Stack.Screen
+          name="(tabs)"
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="(onboarding)"
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="(goals)"
+          options={{
+            headerShown: false,
+          }}
+        />
+      </Stack.Protected>
     </Stack>
   );
 }

@@ -27,6 +27,7 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   isLoggingOut: boolean;
+  isVerifyingUser: boolean; // Prevents services from initializing during user verification
   logoutReason: LogoutReason;
 }
 
@@ -39,6 +40,7 @@ interface AuthActions {
   logout: (reason?: LogoutReason) => Promise<boolean>;
   updateUser: (user: Partial<User>) => void;
   setLoading: (loading: boolean) => void;
+  setVerifyingUser: (verifying: boolean) => void;
   clearLogoutReason: () => void;
 }
 
@@ -52,6 +54,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       isAuthenticated: false,
       isLoading: false,
       isLoggingOut: false,
+      isVerifyingUser: true,
       logoutReason: null,
 
       // Actions
@@ -74,49 +77,61 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           return false;
         }
 
-        set({ isLoggingOut: true });
+        // IMMEDIATELY mark as not authenticated and logging out
+        // This prevents race conditions where other code checks isAuthenticated
+        set({
+          isLoggingOut: true,
+          isAuthenticated: false,
+          user: null,
+          accessToken: null,
+          refreshToken: null,
+        });
+
+        // Clear tokens from cache immediately
+        await TokenManager.clearTokens();
 
         let success = false;
 
         try {
-          try {
-            await notificationService.clearAllData();
-          } catch (notificationError) {
-            console.warn(
-              "[AuthStore] Failed to clear notification data during logout:",
-              notificationError
-            );
-          }
+          if (reason !== "not_found") {
+            try {
+              // Unregister device from backend (preserves local notifications & preferences)
+              // Device will auto-register on next app startup when user logs back in
+              await notificationService.clearOnLogout();
+            } catch (notificationError) {
+              console.warn(
+                "[AuthStore] Failed to unregister device during logout:",
+                notificationError
+              );
+            }
 
-          const response = await authService.logout();
-          if (response.status >= 200 && response.status < 400) {
-            success = true;
-          } else if (response.status === 401) {
-            // Treat missing/expired session as logged out
-            success = true;
-          } else {
-            console.warn(
-              `[AuthStore] Logout request returned status ${response.status}: ${response.error}`
-            );
+            const response = await authService.logout();
+            if (response.status >= 200 && response.status < 400) {
+              success = true;
+            } else if (response.status === 401) {
+              // Treat missing/expired session as logged out
+              success = true;
+            } else {
+              console.warn(
+                `[AuthStore] Logout request returned status ${response.status}: ${response.error}`
+              );
+            }
           }
         } catch (error) {
-          console.error("[AuthStore] Logout failed:", error);
+          // treat as success
+          success = true;
         } finally {
           try {
-            await TokenManager.clearTokens();
             await TokenManager.clearRememberMe();
           } catch (tokenError) {
             console.warn(
-              "[AuthStore] Failed to clear stored tokens during logout:",
+              "[AuthStore] Failed to clear remember me during logout:",
               tokenError
             );
           }
 
+          // Ensure state is cleared (already done above, but confirm)
           set({
-            user: null,
-            accessToken: null,
-            refreshToken: null,
-            isAuthenticated: false,
             isLoading: false,
             isLoggingOut: false,
             logoutReason: reason || null,
@@ -137,6 +152,10 @@ export const useAuthStore = create<AuthState & AuthActions>()(
 
       setLoading: (loading) => {
         set({ isLoading: loading });
+      },
+
+      setVerifyingUser: (verifying) => {
+        set({ isVerifyingUser: verifying });
       },
 
       clearLogoutReason: () => {

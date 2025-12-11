@@ -351,10 +351,10 @@ export default function AILoadingAnimation({
     }).start();
   };
 
-  // Interpolations
+  // Interpolations - use contained width instead of screen width
   const shimmerTranslateX = shimmerAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [-width, width],
+    outputRange: [-200, 200], // Contained width for shimmer effect
   });
 
   const orbRotate = orbRotation.interpolate({
@@ -372,7 +372,8 @@ export default function AILoadingAnimation({
     outputRange: [50, 30],
   });
 
-  const progressBarWidth = width * 0.75;
+  // Use a contained width instead of screen width
+  const progressBarWidth = 280; // Fixed reasonable width
   const progressWidth = progressAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [0, progressBarWidth],
@@ -392,19 +393,6 @@ export default function AILoadingAnimation({
     <>
       <ReducedMotionConfig mode={ReduceMotion.Never} />
       <View style={styles.container}>
-        {/* Animated background gradient */}
-        <Animated.View
-          style={[
-            styles.backgroundGradient,
-            {
-              opacity: fadeAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [0, 0.15],
-              }),
-            },
-          ]}
-        />
-
         <Animated.View
           style={[
             styles.animationContainer,
@@ -565,7 +553,7 @@ export default function AILoadingAnimation({
                       {
                         translateX: waveOffset.interpolate({
                           inputRange: [0, 1],
-                          outputRange: [-width, width],
+                          outputRange: [-280, 280], // Match progress bar width
                         }),
                       },
                     ],
@@ -634,18 +622,11 @@ export default function AILoadingAnimation({
 const makeAILoadingAnimationStyles = (tokens: any, colors: any, brand: any) => {
   return {
     container: {
-      flex: 1,
+      width: "100%",
       justifyContent: "center" as const,
       alignItems: "center" as const,
-      backgroundColor: colors.bg.canvas,
       position: "relative" as const,
-    },
-    backgroundGradient: {
-      position: "absolute" as const,
-      width: width * 1.5,
-      height: height * 1.5,
-      borderRadius: width,
-      backgroundColor: brand.primary,
+      minHeight: 400, // Minimum height for proper layout
     },
     animationContainer: {
       alignItems: "center" as const,
@@ -737,8 +718,10 @@ const makeAILoadingAnimationStyles = (tokens: any, colors: any, brand: any) => {
       backgroundColor: brand.primary,
     },
     progressContainer: {
-      width: width * 0.75,
+      width: "100%",
+      maxWidth: width * 0.75,
       alignItems: "center" as const,
+      paddingHorizontal: toRN(tokens.spacing[4]),
     },
     progressBarBackground: {
       width: "100%",
@@ -750,7 +733,7 @@ const makeAILoadingAnimationStyles = (tokens: any, colors: any, brand: any) => {
     },
     progressWave: {
       position: "absolute" as const,
-      width: width,
+      width: "200%", // Relative to progress bar width
       height: "100%",
       backgroundColor: colors.bg.muted,
       opacity: 0.3,

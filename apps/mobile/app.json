@@ -19,7 +19,11 @@
       "bundleIdentifier": "com.fitnudge.app",
       "infoPlist": {
         "UIBackgroundModes": ["remote-notification", "remote-notification"],
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "We need access to your camera to take progress photos for your fitness goals.",
+        "NSPhotoLibraryUsageDescription": "We need access to your photo library to select progress photos for your fitness goals.",
+        "NSPhotoLibraryAddUsageDescription": "We need access to save progress photos to your photo library.",
+        "NSMicrophoneUsageDescription": "We need access to your microphone to enable voice input for AI chat and fitness coaching."
       },
       "associatedDomains": ["applinks:fitnudge.app"]
     },
@@ -34,7 +38,12 @@
       "permissions": [
         "POST_NOTIFICATIONS",
         "RECEIVE_BOOT_COMPLETED",
-        "VIBRATE"
+        "VIBRATE",
+        "CAMERA",
+        "RECORD_AUDIO",
+        "READ_EXTERNAL_STORAGE",
+        "READ_MEDIA_IMAGES",
+        "WRITE_EXTERNAL_STORAGE"
       ],
       "intentFilters": [
         {
@@ -175,8 +184,7 @@
         {
           "icon": "./assets/notification-icon.png",
           "color": "#2563EB",
-          "sounds": ["./assets/sounds/motivation_call.mp3"],
-          "mode": "production"
+          "sounds": ["./assets/sounds/motivation_call.mp3"]
         }
       ],
       "expo-web-browser",

@@ -1,6 +1,6 @@
 import React from "react";
 import { Text, TextProps } from "react-native";
-import { InAppBrowser } from "./InAppBrowser";
+import { useInAppBrowser } from "./InAppBrowser";
 import { useTheme } from "@/themes";
 
 interface LinkTextProps extends TextProps {
@@ -46,12 +46,17 @@ export default function LinkText({
   ...props
 }: LinkTextProps) {
   const { colors, brandColors } = useTheme();
+  const {
+    openBrowser,
+    openWithChoice,
+    openExternal: openExternalBrowser,
+  } = useInAppBrowser();
 
   const handlePress = () => {
     if (openExternal) {
-      InAppBrowser.openExternal(url);
+      openExternalBrowser(url);
     } else if (showChoice) {
-      InAppBrowser.openWithChoice({
+      openWithChoice({
         url,
         title,
         showOpenInBrowser: true,
@@ -59,7 +64,7 @@ export default function LinkText({
         controlsColor: colors.text.primary,
       });
     } else {
-      InAppBrowser.open({
+      openBrowser({
         url,
         title,
         showOpenInBrowser: true,

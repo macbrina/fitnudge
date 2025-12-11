@@ -15,11 +15,11 @@ import { storageUtil } from "@/utils/storageUtil";
 import { STORAGE_KEYS } from "@/utils/storageUtil";
 import posthog from "@/lib/posthog";
 import { notificationApi } from "@/services/api/notifications";
+import { handleDeepLink as routeDeepLink } from "@/utils/deepLinkHandler";
 
 // Configure notification behavior
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
     shouldShowBanner: true,
@@ -95,6 +95,13 @@ class NotificationService {
   }
 
   public async initializeNotifications(): Promise<void> {
+    // Dynamic import to avoid circular dependency
+    const { useAuthStore } = await import("@/stores/authStore");
+    const { isAuthenticated } = useAuthStore.getState();
+    if (!isAuthenticated) {
+      return;
+    }
+
     try {
       // Set up notification channels for Android
       if (Platform.OS === "android") {
@@ -180,9 +187,33 @@ class NotificationService {
   };
 
   private handleDeepLink(data: NotificationData): void {
-    // TODO: Implement deep linking logic
-    // This will be handled by the navigation system
-    console.log("Deep link data:", data);
+    console.log("📲 Handling notification deep link:", data);
+
+    // Use the deepLink from notification data if available
+    if (data.deepLink) {
+      // Convert relative path to full URL for the handler
+      const fullUrl = `fitnudge://app${data.deepLink}`;
+      routeDeepLink(fullUrl);
+      return;
+    }
+
+    // Fallback: route based on notification type
+    switch (data.type) {
+      case "reminder":
+        if (data.goalId) {
+          routeDeepLink(`fitnudge://app/checkin/${data.goalId}`);
+        }
+        break;
+      case "achievement":
+        routeDeepLink("fitnudge://app/profile");
+        break;
+      case "social":
+        routeDeepLink("fitnudge://app/notifications");
+        break;
+      default:
+        // No specific route, just open the app
+        break;
+    }
   }
 
   public async requestPermissionsWithSoftPrompt(): Promise<PermissionStatus> {
@@ -256,27 +287,52 @@ class NotificationService {
         return null;
       }
 
+      console.log("[Notifications] Getting Expo push token...");
       const token = (
         await Notifications.getExpoPushTokenAsync({
           projectId: Constants.expoConfig?.extra?.eas?.projectId,
         })
       ).data;
 
+      console.log(
+        `[Notifications] Expo push token: ${token.substring(0, 30)}...`
+      );
       this.fcmToken = token;
 
-      // Send token to backend in background (fire-and-forget)
-      this.sendTokenToBackend(token).catch((error) => {
-        console.error("Background token registration failed:", error);
-      });
+      // ALWAYS send token to backend to ensure it's registered and active
+      // This handles cases where token was marked inactive or needs updating
+      console.log("[Notifications] Registering device with backend...");
+      await this.sendTokenToBackend(token);
+      console.log("[Notifications] ✅ Device registered successfully");
 
       return token;
     } catch (error) {
-      console.error("Failed to register for push notifications:", error);
+      console.error(
+        "[Notifications] Failed to register for push notifications:",
+        error
+      );
       return null;
     }
   }
 
   private async sendTokenToBackend(token: string): Promise<void> {
+    if (!token) {
+      console.log("[Notifications] No token to register");
+      return;
+    }
+
+    // Only register if user is authenticated
+    const { isAuthenticated } = (
+      await import("@/stores/authStore")
+    ).useAuthStore.getState();
+
+    if (!isAuthenticated) {
+      console.log(
+        "[Notifications] Skipping device registration: User not authenticated"
+      );
+      return;
+    }
+
     try {
       const deviceInfo: DeviceTokenInfo = {
         fcmToken: token,
@@ -287,10 +343,13 @@ class NotificationService {
         osVersion: Platform.Version.toString(),
       };
 
-      // Register device with backend
-      await notificationApi.registerDevice(deviceInfo);
+      // ALWAYS register - backend will upsert and mark as active
+      const response = await notificationApi.registerDevice(deviceInfo);
     } catch (error) {
-      console.error("Failed to send token to backend:", error);
+      // Silently handle - not critical if registration fails during logout
+      if (__DEV__ && !(error as any)?.message?.includes("Not authenticated")) {
+        console.warn("Failed to register device:", error);
+      }
     }
   }
 
@@ -415,15 +474,28 @@ class NotificationService {
       try {
         const response = await notificationApi.getNotificationPreferences();
 
-        // Store locally for offline access (setItem already stringifies)
-        if (response.preferences) {
-          await storageUtil.setItem(
-            STORAGE_KEYS.NOTIFICATION_PREFERENCES,
-            response.preferences
-          );
-        }
+        // Transform backend response to NotificationPreferences format
+        const preferences: NotificationPreferences = {
+          enabled: response.enabled,
+          aiMotivation: response.ai_motivation,
+          reminders: response.reminders,
+          social: response.social,
+          achievements: response.achievements,
+          reengagement: response.reengagement,
+          quietHours: {
+            enabled: response.quiet_hours_enabled,
+            start: response.quiet_hours_start,
+            end: response.quiet_hours_end,
+          },
+        };
 
-        return response.preferences;
+        // Store locally for offline access
+        await storageUtil.setItem(
+          STORAGE_KEYS.NOTIFICATION_PREFERENCES,
+          preferences
+        );
+
+        return preferences;
       } catch (backendError) {
         console.log(
           "Failed to get preferences from backend, using local storage:",
@@ -511,9 +583,52 @@ class NotificationService {
     }
   }
 
-  public async clearAllData(): Promise<void> {
+  /**
+   * Unregister device on logout.
+   * Does NOT cancel scheduled notifications (they're local and will be reused on re-login).
+   * Does NOT clear user preferences (NOTIFICATION_PREFERENCES, NOTIFICATION_SOFT_PROMPT_SHOWN).
+   * Device will automatically re-register on next app startup when user logs back in.
+   */
+  public async clearOnLogout(): Promise<void> {
+    // Dynamic import to avoid circular dependency
+    const { useAuthStore } = await import("@/stores/authStore");
+    const { isAuthenticated } = useAuthStore.getState();
+    if (!isAuthenticated) {
+      return;
+    }
+
     try {
+      // Unregister device from backend to prevent push notifications while logged out
+      if (this.fcmToken) {
+        try {
+          await notificationApi.unregisterDevice(this.fcmToken);
+        } catch (error) {
+          // silently ignore
+        }
+      }
+
+      // Clear in-memory FCM token
+      this.fcmToken = null;
+
+      // Note: DO NOT reset permissionStatus - user still has granted permissions
+      // Note: DO NOT cancel scheduled notifications - they're for user's goals and will be reused on re-login
+      // Note: DO NOT clear notification preferences - they should persist across sessions
+    } catch (error) {
+      // silently ignore
+    }
+  }
+
+  /**
+   * Complete notification data wipe for account deletion/disabled/suspended.
+   * Cancels ALL scheduled notifications, clears preferences, and unregisters device.
+   * This is a complete reset - use only when user account is gone.
+   */
+  public async clearAllNotificationData(): Promise<void> {
+    try {
+      // Cancel all scheduled local notifications (user's goals are gone)
       await this.cancelAllScheduledNotifications();
+
+      // Clear notification preferences (fresh start for potential new account)
       await storageUtil.removeItem(STORAGE_KEYS.NOTIFICATION_PREFERENCES);
       await storageUtil.removeItem(STORAGE_KEYS.NOTIFICATION_SOFT_PROMPT_SHOWN);
 
@@ -526,12 +641,11 @@ class NotificationService {
         }
       }
 
+      // Reset all in-memory state
       this.fcmToken = null;
       this.permissionStatus = "undetermined";
-
-      console.log("Notification data cleared");
     } catch (error) {
-      console.error("Failed to clear notification data:", error);
+      console.error("Failed to clear all notification data:", error);
     }
   }
 }

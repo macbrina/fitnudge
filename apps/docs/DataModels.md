@@ -27,7 +27,7 @@ CREATE TABLE users (
     username TEXT UNIQUE,
     profile_picture_url TEXT,
     bio TEXT,
-    plan TEXT DEFAULT 'free' CHECK (plan IN ('free', 'pro', 'coach_plus')),
+    plan TEXT DEFAULT 'free' CHECK (plan IN ('free', 'pro', 'elite')),
     timezone TEXT DEFAULT 'UTC',
     language TEXT DEFAULT 'en',
     is_active BOOLEAN DEFAULT true,
@@ -193,7 +193,7 @@ CREATE TABLE feed_preferences (
 CREATE TABLE subscriptions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    plan TEXT NOT NULL CHECK (plan IN ('free', 'pro', 'coach_plus')),
+    plan TEXT NOT NULL CHECK (plan IN ('free', 'pro', 'elite')),
     status TEXT NOT NULL CHECK (status IN ('active', 'cancelled', 'expired', 'past_due')),
     platform TEXT NOT NULL CHECK (platform IN ('ios', 'android')),
     product_id TEXT NOT NULL, -- Apple/Google product ID
@@ -511,7 +511,7 @@ CREATE POLICY "Only admins can access admin_users" ON admin_users
 ```sql
 -- Test user with email/password
 INSERT INTO users (email, password_hash, name, username, auth_provider)
-VALUES ('test@fitnudge.com', '$2b$12$...', 'Test User', 'testuser', 'email');
+VALUES ('test@fitnudge.app', '$2b$12$...', 'Test User', 'testuser', 'email');
 
 -- Test user with Apple Sign In
 INSERT INTO users (email, name, username, auth_provider)
@@ -551,14 +551,91 @@ INSERT INTO blog_categories (name, slug, description) VALUES
 
 ## 🔄 Realtime Configuration
 
-### Enable Realtime for Social Features
+### ⚡ Critical: Realtime-Enabled Tables
+
+**All implementations using these tables MUST use Supabase Realtime for instant updates.**
+
+#### 🔒 **PHASE 1: Security & User Management**
+
+- ✅ **`users`** - Force logout on ban/suspend/disable (CRITICAL)
+
+#### 🎯 **PHASE 2: Core Features**
+
+- ✅ **`check_ins`** - Instant updates when Celery creates/completes check-ins
+- ✅ **`goals`** - Multi-device goal sync, CRUD operations
+- ✅ **`actionable_plans`** - Real-time AI plan generation status (generating → completed)
+- ✅ **`daily_motivations`** - Instant motivation regeneration updates
+
+#### 🔔 **PHASE 3: Notifications & Motivation**
+
+- ✅ **`motivations`** - Scheduled push notification status tracking
+- ✅ **`notification_history`** - Delivery tracking, analytics
+
+#### 🍎 **PHASE 4: Meal Tracking**
+
+- ✅ **`meal_logs`** - Real-time meal logging, multi-device sync
+- ✅ **`daily_nutrition_summaries`** - Auto-updated nutrition totals
+
+#### 🏆 **PHASE 5: Gamification & Social**
+
+- ✅ **`achievement_types`** - New badges added by admins
+- ✅ **`user_achievements`** - Instant badge unlock notifications
+- ✅ **`accountability_partners`** - Partner request status changes
+- ✅ **`challenges`** - Live challenge updates
+- ✅ **`challenge_participants`** - Join/leave updates
+- ✅ **`challenge_leaderboard`** - Live competitive rankings
+- ✅ **`group_goals`** - Team collaboration updates
+
+#### 🌐 **Already Enabled: Social Features**
+
+- ✅ **`posts`** - Real-time feed updates
+- ✅ **`comments`** - Live comment threads
+- ✅ **`likes`** - Instant reaction updates
+- ✅ **`follows`** - Follow/unfollow notifications
+
+---
+
+### 📋 Implementation Requirements
+
+**When implementing features using Realtime-enabled tables:**
+
+1. **Subscribe to table changes** using Supabase Realtime client
+2. **Auto-invalidate React Query cache** on INSERT/UPDATE/DELETE events
+3. **Handle connection/reconnection** gracefully with exponential backoff
+4. **Force logout** on `users` table status changes (disabled/suspended)
+5. **Use optimistic updates** for better UX during network delays
+6. **Clean up subscriptions** on component unmount to prevent memory leaks
+
+**Example Implementation:**
+
+```typescript
+// Mobile: apps/mobile/src/services/realtime/realtimeService.ts
+// Subscribe to check_ins table for instant updates
+supabase
+  .channel("check_ins_changes")
+  .on(
+    "postgres_changes",
+    { event: "*", schema: "public", table: "check_ins" },
+    (payload) => {
+      // Invalidate React Query cache for check-ins
+      queryClient.invalidateQueries({ queryKey: ["check-ins"] });
+    }
+  )
+  .subscribe();
+```
+
+---
+
+### Enable Realtime via Migration
 
 ```sql
--- Enable realtime for posts, comments, likes
-ALTER PUBLICATION supabase_realtime ADD TABLE posts;
-ALTER PUBLICATION supabase_realtime ADD TABLE comments;
-ALTER PUBLICATION supabase_realtime ADD TABLE likes;
-ALTER PUBLICATION supabase_realtime ADD TABLE follows;
+-- See: apps/api/supabase/migrations/20251203000000_enable_realtime_for_core_tables.sql
+-- Uses conditional enablement to avoid errors if already enabled
+
+SELECT add_table_to_realtime_if_not_exists('users');
+SELECT add_table_to_realtime_if_not_exists('check_ins');
+SELECT add_table_to_realtime_if_not_exists('goals');
+-- ... (18 tables total)
 ```
 
 ### Realtime Filters

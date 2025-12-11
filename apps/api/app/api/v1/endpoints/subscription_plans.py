@@ -99,7 +99,6 @@ async def get_subscription_plans(
             plan = SubscriptionPlan(**plan_data, features=plan_features)
             plans.append(plan)
 
-        logger.info(f"Retrieved {len(plans)} subscription plans with features")
         return SubscriptionPlansResponse(plans=plans)
 
     except Exception as e:

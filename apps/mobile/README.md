@@ -45,7 +45,7 @@ The mobile application for FitNudge, built with React Native and Expo, providing
 ### Subscriptions
 
 - **In-App Purchases**: Apple IAP and Google Play Billing
-- **Subscription Tiers**: Free, Pro, Coach+
+- **Subscription Tiers**: Free, Pro, Elite
 - **Feature Gating**: Premium features and limitations
 - **Restore Purchases**: Cross-device subscription sync
 

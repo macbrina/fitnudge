@@ -24,10 +24,15 @@ export interface SubscriptionPlan {
   trial_days: number | null;
   is_active: boolean;
   sort_order: number;
-  // Exit-offer fields (optional)
-  exit_offer_enabled?: boolean | null;
-  exit_offer_monthly_price?: number | null;
-  exit_offer_annual_price?: number | null;
+  // IAP Product IDs (from database)
+  product_id_ios_monthly: string | null;
+  product_id_ios_annual: string | null;
+  product_id_android_monthly: string | null;
+  product_id_android_annual: string | null;
+  // Exit-offer fields
+  exit_offer_enabled: boolean;
+  exit_offer_monthly_price: number | null;
+  exit_offer_annual_price: number | null;
 }
 
 export interface SubscriptionPlansResponse {

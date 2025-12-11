@@ -56,7 +56,7 @@ class MealTrackingService:
                     .select("id, user_id")
                     .eq("id", goal_id)
                     .eq("user_id", user_id)
-                    .single()
+                    .maybe_single()
                     .execute()
                 )
 
@@ -81,7 +81,7 @@ class MealTrackingService:
 
             # Daily nutrition summary will be updated automatically via trigger
 
-            logger.info(
+            print(
                 f"Meal logged for user {user_id}",
                 {
                     "user_id": user_id,
@@ -203,7 +203,7 @@ class MealTrackingService:
                 .select("id, user_id")
                 .eq("id", meal_log_id)
                 .eq("user_id", user_id)
-                .single()
+                .maybe_single()
                 .execute()
             )
 
@@ -235,7 +235,7 @@ class MealTrackingService:
                     supabase.table("meal_logs")
                     .select("*")
                     .eq("id", meal_log_id)
-                    .single()
+                    .maybe_single()
                     .execute()
                 )
                 return result.data if result.data else None
@@ -276,7 +276,7 @@ class MealTrackingService:
                 .select("id")
                 .eq("id", meal_log_id)
                 .eq("user_id", user_id)
-                .single()
+                .maybe_single()
                 .execute()
             )
 
@@ -284,11 +284,6 @@ class MealTrackingService:
                 raise ValueError("Meal log not found or you don't have permission")
 
             supabase.table("meal_logs").delete().eq("id", meal_log_id).execute()
-
-            logger.info(
-                f"Meal log {meal_log_id} deleted",
-                {"meal_log_id": meal_log_id, "user_id": user_id},
-            )
 
             return True
 
@@ -336,7 +331,7 @@ class MealTrackingService:
             else:
                 query = query.is_("goal_id", "null")
 
-            result = query.single().execute()
+            result = query.maybe_single().execute()
 
             return result.data if result.data else None
 

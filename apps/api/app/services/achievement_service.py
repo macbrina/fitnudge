@@ -77,7 +77,7 @@ class AchievementService:
                         newly_unlocked.append(unlocked)
 
             if newly_unlocked:
-                logger.info(
+                print(
                     f"Unlocked {len(newly_unlocked)} achievements for user {user_id}",
                     {
                         "user_id": user_id,
@@ -183,7 +183,7 @@ class AchievementService:
                         supabase.table("goals")
                         .select("target_days")
                         .eq("id", goal_id)
-                        .single()
+                        .maybe_single()
                         .execute()
                     )
                     if goal.data:
@@ -321,7 +321,7 @@ class AchievementService:
                 unlocked["points"] = achievement_data.get("points", 0)
                 unlocked["rarity"] = achievement_data.get("rarity", "common")
 
-                logger.info(
+                print(
                     f"Unlocked achievement {achievement_data.get('badge_key')} for user {user_id}",
                     {
                         "user_id": user_id,

@@ -11,18 +11,21 @@ The social feed combines AI-generated motivation messages with community posts i
 **API Endpoint**: `GET /api/v1/social/feed`
 
 Returns a unified feed containing:
+
 - **AI Motivation Messages**: Personalized AI messages for the user
 - **Community Posts**: Public posts from other users
 
 **Implementation**: `apps/api/app/api/v1/endpoints/social.py`
 
 **Features**:
+
 - Merges AI and community content
 - Sorted by creation date (newest first)
 - Pagination support
 - Filtering options
 
 **Query Parameters**:
+
 - `page`: Page number (default: 1)
 - `limit`: Items per page (default: 20, max: 50)
 - `category`: Filter by category (future feature)
@@ -31,12 +34,14 @@ Returns a unified feed containing:
 ### 2. Feed Preferences
 
 **Database Table**: `feed_preferences`
+
 - User-specific feed settings
 - Controls what appears in feed:
   - `show_ai_posts`: Show AI motivation messages (default: true)
   - `show_following_only`: Only show posts from followed users
 
 **Implementation**:
+
 - Preferences checked when building feed query
 - If `show_following_only` is true, only shows posts from users being followed
 
@@ -45,12 +50,14 @@ Returns a unified feed containing:
 **API Endpoint**: `POST /api/v1/social/posts`
 
 Users can create text posts to share:
+
 - Progress updates
 - Thoughts and reflections
 - Achievements
 - General motivation
 
 **Request**:
+
 ```python
 class PostCreate(BaseModel):
     content: str
@@ -60,6 +67,7 @@ class PostCreate(BaseModel):
 ```
 
 **Database Table**: `posts`
+
 - Stores community posts
 - Tracks likes and comments counts
 - Links to user via `user_id`
@@ -69,10 +77,12 @@ class PostCreate(BaseModel):
 **API Endpoint**: `POST /api/v1/social/posts` (with `media_type: "voice"`)
 
 **Access Control**:
+
 - **Free Users**: Cannot create voice posts
-- **Pro/Coach+ Users**: Can create voice posts
+- **Pro/Elite Users**: Can create voice posts
 
 **Implementation**:
+
 - Checks user's plan before allowing voice post creation
 - Returns 403 Forbidden for free users
 
@@ -81,22 +91,26 @@ class PostCreate(BaseModel):
 **API Endpoint**: `POST /api/v1/social/posts/{post_id}/like`
 
 **Reaction Types**:
+
 - `like`: Standard like
 - `cheer`: Encouragement reaction
 - `love`: Strong positive reaction
 
 **Request**:
+
 ```python
 class LikeCreate(BaseModel):
     reaction_type: str = "like"  # like, cheer, love
 ```
 
 **Database Table**: `likes`
+
 - Tracks reactions to posts
 - Links user to post
 - Stores reaction type
 
 **Features**:
+
 - Update existing like (change reaction type)
 - Remove like: `DELETE /api/v1/social/posts/{post_id}/like`
 - Like counts displayed on posts
@@ -108,6 +122,7 @@ class LikeCreate(BaseModel):
 Users can comment on posts to engage in discussions.
 
 **Request**:
+
 ```python
 class CommentCreate(BaseModel):
     content: str
@@ -116,11 +131,13 @@ class CommentCreate(BaseModel):
 **API Endpoint**: `GET /api/v1/social/posts/{post_id}/comments`
 
 Retrieve comments for a post:
+
 - Pagination support
 - Sorted by creation date (newest first)
 - Includes user information
 
 **Database Table**: `comments`
+
 - Stores post comments
 - Links to post and user
 - Tracks comment count on posts
@@ -144,18 +161,21 @@ Get list of user's followers.
 Get list of users that this user is following.
 
 **Database Table**: `follows`
+
 - `follower_id`: User who is following
 - `following_id`: User being followed
 
 ### 8. Advanced Filtering
 
 **Future Features**:
+
 - Filter by category
 - Filter by date range
 - Filter by popularity (most liked)
 - Filter by post type (text, voice, image)
 
 **Current Implementation**:
+
 - Filter by user_id
 - Filter by following status (via feed preferences)
 
@@ -196,4 +216,3 @@ Get list of users that this user is following.
 - Like/comment UI
 - User profile viewing
 - Follow/unfollow buttons
-
