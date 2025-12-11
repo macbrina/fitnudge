@@ -60,13 +60,9 @@ export default function Index() {
           // base.ts already handled logout if needed (404/401/403)
           // We just need to check if the call succeeded
           if (response.status === 200 && response.data) {
-            console.log("[Index] ✅ User verified");
             isUserVerified = true;
           } else {
             // base.ts triggered logout, just log
-            console.log(
-              `[Index] User verification: ${response.status} (base.ts handling logout)`
-            );
           }
         } catch (error) {
           setVerifyingUser(true);

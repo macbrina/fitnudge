@@ -131,7 +131,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
   const customerInfoListenerRef = useRef<(() => void) | null>(null);
 
   // External stores
-  const { user } = useAuthStore();
+  const { user, isAuthenticated, isVerifyingUser } = useAuthStore();
   const { plans, fetchPlans } = usePricingStore();
   const { refresh: refreshSubscription } = useSubscriptionStore();
   const { markAsSubscribed } = useExitOfferStore();
@@ -795,10 +795,12 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
   // Effects
   // ====================
 
-  // Initialize on mount
+  // Initialize only after user verification is complete and authenticated
   useEffect(() => {
-    initialize();
-  }, [initialize]);
+    if (!isVerifyingUser && isAuthenticated) {
+      initialize();
+    }
+  }, [initialize, isVerifyingUser, isAuthenticated]);
 
   // Handle user changes (login/logout)
   useEffect(() => {

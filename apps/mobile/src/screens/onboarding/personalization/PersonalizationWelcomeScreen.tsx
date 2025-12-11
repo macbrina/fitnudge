@@ -152,7 +152,7 @@ const makePersonalizationWelcomeScreenStyles = (
     benefitCard: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
-      paddingHorizontal: toRN(tokens.spacing[5]),
+      paddingHorizontal: toRN(tokens.spacing[4]),
       paddingVertical: toRN(tokens.spacing[4]),
       borderRadius: toRN(tokens.borderRadius.lg),
     },
