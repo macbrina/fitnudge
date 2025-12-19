@@ -113,33 +113,35 @@ export default function MotivationStyleScreen({
                     isSelected && styles.optionCardSelected,
                   ]}
                 >
-                  <View
-                    style={[
-                      styles.iconContainer,
-                      isSelected && styles.iconContainerSelected,
-                    ]}
-                  >
-                    <Text style={styles.optionIcon}>
-                      {motivationStyle.icon}
-                    </Text>
-                  </View>
-                  <View style={styles.textContainer}>
-                    <Text
+                  <View style={styles.optionRow}>
+                    <View
                       style={[
-                        styles.optionTitle,
-                        isSelected && styles.optionTitleSelected,
+                        styles.iconContainer,
+                        isSelected && styles.iconContainerSelected,
                       ]}
                     >
-                      {t(motivationStyle.title)}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.optionDescription,
-                        isSelected && styles.optionDescriptionSelected,
-                      ]}
-                    >
-                      {t(motivationStyle.description)}
-                    </Text>
+                      <Text style={styles.optionIcon}>
+                        {motivationStyle.icon}
+                      </Text>
+                    </View>
+                    <View style={styles.textContainer}>
+                      <Text
+                        style={[
+                          styles.optionTitle,
+                          isSelected && styles.optionTitleSelected,
+                        ]}
+                      >
+                        {t(motivationStyle.title)}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.optionDescription,
+                          isSelected && styles.optionDescriptionSelected,
+                        ]}
+                      >
+                        {t(motivationStyle.description)}
+                      </Text>
+                    </View>
                   </View>
                 </Card>
               </TouchableOpacity>
@@ -194,6 +196,8 @@ const makeMotivationStyleScreenStyles = (
     },
     optionCard: {
       padding: toRN(tokens.spacing[5]),
+    },
+    optionRow: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
     },

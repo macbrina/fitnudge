@@ -1,6 +1,18 @@
-from fastapi import APIRouter, HTTPException, status, Depends, Query
+"""
+Subscriptions API Endpoints
+
+This module provides endpoints for:
+- Getting user's subscription status
+- Getting available features for user's plan
+- Syncing subscription from RevenueCat (fallback for missed webhooks)
+
+Note: All IAP/receipt verification is handled by RevenueCat.
+The RevenueCat webhook endpoint is in webhooks.py.
+"""
+
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import Optional
 from datetime import datetime
 from app.core.flexible_auth import get_current_user
 
@@ -22,21 +34,6 @@ class SubscriptionResponse(BaseModel):
     auto_renew: bool = False  # Always False for free users
     created_at: Optional[str] = None  # None for free users
     updated_at: Optional[str] = None  # None for free users
-
-
-class AppleReceiptVerify(BaseModel):
-    receipt_data: str
-    product_id: str
-
-
-class GooglePurchaseVerify(BaseModel):
-    purchase_token: str
-    product_id: str
-
-
-class OfferCodeValidate(BaseModel):
-    code: str
-    product_id: str
 
 
 @router.get("/me", response_model=Optional[SubscriptionResponse])
@@ -114,241 +111,169 @@ async def get_available_features(current_user: dict = Depends(get_current_user))
     }
 
 
-# Apple In-App Purchase endpoints
-@router.post("/iap/apple/verify-receipt")
-async def verify_apple_receipt(
-    receipt_data: AppleReceiptVerify, current_user: dict = Depends(get_current_user)
+# ====================
+# Sync Subscription (fallback for missed webhooks)
+# ====================
+
+
+class SyncSubscriptionRequest(BaseModel):
+    """Request body for syncing subscription from RevenueCat"""
+
+    tier: str  # 'free', 'starter', 'pro', 'elite'
+    is_active: bool
+    expires_at: Optional[str] = None
+    will_renew: bool = False
+    platform: Optional[str] = None  # 'ios', 'android', 'stripe'
+    product_id: Optional[str] = None
+
+
+@router.post("/sync")
+async def sync_subscription(
+    sync_data: SyncSubscriptionRequest,
+    current_user: dict = Depends(get_current_user),
 ):
-    """Verify Apple receipt after purchase"""
-    # TODO: Implement Apple receipt verification
-    # This would involve calling Apple's verifyReceipt API
+    """
+    Sync subscription status from RevenueCat to backend database.
 
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Apple receipt verification not yet implemented",
-    )
+    Called by mobile app when:
+    - User logs in
+    - App returns to foreground
+    - RevenueCat customer info updates
 
-
-@router.post("/iap/apple/webhook")
-async def apple_webhook(webhook_data: dict):
-    """Handle Apple App Store Server Notifications"""
-    # TODO: Implement Apple webhook handling
-    # This would process subscription status changes from Apple
-
-    return {"message": "Webhook received"}
-
-
-@router.get("/iap/apple/products")
-async def get_apple_products():
-    """Get Apple product IDs"""
-    return {
-        "products": [
-            {
-                "product_id": "com.fitnudge.pro.monthly",
-                "name": "Pro Monthly",
-                "price": 4.99,
-                "currency": "USD",
-            },
-            {
-                "product_id": "com.fitnudge.pro.annual",
-                "name": "Pro Annual",
-                "price": 49.99,
-                "currency": "USD",
-            },
-            {
-                "product_id": "com.fitnudge.coach.monthly",
-                "name": "Elite Monthly",
-                "price": 9.99,
-                "currency": "USD",
-            },
-            {
-                "product_id": "com.fitnudge.coach.annual",
-                "name": "Elite Annual",
-                "price": 99.99,
-                "currency": "USD",
-            },
-        ]
-    }
-
-
-@router.post("/iap/apple/restore")
-async def restore_apple_purchases(current_user: dict = Depends(get_current_user)):
-    """Restore previous Apple purchases"""
-    # TODO: Implement Apple purchase restoration
-    # This would check for existing purchases and restore subscription status
-
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Apple purchase restoration not yet implemented",
-    )
-
-
-@router.post("/iap/apple/validate-offer")
-async def validate_apple_offer(
-    offer_data: OfferCodeValidate, current_user: dict = Depends(get_current_user)
-):
-    """Validate Apple Offer Code"""
+    This ensures database stays in sync even if webhooks are missed.
+    """
     from app.core.database import get_supabase_client
+    from app.services.logger import logger
 
     supabase = get_supabase_client()
+    user_id = current_user["id"]
+    current_db_plan = current_user.get("plan", "free")
 
-    # Check if offer code exists and is valid
-    offer = (
-        supabase.table("offer_codes")
-        .select("*")
-        .eq("code", offer_data.code)
-        .eq("product_id", offer_data.product_id)
-        .eq("is_active", True)
+    # Map tier to plan ID
+    tier_to_plan = {
+        "free": "free",
+        "starter": "starter",
+        "pro": "pro",
+        "elite": "elite",
+    }
+    revenuecat_plan = tier_to_plan.get(sync_data.tier, "free")
+
+    # Check if there's a mismatch
+    if (
+        current_db_plan == revenuecat_plan
+        and not sync_data.is_active
+        and revenuecat_plan == "free"
+    ):
+        # Already in sync as free user
+        return {"synced": False, "message": "Already in sync", "plan": current_db_plan}
+
+    # Check existing subscription in DB
+    existing_sub = (
+        supabase.table("subscriptions")
+        .select("id, plan, status, updated_at")
+        .eq("user_id", user_id)
+        .maybe_single()
         .execute()
     )
 
-    if not offer.data:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Invalid offer code"
-        )
+    now = datetime.utcnow().isoformat()
 
-    offer_info = offer.data[0]
+    # Prevent race condition: if subscription was updated very recently (< 30 seconds),
+    # skip sync to avoid overwriting fresher webhook data
+    if existing_sub.data and existing_sub.data.get("updated_at"):
+        try:
+            last_updated = datetime.fromisoformat(
+                existing_sub.data["updated_at"].replace("Z", "+00:00")
+            )
+            seconds_since_update = (
+                datetime.utcnow().replace(tzinfo=last_updated.tzinfo) - last_updated
+            ).total_seconds()
+            if seconds_since_update < 30:
+                logger.info(
+                    f"[Sync] Skipping - subscription was updated {seconds_since_update:.1f}s ago"
+                )
+                return {
+                    "synced": False,
+                    "message": "Skipped - recently updated by webhook",
+                    "plan": existing_sub.data.get("plan", current_db_plan),
+                }
+        except Exception as e:
+            logger.warning(f"[Sync] Could not parse updated_at: {e}")
 
-    # Check if offer is still valid
-    now = datetime.utcnow()
-    if (
-        offer_info["valid_until"]
-        and datetime.fromisoformat(offer_info["valid_until"]) < now
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Offer code has expired"
-        )
+    if sync_data.is_active and revenuecat_plan != "free":
+        # User has active paid subscription in RevenueCat
+        subscription_data = {
+            "user_id": user_id,
+            "plan": revenuecat_plan,
+            "status": "active",
+            "platform": sync_data.platform,
+            "product_id": sync_data.product_id,
+            "expires_date": sync_data.expires_at,
+            "auto_renew": sync_data.will_renew,
+            "updated_at": now,
+        }
 
-    if offer_info["max_uses"] and offer_info["used_count"] >= offer_info["max_uses"]:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Offer code has reached maximum uses",
-        )
+        if existing_sub.data:
+            # Update existing subscription
+            supabase.table("subscriptions").update(subscription_data).eq(
+                "user_id", user_id
+            ).execute()
+            logger.info(
+                f"[Sync] Updated subscription for user {user_id}: {revenuecat_plan}"
+            )
+        else:
+            # Create new subscription record
+            subscription_data["created_at"] = now
+            subscription_data["purchase_date"] = now
+            supabase.table("subscriptions").insert(subscription_data).execute()
+            logger.info(
+                f"[Sync] Created subscription for user {user_id}: {revenuecat_plan}"
+            )
 
-    return {
-        "valid": True,
-        "discount_percentage": offer_info["discount_percentage"],
-        "discount_amount": offer_info["discount_amount"],
-        "duration_days": offer_info["duration_days"],
-    }
+        # Update user's plan column
+        if current_db_plan != revenuecat_plan:
+            supabase.table("users").update({"plan": revenuecat_plan}).eq(
+                "id", user_id
+            ).execute()
+            logger.info(
+                f"[Sync] Updated user plan {user_id}: {current_db_plan} -> {revenuecat_plan}"
+            )
 
+        return {
+            "synced": True,
+            "message": "Subscription synced",
+            "previous_plan": current_db_plan,
+            "new_plan": revenuecat_plan,
+        }
 
-# Google Play Billing endpoints
-@router.post("/iap/google/verify-purchase")
-async def verify_google_purchase(
-    purchase_data: GooglePurchaseVerify, current_user: dict = Depends(get_current_user)
-):
-    """Verify Google Play purchase token"""
-    # TODO: Implement Google Play purchase verification
-    # This would involve calling Google Play Developer API
+    else:
+        # User is free in RevenueCat (no active subscription)
+        if current_db_plan != "free":
+            # User was paid but now free - subscription expired
+            if existing_sub.data:
+                supabase.table("subscriptions").update(
+                    {
+                        "status": "expired",
+                        "auto_renew": False,
+                        "updated_at": now,
+                    }
+                ).eq("user_id", user_id).execute()
 
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Google Play purchase verification not yet implemented",
-    )
+            supabase.table("users").update({"plan": "free"}).eq("id", user_id).execute()
 
+            logger.info(f"[Sync] Downgraded user {user_id}: {current_db_plan} -> free")
 
-@router.post("/iap/google/webhook")
-async def google_webhook(webhook_data: dict):
-    """Handle Google Real-time Developer Notifications"""
-    # TODO: Implement Google webhook handling
-    # This would process subscription status changes from Google Play
+            return {
+                "synced": True,
+                "message": "Subscription expired, downgraded to free",
+                "previous_plan": current_db_plan,
+                "new_plan": "free",
+            }
 
-    return {"message": "Webhook received"}
-
-
-@router.get("/iap/google/products")
-async def get_google_products():
-    """Get Google Play product IDs"""
-    return {
-        "products": [
-            {
-                "product_id": "pro_monthly",
-                "name": "Pro Monthly",
-                "price": 4.99,
-                "currency": "USD",
-            },
-            {
-                "product_id": "pro_annual",
-                "name": "Pro Annual",
-                "price": 49.99,
-                "currency": "USD",
-            },
-            {
-                "product_id": "coach_monthly",
-                "name": "Elite Monthly",
-                "price": 9.99,
-                "currency": "USD",
-            },
-            {
-                "product_id": "coach_annual",
-                "name": "Elite Annual",
-                "price": 99.99,
-                "currency": "USD",
-            },
-        ]
-    }
-
-
-@router.post("/iap/google/acknowledge")
-async def acknowledge_google_purchase(
-    purchase_data: GooglePurchaseVerify, current_user: dict = Depends(get_current_user)
-):
-    """Acknowledge Google Play purchase (required by Google)"""
-    # TODO: Implement Google Play purchase acknowledgment
-    # This is required by Google to prevent refunds
-
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Google Play purchase acknowledgment not yet implemented",
-    )
+        return {"synced": False, "message": "Already free", "plan": "free"}
 
 
-@router.post("/iap/google/validate-promo")
-async def validate_google_promo(
-    promo_data: OfferCodeValidate, current_user: dict = Depends(get_current_user)
-):
-    """Validate Google Play promo code"""
-    from app.core.database import get_supabase_client
-
-    supabase = get_supabase_client()
-
-    # Check if promo code exists and is valid
-    offer = (
-        supabase.table("offer_codes")
-        .select("*")
-        .eq("code", promo_data.code)
-        .eq("product_id", promo_data.product_id)
-        .eq("is_active", True)
-        .execute()
-    )
-
-    if not offer.data:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Invalid promo code"
-        )
-
-    offer_info = offer.data[0]
-
-    # Check if offer is still valid
-    now = datetime.utcnow()
-    if (
-        offer_info["valid_until"]
-        and datetime.fromisoformat(offer_info["valid_until"]) < now
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Promo code has expired"
-        )
-
-    if offer_info["max_uses"] and offer_info["used_count"] >= offer_info["max_uses"]:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Promo code has reached maximum uses",
-        )
-
-    return {
-        "valid": True,
-        "discount_percentage": offer_info["discount_percentage"],
-        "discount_amount": offer_info["discount_amount"],
-        "duration_days": offer_info["duration_days"],
-    }
+# Note: All IAP verification, webhooks, and product fetching is handled by RevenueCat.
+# - RevenueCat SDK handles purchases on the client
+# - RevenueCat webhook is at POST /webhooks/revenuecat (in webhooks.py)
+# - Product info comes from RevenueCat SDK/dashboard

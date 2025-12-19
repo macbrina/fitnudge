@@ -301,13 +301,13 @@ def get_exercises_for_ai_prompt(
 def enhance_exercise_with_demo(exercise_name: str) -> Dict[str, Any]:
     """
     Enhance an exercise name with full demo data.
-    Used by plan generator to add GIFs and instructions to plans.
+    Used by plan generator to add MP4 videos and instructions to plans.
 
     Args:
         exercise_name: Name of exercise from AI-generated plan
 
     Returns:
-        Dict with demo data (gif_url, instructions, etc.) or empty dict
+        Dict with demo data (mp4_url, instructions, etc.) or empty dict
     """
     exercise = get_exercise_by_name(exercise_name)
 
@@ -316,8 +316,7 @@ def enhance_exercise_with_demo(exercise_name: str) -> Dict[str, Any]:
 
     return {
         "id": exercise["id"],
-        "gif_url": exercise["gif_url_360"],  # Default for mobile
-        "gif_url_thumb": exercise["gif_url_180"],  # Thumbnail
+        "mp4_url": exercise["mp4_url"],  # MP4 video for mobile
         "target_muscle": exercise["target_muscle"],
         "body_part": exercise["body_part"],
         "equipment": exercise["equipment"],
@@ -327,3 +326,199 @@ def enhance_exercise_with_demo(exercise_name: str) -> Dict[str, Any]:
         "description": exercise["description"],
         "category": exercise["category"],
     }
+
+
+def get_warmup_exercises(
+    target_muscles: Optional[List[str]] = None,
+    equipment: str = "body weight",
+    limit: int = 2,
+) -> List[Dict[str, Any]]:
+    """
+    Get warmup exercises from database.
+
+    Prioritizes stretching category exercises suitable for warmup.
+    All warmup exercises should be dynamic stretches (not static holds).
+
+    Args:
+        target_muscles: List of muscles to warm up (from main workout)
+        equipment: Equipment filter (default: body weight for accessibility)
+        limit: Maximum exercises to return (1-2 as per plan)
+
+    Returns:
+        List of warmup exercises with 30s duration each
+    """
+    supabase = get_supabase_client()
+
+    try:
+        # Query stretching exercises, prefer body weight
+        query = (
+            supabase.table("exercises")
+            .select("*")
+            .eq("category", "stretching")
+            .eq("equipment", equipment)
+        )
+
+        # Filter by target muscles if provided
+        if target_muscles and len(target_muscles) > 0:
+            # Try to find exercises targeting these muscles
+            query = query.in_("target_muscle", target_muscles)
+
+        result = query.order("usage_count", desc=True).limit(limit * 2).execute()
+
+        exercises = result.data or []
+
+        # If no muscle-specific stretches found, get general stretches
+        if len(exercises) < limit:
+            fallback_result = (
+                supabase.table("exercises")
+                .select("*")
+                .eq("category", "stretching")
+                .order("usage_count", desc=True)
+                .limit(limit)
+                .execute()
+            )
+            exercises = fallback_result.data or []
+
+        # Format warmup exercises with 30s duration
+        warmup_exercises = []
+        for ex in exercises[:limit]:
+            warmup_exercises.append(
+                {
+                    "exercise_id": ex["id"],
+                    "name": ex["name"],
+                    "duration_seconds": 30,
+                    "is_timed": True,  # Warmups are always timed
+                    "type": "warmup",
+                    "target_muscle": ex.get("target_muscle"),
+                    "mp4_url": ex.get("mp4_url"),
+                    "instructions": ex.get("instructions", []),
+                }
+            )
+
+        logger.info(f"Retrieved {len(warmup_exercises)} warmup exercises from database")
+        return warmup_exercises
+
+    except Exception as e:
+        logger.error(f"Error fetching warmup exercises: {e}")
+        return []
+
+
+def get_cooldown_exercises(
+    target_muscles: Optional[List[str]] = None,
+    equipment: str = "body weight",
+    limit: int = 2,
+) -> List[Dict[str, Any]]:
+    """
+    Get cooldown exercises from database.
+
+    Prioritizes stretching category exercises suitable for cooldown.
+    Cooldown exercises should be static stretches (held positions).
+
+    Args:
+        target_muscles: List of muscles to stretch (from main workout)
+        equipment: Equipment filter (default: body weight)
+        limit: Maximum exercises to return (1-2 as per plan)
+
+    Returns:
+        List of cooldown exercises with 30-60s duration each
+    """
+    supabase = get_supabase_client()
+
+    try:
+        # Query stretching exercises for cooldown
+        query = (
+            supabase.table("exercises")
+            .select("*")
+            .eq("category", "stretching")
+            .eq("equipment", equipment)
+        )
+
+        # Filter by target muscles if provided
+        if target_muscles and len(target_muscles) > 0:
+            query = query.in_("target_muscle", target_muscles)
+
+        result = query.order("usage_count", desc=True).limit(limit * 2).execute()
+
+        exercises = result.data or []
+
+        # If no muscle-specific stretches found, get general stretches
+        if len(exercises) < limit:
+            fallback_result = (
+                supabase.table("exercises")
+                .select("*")
+                .eq("category", "stretching")
+                .order("usage_count", desc=True)
+                .limit(limit)
+                .execute()
+            )
+            exercises = fallback_result.data or []
+
+        # Format cooldown exercises with 30-60s duration
+        cooldown_exercises = []
+        for i, ex in enumerate(exercises[:limit]):
+            # Alternate between 30s and 45s for variety
+            duration = 30 if i % 2 == 0 else 45
+            cooldown_exercises.append(
+                {
+                    "exercise_id": ex["id"],
+                    "name": ex["name"],
+                    "duration_seconds": duration,
+                    "is_timed": True,  # Cooldowns are always timed
+                    "type": "cooldown",
+                    "target_muscle": ex.get("target_muscle"),
+                    "mp4_url": ex.get("mp4_url"),
+                    "instructions": ex.get("instructions", []),
+                }
+            )
+
+        logger.info(
+            f"Retrieved {len(cooldown_exercises)} cooldown exercises from database"
+        )
+        return cooldown_exercises
+
+    except Exception as e:
+        logger.error(f"Error fetching cooldown exercises: {e}")
+        return []
+
+
+def is_timed_exercise(exercise_name: str) -> bool:
+    """
+    Determine if an exercise should be timed (countdown) or rep-based (done button).
+
+    Timed exercises: planks, holds, wall sits, static stretches
+    Rep-based exercises: squats, pushups, lunges, etc.
+
+    Args:
+        exercise_name: Name of the exercise
+
+    Returns:
+        True if exercise should show timer, False if it should show "Do X reps"
+    """
+    name_lower = exercise_name.lower()
+
+    # Keywords that indicate timed exercises
+    timed_keywords = [
+        "plank",
+        "hold",
+        "wall sit",
+        "bridge hold",
+        "dead hang",
+        "isometric",
+        "static",
+        "stretch",
+        "pose",
+        "position",
+        "hang",
+        "sit",
+        "hollow",
+        "superman hold",
+        "l-sit",
+        "split",
+        "pike",
+    ]
+
+    for keyword in timed_keywords:
+        if keyword in name_lower:
+            return True
+
+    return False

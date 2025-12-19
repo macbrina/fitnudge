@@ -3,7 +3,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.security import HTTPBearer
 from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
 import uvicorn
 import os
 from dotenv import load_dotenv
@@ -69,9 +68,6 @@ app.add_middleware(SessionManagementMiddleware)
 
 # Include API router
 app.include_router(api_router, prefix="/api/v1")
-
-# Mount static files for exercise GIFs and media
-app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Health check endpoint (cached)
 app.add_api_route(

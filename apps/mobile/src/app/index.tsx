@@ -74,36 +74,45 @@ export default function Index() {
         }
 
         // Only fetch background data if user was successfully verified
+        let hasFitnessProfile = false;
         if (isUserVerified) {
-          // Fetch subscription, features, and pricing plans in the background (non-blocking)
+          // Fetch subscription, features, pricing plans, and fitness profile in the background
           // This runs after user verification, preventing wasted calls if user doesn't exist
           try {
-            const [{ useSubscriptionStore }, { usePricingStore }] =
-              await Promise.all([
-                import("@/stores/subscriptionStore"),
-                import("@/stores/pricingStore"),
-              ]);
+            const [
+              { useSubscriptionStore },
+              { usePricingStore },
+              { useOnboardingStore },
+            ] = await Promise.all([
+              import("@/stores/subscriptionStore"),
+              import("@/stores/pricingStore"),
+              import("@/stores/onboardingStore"),
+            ]);
 
-            // Fetch subscription data, features, and pricing plans in parallel
-            await Promise.all([
+            // Fetch subscription data, features, pricing plans, and fitness profile in parallel
+            const [, , , profileExists] = await Promise.all([
               useSubscriptionStore.getState().fetchSubscription(),
               useSubscriptionStore.getState().fetchFeatures(),
               usePricingStore.getState().fetchPlans(), // Prefetch pricing plans
+              useOnboardingStore.getState().checkHasFitnessProfile(), // Check fitness profile
             ]);
+
+            hasFitnessProfile = profileExists;
           } catch (error) {
             // If any fetch fails, log but don't block app
             console.warn("[Index] Background data fetch failed:", error);
           }
         }
-      } else {
-        setVerifyingUser(false);
-      }
 
-      // Get redirect URL based on onboarding status
-      if (isAuthenticated && user) {
-        const url = await getRedirection();
+        // Get redirect URL based on onboarding status
+        const url = await getRedirection({ hasFitnessProfile });
+        console.log("url", url);
         setRedirectUrl(url);
       } else {
+        // Non-authenticated user
+        setVerifyingUser(false);
+
+        // Get redirect URL based on onboarding status for non-authenticated users
         const hasSeenOnboarding = await storageUtil.getItem<boolean>(
           STORAGE_KEYS.HAS_SEEN_ONBOARDING
         );

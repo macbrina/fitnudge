@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import uuid4
 
@@ -80,7 +81,10 @@ def _transform_goal(goal: Dict[str, Any]) -> SuggestedGoalItem:
 
 
 def _generate_ai_goals(
-    profile: Dict[str, Any], user_plan: str, goal_type: str = "habit"
+    profile: Dict[str, Any],
+    user_plan: str,
+    goal_type: str = "habit",
+    user_timezone: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
     Generate AI goals using the goal-type-aware suggestion service.
@@ -89,15 +93,28 @@ def _generate_ai_goals(
         profile: User's fitness profile
         user_plan: User's subscription plan (not currently used by new service)
         goal_type: Type of goals - "habit", "time_challenge", "target_challenge", or "mixed"
+        user_timezone: User's timezone (e.g., 'America/New_York') for time-aware suggestions
     """
     try:
+        # Get current UTC time
+        current_time = datetime.now(timezone.utc)
+
         # Use the goal-type-aware service that generates proper habits vs challenges
-        goals = generate_goals_by_type_sync(profile, goal_type)
+        goals = generate_goals_by_type_sync(
+            profile,
+            goal_type,
+            user_timezone=user_timezone,
+            current_time=current_time,
+        )
 
         if goals:
             logger.info(
                 f"Generated {len(goals)} {goal_type} goals",
-                {"goal_type": goal_type, "count": len(goals)},
+                {
+                    "goal_type": goal_type,
+                    "count": len(goals),
+                    "timezone": user_timezone,
+                },
             )
 
         return goals or []
@@ -202,9 +219,43 @@ def _get_suggested_goals_from_db(
     return suggestions[:5]
 
 
+def _fetch_user_timezone(supabase, user_id: str) -> Optional[str]:
+    """Fetch user's timezone from their profile or preferences."""
+    try:
+        # Try to get timezone from user_fitness_profiles first
+        result = (
+            supabase.table("user_fitness_profiles")
+            .select("timezone")
+            .eq("user_id", user_id)
+            .maybe_single()
+            .execute()
+        )
+        if result.data and result.data.get("timezone"):
+            return result.data["timezone"]
+
+        # Fallback: try users table
+        result = (
+            supabase.table("users")
+            .select("timezone")
+            .eq("id", user_id)
+            .maybe_single()
+            .execute()
+        )
+        if result.data and result.data.get("timezone"):
+            return result.data["timezone"]
+
+    except Exception as exc:
+        logger.warning(
+            "Failed to fetch user timezone",
+            {"user_id": user_id, "error": str(exc)},
+        )
+    return None
+
+
 def generate_suggested_goals_for_user(
     user_id: str,
     goal_type: str = "habit",
+    user_timezone: Optional[str] = None,
 ) -> Tuple[SuggestedGoalsStatus, Optional[List[SuggestedGoalItem]], Optional[str]]:
     """
     Generate suggested goals for a user.
@@ -213,6 +264,8 @@ def generate_suggested_goals_for_user(
         user_id: The user's ID
         goal_type: Type of goals to generate - "habit", "time_challenge",
                    "target_challenge", or "mixed". Defaults to "habit".
+        user_timezone: Optional user timezone (e.g., 'America/New_York').
+                       If not provided, will attempt to fetch from user profile.
     """
     supabase = get_supabase_client()
     profile = _fetch_fitness_profile(supabase, user_id)
@@ -221,8 +274,14 @@ def generate_suggested_goals_for_user(
         logger.error(message, {"user_id": user_id})
         return "failed", None, message
 
+    # Get user timezone if not provided
+    if not user_timezone:
+        user_timezone = _fetch_user_timezone(supabase, user_id)
+
     user_plan = _fetch_user_plan(supabase, user_id)
-    ai_goals = _generate_ai_goals(profile, user_plan, goal_type=goal_type)
+    ai_goals = _generate_ai_goals(
+        profile, user_plan, goal_type=goal_type, user_timezone=user_timezone
+    )
     transformed_goals: List[SuggestedGoalItem] = []
 
     if ai_goals:

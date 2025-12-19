@@ -110,6 +110,7 @@ class AchievementService:
             True if condition is met, False otherwise
         """
         import json
+        from datetime import datetime
 
         try:
             condition_data = (
@@ -195,6 +196,154 @@ class AchievementService:
 
                 return len(completed_dates) >= min(target_days, 7)
 
+            # ==========================================
+            # WORKOUT-SPECIFIC CONDITION TYPES
+            # ==========================================
+
+            elif condition_type == "workout_count":
+                # Count completed workout sessions
+                result = (
+                    supabase.table("workout_sessions")
+                    .select("id", count="exact")
+                    .eq("user_id", user_id)
+                    .eq("status", "completed")
+                    .execute()
+                )
+                count = (
+                    result.count if hasattr(result, "count") else len(result.data or [])
+                )
+                return count >= target_value
+
+            elif condition_type == "perfect_workout":
+                # Check if user completed a workout without skipping
+                result = (
+                    supabase.table("workout_sessions")
+                    .select("id")
+                    .eq("user_id", user_id)
+                    .eq("status", "completed")
+                    .eq("exercises_skipped", 0)
+                    .limit(1)
+                    .execute()
+                )
+                return len(result.data or []) > 0
+
+            elif condition_type == "perfect_workout_count":
+                # Count perfect workouts (no skipped exercises)
+                result = (
+                    supabase.table("workout_sessions")
+                    .select("id", count="exact")
+                    .eq("user_id", user_id)
+                    .eq("status", "completed")
+                    .eq("exercises_skipped", 0)
+                    .execute()
+                )
+                count = (
+                    result.count if hasattr(result, "count") else len(result.data or [])
+                )
+                return count >= target_value
+
+            elif condition_type == "workout_time":
+                # Check if user completed a workout at a specific time
+                time_condition = condition_data.get("condition")  # "before", "after", "between"
+                hour = condition_data.get("hour")
+                start_hour = condition_data.get("start_hour")
+                end_hour = condition_data.get("end_hour")
+
+                result = (
+                    supabase.table("workout_sessions")
+                    .select("started_at")
+                    .eq("user_id", user_id)
+                    .eq("status", "completed")
+                    .execute()
+                )
+
+                for session in result.data or []:
+                    started_at = session.get("started_at")
+                    if not started_at:
+                        continue
+
+                    # Parse the datetime
+                    if isinstance(started_at, str):
+                        session_time = datetime.fromisoformat(
+                            started_at.replace("Z", "+00:00")
+                        )
+                    else:
+                        session_time = started_at
+
+                    session_hour = session_time.hour
+
+                    if time_condition == "before" and session_hour < hour:
+                        return True
+                    elif time_condition == "after" and session_hour >= hour:
+                        return True
+                    elif time_condition == "between":
+                        if start_hour <= session_hour < end_hour:
+                            return True
+
+                return False
+
+            elif condition_type == "workout_duration":
+                # Check if user completed a workout of a certain duration
+                minutes = condition_data.get("minutes", 0)
+                seconds = minutes * 60
+
+                result = (
+                    supabase.table("workout_sessions")
+                    .select("total_duration_seconds")
+                    .eq("user_id", user_id)
+                    .eq("status", "completed")
+                    .gte("total_duration_seconds", seconds)
+                    .limit(1)
+                    .execute()
+                )
+                return len(result.data or []) > 0
+
+            elif condition_type == "workout_streak":
+                # Get current workout streak (consecutive days)
+                streak = await self._get_workout_streak(user_id)
+                return streak >= target_value
+
+            elif condition_type == "weekly_workouts":
+                # Check if user completed X workouts in current week
+                today = date.today()
+                week_start = today - timedelta(days=today.weekday())
+
+                result = (
+                    supabase.table("workout_sessions")
+                    .select("id", count="exact")
+                    .eq("user_id", user_id)
+                    .eq("status", "completed")
+                    .gte("started_at", week_start.isoformat())
+                    .execute()
+                )
+                count = (
+                    result.count if hasattr(result, "count") else len(result.data or [])
+                )
+                return count >= target_value
+
+            elif condition_type == "program_week":
+                # Check if user completed a specific week of their program
+                # This requires tracking program progress - simplified check
+                # by counting completed workouts for a goal
+                if not goal_id:
+                    return False
+
+                result = (
+                    supabase.table("workout_sessions")
+                    .select("id", count="exact")
+                    .eq("user_id", user_id)
+                    .eq("goal_id", goal_id)
+                    .eq("status", "completed")
+                    .execute()
+                )
+                count = (
+                    result.count if hasattr(result, "count") else len(result.data or [])
+                )
+
+                # Assume 3 workouts per week for program progression
+                weeks_completed = count // 3
+                return weeks_completed >= target_value
+
             return False
 
         except Exception as e:
@@ -254,6 +403,65 @@ class AchievementService:
             elif check_in_date < current_date:
                 # Gap in streak, break
                 break
+
+        return streak
+
+    async def _get_workout_streak(self, user_id: str) -> int:
+        """
+        Get current workout streak for user (consecutive days with workouts).
+
+        Args:
+            user_id: User ID
+
+        Returns:
+            Current workout streak count (days)
+        """
+        from datetime import datetime
+
+        supabase = get_supabase_client()
+
+        # Get all completed workout sessions, ordered by date descending
+        result = (
+            supabase.table("workout_sessions")
+            .select("started_at")
+            .eq("user_id", user_id)
+            .eq("status", "completed")
+            .order("started_at", desc=True)
+            .execute()
+        )
+
+        sessions = result.data or []
+
+        if not sessions:
+            return 0
+
+        # Get unique workout dates
+        workout_dates = set()
+        for session in sessions:
+            started_at = session.get("started_at")
+            if started_at:
+                if isinstance(started_at, str):
+                    dt = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
+                else:
+                    dt = started_at
+                workout_dates.add(dt.date())
+
+        # Calculate streak by checking consecutive days
+        streak = 0
+        today = date.today()
+        current_date = today
+
+        # Check if we have a workout today or yesterday
+        if today in workout_dates:
+            current_date = today
+        elif (today - timedelta(days=1)) in workout_dates:
+            current_date = today - timedelta(days=1)
+        else:
+            return 0
+
+        while current_date in workout_dates:
+            streak += 1
+            current_date -= timedelta(days=1)
 
         return streak
 

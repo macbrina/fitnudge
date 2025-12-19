@@ -96,6 +96,7 @@ class OnboardingApiService extends BaseApiService {
       // Profile fetched successfully - tracked via PostHog in component
       return response.data!;
     } catch (error) {
+      console.log("Failed to fetch fitness profile", error);
       logger.error("Failed to fetch fitness profile", {
         error: error instanceof Error ? error.message : String(error),
       });

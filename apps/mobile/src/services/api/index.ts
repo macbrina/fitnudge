@@ -96,6 +96,13 @@ export {
   type PartnerRequest,
   type SearchUserResult,
 } from "./partners";
+export {
+  homeService,
+  type ActiveItem,
+  type PendingCheckIn,
+  type DashboardStats,
+  type HomeDashboardResponse,
+} from "./home";
 
 // Legacy compatibility - re-export the main services as apiService
 export { authService as apiService } from "./auth";

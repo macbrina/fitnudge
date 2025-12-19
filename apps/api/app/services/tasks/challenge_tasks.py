@@ -99,16 +99,24 @@ def _process_ended_challenge(supabase, challenge: Dict[str, Any]) -> None:
 
     print(f"  📊 Processing ended challenge: {challenge_title} ({challenge_id})")
 
-    # 1. Get all participants with their final points
+    # 1. Get all participants (membership only)
     participants_result = (
         supabase.table("challenge_participants")
-        .select("*, user:users(id, display_name, email)")
+        .select("id, user_id, user:users(id, display_name, email)")
+        .eq("challenge_id", challenge_id)
+        .execute()
+    )
+    participants = participants_result.data or []
+
+    # 2. Get leaderboard entries (all scoring data)
+    leaderboard_result = (
+        supabase.table("challenge_leaderboard")
+        .select("user_id, points, progress_data")
         .eq("challenge_id", challenge_id)
         .order("points", desc=True)
         .execute()
     )
-
-    participants = participants_result.data or []
+    leaderboard_entries = leaderboard_result.data or []
 
     if not participants:
         print(f"    ⚠️ No participants in challenge {challenge_id}")
@@ -125,18 +133,21 @@ def _process_ended_challenge(supabase, challenge: Dict[str, Any]) -> None:
         ).eq("id", challenge_id).execute()
         return
 
-    # 2. Update final ranks for all participants
-    for rank, participant in enumerate(participants, start=1):
+    # 3. Mark all participants as completed
+    for participant in participants:
         supabase.table("challenge_participants").update(
-            {
-                "rank": rank,
-                "completed_at": date.today().isoformat(),
-            }
+            {"completed_at": date.today().isoformat()}
         ).eq("id", participant["id"]).execute()
 
-    # 3. Determine winner(s) - could be ties
-    top_points = participants[0]["points"] if participants else 0
-    winners = [p for p in participants if p["points"] == top_points]
+    # 4. Update final ranks in leaderboard
+    for rank, entry in enumerate(leaderboard_entries, start=1):
+        supabase.table("challenge_leaderboard").update({"rank": rank}).eq(
+            "challenge_id", challenge_id
+        ).eq("user_id", entry["user_id"]).execute()
+
+    # 5. Determine winner(s) - could be ties
+    top_points = leaderboard_entries[0]["points"] if leaderboard_entries else 0
+    winners = [e for e in leaderboard_entries if e["points"] == top_points]
 
     # 4. Update challenge metadata with results
     challenge_metadata = {
@@ -178,6 +189,17 @@ def _send_challenge_completion_notifications(
     challenge_title = challenge.get("title", "Challenge")
     winner_ids = set(w["user_id"] for w in winners)
 
+    # Get all scoring data from leaderboard
+    leaderboard_result = (
+        supabase.table("challenge_leaderboard")
+        .select("user_id, rank, points")
+        .eq("challenge_id", challenge_id)
+        .execute()
+    )
+    leaderboard_lookup = {
+        entry["user_id"]: entry for entry in (leaderboard_result.data or [])
+    }
+
     # Get or create event loop
     try:
         loop = asyncio.get_event_loop()
@@ -191,8 +213,9 @@ def _send_challenge_completion_notifications(
     for participant in participants:
         user_id = participant["user_id"]
         user_name = participant.get("user", {}).get("display_name", "Participant")
-        rank = participant.get("rank", 0)
-        points = participant.get("points", 0)
+        leaderboard_entry = leaderboard_lookup.get(user_id, {})
+        rank = leaderboard_entry.get("rank", 0)
+        points = leaderboard_entry.get("points", 0)
         is_winner = user_id in winner_ids
 
         # Customize message based on result
@@ -222,6 +245,8 @@ def _send_challenge_completion_notifications(
                         "deepLink": f"/challenges/{challenge_id}",
                     },
                     notification_type="challenge",
+                    entity_type="challenge",
+                    entity_id=challenge_id,
                 )
             )
             print(f"    📬 Sent completion notification to {user_name} (rank #{rank})")
@@ -326,6 +351,8 @@ def send_challenge_reminder_task(
                             "deepLink": f"/challenges/{challenge_id}",
                         },
                         notification_type="challenge",
+                        entity_type="challenge",
+                        entity_id=challenge_id,
                     )
                 )
                 sent_count += 1

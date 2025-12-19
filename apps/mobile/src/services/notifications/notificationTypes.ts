@@ -6,6 +6,7 @@ export enum NotificationCategory {
   SOCIAL = "social",
   ACHIEVEMENT = "achievement",
   REENGAGEMENT = "reengagement",
+  PLAN_READY = "plan_ready",
 }
 
 export interface NotificationData {

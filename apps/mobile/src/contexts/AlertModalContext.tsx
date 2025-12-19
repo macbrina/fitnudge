@@ -150,6 +150,7 @@ const makeStyles = (tokens: any, colors: any, brandColors: any) => ({
     shadowRadius: 12,
     elevation: 12,
     position: "relative" as const,
+    overflow: "visible" as const,
   },
   closeIconButton: {
     position: "absolute" as const,
@@ -314,11 +315,7 @@ export const AlertOverlay: React.FC<AlertOverlayProps> = ({
             onPress={() => handleResolve(false)}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Ionicons
-              name="close"
-              size={toRN(tokens.typography.fontSize.lg)}
-              color={colors.text.primary}
-            />
+            <Ionicons name="close" size={18} color={colors.text.primary} />
           </TouchableOpacity>
         )}
         <View style={styles.illustrationContainer}>
@@ -356,16 +353,6 @@ export const AlertOverlay: React.FC<AlertOverlayProps> = ({
         )}
 
         <View style={styles.buttonRow}>
-          {currentAlert.showCancel && (
-            <TouchableOpacity
-              style={[styles.button, styles.cancelButton]}
-              onPress={() => handleResolve(false)}
-            >
-              <Text style={[styles.buttonText, { color: colors.text.primary }]}>
-                {currentAlert.cancelLabel}
-              </Text>
-            </TouchableOpacity>
-          )}
           <TouchableOpacity
             style={[
               styles.button,
@@ -386,6 +373,16 @@ export const AlertOverlay: React.FC<AlertOverlayProps> = ({
               {currentAlert.confirmLabel}
             </Text>
           </TouchableOpacity>
+          {currentAlert.showCancel && (
+            <TouchableOpacity
+              style={[styles.button, styles.cancelButton]}
+              onPress={() => handleResolve(false)}
+            >
+              <Text style={[styles.buttonText, { color: colors.text.primary }]}>
+                {currentAlert.cancelLabel}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </Animated.View>
     </Animated.View>
@@ -608,11 +605,7 @@ const AlertModal: React.FC<{
               onPress={() => onResolve(false)}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Ionicons
-                name="close"
-                size={toRN(tokens.typography.fontSize.lg)}
-                color={colors.text.primary}
-              />
+              <Ionicons name="close" size={18} color={colors.text.primary} />
             </TouchableOpacity>
           )}
           <View style={styles.illustrationContainer}>
@@ -650,18 +643,6 @@ const AlertModal: React.FC<{
           )}
 
           <View style={styles.buttonRow}>
-            {alert.showCancel && (
-              <TouchableOpacity
-                style={[styles.button, styles.cancelButton]}
-                onPress={() => onResolve(false)}
-              >
-                <Text
-                  style={[styles.buttonText, { color: colors.text.primary }]}
-                >
-                  {alert.cancelLabel}
-                </Text>
-              </TouchableOpacity>
-            )}
             <TouchableOpacity
               style={[
                 styles.button,
@@ -682,6 +663,18 @@ const AlertModal: React.FC<{
                 {alert.confirmLabel}
               </Text>
             </TouchableOpacity>
+            {alert.showCancel && (
+              <TouchableOpacity
+                style={[styles.button, styles.cancelButton]}
+                onPress={() => onResolve(false)}
+              >
+                <Text
+                  style={[styles.buttonText, { color: colors.text.primary }]}
+                >
+                  {alert.cancelLabel}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         </Animated.View>
       </Animated.View>

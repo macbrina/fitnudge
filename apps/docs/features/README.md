@@ -63,7 +63,6 @@ This directory contains detailed documentation for each feature in the FitNudge 
 10. **[Social Accountability](10-social-accountability.md)**
     - Goal sharing with permissions
     - Accountability partners
-    - Group goals
     - Collaborative progress tracking
 
 11. **[Meal Tracking](11-meal-tracking.md)**
@@ -127,7 +126,7 @@ Each feature document includes:
 | Social         | `posts`, `comments`, `likes`, `follows`, `feed_preferences`     |
 | Achievements   | `achievement_types`, `user_achievements`                        |
 | Challenges     | `challenges`, `challenge_participants`, `challenge_leaderboard` |
-| Accountability | `goal_shares`, `accountability_partners`, `group_goals`         |
+| Accountability | `goal_shares`, `accountability_partners`                        |
 | Meals          | `meal_logs`, `daily_nutrition_summaries`                        |
 
 ## Contributing

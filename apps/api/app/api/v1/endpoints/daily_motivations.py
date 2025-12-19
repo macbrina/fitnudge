@@ -34,14 +34,35 @@ class DailyMotivationListResponse(BaseModel):
 
 
 def get_user_context_for_motivation(supabase, user_id: str) -> dict:
-    """Get user context for AI motivation generation - includes actual goal details"""
+    """Get user context for AI motivation generation - includes goals, challenges, group goals, and user preferences"""
     from datetime import datetime, timedelta
+
+    today = date.today()
 
     # Get user info
     user_result = supabase.table("users").select("*").eq("id", user_id).execute()
     user = user_result.data[0] if user_result.data else None
 
-    # Get active goals with full details (title, category, description)
+    # Get user fitness profile for motivation style
+    motivation_style = "gentle_encouragement"  # default
+    fitness_profile = None
+    try:
+        profile_result = (
+            supabase.table("user_fitness_profiles")
+            .select("*")
+            .eq("user_id", user_id)
+            .maybe_single()
+            .execute()
+        )
+        if profile_result.data:
+            fitness_profile = profile_result.data
+            motivation_style = fitness_profile.get("motivation_style", "friendly")
+    except Exception:
+        pass
+
+    # =========================================
+    # 1. Get active goals
+    # =========================================
     goals_result = (
         supabase.table("goals")
         .select("id, title, category, description, is_active")
@@ -49,61 +70,152 @@ def get_user_context_for_motivation(supabase, user_id: str) -> dict:
         .eq("is_active", True)
         .execute()
     )
-    active_goals_list = goals_result.data or []
-    active_goals_count = len(active_goals_list)
+    personal_goals = goals_result.data or []
 
-    # Get check-ins stats
-    checkins_result = (
-        supabase.table("check_ins")
-        .select("date, completed")
-        .eq("user_id", user_id)
-        .execute()
-    )
+    # =========================================
+    # 3. Get active challenges user participates in
+    # =========================================
+    active_challenges = []
+    try:
+        participant_result = (
+            supabase.table("challenge_participants")
+            .select(
+                "challenge_id, challenges(id, title, description, start_date, end_date, is_active)"
+            )
+            .eq("user_id", user_id)
+            .execute()
+        )
+        for participation in participant_result.data or []:
+            challenge = participation.get("challenges")
+            if not challenge or not challenge.get("is_active"):
+                continue
+            # Check if challenge is currently active (between start and end date)
+            start_date = (
+                date.fromisoformat(challenge["start_date"])
+                if challenge.get("start_date")
+                else None
+            )
+            end_date = (
+                date.fromisoformat(challenge["end_date"])
+                if challenge.get("end_date")
+                else None
+            )
+            if start_date and today < start_date:
+                continue  # Not started yet
+            if end_date and today > end_date:
+                continue  # Already ended
+            active_challenges.append(challenge)
+    except Exception:
+        pass
 
-    total_check_ins = len(checkins_result.data)
-    completed_check_ins = len([c for c in checkins_result.data if c["completed"]])
+    # =========================================
+    # 4. Calculate combined streak from goals AND challenges
+    # =========================================
+    all_checkin_dates: set[str] = set()
 
-    # Calculate current streak
+    # Get completed goal check-ins
+    try:
+        goal_checkins_result = (
+            supabase.table("check_ins")
+            .select("date, completed")
+            .eq("user_id", user_id)
+            .eq("completed", True)
+            .execute()
+        )
+        for checkin in goal_checkins_result.data or []:
+            all_checkin_dates.add(checkin["date"])
+    except Exception:
+        pass
+
+    # Get challenge check-ins (completed only)
+    try:
+        challenge_checkins_result = (
+            supabase.table("challenge_check_ins")
+            .select("check_in_date")
+            .eq("user_id", user_id)
+            .eq("completed", True)
+            .execute()
+        )
+        for checkin in challenge_checkins_result.data or []:
+            all_checkin_dates.add(checkin["check_in_date"])
+    except Exception:
+        pass
+
+    # Calculate current streak from combined dates
     current_streak = 0
-    sorted_checkins = sorted(
-        checkins_result.data, key=lambda x: x["date"], reverse=True
-    )
-    temp_streak = 0
-    for checkin in sorted_checkins:
-        if checkin["completed"]:
-            temp_streak += 1
-            current_streak = max(current_streak, temp_streak)
-        else:
-            break
+    if all_checkin_dates:
+        check_date = today
+        while check_date.isoformat() in all_checkin_dates:
+            current_streak += 1
+            check_date = check_date - timedelta(days=1)
+        # If today not checked, check if streak continues from yesterday
+        if current_streak == 0:
+            check_date = today - timedelta(days=1)
+            while check_date.isoformat() in all_checkin_dates:
+                current_streak += 1
+                check_date = check_date - timedelta(days=1)
 
-    # Get recent check-ins (last 7 days)
+    # =========================================
+    # 5. Get recent stats (last 7 days)
+    # =========================================
     seven_days_ago = (datetime.now() - timedelta(days=7)).date()
-    recent_checkins = [
-        c
-        for c in checkins_result.data
-        if datetime.fromisoformat(c["date"]).date() >= seven_days_ago
-    ]
-    recent_completed = len([c for c in recent_checkins if c["completed"]])
+    recent_completed = sum(
+        1 for d in all_checkin_dates if date.fromisoformat(d) >= seven_days_ago
+    )
+    total_check_ins = len(all_checkin_dates)
 
-    # Build goal details for AI context
-    goal_details = []
-    for goal in active_goals_list:
-        goal_info = {
-            "title": goal.get("title", ""),
-            "category": goal.get("category", "general"),
-            "description": goal.get("description", ""),
+    # =========================================
+    # 6. Build context for AI
+    # =========================================
+    # Personal goals details
+    goal_details = [
+        {
+            "title": g.get("title", ""),
+            "category": g.get("category", "general"),
+            "description": g.get("description", ""),
         }
-        goal_details.append(goal_info)
+        for g in personal_goals
+    ]
+
+    # Challenge details
+    challenge_details = [
+        {"title": c.get("title", ""), "description": c.get("description", "")}
+        for c in active_challenges
+    ]
+
+    # Map motivation style to description
+    motivation_style_map = {
+        "tough_love": "direct and challenging - push them hard with honest feedback",
+        "gentle_encouragement": "warm and supportive - focus on progress and compassion",
+        "data_driven": "analytical and metric-focused - use numbers and measurable progress",
+        "accountability_buddy": "friendly but firm - like a supportive friend who keeps them on track",
+    }
+    motivation_style_description = motivation_style_map.get(
+        motivation_style, "friendly and encouraging"
+    )
 
     context = {
         "user_name": user["name"] if user else "Champion",
-        "active_goals_count": active_goals_count,
-        "active_goals": goal_details,  # Full goal details for AI
+        # Goals
+        "active_goals_count": len(personal_goals),
+        "active_goals": goal_details,
+        # Challenges
+        "active_challenges_count": len(active_challenges),
+        "active_challenges": challenge_details,
+        # Stats
         "total_check_ins": total_check_ins,
-        "completed_check_ins": completed_check_ins,
         "current_streak": current_streak,
         "recent_completed": recent_completed,
-        "recent_total": len(recent_checkins),
+        "recent_total": 7,  # Last 7 days
+        # User preferences
+        "motivation_style": motivation_style,
+        "motivation_style_description": motivation_style_description,
+        "fitness_level": (
+            fitness_profile.get("fitness_level") if fitness_profile else None
+        ),
+        "biggest_challenge": (
+            fitness_profile.get("biggest_challenge") if fitness_profile else None
+        ),
     }
 
     return context
@@ -117,7 +229,7 @@ def generate_daily_motivation_ai(
     Args:
         supabase: Supabase client
         user_id: User ID
-        context: User context dictionary
+        context: User context dictionary (includes goals, challenges, group goals, motivation style)
         is_regeneration: If True, request a different/varied message
 
     Returns:
@@ -131,52 +243,96 @@ def generate_daily_motivation_ai(
     try:
         client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
-        # Build goal details string
+        # Build personal goals string
         goals_str = ""
         if context.get("active_goals"):
             goals_list = []
             for goal in context["active_goals"]:
                 goal_str = f"- {goal['title']} ({goal['category']})"
                 if goal.get("description"):
-                    # Truncate long descriptions
                     desc = (
-                        goal["description"][:200] + "..."
-                        if len(goal.get("description", "")) > 200
+                        goal["description"][:150] + "..."
+                        if len(goal.get("description", "")) > 150
                         else goal.get("description", "")
                     )
                     goal_str += f": {desc}"
                 goals_list.append(goal_str)
             goals_str = "\n".join(goals_list)
         else:
-            goals_str = "No active goals yet"
+            goals_str = "No personal goals yet"
 
-        # Build context string with actual goals
+        # Build challenges string
+        challenges_str = ""
+        if context.get("active_challenges"):
+            challenge_list = []
+            for challenge in context["active_challenges"]:
+                challenge_str = f"- {challenge['title']}"
+                if challenge.get("description"):
+                    desc = (
+                        challenge["description"][:100] + "..."
+                        if len(challenge.get("description", "")) > 100
+                        else challenge.get("description", "")
+                    )
+                    challenge_str += f": {desc}"
+                challenge_list.append(challenge_str)
+            challenges_str = "\n".join(challenge_list)
+        else:
+            challenges_str = "None"
+
+        # Get motivation style
+        motivation_style = context.get("motivation_style", "friendly")
+        motivation_style_description = context.get(
+            "motivation_style_description", "friendly and encouraging"
+        )
+
+        # Build context string with all data
         context_str = f"""User: {context['user_name']}
 
-ACTIVE GOALS:
+GOALS ({context.get('active_goals_count', 0)} active):
 {goals_str}
 
+ACTIVE CHALLENGES ({context.get('active_challenges_count', 0)} active):
+{challenges_str}
+
 PROGRESS:
-- Current Streak: {context['current_streak']} days
-- Recent: {context['recent_completed']}/{context['recent_total']} check-ins completed in last 7 days
-- Total Check-ins Completed: {context['completed_check_ins']}"""
+- Current Streak: {context['current_streak']} days (combined goals + challenges)
+- Recent: {context['recent_completed']}/{context['recent_total']} check-ins in last 7 days
+- Total Check-ins: {context['total_check_ins']}
+
+USER PREFERENCES:
+- Motivation Style: {motivation_style} ({motivation_style_description})
+- Biggest Challenge: {context.get('biggest_challenge', 'Not specified')}
+- Fitness Level: {context.get('fitness_level', 'Not specified')}"""
 
         available_styles_info = get_available_styles_for_ai()
 
-        system_prompt = """You are a world-class motivational writer creating shareable, inspiring quotes for a health and wellness accountability app.
+        # Customize system prompt based on motivation style
+        tone_instructions = {
+            "tough_love": "Be DIRECT and CHALLENGING. Push them hard with honest, no-nonsense feedback. Use phrases like 'No excuses', 'Get it done', 'Rise up'. Be the tough coach they need.",
+            "gentle_encouragement": "Be WARM and SUPPORTIVE. Focus on their progress and show compassion for their journey. Use phrases like 'You're doing amazing', 'Every step counts', 'Be kind to yourself'. Be their encouraging friend.",
+            "data_driven": "Be ANALYTICAL and METRIC-FOCUSED. Reference their numbers (streak, check-ins). Use phrases like 'Your data shows', 'X days of consistency', 'Measurable progress'. Be their performance analyst.",
+            "accountability_buddy": "Be FRIENDLY but FIRM. Like a supportive friend who won't let them off the hook. Use phrases like 'I've got your back', 'Let's do this together', 'You promised yourself'. Be their accountability partner.",
+        }
+        tone_instruction = tone_instructions.get(
+            motivation_style, "Be friendly and encouraging."
+        )
+
+        system_prompt = f"""You are a world-class motivational writer creating shareable, inspiring quotes for a health and wellness accountability app.
 
 YOUR MISSION: Create motivational messages that are so inspiring, users would want to screenshot and share them with friends.
 
+TONE INSTRUCTION (CRITICAL - match their preferred motivation style):
+{tone_instruction}
+
 CRITICAL RULES:
 1. DO NOT use time-based greetings (Good morning, Good afternoon, Good evening) - the message should feel timeless
-2. DO NOT use generic fitness phrases - be SPECIFIC to their actual goals (nutrition, exercise, mindset, etc.)
+2. DO NOT use generic fitness phrases - be SPECIFIC to their actual goals, challenges, and group activities
 3. Create messages that sound like profound quotes from a wise mentor or coach
 4. Keep it concise: 1-2 powerful sentences maximum
-5. Make it personal by referencing their specific goal category and journey
-6. The tone should be inspiring, authentic, and empowering - not cheesy or cliché
+5. Make it personal by referencing their specific goals, challenges, or group activities
+6. If they have active challenges or group goals, occasionally reference the power of community/competition
 7. Focus on the deeper "why" behind their goals, not just the actions
-
-STYLE INSPIRATION: Think of how great coaches like Phil Jackson, quotes from Stoic philosophers, or wellness thought leaders speak - timeless wisdom that applies to their specific journey.
+8. MATCH THEIR MOTIVATION STYLE - this is crucial for personalization
 
 You can also suggest an appropriate background gradient style based on the message mood."""
 
@@ -190,15 +346,17 @@ You can also suggest an appropriate background gradient style based on the messa
             "Focus on the compound effect of small daily choices",
             "Connect their goal to their deeper purpose and identity",
             "Celebrate consistency over perfection",
-            "Remind them that every expert was once a beginner",
+            "Reference their challenge or group goal for community motivation",
             "Emphasize self-compassion alongside discipline",
             "Inspire them with the transformation they're creating",
             "Focus on being better than yesterday, not perfect",
-            "Connect nutrition/fitness to energy, clarity, and life quality",
+            "Connect their fitness journey to energy, clarity, and life quality",
+            "Highlight the power of accountability and community",
+            "Address their biggest challenge with encouragement",
         ]
         selected_angle = random.choice(variation_angles)
 
-        user_prompt = f"""Create a shareable, inspiring motivational message for this user based on their ACTUAL goals:
+        user_prompt = f"""Create a shareable, inspiring motivational message for this user based on their ACTUAL goals, challenges, and preferences:
 
 {context_str}
 
@@ -210,13 +368,14 @@ Available background gradient styles:
 
 CRITICAL: You MUST respond with ONLY valid JSON in this exact format (no other text):
 {{
-  "message": "Your inspiring quote here - make it specific to their goals and shareable",
+  "message": "Your inspiring quote here - match their {motivation_style} motivation style",
   "suggested_background_style": "gradient_sunset" or null
 }}
 
 Remember:
 - NO time greetings (Good morning, etc.)
-- Be SPECIFIC to their goal category (nutrition, fitness, mindset, etc.)
+- MATCH their motivation style: {motivation_style_description}
+- Be SPECIFIC to their goals, challenges, or group activities
 - Make it sound like a quote worth sharing
 - Keep it to 1-2 powerful sentences
 
@@ -265,10 +424,20 @@ Return ONLY the JSON object, nothing else."""
         print(f"ERROR in generate_daily_motivation_ai: {str(e)}")
         print(f"Traceback: {traceback.format_exc()}")
 
-        # Fallback messages based on context
+        # Fallback messages based on context and motivation style
+        motivation_style = context.get("motivation_style", "friendly")
+
         if context["current_streak"] > 0:
-            message = f"Keep that {context['current_streak']}-day streak going! Every day you show up is a win. You've got this! 💪"
-        elif context["active_goals"] > 0:
+            if motivation_style == "tough_love":
+                message = f"{context['current_streak']}-day streak. Don't break it now. Show up today like you mean it. 💪"
+            elif motivation_style == "data_driven":
+                message = f"Streak: {context['current_streak']} days. Your consistency data is building. Keep the metrics strong. 📊"
+            else:
+                message = f"Keep that {context['current_streak']}-day streak going! Every day you show up is a win. You've got this! 💪"
+        elif (
+            context.get("active_goals_count", 0) > 0
+            or context.get("active_challenges_count", 0) > 0
+        ):
             message = "Every journey begins with a single step. You've started, now let's keep the momentum going! 🌟"
         else:
             message = "Today is a fresh start. What small step will you take towards your goals? I believe in you! ✨"
@@ -305,9 +474,10 @@ async def get_today_daily_motivation(
         existing_motivation["background_colors"] = style_metadata["colors"]
         return existing_motivation
 
-    # Delete any existing motivation for today before generating (ensures clean state)
-    supabase.table("daily_motivations").delete().eq("user_id", current_user["id"]).eq(
-        "date", today
+    # Delete ALL existing motivations for this user before generating new one
+    # Each user only keeps one motivation in the database at a time
+    supabase.table("daily_motivations").delete().eq(
+        "user_id", current_user["id"]
     ).execute()
 
     # Generate new motivation for today
@@ -483,9 +653,10 @@ async def regenerate_today_motivation(
 
     today = date.today().isoformat()
 
-    # Delete any existing motivation for today before generating (ensures clean state)
-    supabase.table("daily_motivations").delete().eq("user_id", current_user["id"]).eq(
-        "date", today
+    # Delete ALL existing motivations for this user before regenerating
+    # Each user only keeps one motivation in the database at a time
+    supabase.table("daily_motivations").delete().eq(
+        "user_id", current_user["id"]
     ).execute()
 
     # Generate new motivation for today (mark as regeneration for variation)

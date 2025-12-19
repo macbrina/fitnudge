@@ -139,8 +139,8 @@ class SecurityConfig:
 
     # JWT Security
     JWT_SECURITY = {
-        "access_token_expire_minutes": 15,
-        "refresh_token_expire_days": 7,
+        "access_token_expire_minutes": 60,
+        "refresh_token_expire_days": 30,
         "algorithm": "HS256",
         "require_rotation": True,
         "max_token_family_size": 5,

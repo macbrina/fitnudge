@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import { Home, Target, Activity, User } from "lucide-react-native";
+import { Home, Target, Users, User } from "lucide-react-native";
 
 export default function TabLayout() {
   return (
@@ -31,10 +31,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="feed"
         options={{
-          title: "Feed",
-          tabBarIcon: ({ color, size }) => (
-            <Activity size={size} color={color} />
-          ),
+          title: "Social",
+          tabBarIcon: ({ color, size }) => <Users size={size} color={color} />,
         }}
       />
       <Tabs.Screen

@@ -617,56 +617,95 @@ export default function SubscriptionScreen({
                   {t("onboarding.subscription.premium_features")}
                 </Text>
               )}
-              {(showAllFeatures
-                ? selectedPlan.features
-                : selectedPlan.features.slice(0, 4)
-              ).map((feature: any, index: number) => {
-                const isGoalsFeature = feature.feature_key === "goals";
-                let title = feature.feature_name;
-                if (isGoalsFeature) {
-                  if (
-                    feature.feature_value === null ||
-                    feature.feature_value === undefined
-                  ) {
-                    title = t(
-                      "onboarding.subscription.feature_goals_unlimited"
-                    );
-                  } else if (Number(feature.feature_value) > 0) {
-                    title = t("onboarding.subscription.feature_goals_limit", {
-                      count: feature.feature_value,
-                    });
-                  }
-                }
+              {(() => {
+                // Filter features to only show NEW features for this tier
+                // minimum_tier is a number: 0=free, 1=starter, 2=pro, 3=elite
+                // - Starter (tier 1): show all features
+                // - Pro (tier 2): only show features with minimum_tier >= 2
+                // - Elite (tier 3): only show features with minimum_tier >= 3
+                const planId = selectedPlan.id.toLowerCase();
+                const filteredFeatures = selectedPlan.features
+                  .filter((feature: any) => {
+                    const minTier =
+                      typeof feature.minimum_tier === "number"
+                        ? feature.minimum_tier
+                        : 0;
+                    if (planId === "starter" || planId === "free") {
+                      return true; // Show all features for starter
+                    }
+                    if (planId === "pro") {
+                      // Only show pro+ features (minimum_tier >= 2)
+                      return minTier >= 2;
+                    }
+                    if (planId === "elite") {
+                      // Only show elite-exclusive features (minimum_tier >= 3)
+                      return minTier >= 3;
+                    }
+                    return true;
+                  })
+                  .sort((a: any, b: any) => {
+                    const sortA =
+                      typeof a.sort_order === "number" ? a.sort_order : 999;
+                    const sortB =
+                      typeof b.sort_order === "number" ? b.sort_order : 999;
+                    return sortA - sortB;
+                  });
+
+                const displayedFeatures = showAllFeatures
+                  ? filteredFeatures
+                  : filteredFeatures.slice(0, 4);
+
                 return (
-                  <View key={feature.id || index} style={styles.detailItem}>
-                    <View style={styles.detailIconWrapper}>
-                      <Text style={styles.detailIcon}>•</Text>
-                    </View>
-                    <View style={styles.detailCopy}>
-                      <Text style={styles.detailTitle}>{title}</Text>
-                      {feature.feature_description ? (
-                        <Text style={styles.detailSubtitle}>
-                          {feature.feature_description}
+                  <>
+                    {displayedFeatures.map((feature: any, index: number) => {
+                      let title = feature.feature_name;
+                      const featureValue = feature.feature_value;
+
+                      // If feature_value is a positive number, prepend it to the name
+                      // e.g., "3 Challenges Limit" instead of just "Challenges Limit"
+                      if (
+                        typeof featureValue === "number" &&
+                        featureValue > 0
+                      ) {
+                        title = `${featureValue} ${feature.feature_name}`;
+                      }
+
+                      return (
+                        <View
+                          key={feature.id || index}
+                          style={styles.detailItem}
+                        >
+                          <View style={styles.detailIconWrapper}>
+                            <Text style={styles.detailIcon}>•</Text>
+                          </View>
+                          <View style={styles.detailCopy}>
+                            <Text style={styles.detailTitle}>{title}</Text>
+                            {feature.feature_description ? (
+                              <Text style={styles.detailSubtitle}>
+                                {feature.feature_description}
+                              </Text>
+                            ) : null}
+                          </View>
+                        </View>
+                      );
+                    })}
+                    {filteredFeatures.length > 4 && (
+                      <TouchableOpacity
+                        onPress={() => setShowAllFeatures((prev) => !prev)}
+                        style={styles.featuresToggle}
+                      >
+                        <Text style={styles.featuresToggleText}>
+                          {showAllFeatures
+                            ? t("onboarding.subscription.view_less")
+                            : t("onboarding.subscription.view_all", {
+                                count: filteredFeatures.length - 4,
+                              })}
                         </Text>
-                      ) : null}
-                    </View>
-                  </View>
+                      </TouchableOpacity>
+                    )}
+                  </>
                 );
-              })}
-              {selectedPlan.features.length > 4 && (
-                <TouchableOpacity
-                  onPress={() => setShowAllFeatures((prev) => !prev)}
-                  style={styles.featuresToggle}
-                >
-                  <Text style={styles.featuresToggleText}>
-                    {showAllFeatures
-                      ? t("onboarding.subscription.view_less")
-                      : t("onboarding.subscription.view_all", {
-                          count: selectedPlan.features.length - 4,
-                        })}
-                  </Text>
-                </TouchableOpacity>
-              )}
+              })()}
             </Card>
           </View>
         )}

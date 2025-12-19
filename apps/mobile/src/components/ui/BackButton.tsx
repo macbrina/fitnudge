@@ -120,7 +120,7 @@ const makeBackButtonStyles = (tokens: any, colors: any, brand: any) => {
       zIndex: 2,
     },
     title: {
-      fontSize: toRN(tokens.typography.fontSize.xl),
+      fontSize: toRN(tokens.typography.fontSize.lg),
       fontWeight: tokens.typography.fontWeight.bold,
       color: colors.text.primary,
       fontFamily: fontFamily.groteskBold,

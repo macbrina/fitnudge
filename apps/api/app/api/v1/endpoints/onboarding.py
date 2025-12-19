@@ -194,6 +194,10 @@ class SuggestedGoalsRequest(BaseModel):
         default="habit",
         description="Type of goals to generate: habit, time_challenge, target_challenge, or mixed",
     )
+    timezone: Optional[str] = Field(
+        default=None,
+        description="User's timezone (e.g., 'America/New_York') for time-aware goal suggestions",
+    )
 
 
 @router.post(
@@ -224,12 +228,11 @@ async def request_suggested_goals_generation(
     goal_type = request.goal_type
 
     # Check premium access for non-habit goal types
-    # "habit" is free, everything else requires premium (challenge_create or group_goals feature)
+    # "habit" is free, everything else requires premium (challenge_create feature)
     if goal_type != "habit":
         features_data = get_user_features_by_tier(user_id, user_plan, supabase)
         has_challenge_access = any(
-            f.get("feature_key") in ("challenge_create", "group_goals")
-            and f.get("is_enabled")
+            f.get("feature_key") == "challenge_create" and f.get("is_enabled")
             for f in features_data.get("features", [])
         )
         if not has_challenge_access:
@@ -299,7 +302,9 @@ async def request_suggested_goals_generation(
         )
 
     # Enqueue Celery task to generate suggestions asynchronously
-    generate_suggested_goals_task.delay(user_id=user_id, goal_type=goal_type)
+    generate_suggested_goals_task.delay(
+        user_id=user_id, goal_type=goal_type, user_timezone=request.timezone
+    )
 
     return SuggestedGoalsStatusResponse(
         status="pending", regeneration_count=current_count, goal_type=goal_type
@@ -383,11 +388,10 @@ async def regenerate_suggested_goals(
     features_data = get_user_features_by_tier(user_id, user_plan, supabase)
 
     # Check premium access for non-habit goal types
-    # "habit" is free, everything else requires premium (challenge_create or group_goals feature)
+    # "habit" is free, everything else requires premium (challenge_create feature)
     if goal_type != "habit":
         has_challenge_access = any(
-            f.get("feature_key") in ("challenge_create", "group_goals")
-            and f.get("is_enabled")
+            f.get("feature_key") == "challenge_create" and f.get("is_enabled")
             for f in features_data.get("features", [])
         )
         if not has_challenge_access:
@@ -442,7 +446,9 @@ async def regenerate_suggested_goals(
         ).execute()
 
         # Enqueue Celery task to generate new suggestions
-        generate_suggested_goals_task.delay(user_id=user_id, goal_type=goal_type)
+        generate_suggested_goals_task.delay(
+            user_id=user_id, goal_type=goal_type, user_timezone=request.timezone
+        )
 
         return SuggestedGoalsStatusResponse(
             status="pending",

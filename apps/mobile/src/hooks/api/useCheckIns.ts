@@ -5,6 +5,7 @@ import {
 } from "@/services/api";
 import { useAuthStore } from "@/stores/authStore";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { homeDashboardQueryKeys } from "./useHomeDashboard";
 
 // Query Keys
 export const checkInsQueryKeys = {
@@ -55,6 +56,9 @@ export const useCreateCheckIn = () => {
       await queryClient.cancelQueries({
         queryKey: checkInsQueryKeys.list(newCheckIn.goal_id),
       });
+      await queryClient.cancelQueries({
+        queryKey: homeDashboardQueryKeys.dashboard(),
+      });
 
       // Snapshot previous data
       const previousTodayCheckIns = queryClient.getQueryData(
@@ -62,6 +66,9 @@ export const useCreateCheckIn = () => {
       );
       const previousGoalCheckIns = queryClient.getQueryData(
         checkInsQueryKeys.list(newCheckIn.goal_id)
+      );
+      const previousDashboard = queryClient.getQueryData(
+        homeDashboardQueryKeys.dashboard()
       );
 
       // Create optimistic check-in
@@ -88,9 +95,33 @@ export const useCreateCheckIn = () => {
         }
       );
 
+      // Optimistically update home dashboard
+      queryClient.setQueryData(
+        homeDashboardQueryKeys.dashboard(),
+        (old: any) => {
+          if (!old) return old;
+          return {
+            ...old,
+            // Remove this goal from pending check-ins
+            today_pending_checkins: (old.today_pending_checkins || []).filter(
+              (c: any) =>
+                !(c.type === "goal" && c.data?.goal_id === newCheckIn.goal_id)
+            ),
+            // Optimistically update stats
+            stats: old.stats
+              ? {
+                  ...old.stats,
+                  total_check_ins: (old.stats.total_check_ins || 0) + 1,
+                }
+              : old.stats,
+          };
+        }
+      );
+
       return {
         previousTodayCheckIns,
         previousGoalCheckIns,
+        previousDashboard,
         goalId: newCheckIn.goal_id,
       };
     },
@@ -106,6 +137,12 @@ export const useCreateCheckIn = () => {
         queryClient.setQueryData(
           checkInsQueryKeys.list(newCheckIn.goal_id),
           context.previousGoalCheckIns
+        );
+      }
+      if (context?.previousDashboard) {
+        queryClient.setQueryData(
+          homeDashboardQueryKeys.dashboard(),
+          context.previousDashboard
         );
       }
     },
@@ -132,6 +169,11 @@ export const useCreateCheckIn = () => {
           }
         );
       }
+
+      // Invalidate home dashboard (shows both goals and challenges)
+      queryClient.invalidateQueries({
+        queryKey: homeDashboardQueryKeys.dashboard(),
+      });
     },
   });
 };
@@ -240,6 +282,10 @@ export const useUpdateCheckIn = () => {
       queryClient.invalidateQueries({ queryKey: checkInsQueryKeys.stats() });
       queryClient.invalidateQueries({ queryKey: ["progress"] });
       queryClient.invalidateQueries({ queryKey: ["user", "stats"] });
+      // Invalidate home dashboard (shows both goals and challenges)
+      queryClient.invalidateQueries({
+        queryKey: homeDashboardQueryKeys.dashboard(),
+      });
     },
   });
 };
@@ -285,6 +331,10 @@ export const useDeleteCheckIn = () => {
       queryClient.invalidateQueries({ queryKey: checkInsQueryKeys.stats() });
       queryClient.invalidateQueries({ queryKey: ["progress"] });
       queryClient.invalidateQueries({ queryKey: ["user", "stats"] });
+      // Invalidate home dashboard (shows both goals and challenges)
+      queryClient.invalidateQueries({
+        queryKey: homeDashboardQueryKeys.dashboard(),
+      });
     },
   });
 };
@@ -360,6 +410,10 @@ export const useBulkCreateCheckIns = () => {
       checkInsService.bulkCreateCheckIns(checkIns),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: checkInsQueryKeys.all });
+      // Invalidate home dashboard (shows both goals and challenges)
+      queryClient.invalidateQueries({
+        queryKey: homeDashboardQueryKeys.dashboard(),
+      });
     },
   });
 };

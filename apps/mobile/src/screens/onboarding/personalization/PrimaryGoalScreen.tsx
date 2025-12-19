@@ -109,31 +109,33 @@ export default function PrimaryGoalScreen({
                     isSelected && styles.optionCardSelected,
                   ]}
                 >
-                  <View
-                    style={[
-                      styles.iconContainer,
-                      isSelected && styles.iconContainerSelected,
-                    ]}
-                  >
-                    <Text style={styles.optionIcon}>{goal.icon}</Text>
-                  </View>
-                  <View style={styles.textContainer}>
-                    <Text
+                  <View style={styles.optionRow}>
+                    <View
                       style={[
-                        styles.optionTitle,
-                        isSelected && styles.optionTitleSelected,
+                        styles.iconContainer,
+                        isSelected && styles.iconContainerSelected,
                       ]}
                     >
-                      {t(goal.title)}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.optionDescription,
-                        isSelected && styles.optionDescriptionSelected,
-                      ]}
-                    >
-                      {t(goal.description)}
-                    </Text>
+                      <Text style={styles.optionIcon}>{goal.icon}</Text>
+                    </View>
+                    <View style={styles.textContainer}>
+                      <Text
+                        style={[
+                          styles.optionTitle,
+                          isSelected && styles.optionTitleSelected,
+                        ]}
+                      >
+                        {t(goal.title)}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.optionDescription,
+                          isSelected && styles.optionDescriptionSelected,
+                        ]}
+                      >
+                        {t(goal.description)}
+                      </Text>
+                    </View>
                   </View>
                 </Card>
               </TouchableOpacity>
@@ -184,6 +186,8 @@ const makePrimaryGoalScreenStyles = (tokens: any, colors: any, brand: any) => {
     },
     optionCard: {
       padding: toRN(tokens.spacing[5]),
+    },
+    optionRow: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
     },

@@ -3,9 +3,7 @@ Social Notification Service
 
 Handles sending push notifications for social features including:
 - Accountability Partners
-- Group Goals
 - Challenges
-- Goal Sharing
 - Social Nudges
 """
 
@@ -25,12 +23,6 @@ class SocialNotificationType(Enum):
     PARTNER_MILESTONE = "partner_milestone"
     PARTNER_INACTIVE = "partner_inactive"
 
-    # Group Goals
-    GROUP_INVITE = "group_invite"
-    GROUP_MILESTONE = "group_milestone"
-    GROUP_NUDGE = "group_nudge"
-    GROUP_CONTRIBUTION = "group_contribution"
-
     # Challenges
     CHALLENGE_INVITE = "challenge_invite"
     CHALLENGE_JOINED = "challenge_joined"
@@ -41,8 +33,7 @@ class SocialNotificationType(Enum):
     CHALLENGE_ENDING = "challenge_ending"
     CHALLENGE_ENDED = "challenge_ended"
 
-    # Goal Sharing
-    GOAL_SHARED = "goal_shared"
+    # Motivation
     MOTIVATION_MESSAGE = "motivation_message"
 
 
@@ -55,11 +46,6 @@ SOCIAL_NOTIFICATION_TEMPLATES = {
     "partner_cheer": "🎉 {sender_name} cheered your check-in!",
     "partner_milestone": "🔥 Your partner {sender_name} just hit a {count}-day streak!",
     "partner_inactive": "💙 {sender_name} hasn't checked in for {days} days. Send encouragement?",
-    # Group Goals
-    "group_invite": "👥 {sender_name} invited you to '{goal_title}'",
-    "group_milestone": "🎉 Your team hit {milestone}!",
-    "group_nudge": "💪 {sender_name}: {message}",
-    "group_contribution": "✅ {sender_name} contributed! Team progress: {progress}",
     # Challenges
     "challenge_invite": "🏆 {sender_name} invited you to '{challenge_title}'",
     "challenge_joined": "🙌 {sender_name} joined your challenge!",
@@ -69,8 +55,7 @@ SOCIAL_NOTIFICATION_TEMPLATES = {
     "challenge_starting": "⏰ '{challenge_title}' starts tomorrow!",
     "challenge_ending": "⏰ {days} days left in '{challenge_title}'! You're #{rank}",
     "challenge_ended": "🏆 '{challenge_title}' complete! You finished #{rank}!",
-    # Goal Sharing
-    "goal_shared": "👀 {sender_name} shared '{goal_title}' with you",
+    # Motivation
     "motivation_message": "💪 {sender_name}: {message}",
 }
 
@@ -82,10 +67,6 @@ NOTIFICATION_PREFERENCE_MAPPING = {
     SocialNotificationType.PARTNER_CHEER: "social_partner_cheers",
     SocialNotificationType.PARTNER_MILESTONE: "social_partner_milestones",
     SocialNotificationType.PARTNER_INACTIVE: "social_partner_nudges",
-    SocialNotificationType.GROUP_INVITE: "social_group_invites",
-    SocialNotificationType.GROUP_MILESTONE: "social_group_milestones",
-    SocialNotificationType.GROUP_NUDGE: "social_group_nudges",
-    SocialNotificationType.GROUP_CONTRIBUTION: "social_group_contributions",
     SocialNotificationType.CHALLENGE_INVITE: "social_challenge_invites",
     SocialNotificationType.CHALLENGE_JOINED: "social_challenge_invites",
     SocialNotificationType.CHALLENGE_OVERTAKEN: "social_challenge_leaderboard",
@@ -94,7 +75,6 @@ NOTIFICATION_PREFERENCE_MAPPING = {
     SocialNotificationType.CHALLENGE_STARTING: "social_challenge_reminders",
     SocialNotificationType.CHALLENGE_ENDING: "social_challenge_reminders",
     SocialNotificationType.CHALLENGE_ENDED: "social_challenge_reminders",
-    SocialNotificationType.GOAL_SHARED: "social_goal_shared",
     SocialNotificationType.MOTIVATION_MESSAGE: "social_motivation_messages",
 }
 
@@ -109,11 +89,6 @@ def get_notification_title(notification_type: SocialNotificationType) -> str:
         SocialNotificationType.PARTNER_CHEER: "Cheer!",
         SocialNotificationType.PARTNER_MILESTONE: "Partner Milestone",
         SocialNotificationType.PARTNER_INACTIVE: "Check on Partner",
-        # Groups
-        SocialNotificationType.GROUP_INVITE: "Group Invite",
-        SocialNotificationType.GROUP_MILESTONE: "Team Milestone",
-        SocialNotificationType.GROUP_NUDGE: "Team Nudge",
-        SocialNotificationType.GROUP_CONTRIBUTION: "Team Update",
         # Challenges
         SocialNotificationType.CHALLENGE_INVITE: "Challenge Invite",
         SocialNotificationType.CHALLENGE_JOINED: "New Challenger",
@@ -123,8 +98,7 @@ def get_notification_title(notification_type: SocialNotificationType) -> str:
         SocialNotificationType.CHALLENGE_STARTING: "Challenge Starting",
         SocialNotificationType.CHALLENGE_ENDING: "Challenge Ending Soon",
         SocialNotificationType.CHALLENGE_ENDED: "Challenge Complete",
-        # Sharing
-        SocialNotificationType.GOAL_SHARED: "Goal Shared",
+        # Motivation
         SocialNotificationType.MOTIVATION_MESSAGE: "Motivation",
     }
     return titles.get(notification_type, "FitNudge")
@@ -150,15 +124,10 @@ async def get_notification_preferences(user_id: str, supabase) -> Dict[str, bool
             "social_partner_nudges": True,
             "social_partner_cheers": True,
             "social_partner_milestones": True,
-            "social_group_invites": True,
-            "social_group_milestones": True,
-            "social_group_nudges": True,
-            "social_group_contributions": False,
             "social_challenge_invites": True,
             "social_challenge_leaderboard": True,
             "social_challenge_nudges": True,
             "social_challenge_reminders": True,
-            "social_goal_shared": True,
             "social_motivation_messages": True,
         }
     except Exception as e:
@@ -186,7 +155,7 @@ async def send_social_notification(
     Returns:
         True if notification was sent, False otherwise
     """
-    from app.services.expo_push_service import send_push_notification
+    from app.services.expo_push_service import send_push_to_user
 
     try:
         # Check user preferences
@@ -222,13 +191,47 @@ async def send_social_notification(
             **data,
         }
 
+        # Determine entity type and ID based on notification type
+        entity_type = None
+        entity_id = None
+        
+        if notification_type in [
+            SocialNotificationType.CHALLENGE_INVITE,
+            SocialNotificationType.CHALLENGE_JOINED,
+            SocialNotificationType.CHALLENGE_OVERTAKEN,
+            SocialNotificationType.CHALLENGE_LEAD,
+            SocialNotificationType.CHALLENGE_NUDGE,
+            SocialNotificationType.CHALLENGE_STARTING,
+            SocialNotificationType.CHALLENGE_ENDING,
+            SocialNotificationType.CHALLENGE_ENDED,
+        ]:
+            entity_type = "challenge"
+            entity_id = data.get("challenge_id")
+        elif notification_type in [
+            SocialNotificationType.PARTNER_REQUEST,
+            SocialNotificationType.PARTNER_ACCEPTED,
+        ]:
+            entity_type = "partner_request"
+            entity_id = data.get("request_id") or data.get("partnership_id")
+        elif notification_type in [
+            SocialNotificationType.PARTNER_NUDGE,
+            SocialNotificationType.PARTNER_CHEER,
+            SocialNotificationType.PARTNER_MILESTONE,
+            SocialNotificationType.PARTNER_INACTIVE,
+        ]:
+            # These are partner-related but may reference a goal
+            entity_type = "goal" if data.get("goal_id") else "user"
+            entity_id = data.get("goal_id") or sender_id
+
         # Send push notification
-        await send_push_notification(
+        await send_push_to_user(
             user_id=recipient_id,
             title=title,
             body=message,
             data=notification_data,
-            supabase=supabase,
+            notification_type=notification_type.value,
+            entity_type=entity_type,
+            entity_id=entity_id,
         )
 
         logger.info(
@@ -276,30 +279,6 @@ async def send_partner_notification(
     )
 
 
-async def send_group_notification(
-    notification_type: SocialNotificationType,
-    recipient_id: str,
-    sender_id: str,
-    sender_name: str,
-    goal_title: str,
-    message: Optional[str] = None,
-    milestone: Optional[str] = None,
-    progress: Optional[str] = None,
-    supabase=None,
-) -> bool:
-    """Convenience function for group goal notifications"""
-    data = {
-        "sender_name": sender_name,
-        "goal_title": goal_title,
-        "message": message or "",
-        "milestone": milestone or "",
-        "progress": progress or "",
-    }
-    return await send_social_notification(
-        notification_type, recipient_id, sender_id, data, supabase
-    )
-
-
 async def send_challenge_notification(
     notification_type: SocialNotificationType,
     recipient_id: str,
@@ -318,26 +297,6 @@ async def send_challenge_notification(
         "message": message or "",
         "rank": rank or 0,
         "days": days or 0,
-    }
-    return await send_social_notification(
-        notification_type, recipient_id, sender_id, data, supabase
-    )
-
-
-async def send_goal_share_notification(
-    notification_type: SocialNotificationType,
-    recipient_id: str,
-    sender_id: str,
-    sender_name: str,
-    goal_title: str,
-    message: Optional[str] = None,
-    supabase=None,
-) -> bool:
-    """Convenience function for goal sharing notifications"""
-    data = {
-        "sender_name": sender_name,
-        "goal_title": goal_title,
-        "message": message or "",
     }
     return await send_social_notification(
         notification_type, recipient_id, sender_id, data, supabase

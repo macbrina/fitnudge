@@ -178,6 +178,14 @@ export function ShareAsChallengeModal({
     });
   };
 
+  // Format date as YYYY-MM-DD for backend
+  const formatDateForAPI = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
   const handleCreateChallenge = async () => {
     if (!validateDates()) {
       return;
@@ -189,9 +197,10 @@ export function ShareAsChallengeModal({
         data: {
           title: goal.title,
           description: goal.description,
-          start_date: startDate.toISOString(),
-          join_deadline: joinDeadline.toISOString(),
+          start_date: formatDateForAPI(startDate),
+          join_deadline: formatDateForAPI(joinDeadline),
           is_public: isPublic,
+          archive_original_goal: archiveOption === "archive",
         },
       });
 

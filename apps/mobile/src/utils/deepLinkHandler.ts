@@ -3,13 +3,57 @@ import { MOBILE_ROUTES } from "@/lib/routes";
 import * as Linking from "expo-linking";
 
 /**
+ * Check if user is authenticated and not in verification state
+ * Uses dynamic import to avoid circular dependency with authStore
+ */
+async function isUserAuthenticated(): Promise<boolean> {
+  const { useAuthStore } = await import("@/stores/authStore");
+  const { isAuthenticated, isVerifyingUser } = useAuthStore.getState();
+  return isAuthenticated && !isVerifyingUser;
+}
+
+type AuthRedirectType = "signup" | "login";
+
+/**
+ * Route to authenticated page or auth screen with redirect params
+ *
+ * @param authenticatedRoute - Route to go to if authenticated
+ * @param redirectParams - Params to pass to auth screen for post-auth redirect
+ * @param authType - Which auth screen to redirect to: "signup" or "login" (default: "signup")
+ */
+async function routeWithAuthCheck(
+  authenticatedRoute: string,
+  redirectParams?: Record<string, string>,
+  authType: AuthRedirectType = "signup"
+): Promise<void> {
+  const authenticated = await isUserAuthenticated();
+  if (authenticated) {
+    router.push(authenticatedRoute);
+  } else {
+    // Build auth URL with redirect params
+    const params = new URLSearchParams(redirectParams || {});
+    const authRoute =
+      authType === "login"
+        ? MOBILE_ROUTES.AUTH.LOGIN
+        : MOBILE_ROUTES.AUTH.SIGNUP;
+    const authUrl = params.toString()
+      ? `${authRoute}?${params.toString()}`
+      : authRoute;
+    router.push(authUrl);
+  }
+}
+
+/**
  * Handle deep links from Universal Links/App Links
  * Routes URLs like https://fitnudge.app/reset-password?token=abc123
  * to the appropriate app screens
  *
+ * For authenticated routes, checks auth state first and redirects
+ * to signup with appropriate params if not authenticated.
+ *
  * In development, also accepts localhost and ngrok URLs for testing
  */
-export function handleDeepLink(url: string): void {
+export async function handleDeepLink(url: string): Promise<void> {
   try {
     const parsed = Linking.parse(url);
     const { hostname, path, queryParams } = parsed;
@@ -36,6 +80,9 @@ export function handleDeepLink(url: string): void {
 
     // Route based on path
     switch (normalizedPath) {
+      // =====================================================
+      // PUBLIC ROUTES (no auth required)
+      // =====================================================
       case "/reset-password":
         if (queryParams?.token) {
           router.push(
@@ -48,11 +95,17 @@ export function handleDeepLink(url: string): void {
 
       case "/verify-email":
         if (queryParams?.code) {
-          router.push(
-            `${MOBILE_ROUTES.AUTH.VERIFY_EMAIL}?code=${queryParams.code}`
+          await routeWithAuthCheck(
+            `${MOBILE_ROUTES.AUTH.VERIFY_EMAIL}?code=${queryParams.code}`,
+            { redirectTo: "verify-email", code: queryParams.code as string },
+            "login"
           );
         } else {
-          router.push(MOBILE_ROUTES.AUTH.VERIFY_EMAIL);
+          await routeWithAuthCheck(
+            MOBILE_ROUTES.AUTH.VERIFY_EMAIL,
+            { redirectTo: "verify-email" },
+            "login"
+          );
         }
         break;
 
@@ -60,54 +113,76 @@ export function handleDeepLink(url: string): void {
         router.push(MOBILE_ROUTES.AUTH.FORGOT_PASSWORD);
         break;
 
-      // Goals
+      // Referral signup link: /join?ref={code}
+      // Always goes to signup (this IS a signup route)
+      case "/join":
+        if (queryParams?.ref) {
+          router.push(
+            `${MOBILE_ROUTES.AUTH.SIGNUP}?referral=${queryParams.ref}`
+          );
+        } else {
+          router.push(MOBILE_ROUTES.AUTH.SIGNUP);
+        }
+        break;
+
+      // =====================================================
+      // AUTHENTICATED ROUTES (require auth check)
+      // =====================================================
+
+      // Goals - handles /goal?id=xxx and /goals
       case "/goal":
       case "/goals":
         if (queryParams?.id) {
-          router.push(`${MOBILE_ROUTES.GOALS.DETAILS}?id=${queryParams.id}`);
+          await routeWithAuthCheck(
+            `${MOBILE_ROUTES.GOALS.DETAILS}?id=${queryParams.id}`,
+            { redirectTo: "goal", goalId: queryParams.id as string }
+          );
+        } else if (queryParams?.goalId) {
+          // Handle goalId param (from push notifications)
+          await routeWithAuthCheck(
+            `${MOBILE_ROUTES.GOALS.DETAILS}?id=${queryParams.goalId}`,
+            { redirectTo: "goal", goalId: queryParams.goalId as string }
+          );
         } else {
-          router.push(MOBILE_ROUTES.GOALS.LIST);
+          await routeWithAuthCheck(MOBILE_ROUTES.GOALS.LIST, {
+            redirectTo: "goals",
+          });
         }
         break;
 
       // Profile
       case "/profile":
         if (queryParams?.id) {
-          router.push(
-            `${MOBILE_ROUTES.SOCIAL.USER_PROFILE}?id=${queryParams.id}`
+          await routeWithAuthCheck(
+            `${MOBILE_ROUTES.SOCIAL.USER_PROFILE}?id=${queryParams.id}`,
+            { redirectTo: "profile", profileId: queryParams.id as string }
           );
         } else {
-          router.push(MOBILE_ROUTES.PROFILE.MAIN);
+          await routeWithAuthCheck(MOBILE_ROUTES.PROFILE.MAIN, {
+            redirectTo: "profile",
+          });
         }
         break;
 
       // Notifications
       case "/notification":
       case "/notifications":
-        router.push(MOBILE_ROUTES.PROFILE.NOTIFICATIONS);
-        break;
-
-      // Invites
-      case "/invite":
-      case "/invites":
-        if (queryParams?.token) {
-          // Handle invite acceptance
-          router.push(
-            `${MOBILE_ROUTES.AUTH.SIGNUP}?invite=${queryParams.token}`
-          );
-        } else {
-          router.push(MOBILE_ROUTES.MAIN.HOME);
-        }
+        await routeWithAuthCheck(MOBILE_ROUTES.PROFILE.NOTIFICATIONS, {
+          redirectTo: "notifications",
+        });
         break;
 
       // Check-ins (from push notifications)
       case "/checkin":
         if (queryParams?.goalId) {
-          router.push(
-            `${MOBILE_ROUTES.MAIN.HOME}?openCheckinGoalId=${queryParams.goalId}`
+          await routeWithAuthCheck(
+            `${MOBILE_ROUTES.MAIN.HOME}?openCheckinGoalId=${queryParams.goalId}`,
+            { redirectTo: "checkin", goalId: queryParams.goalId as string }
           );
         } else {
-          router.push(MOBILE_ROUTES.MAIN.HOME);
+          await routeWithAuthCheck(MOBILE_ROUTES.MAIN.HOME, {
+            redirectTo: "home",
+          });
         }
         break;
 
@@ -117,19 +192,51 @@ export function handleDeepLink(url: string): void {
         if (normalizedPath.startsWith("/checkin/")) {
           const goalId = normalizedPath.replace("/checkin/", "");
           if (goalId) {
-            router.push(
-              `${MOBILE_ROUTES.MAIN.HOME}?openCheckinGoalId=${goalId}`
+            await routeWithAuthCheck(
+              `${MOBILE_ROUTES.MAIN.HOME}?openCheckinGoalId=${goalId}`,
+              { redirectTo: "checkin", goalId }
             );
             break;
           }
         }
-        router.push(MOBILE_ROUTES.MAIN.HOME);
+
+        // Challenge detail link: /challenge/{id}
+        if (normalizedPath.startsWith("/challenge/")) {
+          const challengeId = normalizedPath.replace("/challenge/", "");
+          if (challengeId && challengeId !== "join") {
+            await routeWithAuthCheck(
+              MOBILE_ROUTES.CHALLENGES.DETAILS(challengeId),
+              {
+                redirectTo: "challenge",
+                challengeId,
+              }
+            );
+            break;
+          }
+        }
+
+        // Handle /goal/{goalId} format (from push notifications)
+        if (normalizedPath.startsWith("/goal/")) {
+          const goalId = normalizedPath.replace("/goal/", "");
+          if (goalId) {
+            await routeWithAuthCheck(
+              `${MOBILE_ROUTES.GOALS.DETAILS}?id=${goalId}`,
+              { redirectTo: "goal", goalId }
+            );
+            break;
+          }
+        }
+
+        // Default: home (with auth check)
+        await routeWithAuthCheck(MOBILE_ROUTES.MAIN.HOME, {
+          redirectTo: "home",
+        });
         break;
     }
   } catch (error) {
     console.error("Error handling deep link:", error);
-    // Fallback to home on error
-    router.push(MOBILE_ROUTES.MAIN.HOME);
+    // Fallback to home on error (with auth check)
+    await routeWithAuthCheck(MOBILE_ROUTES.MAIN.HOME);
   }
 }
 

@@ -58,6 +58,8 @@ async def send_push_to_user(
     notification_type: str = "general",
     sound: str = "default",
     priority: str = "high",
+    entity_type: Optional[str] = None,
+    entity_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Persist a notification record and deliver it to all active Expo push tokens for the user.
@@ -75,6 +77,8 @@ async def send_push_to_user(
         notification_type: Type of notification (ai_motivation, reminder, etc.)
         sound: Sound to play (default: "default")
         priority: Push priority (default: "high")
+        entity_type: Type of entity referenced (goal, challenge, post, comment, etc.)
+        entity_id: ID of the referenced entity (no FK - handle deleted at app level)
 
     Returns:
         Dict with notification_id, delivered status, and token info
@@ -113,17 +117,24 @@ async def send_push_to_user(
     notification_id = str(uuid4())
     now = datetime.now(timezone.utc).isoformat()
 
-    supabase.table("notification_history").insert(
-        {
-            "id": notification_id,
-            "user_id": user_id,
-            "notification_type": notification_type,
-            "title": title,
-            "body": body,
-            "data": data or {},
-            "sent_at": now,
-        }
-    ).execute()
+    notification_record = {
+        "id": notification_id,
+        "user_id": user_id,
+        "notification_type": notification_type,
+        "title": title,
+        "body": body,
+        "data": data or {},
+        "sent_at": now,
+    }
+    
+    # Add generic entity reference for tracking
+    # entity_type: 'goal', 'challenge', 'post', 'comment', 'follow', etc.
+    # No FK constraint - handle deleted entities at application level
+    if entity_type and entity_id:
+        notification_record["entity_type"] = entity_type
+        notification_record["entity_id"] = entity_id
+
+    supabase.table("notification_history").insert(notification_record).execute()
 
     # Send to device tokens using Expo SDK with proper batching and rate limiting
     # Expo limits: 600 notifications/second per project
@@ -397,3 +408,116 @@ def send_push_message_sync(
     except Exception as exc:
         logger.error(f"Unexpected error sending push: {exc}")
         return False
+
+
+def send_push_to_user_sync(
+    user_id: str,
+    *,
+    title: str,
+    body: str,
+    data: Optional[Dict[str, Any]] = None,
+    notification_type: str = "general",
+    entity_type: Optional[str] = None,
+    entity_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Synchronous version of send_push_to_user for Celery tasks.
+    
+    Sends push notification to all active device tokens for a user
+    and creates notification_history record.
+    
+    Args:
+        user_id: User ID to send notification to
+        title: Notification title
+        body: Notification body
+        data: Optional data payload (include deep link info here)
+        notification_type: Type of notification (plan_ready, goal, etc.)
+        entity_type: Type of entity (goal, plan, etc.)
+        entity_id: ID of the entity
+    
+    Returns:
+        Dict with success status and delivery count
+    """
+    supabase = get_supabase_client()
+    
+    try:
+        # Get all active device tokens for the user
+        tokens_result = (
+            supabase.table("device_tokens")
+            .select("fcm_token, id")
+            .eq("user_id", user_id)
+            .eq("is_active", True)
+            .execute()
+        )
+        
+        tokens = [
+            row
+            for row in tokens_result.data or []
+            if isinstance(row.get("fcm_token"), str)
+            and is_valid_expo_token(row["fcm_token"])
+        ]
+        
+        if not tokens:
+            logger.info(f"No active push tokens for user {user_id}")
+            return {"success": True, "delivered": 0, "reason": "no_tokens"}
+        
+        # Create notification history record
+        notification_id = str(uuid4())
+        try:
+            supabase.table("notification_history").insert({
+                "id": notification_id,
+                "user_id": user_id,
+                "type": notification_type,
+                "title": title,
+                "body": body,
+                "data": data or {},
+                "entity_type": entity_type,
+                "entity_id": entity_id,
+                "delivered": False,
+            }).execute()
+        except Exception as e:
+            logger.warning(f"Failed to create notification history: {e}")
+        
+        # Send to all tokens
+        delivered_count = 0
+        invalid_token_ids = []
+        
+        for token_row in tokens:
+            token = token_row["fcm_token"]
+            token_id = token_row["id"]
+            
+            success = send_push_message_sync(token, title, body, data)
+            if success:
+                delivered_count += 1
+            else:
+                invalid_token_ids.append(token_id)
+        
+        # Mark invalid tokens as inactive
+        if invalid_token_ids:
+            try:
+                supabase.table("device_tokens").update({
+                    "is_active": False,
+                }).in_("id", invalid_token_ids).execute()
+            except Exception as e:
+                logger.warning(f"Failed to deactivate invalid tokens: {e}")
+        
+        # Update notification history as delivered
+        if delivered_count > 0:
+            try:
+                supabase.table("notification_history").update({
+                    "delivered": True,
+                    "delivered_at": datetime.now(timezone.utc).isoformat(),
+                }).eq("id", notification_id).execute()
+            except Exception as e:
+                logger.warning(f"Failed to update notification history: {e}")
+        
+        return {
+            "success": True,
+            "delivered": delivered_count,
+            "total_tokens": len(tokens),
+            "notification_id": notification_id,
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to send push to user {user_id}: {e}")
+        return {"success": False, "error": str(e)}

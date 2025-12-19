@@ -32,7 +32,11 @@ interface SubscriptionState {
   getFeatureValue: (featureKey: string) => any;
   canCreateGoal: (currentGoalCount: number) => boolean;
   getGoalLimit: () => number | null; // null means unlimited (goals user can CREATE)
-  getActiveGoalLimit: () => number; // number of goals that can be ACTIVE simultaneously
+  getActiveGoalLimit: () => number | null; // number of goals that can be ACTIVE simultaneously (null = unlimited)
+
+  // Challenge limits
+  getChallengeLimit: () => number | null; // null = unlimited, 0 = disabled
+  canParticipateInChallenge: (currentCount: number) => boolean;
 
   clearError: () => void;
   reset: () => void;
@@ -322,15 +326,41 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
       (f) => f.feature_key === "active_goal_limit"
     );
 
-    if (
-      activeGoalFeature?.feature_value !== undefined &&
-      activeGoalFeature?.feature_value !== null
-    ) {
+    if (activeGoalFeature) {
+      // null = unlimited, number = that's the limit
       return activeGoalFeature.feature_value;
     }
 
     // Fallback if feature not found
     return 1;
+  },
+
+  // Get the limit for challenges (created + joined)
+  getChallengeLimit: () => {
+    const { features } = get();
+    if (!features) return 1; // Default to most restrictive
+
+    const challengeFeature = features.features_list.find(
+      (f) => f.feature_key === "challenge_limit"
+    );
+
+    if (challengeFeature) {
+      // null = unlimited, 0 = disabled, number = limit
+      return challengeFeature.feature_value;
+    }
+
+    return 1;
+  },
+
+  canParticipateInChallenge: (currentCount: number) => {
+    const limit = get().getChallengeLimit();
+
+    // null = unlimited
+    if (limit === null) return true;
+    // 0 = feature disabled
+    if (limit === 0) return false;
+
+    return currentCount < limit;
   },
 
   clearError: () => {

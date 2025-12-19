@@ -1,20 +1,18 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  goalsService,
-  CreateGoalRequest,
-  UpdateGoalRequest,
-  GoalStats,
-  Goal,
-} from "@/services/api";
-import { useGoalNotifications } from "@/hooks/notifications/useGoalNotifications";
-import { useUserTimezone } from "@/hooks/useUserTimezone";
-import { useAuthStore } from "@/stores/authStore";
-import {
-  goalsQueryKeys,
   actionablePlansQueryKeys,
-  userQueryKeys,
   checkInsQueryKeys,
+  goalsQueryKeys,
+  userQueryKeys,
 } from "@/hooks/api/queryKeys";
+import { homeDashboardQueryKeys } from "@/hooks/api/useHomeDashboard";
+import { useGoalNotifications } from "@/hooks/notifications/useGoalNotifications";
+import {
+  CreateGoalRequest,
+  goalsService,
+  UpdateGoalRequest,
+} from "@/services/api";
+import { useAuthStore } from "@/stores/authStore";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 // Re-export for backward compatibility
 export { goalsQueryKeys } from "@/hooks/api/queryKeys";
@@ -310,6 +308,9 @@ export const useDeleteGoal = () => {
       await queryClient.cancelQueries({ queryKey: userQueryKeys.userStats() });
       await queryClient.cancelQueries({ queryKey: checkInsQueryKeys.today() });
       await queryClient.cancelQueries({ queryKey: checkInsQueryKeys.stats() });
+      await queryClient.cancelQueries({
+        queryKey: homeDashboardQueryKeys.dashboard(),
+      });
 
       // Snapshot previous data
       const previousGoals = queryClient.getQueryData(goalsQueryKeys.list());
@@ -324,6 +325,9 @@ export const useDeleteGoal = () => {
       );
       const previousCheckInStats = queryClient.getQueryData(
         checkInsQueryKeys.stats()
+      );
+      const previousDashboard = queryClient.getQueryData(
+        homeDashboardQueryKeys.dashboard()
       );
 
       // Check if the goal being deleted is active (for stats update)
@@ -395,12 +399,40 @@ export const useDeleteGoal = () => {
         };
       });
 
+      // Optimistically update home dashboard (HomeScreen)
+      queryClient.setQueryData(
+        homeDashboardQueryKeys.dashboard(),
+        (old: any) => {
+          if (!old) return old;
+          return {
+            ...old,
+            // Remove goal from items
+            items: (old.items || []).filter(
+              (item: any) => !(item.type === "goal" && item.data?.id === goalId)
+            ),
+            // Remove pending check-ins for this goal
+            today_pending_checkins: (old.today_pending_checkins || []).filter(
+              (item: any) =>
+                !(item.type === "goal" && item.data?.goal_id === goalId)
+            ),
+            // Update stats
+            stats: old.stats
+              ? {
+                  ...old.stats,
+                  active_count: Math.max(0, (old.stats.active_count || 0) - 1),
+                }
+              : old.stats,
+          };
+        }
+      );
+
       return {
         previousGoals,
         previousActiveGoals,
         previousUserStats,
         previousTodayCheckIns,
         previousCheckInStats,
+        previousDashboard,
       };
     },
     onError: (err, goalId, context) => {
@@ -432,12 +464,25 @@ export const useDeleteGoal = () => {
           context.previousCheckInStats
         );
       }
+      if (context?.previousDashboard) {
+        queryClient.setQueryData(
+          homeDashboardQueryKeys.dashboard(),
+          context.previousDashboard
+        );
+      }
     },
     onSuccess: () => {
-      // Invalidate stats for accurate recalculation from server
-      // (streak, completion rate, etc. need server-side calculation)
+      // Invalidate all related queries to ensure UI is in sync
+      // Goals list (GoalsScreen counts and tabs)
+      queryClient.invalidateQueries({ queryKey: goalsQueryKeys.list() });
+      queryClient.invalidateQueries({ queryKey: goalsQueryKeys.active() });
+      // Stats for accurate recalculation from server
       queryClient.invalidateQueries({ queryKey: userQueryKeys.userStats() });
       queryClient.invalidateQueries({ queryKey: checkInsQueryKeys.stats() });
+      // Home dashboard (HomeScreen uses this)
+      queryClient.invalidateQueries({
+        queryKey: homeDashboardQueryKeys.dashboard(),
+      });
     },
   });
 };
@@ -671,6 +716,9 @@ export const useActivateGoal = () => {
     onMutate: async (goalId) => {
       await queryClient.cancelQueries({ queryKey: goalsQueryKeys.list() });
       await queryClient.cancelQueries({ queryKey: goalsQueryKeys.active() });
+      await queryClient.cancelQueries({
+        queryKey: homeDashboardQueryKeys.dashboard(),
+      });
 
       const previousGoals = queryClient.getQueryData(goalsQueryKeys.list());
       const previousActiveGoals = queryClient.getQueryData(
@@ -678,6 +726,9 @@ export const useActivateGoal = () => {
       );
       const previousUserStats = queryClient.getQueryData(
         userQueryKeys.userStats()
+      );
+      const previousDashboard = queryClient.getQueryData(
+        homeDashboardQueryKeys.dashboard()
       );
 
       // Get the goal to add to active
@@ -717,7 +768,29 @@ export const useActivateGoal = () => {
         };
       });
 
-      return { previousGoals, previousActiveGoals, previousUserStats };
+      // Optimistically update home dashboard
+      queryClient.setQueryData(
+        homeDashboardQueryKeys.dashboard(),
+        (old: any) => {
+          if (!old) return old;
+          return {
+            ...old,
+            stats: old.stats
+              ? {
+                  ...old.stats,
+                  active_count: (old.stats.active_count || 0) + 1,
+                }
+              : old.stats,
+          };
+        }
+      );
+
+      return {
+        previousGoals,
+        previousActiveGoals,
+        previousUserStats,
+        previousDashboard,
+      };
     },
     onError: (err, goalId, context) => {
       if (context?.previousGoals) {
@@ -735,12 +808,23 @@ export const useActivateGoal = () => {
           context.previousUserStats
         );
       }
+      if (context?.previousDashboard) {
+        queryClient.setQueryData(
+          homeDashboardQueryKeys.dashboard(),
+          context.previousDashboard
+        );
+      }
     },
     onSuccess: async (response, goalId) => {
       queryClient.invalidateQueries({
         queryKey: actionablePlansQueryKeys.planStatus(goalId),
       });
+      queryClient.invalidateQueries({ queryKey: goalsQueryKeys.list() });
+      queryClient.invalidateQueries({ queryKey: goalsQueryKeys.active() });
       queryClient.invalidateQueries({ queryKey: userQueryKeys.userStats() });
+      queryClient.invalidateQueries({
+        queryKey: homeDashboardQueryKeys.dashboard(),
+      });
     },
   });
 };
@@ -754,6 +838,9 @@ export const useDeactivateGoal = () => {
     onMutate: async (goalId) => {
       await queryClient.cancelQueries({ queryKey: goalsQueryKeys.list() });
       await queryClient.cancelQueries({ queryKey: goalsQueryKeys.active() });
+      await queryClient.cancelQueries({
+        queryKey: homeDashboardQueryKeys.dashboard(),
+      });
 
       const previousGoals = queryClient.getQueryData(goalsQueryKeys.list());
       const previousActiveGoals = queryClient.getQueryData(
@@ -761,6 +848,9 @@ export const useDeactivateGoal = () => {
       );
       const previousUserStats = queryClient.getQueryData(
         userQueryKeys.userStats()
+      );
+      const previousDashboard = queryClient.getQueryData(
+        homeDashboardQueryKeys.dashboard()
       );
 
       // Optimistically update is_active to false
@@ -795,7 +885,33 @@ export const useDeactivateGoal = () => {
         };
       });
 
-      return { previousGoals, previousActiveGoals, previousUserStats };
+      // Optimistically update home dashboard
+      queryClient.setQueryData(
+        homeDashboardQueryKeys.dashboard(),
+        (old: any) => {
+          if (!old) return old;
+          return {
+            ...old,
+            // Remove goal from items
+            items: (old.items || []).filter(
+              (item: any) => !(item.type === "goal" && item.data?.id === goalId)
+            ),
+            stats: old.stats
+              ? {
+                  ...old.stats,
+                  active_count: Math.max(0, (old.stats.active_count || 1) - 1),
+                }
+              : old.stats,
+          };
+        }
+      );
+
+      return {
+        previousGoals,
+        previousActiveGoals,
+        previousUserStats,
+        previousDashboard,
+      };
     },
     onError: (err, goalId, context) => {
       if (context?.previousGoals) {
@@ -813,12 +929,23 @@ export const useDeactivateGoal = () => {
           context.previousUserStats
         );
       }
+      if (context?.previousDashboard) {
+        queryClient.setQueryData(
+          homeDashboardQueryKeys.dashboard(),
+          context.previousDashboard
+        );
+      }
     },
     onSuccess: async (response, goalId) => {
       queryClient.invalidateQueries({
         queryKey: actionablePlansQueryKeys.planStatus(goalId),
       });
+      queryClient.invalidateQueries({ queryKey: goalsQueryKeys.list() });
+      queryClient.invalidateQueries({ queryKey: goalsQueryKeys.active() });
       queryClient.invalidateQueries({ queryKey: userQueryKeys.userStats() });
+      queryClient.invalidateQueries({
+        queryKey: homeDashboardQueryKeys.dashboard(),
+      });
     },
   });
 };

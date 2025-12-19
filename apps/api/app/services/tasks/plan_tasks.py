@@ -13,6 +13,7 @@ from app.services.tasks.base import (
 )
 from app.services.plan_generator import PlanGenerator
 from app.services.suggested_goals_service import generate_suggested_goals_for_user
+from app.services.expo_push_service import send_push_to_user_sync
 
 
 @celery_app.task(
@@ -143,6 +144,31 @@ def generate_plan_task(
                     days_of_week=activation_context.get("days_of_week"),
                 )
 
+            # 🔔 SEND PUSH NOTIFICATION - Plan is ready!
+            if user_id:
+                goal_title = goal_data.get("title", "Your goal")
+                try:
+                    send_push_to_user_sync(
+                        user_id=user_id,
+                        title="Your plan is ready! 🎯",
+                        body=f"Your personalized plan for '{goal_title}' is ready. Tap to view.",
+                        data={
+                            "type": "plan_ready",
+                            "goalId": goal_id,
+                            "planId": plan_id,
+                            "url": f"/goal?id={goal_id}",
+                        },
+                        notification_type="plan_ready",
+                        entity_type="goal",
+                        entity_id=goal_id,
+                    )
+                    logger.info(f"Sent plan ready notification for goal {goal_id}")
+                except Exception as notif_error:
+                    # Don't fail the task if notification fails
+                    logger.warning(
+                        f"Failed to send plan ready notification: {notif_error}"
+                    )
+
             return {
                 "success": True,
                 "plan_id": plan_id,
@@ -236,7 +262,7 @@ def generate_plan_task(
     retry_backoff=True,
 )
 def generate_suggested_goals_task(
-    self, user_id: str, goal_type: str = "habit"
+    self, user_id: str, goal_type: str = "habit", user_timezone: str = None
 ) -> Dict[str, Any]:
     """
     Celery task to generate suggested goals for a user and persist them.
@@ -245,12 +271,13 @@ def generate_suggested_goals_task(
         user_id: The user's ID
         goal_type: Type of goals to generate - "habit", "time_challenge",
                    "target_challenge", or "mixed". Defaults to "habit".
+        user_timezone: User's timezone (e.g., 'America/New_York') for time-aware suggestions.
     """
     supabase = get_supabase_client()
 
     try:
         status, goals, error_message = generate_suggested_goals_for_user(
-            user_id, goal_type=goal_type
+            user_id, goal_type=goal_type, user_timezone=user_timezone
         )
 
         # Get current regeneration count (use maybe_single to handle 0 rows)
@@ -364,3 +391,103 @@ def generate_suggested_goals_task(
 
         # Still have retries left - retry the task
         raise self.retry(exc=exc)
+
+
+# =============================================================================
+# STALE TASK CLEANUP
+# =============================================================================
+
+
+@celery_app.task(name="cleanup_stale_pending_tasks")
+def cleanup_stale_pending_tasks() -> Dict[str, Any]:
+    """
+    Periodic task to clean up stale 'pending' records that got stuck.
+
+    This handles cases where:
+    - Celery worker crashed/restarted mid-task
+    - Task failed before updating status
+    - Network issues prevented status update
+
+    Runs every 2 minutes via Celery Beat.
+    Marks records pending for more than 3 minutes as 'failed'.
+    """
+    from datetime import datetime, timedelta, timezone
+
+    supabase = get_supabase_client()
+
+    # Consider "pending" records older than 3 minutes as stale
+    stale_threshold = datetime.now(timezone.utc) - timedelta(minutes=3)
+    stale_threshold_str = stale_threshold.isoformat()
+
+    cleaned_count = 0
+
+    try:
+        # Find stale suggested_goals records
+        stale_goals = (
+            supabase.table("suggested_goals")
+            .select("user_id, updated_at")
+            .eq("status", "pending")
+            .lt("updated_at", stale_threshold_str)
+            .execute()
+        )
+
+        if stale_goals.data:
+            for record in stale_goals.data:
+                try:
+                    supabase.table("suggested_goals").update(
+                        {
+                            "status": "failed",
+                            "error_message": "Generation timed out. Please try again.",
+                            "updated_at": "now()",
+                        }
+                    ).eq("user_id", record["user_id"]).eq("status", "pending").execute()
+                    cleaned_count += 1
+                    logger.warning(
+                        f"Cleaned up stale suggested_goals for user {record['user_id']}"
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Failed to cleanup stale suggested_goals: {e}",
+                        {"user_id": record["user_id"]},
+                    )
+
+        # Find stale actionable_plans records
+        stale_plans = (
+            supabase.table("actionable_plans")
+            .select("id, goal_id, updated_at")
+            .eq("status", "pending")
+            .lt("updated_at", stale_threshold_str)
+            .execute()
+        )
+
+        if stale_plans.data:
+            for record in stale_plans.data:
+                try:
+                    supabase.table("actionable_plans").update(
+                        {
+                            "status": "failed",
+                            "error_message": "Plan generation timed out. Please try again.",
+                            "updated_at": "now()",
+                        }
+                    ).eq("id", record["id"]).eq("status", "pending").execute()
+                    cleaned_count += 1
+                    logger.warning(f"Cleaned up stale actionable_plan {record['id']}")
+                except Exception as e:
+                    logger.error(
+                        f"Failed to cleanup stale actionable_plan: {e}",
+                        {"plan_id": record["id"]},
+                    )
+
+        if cleaned_count > 0:
+            logger.info(f"Cleaned up {cleaned_count} stale pending records")
+
+        return {
+            "success": True,
+            "cleaned_count": cleaned_count,
+            "stale_goals": len(stale_goals.data) if stale_goals.data else 0,
+            "stale_plans": len(stale_plans.data) if stale_plans.data else 0,
+        }
+
+    except Exception as e:
+        logger.error(f"Stale task cleanup failed: {e}")
+        return {"success": False, "error": str(e), "cleaned_count": 0}

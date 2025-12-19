@@ -12,10 +12,12 @@ import { LaunchDarklyProvider } from "@/services/launchDarklyProvider";
 import { logger } from "@/services/logger";
 import { ThemeProvider, useTheme } from "@/themes";
 import { setupDeepLinkListener } from "@/utils/deepLinkHandler";
+import { initDeviceInfo } from "@/utils/deviceInfo";
 import "@i18n";
 import * as Sentry from "@sentry/react-native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack, usePathname, useSegments } from "expo-router";
+import * as ScreenOrientation from "expo-screen-orientation";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, type ReactElement, type ReactNode } from "react";
 import { Platform, StatusBar as RNStatusBar, View } from "react-native";
@@ -75,12 +77,16 @@ function SafeAreaWrapper() {
   // Check if we're in tabs route using segments: ["(user)", "(tabs)", ...]
   const inTabs = segments.includes("(user)") && segments.includes("(tabs)");
   const inGoals = segments.includes("(user)") && segments.includes("(goals)");
+  const inChallenges =
+    segments.includes("(user)") && segments.includes("challenges");
+  const inWorkout = segments.includes("(user)") && segments.includes("workout");
 
-  const isSafeAreaHidden = inOnboarding || isAuthBase;
+  // Workout screens handle their own safe areas for full-screen overlays
+  const isSafeAreaHidden = inOnboarding || isAuthBase || inWorkout;
 
   // For tabs, exclude bottom edge since tab bar handles its own safe area insets
   const safeAreaEdges: ("bottom" | "left" | "right" | "top")[] =
-    inTabs || inGoals || inAuth
+    inTabs || inGoals || inChallenges || inAuth || inWorkout
       ? ["left", "right", "top"]
       : ["bottom", "left", "right", "top"];
 
@@ -174,9 +180,22 @@ function BackgroundColorWrapper({ children }: { children: ReactNode }) {
 // LaunchDarkly user identification is now handled by the provider
 
 function RootLayout(): ReactElement {
-  // Setup deep link listener
+  // Lock to portrait on app start (workout player can override this)
+  useEffect(() => {
+    ScreenOrientation.lockAsync(
+      ScreenOrientation.OrientationLock.PORTRAIT_UP
+    ).catch((error) => {
+      console.warn("[RootLayout] Failed to lock orientation:", error);
+    });
+  }, []);
+
+  // Setup deep link listener and initialize device info
   useEffect(() => {
     const cleanup = setupDeepLinkListener();
+    // Initialize and cache device info for auth requests
+    initDeviceInfo().catch((error) => {
+      console.warn("[RootLayout] Failed to initialize device info:", error);
+    });
     return cleanup;
   }, []);
   useBackendHealthMonitor();

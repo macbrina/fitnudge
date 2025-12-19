@@ -1,11 +1,17 @@
 import { BaseApiService, ApiResponse } from "./base";
 import { ROUTES } from "@/lib/routes";
+import {
+  getDeviceInfo,
+  getCachedDeviceInfo,
+  DeviceInfo,
+} from "@/utils/deviceInfo";
 
 // Auth Types
 export interface LoginRequest {
   email: string;
   password: string;
   remember_me?: boolean;
+  device_info?: DeviceInfo;
 }
 
 export interface LoginResponse {
@@ -30,6 +36,8 @@ export interface SignupRequest {
   email: string;
   password: string;
   timezone?: string; // Optional IANA timezone string (e.g., 'America/New_York'), defaults to device timezone if not provided
+  referral_code?: string; // Optional referral code of the user who referred them
+  device_info?: DeviceInfo;
 }
 
 export interface RefreshTokenRequest {
@@ -58,10 +66,13 @@ export interface AppleLoginPayload {
 // Auth Service
 export class AuthService extends BaseApiService {
   async login(credentials: LoginRequest): Promise<ApiResponse<LoginResponse>> {
-    const response = await this.post<LoginResponse>(
-      ROUTES.AUTH.LOGIN,
-      credentials
-    );
+    // Get device info for session tracking
+    const deviceInfo = getCachedDeviceInfo() || (await getDeviceInfo());
+
+    const response = await this.post<LoginResponse>(ROUTES.AUTH.LOGIN, {
+      ...credentials,
+      device_info: deviceInfo,
+    });
 
     if (response.data) {
       const { TokenManager } = await import("./base");
@@ -79,11 +90,18 @@ export class AuthService extends BaseApiService {
     const timezone =
       userData.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
 
+    // Get device info for session tracking
+    const deviceInfo = getCachedDeviceInfo() || (await getDeviceInfo());
+
     const response = await this.post<LoginResponse>(ROUTES.AUTH.SIGNUP, {
       ...userData,
       // Backend requires 'name'; use username as display name if not collected separately
       name: userData.username,
       timezone: timezone,
+      // Include referral code if provided
+      referral_code: userData.referral_code || undefined,
+      // Include device info for session tracking
+      device_info: deviceInfo,
     });
 
     if (response.data) {
@@ -181,9 +199,17 @@ export class AuthService extends BaseApiService {
     return this.post(ROUTES.AUTH.VALIDATE_RESET_TOKEN, { token });
   }
 
-  async loginWithGoogle(idToken: string): Promise<ApiResponse<LoginResponse>> {
+  async loginWithGoogle(
+    idToken: string,
+    referralCode?: string
+  ): Promise<ApiResponse<LoginResponse>> {
+    // Get device info for session tracking
+    const deviceInfo = getCachedDeviceInfo() || (await getDeviceInfo());
+
     const response = await this.post<LoginResponse>(ROUTES.AUTH.OAUTH.GOOGLE, {
       id_token: idToken,
+      device_info: deviceInfo,
+      referral_code: referralCode || undefined,
     });
 
     if (response.data) {
@@ -198,13 +224,19 @@ export class AuthService extends BaseApiService {
   }
 
   async loginWithApple(
-    payload: AppleLoginPayload
+    payload: AppleLoginPayload,
+    referralCode?: string
   ): Promise<ApiResponse<LoginResponse>> {
+    // Get device info for session tracking
+    const deviceInfo = getCachedDeviceInfo() || (await getDeviceInfo());
+
     const response = await this.post<LoginResponse>(ROUTES.AUTH.OAUTH.APPLE, {
       identity_token: payload.identityToken,
       authorization_code: payload.authorizationCode,
       email: payload.email,
       full_name: payload.fullName,
+      device_info: deviceInfo,
+      referral_code: referralCode || undefined,
     });
 
     if (response.data) {

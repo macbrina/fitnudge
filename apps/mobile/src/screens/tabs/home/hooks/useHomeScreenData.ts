@@ -1,9 +1,20 @@
-import { useActiveGoals } from "@/hooks/api/useGoals";
-import { useTodayCheckIns, useCheckInStats } from "@/hooks/api/useCheckIns";
-import { useUserStats } from "@/hooks/api/useUser";
-import { useMemo } from "react";
+import { useHomeDashboard } from "@/hooks/api/useHomeDashboard";
+import { useMemo, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { homeDashboardQueryKeys } from "@/hooks/api/useHomeDashboard";
+import {
+  ActiveItem,
+  PendingCheckIn,
+  DashboardStats,
+} from "@/services/api/home";
 
 export interface HomeScreenData {
+  // New combined data
+  activeItems: ActiveItem[];
+  todayPendingCheckIns: PendingCheckIn[];
+  dashboardStats: DashboardStats | null;
+
+  // Legacy fields for backward compatibility
   activeGoals: any[];
   todayCheckIns: any[];
   userStats: {
@@ -14,6 +25,7 @@ export interface HomeScreenData {
     longest_streak: number;
     completion_rate: number;
   } | null;
+
   isLoading: boolean;
   hasError: boolean;
   refetch: () => Promise<void>;
@@ -21,113 +33,90 @@ export interface HomeScreenData {
 
 /**
  * Custom hook to fetch all data needed for the home screen
- * Centralizes data fetching logic and prevents prop drilling
+ * Uses the combined /home/dashboard endpoint for efficiency
  *
- * Uses React Query for all server state (goals, check-ins, stats)
- * This ensures Realtime cache invalidation works properly
+ * Returns:
+ * - activeItems: Combined list of goals, challenges, and group goals
+ * - todayPendingCheckIns: Check-ins that need to be completed today
+ * - dashboardStats: Combined stats (active count, streak, etc.)
  */
 export function useHomeScreenData(): HomeScreenData {
-  // Use React Query for goals (not Zustand) - enables Realtime updates
-  const {
-    data: activeGoalsResponse,
-    isLoading: goalsLoading,
-    isError: goalsError,
-    refetch: refetchGoals,
-  } = useActiveGoals();
+  const queryClient = useQueryClient();
 
   const {
-    data: todayCheckInsResponse,
-    isLoading: checkInsLoading,
-    isError: checkInsError,
-    refetch: refetchCheckIns,
-  } = useTodayCheckIns();
+    data: dashboardData,
+    isLoading,
+    isError,
+    refetch: refetchDashboard,
+  } = useHomeDashboard();
 
-  const {
-    data: userStatsResponse,
-    isLoading: userStatsLoading,
-    isError: userStatsError,
-    refetch: refetchUserStats,
-  } = useUserStats();
+  // Extract active items from response
+  const activeItems = useMemo(() => {
+    return dashboardData?.items || [];
+  }, [dashboardData]);
 
-  const {
-    data: checkInStatsResponse,
-    isLoading: checkInStatsLoading,
-    refetch: refetchCheckInStats,
-  } = useCheckInStats();
+  // Extract today's pending check-ins
+  const todayPendingCheckIns = useMemo(() => {
+    return dashboardData?.today_pending_checkins || [];
+  }, [dashboardData]);
 
-  // Extract active goals from React Query response
+  // Extract dashboard stats
+  const dashboardStats = useMemo(() => {
+    return dashboardData?.stats || null;
+  }, [dashboardData]);
+
+  // Legacy: Extract just goals for backward compatibility
   const activeGoals = useMemo(() => {
-    if (!activeGoalsResponse?.data) return [];
-    return Array.isArray(activeGoalsResponse.data)
-      ? activeGoalsResponse.data
-      : [];
-  }, [activeGoalsResponse]);
+    return activeItems
+      .filter((item) => item.type === "goal")
+      .map((item) => item.data);
+  }, [activeItems]);
 
+  // Legacy: Extract just goal check-ins for backward compatibility
   const todayCheckIns = useMemo(() => {
-    if (!todayCheckInsResponse?.data) return [];
-    return Array.isArray(todayCheckInsResponse.data)
-      ? todayCheckInsResponse.data
-      : [];
-  }, [todayCheckInsResponse]);
+    return todayPendingCheckIns
+      .filter((item) => item.type === "goal")
+      .map((item) => ({
+        ...item.data,
+        goal: item.item,
+      }));
+  }, [todayPendingCheckIns]);
 
+  // Legacy: Convert dashboard stats to old format
   const userStats = useMemo(() => {
-    if (!userStatsResponse?.data) return null;
-    const stats = userStatsResponse.data;
-
-    // Calculate active goals (total - completed)
-    const activeGoalsCount = Math.max(
-      0,
-      (stats.total_goals || 0) - (stats.completed_goals || 0)
-    );
-
-    // Calculate completion rate from check-in stats if available
-    let completionRate = 0;
-    if (checkInStatsResponse?.data) {
-      completionRate = Math.round(
-        checkInStatsResponse.data.completion_rate || 0
-      );
-    } else if (stats.total_check_ins > 0) {
-      // Fallback: calculate from total check-ins (rough estimate)
-      completionRate = Math.min(
-        100,
-        Math.round((stats.current_streak / 7) * 100)
-      );
-    }
-
+    if (!dashboardStats) return null;
     return {
-      total_goals: stats.total_goals || 0,
-      active_goals: activeGoalsCount,
-      total_check_ins: stats.total_check_ins || 0,
-      current_streak: stats.current_streak || 0,
-      longest_streak: stats.longest_streak || 0,
-      completion_rate: completionRate,
+      total_goals: dashboardStats.active_count,
+      active_goals: dashboardStats.active_count,
+      total_check_ins: dashboardStats.total_check_ins,
+      current_streak: dashboardStats.current_streak,
+      longest_streak: dashboardStats.current_streak, // Not tracked in new API
+      completion_rate: dashboardStats.completion_rate,
     };
-  }, [userStatsResponse, checkInStatsResponse]);
+  }, [dashboardStats]);
 
-  const isLoading =
-    goalsLoading ||
-    checkInsLoading ||
-    userStatsLoading ||
-    checkInStatsLoading ||
-    false;
-  const hasError = goalsError || checkInsError || userStatsError || false;
-
-  // Refetch all data (all React Query now!)
-  const refetch = async () => {
-    await Promise.all([
-      refetchGoals(),
-      refetchCheckIns(),
-      refetchUserStats(),
-      refetchCheckInStats(),
-    ]);
-  };
+  // Refetch dashboard data
+  const refetch = useCallback(async () => {
+    await refetchDashboard();
+    // Also invalidate related queries that might be affected
+    queryClient.invalidateQueries({ queryKey: ["goals"] });
+    queryClient.invalidateQueries({ queryKey: ["challenges"] });
+    queryClient.invalidateQueries({ queryKey: ["check-ins"] });
+  }, [refetchDashboard, queryClient]);
 
   return {
+    // New combined data
+    activeItems,
+    todayPendingCheckIns,
+    dashboardStats,
+
+    // Legacy fields
     activeGoals,
     todayCheckIns,
     userStats,
+
     isLoading,
-    hasError,
+    hasError: isError,
     refetch,
   };
 }

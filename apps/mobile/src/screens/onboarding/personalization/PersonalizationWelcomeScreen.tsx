@@ -50,28 +50,34 @@ export default function PersonalizationWelcomeScreen({
         {/* Benefits Cards */}
         <View style={styles.benefitsContainer}>
           <Card padded={false} shadow="lg" style={styles.benefitCard}>
-            <View style={styles.benefitIconContainer}>
-              <Text style={styles.benefitIcon}>🎯</Text>
+            <View style={styles.benefitRow}>
+              <View style={styles.benefitIconContainer}>
+                <Text style={styles.benefitIcon}>🎯</Text>
+              </View>
+              <Text style={styles.benefitText}>
+                {t("onboarding.personalization.welcome.benefit_goals")}
+              </Text>
             </View>
-            <Text style={styles.benefitText}>
-              {t("onboarding.personalization.welcome.benefit_goals")}
-            </Text>
           </Card>
           <Card padded={false} shadow="lg" style={styles.benefitCard}>
-            <View style={styles.benefitIconContainer}>
-              <Text style={styles.benefitIcon}>🤖</Text>
+            <View style={styles.benefitRow}>
+              <View style={styles.benefitIconContainer}>
+                <Text style={styles.benefitIcon}>🤖</Text>
+              </View>
+              <Text style={styles.benefitText}>
+                {t("onboarding.personalization.welcome.benefit_ai")}
+              </Text>
             </View>
-            <Text style={styles.benefitText}>
-              {t("onboarding.personalization.welcome.benefit_ai")}
-            </Text>
           </Card>
           <Card padded={false} shadow="lg" style={styles.benefitCard}>
-            <View style={styles.benefitIconContainer}>
-              <Text style={styles.benefitIcon}>📊</Text>
+            <View style={styles.benefitRow}>
+              <View style={styles.benefitIconContainer}>
+                <Text style={styles.benefitIcon}>📊</Text>
+              </View>
+              <Text style={styles.benefitText}>
+                {t("onboarding.personalization.welcome.benefit_tracking")}
+              </Text>
             </View>
-            <Text style={styles.benefitText}>
-              {t("onboarding.personalization.welcome.benefit_tracking")}
-            </Text>
           </Card>
         </View>
       </View>
@@ -150,11 +156,13 @@ const makePersonalizationWelcomeScreenStyles = (
       gap: toRN(tokens.spacing[4]),
     },
     benefitCard: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
       paddingHorizontal: toRN(tokens.spacing[4]),
       paddingVertical: toRN(tokens.spacing[4]),
       borderRadius: toRN(tokens.borderRadius.lg),
+    },
+    benefitRow: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
     },
     benefitIconContainer: {
       width: 48,
@@ -163,7 +171,6 @@ const makePersonalizationWelcomeScreenStyles = (
       backgroundColor: colors.bg.card,
       alignItems: "center" as const,
       justifyContent: "center" as const,
-      marginRight: toRN(tokens.spacing[4]),
     },
     benefitIcon: {
       fontSize: 24,

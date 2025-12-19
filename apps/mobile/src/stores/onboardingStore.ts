@@ -16,6 +16,7 @@ interface OnboardingState {
   // State
   isSubmitting: boolean;
   isCompleted: boolean;
+  hasFitnessProfile: boolean | null; // null = not checked yet, true/false = checked
   error: string | null;
 
   // Actions
@@ -27,6 +28,7 @@ interface OnboardingState {
   setMotivationStyle: (style: string) => void;
   setBiggestChallenge: (challenge: string) => void;
   loadProfile: () => Promise<boolean>; // Returns true if profile exists, false otherwise
+  checkHasFitnessProfile: () => Promise<boolean>; // Quick check without loading full profile
   submitProfile: () => Promise<void>;
   reset: () => void;
 }
@@ -42,6 +44,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
   biggest_challenge: "",
   isSubmitting: false,
   isCompleted: false,
+  hasFitnessProfile: null, // null = not checked yet
   error: null,
 
   // Actions
@@ -88,11 +91,13 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
           motivation_style: profile.motivation_style || "",
           biggest_challenge: profile.biggest_challenge || "",
           isCompleted: true, // Profile exists, so it's been completed
+          hasFitnessProfile: true,
         });
 
         return true; // Profile exists
       }
 
+      set({ hasFitnessProfile: false });
       return false; // No profile found
     } catch (error) {
       // Profile doesn't exist or error fetching - not an error state
@@ -110,8 +115,20 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
         });
       }
 
+      set({ hasFitnessProfile: false });
       return false; // No profile exists
     }
+  },
+
+  checkHasFitnessProfile: async () => {
+    // If already checked, return cached value
+    const currentState = get().hasFitnessProfile;
+    if (currentState !== null) {
+      return currentState;
+    }
+
+    // Otherwise, load profile to check
+    return get().loadProfile();
   },
 
   submitProfile: async () => {
@@ -200,6 +217,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
       biggest_challenge: "",
       isSubmitting: false,
       isCompleted: false,
+      hasFitnessProfile: null,
       error: null,
     });
   },

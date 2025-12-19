@@ -48,6 +48,8 @@ export const ROUTES = {
   CHALLENGES: {
     BASE: "/challenges",
     LIST: "/challenges",
+    MY: "/challenges/my", // All challenges user has access to (created or joined)
+    PUBLIC: "/challenges/public", // Public challenges for discovery
     GET: (id: string) => `/challenges/${id}`,
     CREATE: "/challenges",
     UPDATE: (id: string) => `/challenges/${id}`,
@@ -57,9 +59,24 @@ export const ROUTES = {
     CHECK_IN: (id: string) => `/challenges/${id}/check-in`,
     CHECK_INS: (id: string) => `/challenges/${id}/check-ins`,
     MY_CHECK_INS: (id: string) => `/challenges/${id}/my-check-ins`,
+    UPDATE_CHECK_IN: (challengeId: string, checkInId: string) =>
+      `/challenges/${challengeId}/check-ins/${checkInId}`,
+    DELETE_CHECK_IN: (challengeId: string, checkInId: string) =>
+      `/challenges/${challengeId}/check-ins/${checkInId}`,
     LEADERBOARD: (id: string) => `/challenges/${id}/leaderboard`,
     PARTICIPANTS: (id: string) => `/challenges/${id}/participants`,
-    PUBLIC: "/challenges/public",
+    // Invite management routes
+    INVITES_RECEIVED: "/challenges/invites/received",
+    INVITES_SENT: "/challenges/invites/sent",
+    INVITE_ACCEPT: (inviteId: string) =>
+      `/challenges/invites/${inviteId}/accept`,
+    INVITE_DECLINE: (inviteId: string) =>
+      `/challenges/invites/${inviteId}/decline`,
+    INVITE_CANCEL: (inviteId: string) => `/challenges/invites/${inviteId}`,
+    // Other invite routes
+    INVITE: (id: string) => `/challenges/${id}/invite`,
+    INVITE_LINK: (id: string) => `/challenges/${id}/invite-link`,
+    JOIN_VIA_INVITE: (inviteCode: string) => `/challenges/join/${inviteCode}`,
   },
 
   // Nudges routes (social motivation)
@@ -79,11 +96,14 @@ export const ROUTES = {
     BASE: "/partners",
     LIST: "/partners",
     PENDING: "/partners/pending",
+    SENT: "/partners/sent",
     REQUEST: "/partners/request",
     ACCEPT: (id: string) => `/partners/${id}/accept`,
     REJECT: (id: string) => `/partners/${id}/reject`,
+    CANCEL: (id: string) => `/partners/${id}/cancel`,
     REMOVE: (id: string) => `/partners/${id}`,
     SEARCH_USERS: "/partners/search",
+    SUGGESTED_USERS: "/partners/suggested",
   },
 
   // Motivation routes
@@ -138,24 +158,11 @@ export const ROUTES = {
   },
 
   // Subscription routes
+  // Note: IAP verification/products handled by RevenueCat SDK, not our backend
   SUBSCRIPTIONS: {
     ME: "/subscriptions/me",
     FEATURES: "/subscriptions/features",
     SYNC: "/subscriptions/sync",
-    APPLE: {
-      VERIFY_RECEIPT: "/subscriptions/iap/apple/verify-receipt",
-      WEBHOOK: "/subscriptions/iap/apple/webhook",
-      PRODUCTS: "/subscriptions/iap/apple/products",
-      RESTORE: "/subscriptions/iap/apple/restore",
-      VALIDATE_OFFER: "/subscriptions/iap/apple/validate-offer",
-    },
-    GOOGLE: {
-      VERIFY_PURCHASE: "/subscriptions/iap/google/verify-purchase",
-      WEBHOOK: "/subscriptions/iap/google/webhook",
-      PRODUCTS: "/subscriptions/iap/google/products",
-      ACKNOWLEDGE: "/subscriptions/iap/google/acknowledge",
-      VALIDATE_PROMO: "/subscriptions/iap/google/validate-promo",
-    },
   },
 
   // Subscription Plans
@@ -196,6 +203,8 @@ export const ROUTES = {
     CHANGE_PASSWORD: "/users/change-password",
     PROFILE_PICTURE: "/users/profile-picture",
     NOTIFICATION_SETTINGS: "/users/notification-settings",
+    REFERRAL_CODE: "/users/me/referral-code",
+    REFERRALS: "/users/me/referrals",
   },
 
   // Check-ins routes
@@ -315,6 +324,10 @@ export const MOBILE_ROUTES = {
     CREATE_POST: "/(user)/social/create",
     POST_DETAILS: "/(user)/social/post",
     USER_PROFILE: "/(user)/social/profile",
+    PARTNERS: "/(user)/social/partners",
+    FIND_PARTNER: "/(user)/social/find-partner",
+    NUDGES: "/(user)/social/nudges",
+    REFERRAL: "/(user)/social/referral",
   },
 
   // Profile screens
@@ -341,6 +354,20 @@ export const MOBILE_ROUTES = {
     LIST: "/(user)/challenges",
     DETAILS: (id: string) => `/(user)/challenges/${id}` as const,
     CREATE: "/(user)/challenges/create",
+    LEADERBOARD: (id: string) =>
+      `/(user)/challenges/${id}/leaderboard` as const,
+    INVITES: "/(user)/challenges/invites",
+    INVITE_USERS: (challengeId: string) =>
+      `/(user)/challenges/invites?challengeId=${challengeId}` as const,
+  },
+
+  // Workout
+  WORKOUT: {
+    PLAYER: (goalId: string) => `/workout/${goalId}` as const,
+    PLAYER_RESUME: (goalId: string) =>
+      `/workout/${goalId}?resume=true` as const,
+    PLAYER_RESTART: (goalId: string) =>
+      `/workout/${goalId}?restart=true` as const,
   },
 } as const;
 

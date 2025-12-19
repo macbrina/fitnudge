@@ -1,3 +1,3 @@
-import GoalDetailScreen from "@/screens/goals/GoalDetailScreen";
+import GoalDetailScreen from "@/screens/tabs/goals/GoalDetailScreen";
 
 export default GoalDetailScreen;

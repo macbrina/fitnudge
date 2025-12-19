@@ -86,7 +86,8 @@ CREATE POLICY "Users can view challenge check-ins for challenges they participat
 ON challenge_check_ins FOR SELECT
 TO authenticated
 USING (
-    EXISTS (
+    user_id = auth.uid()
+    OR EXISTS (
         SELECT 1 FROM challenge_participants cp
         WHERE cp.challenge_id = challenge_check_ins.challenge_id
         AND cp.user_id = auth.uid()

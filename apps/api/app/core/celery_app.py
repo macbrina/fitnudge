@@ -117,6 +117,54 @@ celery_app.conf.update(
             # Sends reminders for challenges ending in 1-3 days
             # Keeps participants engaged and aware of deadlines
         },
+        # Subscription lifecycle tasks
+        "check-expiring-subscriptions": {
+            "task": "subscription.check_expiring_subscriptions",
+            "schedule": 60.0 * 60.0 * 24.0,  # Run DAILY
+            # Warns users 3 days before subscription expires (if auto_renew=false)
+            # Sends push notification with upgrade CTA
+        },
+        "update-challenge-statuses": {
+            "task": "subscription.update_challenge_statuses",
+            "schedule": 60.0 * 60.0,  # Run HOURLY
+            # Transitions challenges: upcoming -> active -> completed
+            # Calculates final rankings when challenges end
+        },
+        "cleanup-abandoned-challenges": {
+            "task": "subscription.cleanup_abandoned_challenges",
+            "schedule": 60.0 * 60.0 * 24.0,  # Run DAILY
+            # Cancels challenges with no participants after join deadline
+            # Keeps challenge lists clean
+        },
+        "process-failed-webhook-events": {
+            "task": "subscription.process_failed_webhook_events",
+            "schedule": 60.0 * 5.0,  # Run EVERY 5 MINUTES
+            # Retries failed RevenueCat webhook events
+            # Ensures subscription state stays in sync
+        },
+        # Auth maintenance tasks
+        "cleanup-expired-refresh-tokens": {
+            "task": "cleanup_expired_refresh_tokens",
+            "schedule": 60.0 * 60.0 * 24.0,  # Run DAILY
+            # Removes expired refresh tokens from abandoned sessions
+            # With immediate deletion on rotation, this is just for cleanup
+        },
+        # Notification cleanup tasks
+        "cleanup-orphaned-notifications": {
+            "task": "cleanup_orphaned_notifications",
+            "schedule": 60.0 * 60.0 * 24.0 * 7,  # Run WEEKLY
+            # Removes notifications referencing deleted entities (goals, challenges, etc.)
+            # Only cleans up notifications older than 30 days
+            # Keeps notification_history table clean
+        },
+        # Stale task cleanup - CRITICAL for production reliability
+        "cleanup-stale-pending-tasks": {
+            "task": "cleanup_stale_pending_tasks",
+            "schedule": 60.0 * 2.0,  # Run EVERY 2 MINUTES
+            # Marks stuck "pending" records as "failed" after 3 minutes
+            # Handles cases where Celery worker crashes/restarts mid-task
+            # Allows users to retry instead of being stuck forever
+        },
     },
 )
 

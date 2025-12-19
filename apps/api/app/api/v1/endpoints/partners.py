@@ -39,7 +39,9 @@ class PartnerSearchResult(BaseModel):
     username: Optional[str] = None
     profile_picture_url: Optional[str] = None
     is_partner: bool = False
-    has_pending_request: bool = False
+    has_pending_request: bool = False  # Deprecated: use request_status instead
+    request_status: str = "none"  # none, sent, received, accepted
+    partnership_id: Optional[str] = None  # For cancel/accept actions
 
 
 class PartnerRequest(BaseModel):
@@ -182,78 +184,275 @@ async def get_pending_requests(
         )
 
 
-@router.get("/search", response_model=List[PartnerSearchResult])
-async def search_users_for_partners(
-    query: str = Query(..., min_length=2),
+@router.get("/sent", response_model=List[PartnerResponse])
+async def get_sent_requests(
     current_user: dict = Depends(get_current_user),
-    limit: int = Query(20, ge=1, le=50),
 ):
-    """Search users to add as accountability partners"""
+    """Get partner requests sent by current user (outgoing requests)"""
     from app.core.database import get_supabase_client
 
     supabase = get_supabase_client()
     user_id = current_user["id"]
 
     try:
-        # Search users by name or username
+        # Get pending requests where current user is the initiator
         result = (
-            supabase.table("users")
-            .select("id, name, username, profile_picture_url")
-            .or_(f"name.ilike.%{query}%,username.ilike.%{query}%")
-            .neq("id", user_id)  # Exclude current user
-            .limit(limit)
+            supabase.table("accountability_partners")
+            .select(
+                """
+                id,
+                user_id,
+                partner_user_id,
+                status,
+                initiated_by_user_id,
+                created_at,
+                partner:users!accountability_partners_partner_user_id_fkey(id, name, username, profile_picture_url)
+            """
+            )
+            .eq("status", "pending")
+            .eq("initiated_by_user_id", user_id)
+            .order("created_at", desc=True)
             .execute()
         )
 
-        if not result.data:
-            return []
+        sent = []
+        for row in result.data or []:
+            receiver_info = row.get("partner", {})
+            sent.append(
+                {
+                    "id": row["id"],
+                    "user_id": row["user_id"],
+                    "partner_user_id": row["partner_user_id"],
+                    "partner": {
+                        "id": receiver_info.get("id"),
+                        "name": receiver_info.get("name"),
+                        "username": receiver_info.get("username"),
+                        "profile_picture_url": receiver_info.get("profile_picture_url"),
+                    },
+                    "status": row["status"],
+                    "initiated_by_user_id": row["initiated_by_user_id"],
+                    "created_at": row["created_at"],
+                    "accepted_at": None,
+                }
+            )
 
-        user_ids = [u["id"] for u in result.data]
+        return sent
+
+    except Exception as e:
+        logger.error(
+            f"Failed to get sent requests for user {user_id}",
+            {"error": str(e), "user_id": user_id},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get sent requests",
+        )
+
+
+class PaginatedSearchResponse(BaseModel):
+    users: List[PartnerSearchResult]
+    total: int
+    page: int
+    limit: int
+    has_more: bool
+
+
+@router.get("/search", response_model=PaginatedSearchResponse)
+async def search_users_for_partners(
+    query: str = Query(..., min_length=2),
+    current_user: dict = Depends(get_current_user),
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=50),
+):
+    """Search users to add as accountability partners with pagination"""
+    from app.core.database import get_supabase_client
+
+    supabase = get_supabase_client()
+    user_id = current_user["id"]
+    offset = (page - 1) * limit
+
+    try:
+        # Search users by name or username with pagination
+        result = (
+            supabase.table("users")
+            .select("id, name, username, profile_picture_url", count="exact")
+            .or_(f"name.ilike.%{query}%,username.ilike.%{query}%")
+            .neq("id", user_id)  # Exclude current user
+            .eq("status", "active")
+            .range(offset, offset + limit - 1)
+            .execute()
+        )
+
+        total = result.count if hasattr(result, "count") and result.count else 0
+
+        if not result.data:
+            return {
+                "users": [],
+                "total": 0,
+                "page": page,
+                "limit": limit,
+                "has_more": False,
+            }
 
         # Get existing partnerships (accepted or pending)
         partnerships = (
             supabase.table("accountability_partners")
-            .select("user_id, partner_user_id, status")
+            .select("id, user_id, partner_user_id, status, initiated_by_user_id")
             .or_(f"user_id.eq.{user_id},partner_user_id.eq.{user_id}")
             .in_("status", ["accepted", "pending"])
             .execute()
         )
 
-        # Build lookup sets
-        partner_ids = set()
-        pending_ids = set()
+        # Build lookup dicts with detailed status
+        # Key: other user's id, Value: {status, i_initiated, partnership_id}
+        partnership_info = {}
 
         for p in partnerships.data or []:
             other_id = p["partner_user_id"] if p["user_id"] == user_id else p["user_id"]
-            if p["status"] == "accepted":
-                partner_ids.add(other_id)
-            else:
-                pending_ids.add(other_id)
+            i_initiated = p["initiated_by_user_id"] == user_id
+            partnership_info[other_id] = {
+                "status": p["status"],
+                "i_initiated": i_initiated,
+                "partnership_id": p["id"],
+            }
 
         # Build response
         search_results = []
         for user in result.data:
+            info = partnership_info.get(user["id"])
+
+            if info:
+                if info["status"] == "accepted":
+                    request_status = "accepted"
+                    is_partner = True
+                    has_pending = False
+                else:  # pending
+                    is_partner = False
+                    has_pending = True
+                    request_status = "sent" if info["i_initiated"] else "received"
+                partnership_id = info["partnership_id"]
+            else:
+                request_status = "none"
+                is_partner = False
+                has_pending = False
+                partnership_id = None
+
             search_results.append(
                 {
                     "id": user["id"],
                     "name": user.get("name"),
                     "username": user.get("username"),
                     "profile_picture_url": user.get("profile_picture_url"),
-                    "is_partner": user["id"] in partner_ids,
-                    "has_pending_request": user["id"] in pending_ids,
+                    "is_partner": is_partner,
+                    "has_pending_request": has_pending,
+                    "request_status": request_status,
+                    "partnership_id": partnership_id,
                 }
             )
 
-        return search_results
+        return {
+            "users": search_results,
+            "total": total,
+            "page": page,
+            "limit": limit,
+            "has_more": offset + limit < total,
+        }
 
     except Exception as e:
         logger.error(
-            f"Failed to search users for user {user_id}",
+            f"Failed to search users for user {user_id}: {str(e)}",
             {"error": str(e), "user_id": user_id, "query": query},
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to search users",
+            detail=f"Failed to search users: {str(e)}",
+        )
+
+
+@router.get("/suggested", response_model=PaginatedSearchResponse)
+async def get_suggested_partners(
+    current_user: dict = Depends(get_current_user),
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=50),
+):
+    """Get suggested users to add as accountability partners
+
+    Suggests recently active users.
+    Excludes existing partners and pending requests.
+    """
+    from app.core.database import get_supabase_client
+
+    supabase = get_supabase_client()
+    user_id = current_user["id"]
+    offset = (page - 1) * limit
+
+    try:
+        # Get existing partnerships and pending requests to exclude
+        partnerships = (
+            supabase.table("accountability_partners")
+            .select("user_id, partner_user_id")
+            .or_(f"user_id.eq.{user_id},partner_user_id.eq.{user_id}")
+            .in_("status", ["accepted", "pending"])
+            .execute()
+        )
+
+        exclude_ids = {user_id}  # Always exclude self
+        for p in partnerships.data or []:
+            exclude_ids.add(p["user_id"])
+            exclude_ids.add(p["partner_user_id"])
+
+        # Get recently active users, excluding existing partners and pending requests
+        exclude_list = list(exclude_ids)
+
+        query = (
+            supabase.table("users")
+            .select("id, name, username, profile_picture_url", count="exact")
+            .eq("status", "active")
+        )
+
+        # Only add NOT IN filter if we have IDs to exclude
+        if exclude_list:
+            exclude_str = f"({','.join(exclude_list)})"
+            query = query.filter("id", "not.in", exclude_str)
+
+        result = (
+            query.order("created_at", desc=True)
+            .range(offset, offset + limit - 1)
+            .execute()
+        )
+
+        total = result.count if hasattr(result, "count") and result.count else 0
+
+        users = [
+            {
+                "id": u["id"],
+                "name": u.get("name"),
+                "username": u.get("username"),
+                "profile_picture_url": u.get("profile_picture_url"),
+                "is_partner": False,
+                "has_pending_request": False,
+                "request_status": "none",
+                "partnership_id": None,
+            }
+            for u in result.data or []
+        ]
+
+        return {
+            "users": users,
+            "total": total,
+            "page": page,
+            "limit": limit,
+            "has_more": offset + limit < total,
+        }
+
+    except Exception as e:
+        logger.error(
+            f"Failed to get suggested partners for user {user_id}: {str(e)}",
+            {"error": str(e), "user_id": user_id},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get suggested partners: {str(e)}",
         )
 
 
@@ -485,6 +684,60 @@ async def reject_partner_request(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to reject partner request",
+        )
+
+
+@router.post("/{partnership_id}/cancel")
+async def cancel_partner_request(
+    partnership_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Cancel a pending partner request that the current user initiated"""
+    from app.core.database import get_supabase_client
+
+    supabase = get_supabase_client()
+    user_id = current_user["id"]
+
+    try:
+        # Get the partnership (must be pending and initiated by current user)
+        partnership = (
+            supabase.table("accountability_partners")
+            .select("*")
+            .eq("id", partnership_id)
+            .eq("initiated_by_user_id", user_id)
+            .eq("status", "pending")
+            .maybe_single()
+            .execute()
+        )
+
+        if not partnership.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Pending request not found or you are not the initiator",
+            )
+
+        # Delete the pending request
+        supabase.table("accountability_partners").delete().eq(
+            "id", partnership_id
+        ).execute()
+
+        logger.info(
+            f"Partner request {partnership_id} cancelled by {user_id}",
+            {"partnership_id": partnership_id, "user_id": user_id},
+        )
+
+        return {"message": "Partner request cancelled"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to cancel partner request {partnership_id}",
+            {"error": str(e), "partnership_id": partnership_id, "user_id": user_id},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to cancel partner request",
         )
 
 

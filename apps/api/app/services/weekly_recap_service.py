@@ -38,7 +38,9 @@ class WeeklyRecapService:
             week_start = today - timedelta(days=7)
             week_end = today
 
-            # Get check-ins for the week
+            # =========================================
+            # 1. Get goal check-ins for the week
+            # =========================================
             query = (
                 supabase.table("check_ins")
                 .select("*")
@@ -52,9 +54,29 @@ class WeeklyRecapService:
                 query = query.eq("goal_id", goal_id)
 
             check_ins_result = query.execute()
-            check_ins = check_ins_result.data or []
+            goal_check_ins = check_ins_result.data or []
 
-            # Get goal information
+            # =========================================
+            # 2. Get challenge check-ins for the week (completed only)
+            # =========================================
+            challenge_check_ins = []
+            try:
+                challenge_checkins_result = (
+                    supabase.table("challenge_check_ins")
+                    .select("*")
+                    .eq("user_id", user_id)
+                    .eq("completed", True)
+                    .gte("check_in_date", week_start.isoformat())
+                    .lte("check_in_date", week_end.isoformat())
+                    .execute()
+                )
+                challenge_check_ins = challenge_checkins_result.data or []
+            except Exception:
+                pass
+
+            # =========================================
+            # 3. Get active personal goals
+            # =========================================
             if goal_id:
                 goal_result = (
                     supabase.table("goals")
@@ -65,26 +87,83 @@ class WeeklyRecapService:
                     .execute()
                 )
                 goal = goal_result.data if goal_result.data else None
+                personal_goals = [goal] if goal else []
             else:
-                # Get active goal
                 goal_result = (
                     supabase.table("goals")
                     .select("*")
                     .eq("user_id", user_id)
                     .eq("is_active", True)
-                    .limit(1)
                     .execute()
                 )
-                goal = goal_result.data[0] if goal_result.data else None
+                personal_goals = goal_result.data or []
+                goal = personal_goals[0] if personal_goals else None
 
-            if not goal:
-                logger.warning(f"No active goal found for user {user_id}")
+            # =========================================
+            # 4. Get active challenges
+            # =========================================
+            active_challenges = []
+            try:
+                participant_result = (
+                    supabase.table("challenge_participants")
+                    .select(
+                        "challenges(id, title, description, start_date, end_date, is_active)"
+                    )
+                    .eq("user_id", user_id)
+                    .execute()
+                )
+                for p in participant_result.data or []:
+                    challenge = p.get("challenges")
+                    if not challenge or not challenge.get("is_active"):
+                        continue
+                    start_date_c = (
+                        date.fromisoformat(challenge["start_date"])
+                        if challenge.get("start_date")
+                        else None
+                    )
+                    end_date_c = (
+                        date.fromisoformat(challenge["end_date"])
+                        if challenge.get("end_date")
+                        else None
+                    )
+                    if start_date_c and today < start_date_c:
+                        continue
+                    if end_date_c and today > end_date_c:
+                        continue
+                    active_challenges.append(challenge)
+            except Exception:
+                pass
+
+            if not goal and not active_challenges:
+                logger.warning(
+                    f"No active goals or challenges found for user {user_id}"
+                )
                 return None
 
-            # Calculate statistics
-            stats = self._calculate_stats(check_ins, week_start, week_end)
+            # =========================================
+            # 5. Calculate combined statistics
+            # =========================================
+            # Combine check-in dates for streak calculation
+            all_checkin_dates: set[str] = set()
+            for c in goal_check_ins:
+                all_checkin_dates.add(c["date"])
+            for c in challenge_check_ins:
+                all_checkin_dates.add(c["check_in_date"])
 
-            # Get user profile for personalization
+            stats = self._calculate_stats(goal_check_ins, week_start, week_end)
+            # Add challenge stats
+            stats["challenge_check_ins"] = len(challenge_check_ins)
+            stats["total_check_ins"] = stats["completed_check_ins"] + len(
+                challenge_check_ins
+            )
+            # Recalculate streak from combined dates
+            stats["current_streak"] = self._calculate_combined_streak(
+                all_checkin_dates, week_end
+            )
+
+            # =========================================
+            # 6. Get user profile for personalization
+            # =========================================
             profile_result = (
                 supabase.table("user_fitness_profiles")
                 .select("*")
@@ -94,16 +173,26 @@ class WeeklyRecapService:
             )
             user_profile = profile_result.data if profile_result.data else None
 
-            # Generate AI recap
+            # =========================================
+            # 7. Generate AI recap with full context
+            # =========================================
             recap_text = await self._generate_ai_recap(
-                goal, check_ins, stats, user_profile, week_start, week_end
+                goal=goal,
+                personal_goals=personal_goals,
+                active_challenges=active_challenges,
+                goal_check_ins=goal_check_ins,
+                challenge_check_ins=challenge_check_ins,
+                stats=stats,
+                user_profile=user_profile,
+                week_start=week_start,
+                week_end=week_end,
             )
 
             recap = {
                 "week_start": week_start.isoformat(),
                 "week_end": week_end.isoformat(),
-                "goal_id": goal["id"],
-                "goal_title": goal["title"],
+                "goal_id": goal["id"] if goal else None,
+                "goal_title": goal["title"] if goal else "Multiple Activities",
                 "stats": stats,
                 "recap_text": recap_text,
                 "generated_at": datetime.now().isoformat(),
@@ -114,7 +203,9 @@ class WeeklyRecapService:
                 {
                     "user_id": user_id,
                     "goal_id": goal_id,
-                    "check_in_count": stats["completed_check_ins"],
+                    "goal_check_ins": stats["completed_check_ins"],
+                    "challenge_check_ins": stats["challenge_check_ins"],
+                    "challenges": len(active_challenges),
                 },
             )
 
@@ -126,6 +217,29 @@ class WeeklyRecapService:
                 {"error": str(e), "user_id": user_id, "goal_id": goal_id},
             )
             return None
+
+    def _calculate_combined_streak(
+        self, checkin_dates: set[str], end_date: date
+    ) -> int:
+        """Calculate streak from combined goal and challenge check-in dates"""
+        if not checkin_dates:
+            return 0
+
+        streak = 0
+        check_date = end_date
+
+        while check_date.isoformat() in checkin_dates:
+            streak += 1
+            check_date = check_date - timedelta(days=1)
+
+        # If today not checked, check if streak continues from yesterday
+        if streak == 0:
+            check_date = end_date - timedelta(days=1)
+            while check_date.isoformat() in checkin_dates:
+                streak += 1
+                check_date = check_date - timedelta(days=1)
+
+        return streak
 
     def _calculate_stats(
         self, check_ins: List[Dict[str, Any]], week_start: date, week_end: date
@@ -233,19 +347,25 @@ class WeeklyRecapService:
 
     async def _generate_ai_recap(
         self,
-        goal: Dict[str, Any],
-        check_ins: List[Dict[str, Any]],
+        goal: Optional[Dict[str, Any]],
+        personal_goals: List[Dict[str, Any]],
+        active_challenges: List[Dict[str, Any]],
+        goal_check_ins: List[Dict[str, Any]],
+        challenge_check_ins: List[Dict[str, Any]],
         stats: Dict[str, Any],
         user_profile: Optional[Dict[str, Any]],
         week_start: date,
         week_end: date,
     ) -> str:
         """
-        Generate AI-powered recap text.
+        Generate AI-powered recap text with full context.
 
         Args:
-            goal: Goal data
-            check_ins: List of check-ins for the week
+            goal: Primary goal data (for backward compat)
+            personal_goals: List of personal goals
+            active_challenges: List of active challenges
+            goal_check_ins: List of goal check-ins for the week
+            challenge_check_ins: List of challenge check-ins for the week
             stats: Calculated statistics
             user_profile: Optional user profile
             week_start: Week start date
@@ -254,39 +374,83 @@ class WeeklyRecapService:
         Returns:
             Generated recap text
         """
-        # Build prompt for AI
-        prompt = f"""Generate a friendly, motivating weekly recap for a fitness accountability app user.
+        # Get motivation style
+        motivation_style = (
+            user_profile.get("motivation_style", "friendly")
+            if user_profile
+            else "friendly"
+        )
 
-USER'S GOAL: {goal.get('title', 'Unknown')}
-GOAL DESCRIPTION: {goal.get('description', 'No description')}
+        # Map motivation style to tone description
+        tone_map = {
+            "tough_love": "direct, challenging, and no-nonsense",
+            "gentle_encouragement": "warm, supportive, and compassionate",
+            "data_driven": "analytical, metric-focused, and logical",
+            "accountability_buddy": "friendly but firm, like a supportive friend",
+        }
+        tone_description = tone_map.get(motivation_style, "friendly and encouraging")
+
+        # Build personal goals section
+        personal_goals_str = ""
+        if personal_goals:
+            goals_list = [
+                f"- {g.get('title', 'Unknown')} ({g.get('category', 'general')})"
+                for g in personal_goals
+            ]
+            personal_goals_str = "\n".join(goals_list)
+        else:
+            personal_goals_str = "None"
+
+        # Build challenges section
+        challenges_str = ""
+        if active_challenges:
+            challenges_list = [
+                f"- {c.get('title', 'Unknown')}" for c in active_challenges
+            ]
+            challenges_str = "\n".join(challenges_list)
+        else:
+            challenges_str = "None"
+
+        # Build prompt for AI
+        prompt = f"""Generate a personalized weekly recap for a fitness accountability app user.
+
+PERSONAL GOALS ({len(personal_goals)} active):
+{personal_goals_str}
+
+ACTIVE CHALLENGES ({len(active_challenges)} active):
+{challenges_str}
 
 WEEKLY STATS (Week of {week_start.strftime('%B %d')} - {week_end.strftime('%B %d, %Y')}):
-- Completed {stats['completed_check_ins']} check-ins
-- Active {stats['days_with_checkins']} out of 7 days
-- Current streak: {stats['current_streak']} days
-- Longest streak this week: {stats['longest_streak']} days
-- Completion rate: {stats['completion_rate']}%
+- Goal Check-ins: {stats['completed_check_ins']}
+- Challenge Check-ins: {stats.get('challenge_check_ins', 0)}
+- Total Check-ins: {stats.get('total_check_ins', stats['completed_check_ins'])}
+- Active Days: {stats['days_with_checkins']} out of 7 days
+- Current Streak: {stats['current_streak']} days (combined goals + challenges)
+- Longest Streak This Week: {stats['longest_streak']} days
+- Completion Rate: {stats['completion_rate']}%
 """
 
         if stats.get("average_mood"):
-            prompt += f"- Average mood: {stats['average_mood']}/5\n"
+            prompt += f"- Average Mood: {stats['average_mood']}/5\n"
 
         if user_profile:
-            motivation_style = user_profile.get("motivation_style", "friendly")
-            biggest_challenge = user_profile.get("biggest_challenge", "")
-            prompt += f"\nUSER CONTEXT:\n"
-            prompt += f"- Motivation style: {motivation_style}\n"
-            prompt += f"- Biggest challenge: {biggest_challenge}\n"
+            prompt += f"""
+USER PREFERENCES:
+- Motivation Style: {motivation_style} ({tone_description})
+- Biggest Challenge: {user_profile.get("biggest_challenge", "Not specified")}
+- Fitness Level: {user_profile.get("fitness_level", "Not specified")}
+"""
 
         prompt += f"""
 INSTRUCTIONS:
-1. Write in a {user_profile.get('motivation_style', 'friendly') if user_profile else 'friendly'} tone
-2. Celebrate their wins and progress
-3. Address their completion rate ({stats['completion_rate']}%) constructively
-4. If streak is {stats['current_streak']}, highlight the momentum
-5. Provide 1-2 actionable insights or tips
-6. Keep it encouraging and motivating
-7. Be concise (2-3 paragraphs max)
+1. Write in a {tone_description} tone - MATCH their preferred motivation style
+2. Celebrate their wins across goals AND challenges
+3. If they have group goals or challenges, mention the power of community/accountability
+4. Address their completion rate ({stats['completion_rate']}%) constructively
+5. Highlight their {stats['current_streak']}-day streak momentum
+6. Provide 1-2 actionable insights or tips
+7. Keep it encouraging and motivating
+8. Be concise (2-3 paragraphs max)
 
 Generate the recap now:"""
 

@@ -21,6 +21,17 @@ export default function NotificationPermissionScreen() {
   const { requestPermissionsWithSoftPrompt } = useNotificationPermissions();
   const { capture } = usePostHog();
 
+  // Check if user has fitness profile (for personalization skip)
+  const checkFitnessProfile = async (): Promise<boolean> => {
+    try {
+      const { useOnboardingStore } = await import("@/stores/onboardingStore");
+      return await useOnboardingStore.getState().checkHasFitnessProfile();
+    } catch (error) {
+      console.warn("[Login] Failed to check fitness profile:", error);
+      return false;
+    }
+  };
+
   const handleEnableNotifications = async () => {
     try {
       setIsLoading(true);
@@ -59,7 +70,14 @@ export default function NotificationPermissionScreen() {
       );
 
       // Navigate to personalization flow regardless of permission result
-      router.push(MOBILE_ROUTES.ONBOARDING.PERSONALIZATION);
+
+      const hasFitnessProfile = await checkFitnessProfile();
+
+      if (hasFitnessProfile) {
+        router.push(MOBILE_ROUTES.MAIN.HOME);
+      } else {
+        router.push(MOBILE_ROUTES.ONBOARDING.PERSONALIZATION);
+      }
     } catch (error) {
       logger.error("Error requesting notification permissions", {
         error: error instanceof Error ? error.message : String(error),

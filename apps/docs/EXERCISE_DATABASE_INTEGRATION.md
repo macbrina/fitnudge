@@ -2,8 +2,8 @@
 
 **Status**: ✅ Implemented  
 **Cost**: $129 one-time (ExerciseDB purchase)  
-**Exercises**: 1,324 with GIF demonstrations  
-**Performance**: Instant loading (self-hosted)
+**Exercises**: 1,324 with MP4 video demonstrations  
+**Performance**: Instant loading (Cloudflare R2 CDN)
 
 ---
 
@@ -22,31 +22,38 @@
 
 **Columns**:
 
-- `id` - Exercise ID (matches GIF filename)
+- `id` - Exercise ID (matches video filename)
 - `name` - Exercise name
 - `body_part`, `equipment`, `target_muscle`, `secondary_muscles`
 - `instructions[]` - Step-by-step array
 - `description` - Full explanation
 - `difficulty`, `category`
-- `gif_url_180`, `gif_url_360` - GIF paths
+- `mp4_url` - Full CDN video URL
 - `usage_count`, `last_used_at` - Analytics
 
 ---
 
-### 2. **Static File Serving**
+### 2. **CDN Hosting (Cloudflare R2)**
 
-**Files**: `apps/api/main.py`, `apps/api/static/exercises/`
+**Migration**: `apps/api/supabase/migrations/20251219000000_migrate_gif_to_mp4.sql`
 
-- Configured FastAPI to serve static files
-- 1,394 GIFs at 180x180px (thumbnails)
-- 1,393 GIFs at 360x360px (mobile default)
+MP4 videos are hosted on Cloudflare R2 for global CDN distribution:
 
-**URLs**:
+- 1,393 MP4 videos at 360px (mobile optimized)
+
+**URL Format**:
 
 ```
-https://api-dev.fitnudge.app/static/exercises/360/0001.gif
-https://api.fitnudge.app/static/exercises/360/0001.gif
+https://media.fitnudge.app/exercises/360/0001.mp4
 ```
+
+**Benefits**:
+
+- ⚡ Global edge caching
+- 🌍 Fast loading worldwide
+- 💰 No server bandwidth costs
+- 🔒 Separate media domain
+- 🎬 Full video controls (pause/play, slow motion)
 
 ---
 
@@ -55,6 +62,7 @@ https://api.fitnudge.app/static/exercises/360/0001.gif
 **File**: `apps/api/scripts/import_exercises.py`
 
 - Imports all exercises from JSON
+- Sets CDN URLs: `https://media.fitnudge.app/exercises/360/{id}.mp4`
 - Batch processing (100 per batch)
 - Progress tracking
 - Error handling
@@ -91,7 +99,7 @@ poetry run python scripts/import_exercises.py
 
 - Added `_enhance_exercises_with_demos()` method
 - Automatically looks up each exercise in generated plans
-- Adds GIF URLs, instructions, and metadata
+- Adds MP4 URLs, instructions, and metadata
 - Works for all workout plans
 
 **Before**:
@@ -112,7 +120,7 @@ poetry run python scripts/import_exercises.py
       "sets": 3,
       "reps": "10-12",
       "demo": {
-        "gif_url": "/static/exercises/360/0003.gif",
+        "mp4_url": "https://media.fitnudge.app/exercises/360/0003.mp4",
         "target_muscle": "pectorals",
         "instructions": ["Step 1...", "Step 2..."],
         "difficulty": "beginner"
@@ -124,25 +132,28 @@ poetry run python scripts/import_exercises.py
 
 ---
 
-### 6. **Mobile ExerciseCard Component**
+### 6. **Mobile Components**
 
-**File**: `apps/mobile/src/screens/goals/components/ExerciseCard.tsx`
+**Exercise Display**: `apps/mobile/src/screens/workout/components/ExerciseDisplay.tsx`
 
 **Features**:
 
-- ✅ Collapsible design (tap to expand)
-- ✅ GIF demonstration (360x360px, perfect for mobile)
+- ✅ MP4 video player (expo-video VideoView component)
+- ✅ Pause/Play synced with workout state
+- ✅ Slow motion playback (0.5x speed)
 - ✅ Loading state with spinner
-- ✅ Error handling (fallback to text if GIF fails)
+- ✅ Error handling (fallback if video fails)
 - ✅ Metadata chips (target muscle, equipment, difficulty)
 - ✅ Color-coded difficulty (green=beginner, yellow=intermediate, red=advanced)
 - ✅ Step-by-step instructions
 - ✅ Secondary muscles info
 - ✅ Beautiful design matching app style
 
-**Updated**: `apps/mobile/src/screens/goals/components/WorkoutPlanCard.tsx`
+**Workout Player**: `apps/mobile/src/screens/workout/WorkoutPlayerScreen.tsx`
 
-- Replaced simple exercise rows with rich ExerciseCard components
+- Uses CDN MP4 URLs directly from database
+- Video pauses when workout is paused
+- Slow motion playback for better form understanding
 
 ---
 
@@ -156,7 +167,7 @@ poetry run python scripts/import_exercises.py
 ### 2. **User Taps Exercise**
 
 - Expands to show:
-  - 🎞️ Looping GIF demonstration
+  - 🎬 Looping MP4 video demonstration (from CDN)
   - 💪 Target muscle + equipment
   - 🎯 Difficulty level
   - 📝 Step-by-step instructions
@@ -164,7 +175,8 @@ poetry run python scripts/import_exercises.py
 
 ### 3. **User Performs Exercise**
 
-- Watches GIF for proper form
+- Watches video for proper form (at 0.5x slow motion)
+- Can pause video anytime
 - Follows instructions
 - Completes workout correctly!
 
@@ -176,11 +188,11 @@ poetry run python scripts/import_exercises.py
 
 ### Performance
 
-| Metric              | Before | After    | Improvement       |
-| ------------------- | ------ | -------- | ----------------- |
-| **Exercise lookup** | N/A    | 5-10ms   | Instant           |
-| **GIF loading**     | N/A    | 50-200ms | CDN-fast          |
-| **Plan generation** | 2-3s   | 2.2-3.2s | +0.2s (worth it!) |
+| Metric              | Value     | Notes                    |
+| ------------------- | --------- | ------------------------ |
+| **Exercise lookup** | 5-10ms    | Indexed database query   |
+| **Video loading**   | 100-300ms | Cloudflare edge caching  |
+| **Plan generation** | 2.2-3.2s  | Includes demo enrichment |
 
 ### Cost Analysis
 
@@ -195,24 +207,26 @@ poetry run python scripts/import_exercises.py
 
 ## 🗂️ Files Created/Modified
 
-### Backend (6 files)
+### Backend
 
 1. ✅ `apps/api/supabase/migrations/20251206000004_create_exercises_table.sql`
-2. ✅ `apps/api/scripts/import_exercises.py`
-3. ✅ `apps/api/app/services/exercise_service.py`
-4. ✅ `apps/api/app/services/plan_generator.py` (modified)
-5. ✅ `apps/api/main.py` (modified - static files)
+2. ✅ `apps/api/supabase/migrations/20251219000000_migrate_gif_to_mp4.sql` - MP4 migration
+3. ✅ `apps/api/scripts/import_exercises.py`
+4. ✅ `apps/api/app/services/exercise_service.py`
+5. ✅ `apps/api/app/services/plan_generator.py` (modified)
 6. ✅ `apps/api/data/exerciseData_complete.json` (data file)
 
-### Frontend (2 files)
+### Frontend
 
-1. ✅ `apps/mobile/src/screens/goals/components/ExerciseCard.tsx` (new)
-2. ✅ `apps/mobile/src/screens/goals/components/WorkoutPlanCard.tsx` (modified)
+1. ✅ `apps/mobile/src/screens/workout/components/ExerciseDisplay.tsx`
+2. ✅ `apps/mobile/src/components/exercises/ExerciseDetailModal.tsx`
+3. ✅ `apps/mobile/src/screens/workout/WorkoutPlayerScreen.tsx`
+4. ✅ `apps/mobile/src/screens/workout/components/RestScreen.tsx`
+5. ✅ `apps/mobile/src/screens/workout/components/LandscapeWorkoutView.tsx`
 
-### Static Assets
+### CDN Assets (Cloudflare R2)
 
-- ✅ `apps/api/static/exercises/180/` (1,394 GIFs)
-- ✅ `apps/api/static/exercises/360/` (1,393 GIFs)
+- ✅ `media.fitnudge.app/exercises/` (1,393 MP4 videos)
 
 ---
 
@@ -226,15 +240,15 @@ from app.services.exercise_service import get_exercise_by_name
 
 exercise = get_exercise_by_name("push up")
 print(exercise)
-# Returns: Full exercise dict with GIF URLs and instructions
+# Returns: Full exercise dict with CDN MP4 URL and instructions
 ```
 
-### Test GIF Access
+### Test Video Access
 
 ```bash
 # In browser
-https://api-dev.fitnudge.app/static/exercises/360/0003.gif
-# Should display push-up GIF
+https://media.fitnudge.app/exercises/0003.mp4
+# Should play push-up video
 ```
 
 ### Test in Mobile App
@@ -243,22 +257,21 @@ https://api-dev.fitnudge.app/static/exercises/360/0003.gif
 2. View goal detail screen
 3. See workout plan with exercises
 4. Tap any exercise to expand
-5. See GIF demo + instructions!
+5. See video demo + instructions!
 
 ---
 
-## 📈 Next Steps (Optional Enhancements)
+## 📈 Future Enhancements
 
-### Phase 2: Optimization (Later)
+### Phase 2: Optimization
 
-1. **CDN Upload** - Move GIFs to Cloudflare R2 for global distribution
-2. **Lazy Loading** - Only load GIFs when expanded
-3. **Video Upgrades** - Add video alternatives for key exercises
-4. **Custom Exercises** - Allow trainers to upload custom demos
-5. **Exercise Library Screen** - Browse all 1,324 exercises
-6. **Favorites** - Let users save favorite exercises
+1. **Lazy Loading** - Only load videos when expanded
+2. **Resolution Options** - Multiple quality levels
+3. **Custom Exercises** - Allow trainers to upload custom demos
+4. **Exercise Library Screen** - Browse all 1,324 exercises
+5. **Favorites** - Let users save favorite exercises
 
-### Phase 3: Advanced Features (Future)
+### Phase 3: Advanced Features
 
 1. **Form Analysis** - AI analyzes user's exercise form from video
 2. **Alternative Exercises** - Suggest replacements based on equipment
@@ -275,6 +288,7 @@ https://api-dev.fitnudge.app/static/exercises/360/0003.gif
 - ✅ Proper form = fewer injuries
 - ✅ Professional feel = higher perceived value
 - ✅ Higher completion rate
+- ✅ Slow motion = better form learning
 
 ### Business Benefits
 
@@ -285,54 +299,54 @@ https://api-dev.fitnudge.app/static/exercises/360/0003.gif
 
 ### Technical Benefits
 
-- ✅ Self-hosted = fast and reliable
+- ✅ CDN-hosted = fast and reliable globally
 - ✅ Owned data = no vendor lock-in
 - ✅ Extensible = can add custom content
 - ✅ Scalable = handles millions of users
+- ✅ MP4 videos = better quality, pause/play controls
 
 ---
 
 ## ✅ Deployment Checklist
 
 - [x] Exercise table migration created
-- [x] GIFs copied to static directory (2,787 files)
 - [x] JSON data imported (1,324 exercises)
 - [x] Exercise service created
 - [x] Plan generator enhanced
-- [x] Mobile component created
-- [ ] Apply migration to production
-- [ ] Test in mobile app
-- [ ] Upload GIFs to CDN (optional, for production)
-- [ ] Add .gitignore for large GIF files
+- [x] Mobile components created
+- [x] Videos uploaded to Cloudflare R2
+- [x] GIF to MP4 migration created
+- [x] Frontend updated to use video player
+- [ ] Apply migrations to production
+- [ ] Test video loading from CDN
 
 ---
 
-## 💾 Storage Considerations
+## 💾 CDN Storage
 
-**GIF files size**: ~50MB total (compressed)
+**Cloudflare R2 Bucket**: `media.fitnudge.app`
 
-- 180px: ~20-30MB
-- 360px: ~20-30MB
+**Structure**:
 
-**Recommendations**:
-
-1. **Development**: Serve from local static directory ✅
-2. **Production**: Upload to Cloudflare R2 or AWS S3 (CDN)
-3. **Git**: Add to `.gitignore` (don't commit 2,700+ files!)
-
-```gitignore
-# Add to apps/api/.gitignore
-static/exercises/180/
-static/exercises/360/
-data/exerciseData_complete.json
 ```
+exercises/
+  /     # Mobile MP4 videos (360px)
+    0001.mp4
+    0002.mp4
+    ...
+sounds/    # Audio files
+  ding.mp3
+  workout_complete.mp3
+```
+
+**Total Size**: ~200MB (compressed MP4 videos)
 
 ---
 
 ## 🎉 Summary
 
 **Investment**: $129 one-time  
-**Result**: Professional exercise demonstration system  
+**Result**: Professional exercise demonstration system with video controls  
 **Time to implement**: 2-3 hours  
 **Value added**: Massive UX improvement  
 **ROI**: Pays for itself in 11 months, saves thousands long-term

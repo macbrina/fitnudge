@@ -1,7 +1,7 @@
 """
 Social Accountability API endpoints
 
-Handles goal sharing, accountability partners, and group goals.
+Handles accountability partners and nudges.
 """
 
 from fastapi import APIRouter, HTTPException, status, Depends, Query
@@ -15,24 +15,11 @@ router = APIRouter(redirect_slashes=False)
 
 
 # Pydantic models
-class GoalShareCreate(BaseModel):
-    shared_with_user_id: str
-    permission_level: str = "view"  # view, comment, motivate
-
-
-class GoalShareResponse(BaseModel):
-    id: str
-    goal_id: str
-    shared_with_user_id: str
-    permission_level: str
-    shared_by_user_id: str
-    is_active: bool
-    created_at: str
-    updated_at: str
-
-
 class AccountabilityPartnerRequest(BaseModel):
     partner_user_id: str
+    scope: str = "global"  # global, goal, challenge
+    goal_id: Optional[str] = None  # Required if scope is 'goal'
+    challenge_id: Optional[str] = None  # Required if scope is 'challenge'
 
 
 class AccountabilityPartnerResponse(BaseModel):
@@ -41,128 +28,11 @@ class AccountabilityPartnerResponse(BaseModel):
     partner_user_id: str
     status: str
     initiated_by_user_id: str
+    scope: Optional[str] = "global"
+    goal_id: Optional[str] = None
+    challenge_id: Optional[str] = None
     created_at: str
     accepted_at: Optional[str]
-
-
-class GroupGoalMemberAdd(BaseModel):
-    user_id: str
-    role: str = "member"  # member, admin
-
-
-class GroupGoalResponse(BaseModel):
-    id: str
-    goal_id: str
-    user_id: str
-    role: str
-    joined_at: str
-    is_active: bool
-
-
-# Goal Sharing Endpoints
-@router.post(
-    "/goals/{goal_id}/share",
-    response_model=GoalShareResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-async def share_goal(
-    goal_id: str,
-    share_data: GoalShareCreate,
-    current_user: dict = Depends(get_current_user),
-):
-    """Share a goal with a specific user"""
-    try:
-        result = await social_accountability_service.share_goal_with_user(
-            goal_id=goal_id,
-            shared_with_user_id=share_data.shared_with_user_id,
-            owner_user_id=current_user["id"],
-            permission_level=share_data.permission_level,
-        )
-        return result
-
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-    except Exception as e:
-        logger.error(
-            f"Failed to share goal {goal_id} for user {current_user['id']}",
-            {"error": str(e), "goal_id": goal_id, "user_id": current_user["id"]},
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to share goal",
-        )
-
-
-@router.delete("/goals/{goal_id}/share/{shared_with_user_id}")
-async def unshare_goal(
-    goal_id: str,
-    shared_with_user_id: str,
-    current_user: dict = Depends(get_current_user),
-):
-    """Unshare a goal with a user"""
-    try:
-        await social_accountability_service.unshare_goal(
-            goal_id=goal_id,
-            shared_with_user_id=shared_with_user_id,
-            owner_user_id=current_user["id"],
-        )
-        return {"message": "Goal unshared successfully"}
-
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-    except Exception as e:
-        logger.error(
-            f"Failed to unshare goal {goal_id} for user {current_user['id']}",
-            {"error": str(e), "goal_id": goal_id, "user_id": current_user["id"]},
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to unshare goal",
-        )
-
-
-@router.get("/goals/shared-with-me", response_model=List[dict])
-async def get_goals_shared_with_me(
-    current_user: dict = Depends(get_current_user),
-):
-    """Get goals shared with the current user"""
-    try:
-        result = await social_accountability_service.get_shared_goals(
-            user_id=current_user["id"], include_my_shared=False
-        )
-        return result
-
-    except Exception as e:
-        logger.error(
-            f"Failed to get shared goals for user {current_user['id']}",
-            {"error": str(e), "user_id": current_user["id"]},
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to get shared goals",
-        )
-
-
-@router.get("/goals/my-shared", response_model=List[dict])
-async def get_my_shared_goals(
-    current_user: dict = Depends(get_current_user),
-):
-    """Get goals shared by the current user"""
-    try:
-        result = await social_accountability_service.get_shared_goals(
-            user_id=current_user["id"], include_my_shared=True
-        )
-        return result
-
-    except Exception as e:
-        logger.error(
-            f"Failed to get my shared goals for user {current_user['id']}",
-            {"error": str(e), "user_id": current_user["id"]},
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to get shared goals",
-        )
 
 
 # Accountability Partners Endpoints
@@ -175,14 +45,211 @@ async def request_accountability_partner(
     request_data: AccountabilityPartnerRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    """Request an accountability partnership"""
-    try:
-        result = await social_accountability_service.request_accountability_partner(
-            user_id=current_user["id"],
-            partner_user_id=request_data.partner_user_id,
-        )
-        return result
+    """Request an accountability partnership
 
+    Supports scoped partnerships:
+    - global: Partner for all goals (default)
+    - goal: Partner for a specific goal (requires goal_id)
+    - challenge: Partner for a specific challenge (requires challenge_id)
+    """
+    from app.core.database import get_supabase_client
+    from app.core.subscriptions import check_user_has_feature
+    from app.api.v1.endpoints.goals import get_feature_limit
+
+    supabase = get_supabase_client()
+    user_id = current_user["id"]
+    user_plan = current_user.get("plan", "free")
+
+    # Check if user has access to accountability partners feature (Starter+)
+    if not check_user_has_feature(
+        user_id, "social_accountability", user_plan, supabase
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Accountability partners are available on Starter plans and above. Please upgrade.",
+        )
+
+    # Check partner limit
+    partner_limit = get_feature_limit(
+        user_plan, "accountability_partner_limit", supabase, default=0
+    )
+
+    # Count existing accepted partners
+    existing_partners = (
+        supabase.table("accountability_partners")
+        .select("id", count="exact")
+        .or_(f"user_id.eq.{user_id},partner_user_id.eq.{user_id}")
+        .eq("status", "accepted")
+        .execute()
+    )
+    existing_count = (
+        existing_partners.count
+        if hasattr(existing_partners, "count")
+        else len(existing_partners.data or [])
+    )
+
+    if partner_limit is not None and existing_count >= partner_limit:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"You've reached your limit of {partner_limit} accountability partners. Upgrade for more.",
+        )
+
+    # Validate scope and required fields
+    if request_data.scope == "goal" and not request_data.goal_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="goal_id is required when scope is 'goal'",
+        )
+    if request_data.scope == "challenge" and not request_data.challenge_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="challenge_id is required when scope is 'challenge'",
+        )
+
+    # Validate goal exists if scoped to goal
+    if request_data.goal_id:
+        goal = (
+            supabase.table("goals")
+            .select("id, user_id")
+            .eq("id", request_data.goal_id)
+            .maybe_single()
+            .execute()
+        )
+        if not goal.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Goal not found",
+            )
+        # User must own the goal
+        if goal.data["user_id"] != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You can only add accountability partners for your own goals",
+            )
+
+    # Validate challenge exists if scoped to challenge
+    if request_data.challenge_id:
+        challenge = (
+            supabase.table("challenges")
+            .select("id, created_by")
+            .eq("id", request_data.challenge_id)
+            .maybe_single()
+            .execute()
+        )
+        if not challenge.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Challenge not found",
+            )
+        # User must be creator or participant
+        is_creator = challenge.data["created_by"] == user_id
+        is_participant = (
+            supabase.table("challenge_participants")
+            .select("id")
+            .eq("challenge_id", request_data.challenge_id)
+            .eq("user_id", user_id)
+            .maybe_single()
+            .execute()
+        ).data
+        if not is_creator and not is_participant:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You must be a participant to add accountability partners",
+            )
+
+    try:
+        # Check if partnership already exists with same scope
+        existing = (
+            supabase.table("accountability_partners")
+            .select("id, status")
+            .eq("user_id", user_id)
+            .eq("partner_user_id", request_data.partner_user_id)
+            .eq("scope", request_data.scope)
+        )
+
+        if request_data.scope == "goal":
+            existing = existing.eq("goal_id", request_data.goal_id)
+        elif request_data.scope == "challenge":
+            existing = existing.eq("challenge_id", request_data.challenge_id)
+        else:
+            existing = existing.is_("goal_id", "null").is_("challenge_id", "null")
+
+        existing_result = existing.maybe_single().execute()
+
+        if existing_result.data:
+            if existing_result.data["status"] == "pending":
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="A partnership request is already pending",
+                )
+            elif existing_result.data["status"] == "accepted":
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="You are already accountability partners",
+                )
+
+        # Create new partnership request
+        partnership_data = {
+            "user_id": user_id,
+            "partner_user_id": request_data.partner_user_id,
+            "initiated_by_user_id": user_id,
+            "status": "pending",
+            "scope": request_data.scope,
+            "goal_id": request_data.goal_id if request_data.scope == "goal" else None,
+            "challenge_id": (
+                request_data.challenge_id if request_data.scope == "challenge" else None
+            ),
+        }
+
+        result = (
+            supabase.table("accountability_partners").insert(partnership_data).execute()
+        )
+
+        logger.info(
+            f"Accountability partner request created",
+            {
+                "user_id": user_id,
+                "partner_user_id": request_data.partner_user_id,
+                "scope": request_data.scope,
+            },
+        )
+
+        # Send push notification to partner
+        try:
+            from app.services.social_notification_service import (
+                send_partner_notification,
+                SocialNotificationType,
+            )
+
+            # Get sender's name
+            sender = (
+                supabase.table("users")
+                .select("username, name")
+                .eq("id", user_id)
+                .maybe_single()
+                .execute()
+            )
+            sender_name = (
+                sender.data.get("name") or sender.data.get("username") or "Someone"
+                if sender.data
+                else "Someone"
+            )
+
+            await send_partner_notification(
+                notification_type=SocialNotificationType.PARTNER_REQUEST,
+                recipient_id=request_data.partner_user_id,
+                sender_id=user_id,
+                sender_name=sender_name,
+                supabase=supabase,
+            )
+        except Exception as e:
+            # Don't fail the request if notification fails
+            logger.warning(f"Failed to send partner request notification: {e}")
+
+        return result.data[0]
+
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
@@ -202,16 +269,58 @@ async def accept_accountability_partner(
     current_user: dict = Depends(get_current_user),
 ):
     """Accept an accountability partnership request"""
+    from app.core.database import get_supabase_client
+    from app.core.subscriptions import check_user_has_feature
+    from app.api.v1.endpoints.goals import get_feature_limit
+
+    supabase = get_supabase_client()
+    user_id = current_user["id"]
+    user_plan = current_user.get("plan", "free")
+
+    # Check if user has access to accountability partners feature (Starter+)
+    if not check_user_has_feature(
+        user_id, "social_accountability", user_plan, supabase
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Accountability partners are available on Starter plans and above. Please upgrade.",
+        )
+
+    # Check partner limit before accepting
+    partner_limit = get_feature_limit(
+        user_plan, "accountability_partner_limit", supabase, default=0
+    )
+
+    # Count existing accepted partners
+    existing_partners = (
+        supabase.table("accountability_partners")
+        .select("id", count="exact")
+        .or_(f"user_id.eq.{user_id},partner_user_id.eq.{user_id}")
+        .eq("status", "accepted")
+        .execute()
+    )
+    existing_count = (
+        existing_partners.count
+        if hasattr(existing_partners, "count")
+        else len(existing_partners.data or [])
+    )
+
+    if partner_limit is not None and existing_count >= partner_limit:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"You've reached your limit of {partner_limit} accountability partners. Upgrade for more.",
+        )
+
     try:
         await social_accountability_service.accept_accountability_partner(
-            user_id=current_user["id"], partner_user_id=partner_user_id
+            user_id=user_id, partner_user_id=partner_user_id
         )
         return {"message": "Partnership accepted successfully"}
 
     except Exception as e:
         logger.error(
-            f"Failed to accept accountability partner for user {current_user['id']}",
-            {"error": str(e), "user_id": current_user["id"]},
+            f"Failed to accept accountability partner for user {user_id}",
+            {"error": str(e), "user_id": user_id},
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -219,89 +328,292 @@ async def accept_accountability_partner(
         )
 
 
-# Group Goals Endpoints
-@router.post(
-    "/goals/{goal_id}/group",
-    response_model=dict,
-    status_code=status.HTTP_201_CREATED,
-)
-async def create_group_goal(
-    goal_id: str,
-    member_user_ids: List[str],
+# =====================================================
+# Accountability Partner Invite Link Endpoints
+# =====================================================
+
+
+class PartnerInviteLinkRequest(BaseModel):
+    scope: str = "global"  # global, goal, challenge
+    goal_id: Optional[str] = None
+    challenge_id: Optional[str] = None
+
+
+@router.post("/accountability-partners/invite-link")
+async def generate_partner_invite_link(
+    request_data: PartnerInviteLinkRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    """Create a group goal and add members"""
-    try:
-        result = await social_accountability_service.create_group_goal(
-            goal_id=goal_id,
-            owner_user_id=current_user["id"],
-            member_user_ids=member_user_ids,
-        )
-        return result
+    """Generate a shareable invite link to become an accountability partner
 
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-    except Exception as e:
-        logger.error(
-            f"Failed to create group goal {goal_id} for user {current_user['id']}",
-            {"error": str(e), "goal_id": goal_id, "user_id": current_user["id"]},
-        )
+    The person who clicks the link will see a pending request that they
+    must accept before becoming a partner.
+    """
+    from app.core.database import get_supabase_client
+    from app.core.subscriptions import check_user_has_feature
+    from app.services.referral_service import generate_invite_code
+    from datetime import datetime, timezone, timedelta
+
+    supabase = get_supabase_client()
+    user_id = current_user["id"]
+    user_plan = current_user.get("plan", "free")
+
+    # Check if user has access to accountability partners feature (Starter+)
+    if not check_user_has_feature(
+        user_id, "social_accountability", user_plan, supabase
+    ):
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create group goal",
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Accountability partners are available on Starter plans and above. Please upgrade.",
         )
 
+    # Validate scope and required fields
+    if request_data.scope == "goal" and not request_data.goal_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="goal_id is required when scope is 'goal'",
+        )
+    if request_data.scope == "challenge" and not request_data.challenge_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="challenge_id is required when scope is 'challenge'",
+        )
 
-@router.post(
-    "/goals/{goal_id}/group/members",
-    response_model=GroupGoalResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-async def add_group_goal_member(
-    goal_id: str,
-    member_data: GroupGoalMemberAdd,
+    # Validate goal/challenge exists and user owns it
+    if request_data.goal_id:
+        goal = (
+            supabase.table("goals")
+            .select("id, user_id, title")
+            .eq("id", request_data.goal_id)
+            .maybe_single()
+            .execute()
+        )
+        if not goal.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Goal not found",
+            )
+        if goal.data["user_id"] != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You can only create partner invites for your own goals",
+            )
+
+    if request_data.challenge_id:
+        challenge = (
+            supabase.table("challenges")
+            .select("id, created_by, title")
+            .eq("id", request_data.challenge_id)
+            .maybe_single()
+            .execute()
+        )
+        if not challenge.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Challenge not found",
+            )
+        # Must be creator or participant
+        is_creator = challenge.data["created_by"] == user_id
+        is_participant = (
+            supabase.table("challenge_participants")
+            .select("id")
+            .eq("challenge_id", request_data.challenge_id)
+            .eq("user_id", user_id)
+            .maybe_single()
+            .execute()
+        ).data
+        if not is_creator and not is_participant:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You must be a participant to create partner invites",
+            )
+
+    # Generate invite code
+    invite_code = generate_invite_code()
+
+    # Get the sharer's referral code for tracking
+    sharer = (
+        supabase.table("users")
+        .select("referral_code")
+        .eq("id", user_id)
+        .maybe_single()
+        .execute()
+    )
+    sharer_referral_code = sharer.data.get("referral_code") if sharer.data else None
+
+    # Create placeholder partnership record with invite code
+    partnership_data = {
+        "user_id": user_id,
+        "partner_user_id": user_id,  # Placeholder - will be updated when claimed
+        "initiated_by_user_id": user_id,
+        "status": "pending",
+        "scope": request_data.scope,
+        "goal_id": request_data.goal_id if request_data.scope == "goal" else None,
+        "challenge_id": (
+            request_data.challenge_id if request_data.scope == "challenge" else None
+        ),
+        "invite_code": invite_code,
+    }
+
+    result = (
+        supabase.table("accountability_partners").insert(partnership_data).execute()
+    )
+
+    logger.info(
+        f"Partner invite link generated",
+        {"user_id": user_id, "invite_code": invite_code, "scope": request_data.scope},
+    )
+
+    # Build invite link with referral code for new user attribution
+    invite_link = f"https://fitnudge.app/partner/invite/{invite_code}"
+    if sharer_referral_code:
+        invite_link += f"?ref={sharer_referral_code}"
+
+    return {
+        "invite_code": invite_code,
+        "invite_link": invite_link,
+        "scope": request_data.scope,
+        "expires_in_days": 30,
+    }
+
+
+@router.post("/accountability-partners/join/{invite_code}")
+async def join_via_partner_invite(
+    invite_code: str,
     current_user: dict = Depends(get_current_user),
 ):
-    """Add a member to a group goal"""
-    try:
-        result = await social_accountability_service.add_group_goal_member(
-            goal_id=goal_id,
-            user_id=member_data.user_id,
-            admin_user_id=current_user["id"],
-            role=member_data.role,
-        )
-        return result
+    """Accept a partner invite via invite code
 
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-    except Exception as e:
-        logger.error(
-            f"Failed to add member to group goal {goal_id} for user {current_user['id']}",
-            {"error": str(e), "goal_id": goal_id, "user_id": current_user["id"]},
-        )
+    Creates a pending partner request that the user must accept.
+    Unlike challenge invites, this doesn't auto-accept.
+    """
+    from app.core.database import get_supabase_client
+    from app.core.subscriptions import check_user_has_feature
+    from app.api.v1.endpoints.goals import get_feature_limit
+    from datetime import datetime, timezone
+
+    supabase = get_supabase_client()
+    user_id = current_user["id"]
+    user_plan = current_user.get("plan", "free")
+
+    # Check if user has access to accountability partners feature (Starter+)
+    if not check_user_has_feature(
+        user_id, "social_accountability", user_plan, supabase
+    ):
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to add group goal member",
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Accountability partners are available on Starter plans and above. Please upgrade.",
         )
 
+    # Check partner limit before joining
+    partner_limit = get_feature_limit(
+        user_plan, "accountability_partner_limit", supabase, default=0
+    )
 
-@router.get("/goals/group", response_model=List[dict])
-async def get_group_goals(
-    current_user: dict = Depends(get_current_user),
-):
-    """Get all group goals the user is part of"""
-    try:
-        result = await social_accountability_service.get_group_goals(
-            user_id=current_user["id"]
-        )
-        return result
+    # Count existing accepted partners
+    existing_partners = (
+        supabase.table("accountability_partners")
+        .select("id", count="exact")
+        .or_(f"user_id.eq.{user_id},partner_user_id.eq.{user_id}")
+        .eq("status", "accepted")
+        .execute()
+    )
+    existing_count = (
+        existing_partners.count
+        if hasattr(existing_partners, "count")
+        else len(existing_partners.data or [])
+    )
 
-    except Exception as e:
-        logger.error(
-            f"Failed to get group goals for user {current_user['id']}",
-            {"error": str(e), "user_id": current_user["id"]},
-        )
+    if partner_limit is not None and existing_count >= partner_limit:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to get group goals",
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"You've reached your limit of {partner_limit} accountability partners. Upgrade for more.",
         )
+
+    # Find the invite
+    invite = (
+        supabase.table("accountability_partners")
+        .select("*")
+        .eq("invite_code", invite_code)
+        .maybe_single()
+        .execute()
+    )
+
+    if not invite.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invalid invite code",
+        )
+
+    invite_data = invite.data
+    inviter_user_id = invite_data["user_id"]
+
+    # Can't partner with yourself
+    if inviter_user_id == user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You cannot be your own accountability partner",
+        )
+
+    # Check if already partners with same scope
+    existing = (
+        supabase.table("accountability_partners")
+        .select("id, status")
+        .eq("user_id", inviter_user_id)
+        .eq("partner_user_id", user_id)
+        .eq("scope", invite_data["scope"])
+    )
+
+    if invite_data["scope"] == "goal":
+        existing = existing.eq("goal_id", invite_data["goal_id"])
+    elif invite_data["scope"] == "challenge":
+        existing = existing.eq("challenge_id", invite_data["challenge_id"])
+    else:
+        existing = existing.is_("goal_id", "null").is_("challenge_id", "null")
+
+    existing_result = existing.maybe_single().execute()
+
+    if existing_result.data and existing_result.data["status"] == "accepted":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You are already accountability partners",
+        )
+
+    # Update the invite to set the actual partner and reset status to pending
+    # (The invitee needs to accept it)
+    supabase.table("accountability_partners").update(
+        {
+            "partner_user_id": user_id,
+            "status": "pending",
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+    ).eq("id", invite_data["id"]).execute()
+
+    # Get inviter info for response
+    inviter = (
+        supabase.table("users")
+        .select("id, username, name")
+        .eq("id", inviter_user_id)
+        .maybe_single()
+        .execute()
+    )
+
+    logger.info(
+        f"Partner invite claimed",
+        {
+            "invite_code": invite_code,
+            "inviter_id": inviter_user_id,
+            "invitee_id": user_id,
+        },
+    )
+
+    return {
+        "message": "You have a pending accountability partner request. Accept it to start your partnership!",
+        "partnership_id": invite_data["id"],
+        "inviter": {
+            "id": inviter.data["id"] if inviter.data else None,
+            "username": inviter.data.get("username") if inviter.data else None,
+            "name": inviter.data.get("name") if inviter.data else None,
+        },
+        "scope": invite_data["scope"],
+    }

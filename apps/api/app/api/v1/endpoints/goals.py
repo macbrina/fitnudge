@@ -113,33 +113,108 @@ async def create_initial_checkin(
         )
 
 
-def get_user_active_goal_limit(user_plan: str, supabase) -> int:
+def get_feature_limit(
+    user_plan: str, feature_key: str, supabase, default: int = 1
+) -> Optional[int]:
     """
-    Get active goal limit for user's plan from subscription_plans table.
-    Returns integer for active goal limit (defaults to 1 if not found).
-    This determines how many goals can be active simultaneously.
+    Get a feature limit from plan_features table.
+    Returns:
+    - int: The limit value
+    - None: Unlimited
+    - 0: Feature disabled
     """
     try:
-        plan_result = (
-            supabase.table("subscription_plans")
-            .select("active_goal_limit")
-            .eq("id", user_plan)
-            .eq("is_active", True)
+        result = (
+            supabase.table("plan_features")
+            .select("feature_value, is_enabled")
+            .eq("plan_id", user_plan)
+            .eq("feature_key", feature_key)
+            .maybe_single()
             .execute()
         )
 
-        if plan_result.data and len(plan_result.data) > 0:
-            active_limit = plan_result.data[0].get("active_goal_limit")
-            if active_limit is not None:
-                return active_limit
+        if result.data:
+            if not result.data.get("is_enabled", True):
+                return 0  # Feature disabled
+            return result.data.get("feature_value")  # None = unlimited
 
         logger.warning(
-            f"Active goal limit not found for plan {user_plan}, defaulting to 1"
+            f"{feature_key} not found for plan {user_plan}, defaulting to {default}"
         )
-        return 1
+        return default
     except Exception as e:
-        logger.error(f"Error getting active goal limit for plan {user_plan}: {e}")
-        return 1  # Safe default: 1 active goal
+        logger.error(f"Error getting {feature_key} for plan {user_plan}: {e}")
+        return default
+
+
+def get_user_active_goal_limit(user_plan: str, supabase) -> Optional[int]:
+    """
+    Get active goal limit for user's plan from plan_features table.
+    Returns: int for limit, None for unlimited, defaults to 1.
+    This is for PERSONAL goals only (not challenges or group goals).
+    """
+    return get_feature_limit(user_plan, "active_goal_limit", supabase, default=1)
+
+
+def get_user_challenge_limit(user_plan: str, supabase) -> Optional[int]:
+    """
+    Get challenge participation limit (created + joined) from plan_features.
+    Returns: int for limit, None for unlimited, defaults to 1.
+    """
+    return get_feature_limit(user_plan, "challenge_limit", supabase, default=1)
+
+
+def get_user_challenge_participation_count(user_id: str, supabase) -> int:
+    """
+    Count total challenges user is participating in (created + joined).
+    Only counts challenges that are still ongoing (upcoming or active, not completed/cancelled).
+
+    NOTE: Status is computed, not stored:
+    - is_active=false -> cancelled
+    - is_active=true, today < start_date -> upcoming
+    - is_active=true, start_date <= today <= end_date -> active
+    - is_active=true, today > end_date -> completed
+    """
+    from datetime import date
+
+    today = date.today().isoformat()
+
+    # Count challenges created by user that are ongoing
+    # Ongoing = is_active AND end_date >= today (or end_date is null)
+    created_result = (
+        supabase.table("challenges")
+        .select("id, end_date")
+        .eq("created_by", user_id)
+        .eq("is_active", True)
+        .execute()
+    )
+    # Filter: end_date >= today OR end_date is null (ongoing challenges)
+    created_count = sum(
+        1
+        for c in (created_result.data or [])
+        if c.get("end_date") is None or c.get("end_date") >= today
+    )
+
+    # Count challenges joined (via challenge_participants, not created by user)
+    joined_result = (
+        supabase.table("challenge_participants")
+        .select(
+            "id, challenge_id, challenges!inner(id, is_active, end_date, created_by)"
+        )
+        .eq("user_id", user_id)
+        .eq("challenges.is_active", True)
+        .neq("challenges.created_by", user_id)
+        .execute()
+    )
+    # Filter: ongoing challenges (end_date >= today or null)
+    joined_count = sum(
+        1
+        for p in (joined_result.data or [])
+        if p.get("challenges", {}).get("end_date") is None
+        or p.get("challenges", {}).get("end_date") >= today
+    )
+
+    return created_count + joined_count
 
 
 # Validation helpers
@@ -370,14 +445,11 @@ async def get_goal_suggestions_by_type(
     if request.goal_type in ["time_challenge", "target_challenge"]:
         from app.core.subscriptions import check_user_has_feature
 
-        has_group_goals = check_user_has_feature(
-            user_id, "group_goals", user_plan, supabase
-        )
         has_challenge_create = check_user_has_feature(
             user_id, "challenge_create", user_plan, supabase
         )
 
-        if not has_group_goals and not has_challenge_create:
+        if not has_challenge_create:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Upgrade to paid plan to create challenges. Habits are free for all users.",
@@ -515,14 +587,11 @@ async def create_goal(
     if goal_type in ["time_challenge", "target_challenge"]:
         from app.core.subscriptions import check_user_has_feature
 
-        has_group_goals = check_user_has_feature(
-            user_id, "group_goals", user_plan, supabase
-        )
         has_challenge_create = check_user_has_feature(
             user_id, "challenge_create", user_plan, supabase
         )
 
-        if not has_group_goals and not has_challenge_create:
+        if not has_challenge_create:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Upgrade to paid plan to create challenges. Habits are free for all users.",
@@ -612,6 +681,7 @@ async def create_goal(
             "category": goal_data.category,
             "frequency": goal_data.frequency,
             "target_days": goal_data.target_days,
+            "days_of_week": goal_data.days_of_week,  # For scheduling
             # Goal type fields for plan generation
             "goal_type": goal_type,
             "target_checkins": (
@@ -811,6 +881,7 @@ async def retry_plan_generation(
         "category": goal_data["category"],
         "frequency": goal_data["frequency"],
         "target_days": goal_data.get("target_days"),
+        "days_of_week": goal_data.get("days_of_week"),  # For scheduling
         # Goal type fields for plan generation
         "goal_type": goal_data.get("goal_type", "habit"),
         "target_checkins": goal_data.get("target_checkins"),
@@ -1223,33 +1294,30 @@ async def activate_goal(goal_id: str, current_user: dict = Depends(get_current_u
             + (f"View the challenge instead." if challenge_id else ""),
         )
 
-    # Check if goal is archived for other reasons
-    if goal.get("is_archived"):
-        # Unarchive it first before activating
-        pass  # Allow activation, it will also unarchive
+    # Check if goal is archived for other reasons (has archived_reason but not converted)
+    # Allow activation - it will clear the archived_reason
 
-    # Get active goal limit for user's plan (dynamically from database)
+    # Get active goal limit for user's plan (for personal goals only)
     active_goal_limit = get_user_active_goal_limit(user_plan, supabase)
 
-    # Get combined active count (goals + challenges created by user)
-    current_active_count = get_combined_active_count(user_id, supabase)
+    # Get active personal goals count (not challenges, not group goals)
+    current_active_count = get_active_personal_goals_count(user_id, supabase)
 
-    # Check if user has reached active goal limit
-    if current_active_count >= active_goal_limit:
+    # Check if user has reached active goal limit (None = unlimited)
+    if active_goal_limit is not None and current_active_count >= active_goal_limit:
         plan_name = user_plan.capitalize()
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"{plan_name} plan allows only {active_goal_limit} active goal(s)/challenge(s). "
-            f"Deactivate another goal or end a challenge first.",
+            detail=f"{plan_name} plan allows only {active_goal_limit} active goal(s). "
+            f"Deactivate another goal first.",
         )
 
-    # Activate this goal and unarchive if needed
+    # Activate this goal and clear archived_reason if needed
     update_data = {"is_active": True}
     if (
-        goal.get("is_archived")
+        goal.get("archived_reason")
         and goal.get("archived_reason") != "converted_to_challenge"
     ):
-        update_data["is_archived"] = False
         update_data["archived_reason"] = None
 
     result = supabase.table("goals").update(update_data).eq("id", goal_id).execute()
@@ -1500,41 +1568,23 @@ async def get_all_goals_stats(current_user: dict = Depends(get_current_user)):
 # =====================================================
 # SHARE AS CHALLENGE
 # =====================================================
-def get_combined_active_count(user_id: str, supabase) -> int:
+def get_active_personal_goals_count(user_id: str, supabase) -> int:
     """
-    Get combined count of active goals + active challenges created by user.
-    This is used to enforce the active goal limit across both goals and challenges.
+    Count active PERSONAL goals only (not challenges).
+    Used to enforce active_goal_limit.
     """
-    # Count active goals
     active_goals = (
         supabase.table("goals")
         .select("id", count="exact")
         .eq("user_id", user_id)
         .eq("is_active", True)
-        .eq("is_archived", False)
         .execute()
     )
-    goals_count = (
+    return (
         active_goals.count
         if hasattr(active_goals, "count")
         else len(active_goals.data or [])
     )
-
-    # Count active challenges created by this user
-    active_challenges = (
-        supabase.table("challenges")
-        .select("id", count="exact")
-        .eq("created_by", user_id)
-        .eq("is_active", True)
-        .execute()
-    )
-    challenges_count = (
-        active_challenges.count
-        if hasattr(active_challenges, "count")
-        else len(active_challenges.data or [])
-    )
-
-    return goals_count + challenges_count
 
 
 class ShareAsChallengeRequest(BaseModel):
@@ -1619,11 +1669,11 @@ async def share_goal_as_challenge(
 
     goal = goal_result.data
 
-    # Verify goal is not archived
-    if goal.get("is_archived"):
+    # Verify goal is active (not archived/deactivated)
+    if not goal.get("is_active"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Archived goals cannot be shared as challenges",
+            detail="Inactive goals cannot be shared as challenges. Activate the goal first.",
         )
 
     # Verify goal type is challenge-compatible
@@ -1641,25 +1691,32 @@ async def share_goal_as_challenge(
             detail="This goal has already been shared as a challenge",
         )
 
-    # Check combined active limit (goals + challenges)
-    active_goal_limit = get_user_active_goal_limit(user_plan, supabase)
-    current_active = get_combined_active_count(user_id, supabase)
+    # Check CHALLENGE limit (separate from goals limit)
+    challenge_limit = get_user_challenge_limit(user_plan, supabase)
+    current_challenge_count = get_user_challenge_participation_count(user_id, supabase)
 
-    # If keeping goal active, creating challenge adds +1 to count
-    # If archiving goal, it's net 0 (goal -1, challenge +1)
+    # Check if user can create another challenge (None = unlimited)
+    if challenge_limit is not None and current_challenge_count >= challenge_limit:
+        plan_name = user_plan.capitalize()
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"{plan_name} plan allows only {challenge_limit} challenge(s). "
+            f"Complete or leave a challenge first to create a new one.",
+        )
+
+    # If keeping goal active, also check goal limit
     if not data.archive_original_goal and goal.get("is_active"):
-        # Both will be active - check if we have room
-        if current_active >= active_goal_limit:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"You've reached your active limit of {active_goal_limit}. "
-                f"Either archive the goal when sharing, or deactivate another goal/challenge first.",
-            )
+        active_goal_limit = get_user_active_goal_limit(user_plan, supabase)
+        current_active_goals = get_active_personal_goals_count(user_id, supabase)
+        # The goal is already counted, so no additional check needed
+        # Just verify we're not going over if they were to keep the goal active
 
     # Fetch the actionable plan for this goal (to make challenge self-contained)
+    # Table structure: id, goal_id, plan_type, structured_data (JSONB), status, error_message, generated_at
+    # structured_data contains: guidance, structure (with routine, schedule, progression, etc.)
     actionable_plan_result = (
         supabase.table("actionable_plans")
-        .select("*")
+        .select("plan_type, structured_data, status, error_message")
         .eq("goal_id", goal_id)
         .maybe_single()
         .execute()
@@ -1667,11 +1724,11 @@ async def share_goal_as_challenge(
     actionable_plan_data = None
     if actionable_plan_result.data:
         ap = actionable_plan_result.data
+        # Just pass plan_type and structured_data as-is - frontend handles the rest
         actionable_plan_data = {
             "status": ap.get("status"),
-            "plan": ap.get("plan"),
-            "tips": ap.get("tips"),
-            "schedule": ap.get("schedule"),
+            "plan_type": ap.get("plan_type"),
+            "structured_data": ap.get("structured_data"),
             "error_message": ap.get("error_message"),
         }
 
@@ -1684,6 +1741,30 @@ async def share_goal_as_challenge(
         goal.get("challenge_duration_days") or goal.get("duration_days") or 30
     )
     end_date = data.start_date + timedelta(days=duration_days - 1)
+
+    # Validate target_checkins is achievable within duration
+    target_checkins = goal.get("target_checkins")
+    days_of_week = goal.get("days_of_week") or []
+    frequency = goal.get("frequency", "weekly")
+    reminder_times = goal.get("reminder_times") or ["07:00"]
+
+    if target_checkins and goal_type == "target_challenge":
+        # Calculate max possible check-ins in this duration
+        if frequency == "weekly" and days_of_week:
+            workout_days_per_week = len(days_of_week)
+            weeks = duration_days / 7
+            max_checkins = int(workout_days_per_week * weeks * len(reminder_times))
+        else:
+            # Daily frequency
+            max_checkins = duration_days * len(reminder_times)
+
+        if target_checkins > max_checkins:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Target of {target_checkins} check-ins is not achievable in {duration_days} days. "
+                f"Maximum possible: {max_checkins} check-ins with {len(days_of_week) or 7} workout days per week. "
+                f"Either reduce target or increase duration.",
+            )
 
     # Determine challenge type
     if goal_type == "time_challenge":
@@ -1743,7 +1824,6 @@ async def share_goal_as_challenge(
         supabase.table("goals").update(
             {
                 "is_active": False,
-                "is_archived": True,
                 "archived_reason": "converted_to_challenge",
                 "converted_to_challenge_id": challenge_id,
             }

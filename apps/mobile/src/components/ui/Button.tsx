@@ -150,7 +150,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     color: brand.onPrimary,
   },
   secondaryText: {
-    color: brand.onPrimary,
+    color: colors.text.primary,
   },
   outlineText: {
     color: brand.primary,
@@ -481,6 +481,7 @@ function getIconColor(
     case "primary":
       return brandColors.onPrimary;
     case "secondary":
+      return colors.text.primary;
     case "danger":
     case "success":
       return brandColors.onPrimary;
