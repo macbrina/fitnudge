@@ -68,9 +68,24 @@ def create_access_token(
 
 
 def create_refresh_token(
-    data: Dict[str, Any], expires_delta: Optional[timedelta] = None
+    data: Dict[str, Any],
+    expires_delta: Optional[timedelta] = None,
+    token_family: Optional[str] = None,
+    device_info: Optional[Dict[str, Any]] = None,
 ) -> str:
-    """Create JWT refresh token with rotation support (Supabase-compatible)"""
+    """Create JWT refresh token with rotation support (Supabase-compatible)
+
+    Args:
+        data: Dict containing user_id
+        expires_delta: Optional custom expiration time
+        token_family: Optional existing token family (for rotation, keeps same family)
+        device_info: Optional device information for session tracking:
+            - device_name: Human-readable name (e.g., "iPhone 14 Pro")
+            - device_id: Unique device identifier
+            - device_type: Platform ("ios", "android", "web")
+            - ip_address: Client IP address
+            - user_agent: Browser/app user agent string
+    """
     # Use timezone-aware UTC datetime to avoid timestamp() issues
     now = datetime.now(timezone.utc)
     if expires_delta:
@@ -78,8 +93,10 @@ def create_refresh_token(
     else:
         expire = now + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
 
-    # Add token family for rotation
-    token_family = secrets.token_urlsafe(16)
+    # Use existing token family if provided (rotation), otherwise create new (login)
+    if token_family is None:
+        token_family = secrets.token_urlsafe(16)
+
     token_id = secrets.token_urlsafe(16)
     user_id = data.get("user_id")
 
@@ -96,25 +113,38 @@ def create_refresh_token(
         "type": "refresh",
         "token_family": token_family,
         "token_id": token_id,
-        "version": 1,
     }
 
     encoded_jwt = jwt.encode(
         to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM
     )
 
-    # Store token family in database for rotation tracking
+    # Build token record with optional device info
+    token_record = {
+        "user_id": user_id,
+        "token_family": token_family,
+        "token_id": token_id,
+        "is_active": True,
+        "created_at": now.isoformat(),
+        "expires_at": expire.isoformat(),
+    }
+
+    # Add device info if provided
+    if device_info:
+        if device_info.get("device_name"):
+            token_record["device_name"] = device_info["device_name"][:100]
+        if device_info.get("device_id"):
+            token_record["device_id"] = device_info["device_id"][:100]
+        if device_info.get("device_type"):
+            token_record["device_type"] = device_info["device_type"][:20]
+        if device_info.get("ip_address"):
+            token_record["ip_address"] = device_info["ip_address"]
+        if device_info.get("user_agent"):
+            token_record["user_agent"] = device_info["user_agent"]
+
+    # Store token in database
     supabase = get_supabase_client()
-    supabase.table("refresh_tokens").insert(
-        {
-            "user_id": user_id,
-            "token_family": token_family,
-            "token_id": token_id,
-            "is_active": True,
-            "created_at": now.isoformat(),
-            "expires_at": expire.isoformat(),
-        }
-    ).execute()
+    supabase.table("refresh_tokens").insert(token_record).execute()
 
     return encoded_jwt
 
@@ -464,7 +494,22 @@ async def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
 
 
 def rotate_refresh_token(old_refresh_token: str) -> Optional[Dict[str, str]]:
-    """Rotate refresh token for enhanced security"""
+    """Rotate refresh token with immediate cleanup (no accumulation)
+
+    Flow:
+    1. Validate the old refresh token (JWT signature)
+    2. Check if token exists and is active in database
+    3. DELETE the old token immediately
+    4. Create new tokens with SAME token_family (for reuse detection)
+    5. Return new tokens
+
+    Reuse Detection:
+    - If token_id not found but token_family exists with different token_id
+      → Token was already rotated → Someone is reusing old token → Revoke family
+
+    Returns:
+        Dict with new access_token and refresh_token, or None if rotation fails
+    """
     try:
         # Decode the old token
         payload = verify_token(old_refresh_token)
@@ -480,31 +525,63 @@ def rotate_refresh_token(old_refresh_token: str) -> Optional[Dict[str, str]]:
 
         supabase = get_supabase_client()
 
-        # Check if token family is still active
-        family_check = (
+        # Check if this exact token exists and is active (fetch device info too)
+        token_check = (
             supabase.table("refresh_tokens")
-            .select("*")
+            .select("id, device_name, device_id, device_type, ip_address, user_agent")
             .eq("token_family", token_family)
             .eq("token_id", token_id)
             .eq("is_active", True)
             .execute()
         )
 
-        if not family_check.data:
-            # Token family compromised, revoke all tokens for this family
-            supabase.table("refresh_tokens").update({"is_active": False}).eq(
-                "token_family", token_family
-            ).execute()
+        if not token_check.data:
+            # Token not found or not active
+            # Check if family exists with a DIFFERENT token_id (reuse detection)
+            family_check = (
+                supabase.table("refresh_tokens")
+                .select("id")
+                .eq("token_family", token_family)
+                .eq("is_active", True)
+                .execute()
+            )
+
+            if family_check.data:
+                # Family exists with different token_id → REUSE DETECTED!
+                # Someone is using an old token that was already rotated
+                # Revoke entire family (delete all tokens for this family)
+                supabase.table("refresh_tokens").delete().eq(
+                    "token_family", token_family
+                ).execute()
+
             return None
 
-        # Revoke the old token
-        supabase.table("refresh_tokens").update({"is_active": False}).eq(
-            "token_family", token_family
-        ).eq("token_id", token_id).execute()
+        # Preserve device info from the old token
+        old_token_data = token_check.data[0]
+        device_info = {}
+        if old_token_data.get("device_name"):
+            device_info["device_name"] = old_token_data["device_name"]
+        if old_token_data.get("device_id"):
+            device_info["device_id"] = old_token_data["device_id"]
+        if old_token_data.get("device_type"):
+            device_info["device_type"] = old_token_data["device_type"]
+        if old_token_data.get("ip_address"):
+            device_info["ip_address"] = str(old_token_data["ip_address"])
+        if old_token_data.get("user_agent"):
+            device_info["user_agent"] = old_token_data["user_agent"]
 
-        # Create new tokens
+        # Token is valid and active → DELETE it immediately
+        supabase.table("refresh_tokens").delete().eq("token_family", token_family).eq(
+            "token_id", token_id
+        ).execute()
+
+        # Create new tokens with SAME token_family and device_info (for reuse detection)
         new_access_token = create_access_token({"user_id": user_id})
-        new_refresh_token = create_refresh_token({"user_id": user_id})
+        new_refresh_token = create_refresh_token(
+            {"user_id": user_id},
+            token_family=token_family,
+            device_info=device_info if device_info else None,
+        )
 
         return {"access_token": new_access_token, "refresh_token": new_refresh_token}
 
@@ -513,11 +590,97 @@ def rotate_refresh_token(old_refresh_token: str) -> Optional[Dict[str, str]]:
 
 
 def revoke_all_user_tokens(user_id: str):
-    """Revoke all refresh tokens for a user (logout from all devices)"""
+    """Revoke all refresh tokens for a user (logout from all devices)
+
+    Deletes all tokens for the user immediately.
+    """
     supabase = get_supabase_client()
-    supabase.table("refresh_tokens").update({"is_active": False}).eq(
-        "user_id", user_id
-    ).execute()
+    supabase.table("refresh_tokens").delete().eq("user_id", user_id).execute()
+
+
+def get_user_sessions(user_id: str) -> list:
+    """Get all active sessions for a user
+
+    Returns list of sessions with device info for display in settings.
+    """
+    supabase = get_supabase_client()
+
+    result = (
+        supabase.table("refresh_tokens")
+        .select(
+            "id, token_family, device_name, device_id, device_type, "
+            "ip_address, created_at, last_used_at"
+        )
+        .eq("user_id", user_id)
+        .eq("is_active", True)
+        .order("created_at", desc=True)
+        .execute()
+    )
+
+    return result.data if result.data else []
+
+
+def revoke_session(user_id: str, session_id: str) -> bool:
+    """Revoke a specific session for a user
+
+    Args:
+        user_id: The user's ID (for security - ensure they own the session)
+        session_id: The session ID (refresh_tokens.id) to revoke
+
+    Returns:
+        True if session was revoked, False if not found or not owned by user
+    """
+    supabase = get_supabase_client()
+
+    # Delete the session (only if owned by this user)
+    result = (
+        supabase.table("refresh_tokens")
+        .delete()
+        .eq("id", session_id)
+        .eq("user_id", user_id)
+        .execute()
+    )
+
+    # Return True if a row was deleted
+    return bool(result.data)
+
+
+def cleanup_expired_refresh_tokens() -> int:
+    """Clean up expired refresh tokens
+
+    This is a maintenance function that can be called periodically
+    to remove tokens that have passed their expiration date.
+
+    With immediate deletion on rotation, this should rarely find anything,
+    but it's useful for cleaning up tokens from users who never refreshed
+    (e.g., abandoned sessions).
+
+    Returns:
+        Number of tokens deleted
+    """
+    from app.services.logger import logger
+
+    supabase = get_supabase_client()
+    now = datetime.now(timezone.utc)
+
+    try:
+        # Delete expired tokens (past expiration date)
+        result = (
+            supabase.table("refresh_tokens")
+            .delete()
+            .lt("expires_at", now.isoformat())
+            .execute()
+        )
+        deleted_count = len(result.data) if result.data else 0
+
+        if deleted_count > 0:
+            logger.info(f"Cleaned up {deleted_count} expired refresh tokens")
+
+        return deleted_count
+
+    except Exception as e:
+        logger.error(f"Failed to cleanup refresh tokens: {e}")
+        return 0
 
 
 def check_password_strength(password: str) -> Dict[str, Any]:

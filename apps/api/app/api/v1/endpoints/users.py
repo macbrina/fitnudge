@@ -353,3 +353,112 @@ async def upload_profile_picture(
     )
 
     return {"message": "Profile picture updated successfully", "url": file_url}
+
+
+# =====================================================
+# User Search & Referral Endpoints
+# =====================================================
+
+
+@router.get("/search")
+async def search_users(
+    q: str = Query(..., min_length=2, description="Search query (username)"),
+    limit: int = Query(10, ge=1, le=50),
+    current_user: dict = Depends(get_current_user),
+):
+    """Search users by username for in-app invites
+
+    Returns basic user info for users matching the search query.
+    Excludes the current user from results.
+    """
+    from app.core.database import get_supabase_client
+
+    supabase = get_supabase_client()
+
+    # Search by username (case-insensitive partial match)
+    result = (
+        supabase.table("users")
+        .select("id, username, name, profile_picture_url")
+        .ilike("username", f"%{q}%")
+        .neq("id", current_user["id"])  # Exclude current user
+        .eq("is_active", True)
+        .limit(limit)
+        .execute()
+    )
+
+    return {
+        "users": result.data if result.data else [],
+        "count": len(result.data or []),
+    }
+
+
+@router.get("/me/referral-code")
+async def get_my_referral_code(current_user: dict = Depends(get_current_user)):
+    """Get current user's referral code
+
+    If the user doesn't have a referral code yet (legacy users),
+    generate one and save it.
+    """
+    from app.core.database import get_supabase_client
+    from app.services.referral_service import generate_referral_code
+
+    supabase = get_supabase_client()
+
+    # Get user's referral code
+    result = (
+        supabase.table("users")
+        .select("referral_code, username")
+        .eq("id", current_user["id"])
+        .execute()
+    )
+
+    if not result.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+
+    user = result.data[0]
+    referral_code = user.get("referral_code")
+
+    # Generate referral code for legacy users who don't have one
+    if not referral_code:
+        referral_code = generate_referral_code(user.get("username", "USER"))
+
+        # Save the generated code
+        supabase.table("users").update({"referral_code": referral_code}).eq(
+            "id", current_user["id"]
+        ).execute()
+
+    return {
+        "referral_code": referral_code,
+        "referral_link": f"https://fitnudge.app/join?ref={referral_code}",
+    }
+
+
+@router.get("/me/referrals")
+async def get_my_referrals(current_user: dict = Depends(get_current_user)):
+    """Get list of users referred by the current user
+
+    Shows all users who signed up using your referral code.
+    """
+    from app.services.referral_service import get_user_referrals
+
+    referrals = await get_user_referrals(current_user["id"])
+
+    # Format the response
+    formatted_referrals = []
+    for referral in referrals:
+        formatted_referrals.append(
+            {
+                "id": referral.get("id"),
+                "username": referral.get("username"),
+                "name": referral.get("name"),
+                "joined_at": referral.get("created_at"),
+                "bonus_granted": referral.get("referral_bonus_granted_at") is not None,
+            }
+        )
+
+    return {
+        "referrals": formatted_referrals,
+        "total_count": len(formatted_referrals),
+    }

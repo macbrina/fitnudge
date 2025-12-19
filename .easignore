@@ -106,7 +106,11 @@ apps/docs/
 
 # ================================
 
+.git
 .git/
+**/.git
+**/.git/
+.git/**
 
 # ================================
 
@@ -115,9 +119,16 @@ apps/docs/
 # ================================
 
 .idea/
+.idea
 .vscode/
-_.swp
-_.swo
+.vscode
+.cursor/
+.cursor
+**/.idea
+**/.vscode
+**/.cursor
+*.swp
+*.swo
 
 # ================================
 
@@ -125,8 +136,15 @@ _.swo
 
 # ================================
 
-_.tsbuildinfo
+*.tsbuildinfo
 tmp/
 temp/
-_.tmp
-\*.log
+*.tmp
+*.log
+
+# Husky git hooks (not needed for build)
+.husky/
+.husky
+
+# NPM/PNPM config
+.npmrc

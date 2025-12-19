@@ -4,6 +4,19 @@ import * as Device from "expo-device";
 import { STORAGE_KEYS, storageUtil } from "../../utils/storageUtil";
 import { useSystemStatusStore } from "@/stores/systemStatusStore";
 
+// Build User-Agent string once at startup
+const buildUserAgent = (): string => {
+  const appName = Constants.expoConfig?.name || "FitNudge";
+  const appVersion = Constants.expoConfig?.version || "1.0.0";
+  const platform = Platform.OS;
+  const osVersion = Platform.Version;
+  const deviceModel = Device.modelName || "Unknown";
+
+  return `${appName}/${appVersion} (${platform}; ${osVersion}; ${deviceModel})`;
+};
+
+const USER_AGENT = buildUserAgent();
+
 // Global flag to prevent API calls during logout
 let isLoggingOut = false;
 
@@ -325,6 +338,7 @@ export abstract class BaseApiService {
     const defaultHeaders: HeadersInit = {
       "Content-Type": "application/json",
       Accept: "application/json",
+      "User-Agent": USER_AGENT,
     };
 
     if (token) {

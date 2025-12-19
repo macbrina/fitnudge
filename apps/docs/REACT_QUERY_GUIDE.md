@@ -447,6 +447,102 @@ onMutate: async (postId) => {
 };
 ```
 
+### Pattern 5: Optimistic Button State in Infinite Queries (Request/Cancel/Accept)
+
+When a user action changes a button state (e.g., "Request" → "Requested" → "Partner"), update the item's status immediately in infinite query pages:
+
+```typescript
+// Helper to update a user's status across all infinite query pages
+const updateUserInInfiniteQuery = (
+  queryClient: QueryClient,
+  queryKey: readonly string[],
+  userId: string,
+  updates: { request_status: string; partnership_id?: string | null }
+) => {
+  queryClient.setQueryData(queryKey, (old: any) => {
+    if (!old?.pages) return old;
+    return {
+      ...old,
+      pages: old.pages.map((page: any) => ({
+        ...page,
+        users: page.users.map((user: any) =>
+          user.id === userId ? { ...user, ...updates } : user
+        ),
+      })),
+    };
+  });
+};
+
+// Usage in mutation
+export const useSendPartnerRequest = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data) => partnersService.sendRequest(data),
+    onMutate: async (data) => {
+      // Cancel relevant queries
+      await queryClient.cancelQueries({ queryKey: partnersQueryKeys.all });
+
+      // Snapshot all affected infinite queries
+      const searchQueryState = queryClient.getQueriesData({
+        queryKey: partnersQueryKeys.searchInfinite(""),
+        exact: false, // Match all search queries regardless of search term
+      });
+      const suggestedQueryState = queryClient.getQueriesData({
+        queryKey: partnersQueryKeys.suggestedInfinite(),
+      });
+
+      // Optimistically update button state to "Requested"
+      searchQueryState.forEach(([key]) => {
+        updateUserInInfiniteQuery(
+          queryClient,
+          key as readonly string[],
+          data.partner_user_id,
+          { request_status: "sent", partnership_id: `temp-${Date.now()}` }
+        );
+      });
+
+      updateUserInInfiniteQuery(
+        queryClient,
+        partnersQueryKeys.suggestedInfinite(),
+        data.partner_user_id,
+        { request_status: "sent", partnership_id: `temp-${Date.now()}` }
+      );
+
+      return { searchQueryState, suggestedQueryState };
+    },
+    onError: (err, data, context) => {
+      // Rollback all queries to their previous state
+      context?.searchQueryState?.forEach(([key, value]: [any, any]) => {
+        queryClient.setQueryData(key, value);
+      });
+      context?.suggestedQueryState?.forEach(([key, value]: [any, any]) => {
+        queryClient.setQueryData(key, value);
+      });
+    },
+    onSuccess: (response, data) => {
+      // Update with real partnership_id from server
+      const realId = response?.data?.id;
+      if (realId) {
+        updateUserInInfiniteQuery(
+          queryClient,
+          partnersQueryKeys.suggestedInfinite(),
+          data.partner_user_id,
+          { request_status: "sent", partnership_id: realId }
+        );
+      }
+    },
+  });
+};
+```
+
+**Key Points:**
+
+- Use `getQueriesData` with `exact: false` to get all matching infinite queries
+- Update each page's items array to change the specific user's status
+- The button state changes **instantly** without waiting for the server
+- Pass both `userId` and `partnershipId` to mutations so optimistic updates know which user to update
+
 ---
 
 ## Checklist for New Hooks

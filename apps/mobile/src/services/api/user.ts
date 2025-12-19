@@ -117,6 +117,35 @@ export class UserService extends BaseApiService {
   > {
     return this.get(ROUTES.USERS.NOTIFICATION_SETTINGS);
   }
+
+  /**
+   * Get current user's referral code and link
+   */
+  async getReferralCode(): Promise<
+    ApiResponse<{
+      referral_code: string;
+      referral_link: string;
+    }>
+  > {
+    return this.get(ROUTES.USERS.REFERRAL_CODE);
+  }
+
+  /**
+   * Get list of users referred by current user
+   */
+  async getMyReferrals(): Promise<
+    ApiResponse<
+      Array<{
+        id: string;
+        username: string;
+        name: string;
+        created_at: string;
+        referral_bonus_granted_at?: string;
+      }>
+    >
+  > {
+    return this.get(ROUTES.USERS.REFERRALS);
+  }
 }
 
 // Export singleton instance

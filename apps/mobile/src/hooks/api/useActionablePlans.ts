@@ -5,10 +5,18 @@ import {
   userQueryKeys,
 } from "@/hooks/api/queryKeys";
 import { progressQueryKeys } from "@/hooks/api/useProgressData";
-import { actionablePlansService } from "@/services/api/actionablePlans";
+import {
+  actionablePlansService,
+  PlanStatus,
+} from "@/services/api/actionablePlans";
 import { logger } from "@/services/logger";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef } from "react";
+import {
+  useMutation,
+  useQueries,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+import { useEffect, useMemo, useRef } from "react";
 
 // Re-export for backward compatibility
 export { actionablePlansQueryKeys } from "@/hooks/api/queryKeys";
@@ -79,16 +87,103 @@ export const usePlanStatus = (goalId: string | undefined, enabled = true) => {
       queryClient.invalidateQueries({
         queryKey: [...progressQueryKeys.all, "chain", goalId],
       });
-
-      // Log for debugging
-      console.log(
-        `[usePlanStatus] Goal ${goalId} plan completed, invalidated queries (firstMount: ${isFirstMount})`
-      );
     }
     prevStatusRef.current = currentStatus || null;
   }, [query.data?.status, queryClient, goalId]);
 
   return query;
+};
+
+/**
+ * Hook to batch fetch plan statuses for multiple goals at once
+ * Returns a map of goalId -> planStatus for easy lookup
+ *
+ * IMPORTANT: Polls every 3 seconds when ANY plan is pending/generating
+ */
+export const useBatchPlanStatuses = (goalIds: string[]) => {
+  const queryClient = useQueryClient();
+  const prevStatusesRef = useRef<Record<string, string>>({});
+
+  const queries = useQueries({
+    queries: goalIds.map((goalId) => ({
+      queryKey: actionablePlansQueryKeys.planStatus(goalId),
+      queryFn: () => actionablePlansService.getPlanStatus(goalId),
+      staleTime: 0, // Always fetch fresh data
+      refetchOnMount: "always" as const,
+      refetchOnWindowFocus: true,
+      // Each query polls independently based on its own status
+      refetchInterval: (q: any) => {
+        const status = q.state.data?.status;
+        if (status === "pending" || status === "generating") {
+          return 3000; // Poll every 3 seconds
+        }
+        return false; // Stop polling
+      },
+      refetchIntervalInBackground: false,
+    })),
+  });
+
+  const isLoading = queries.some((q) => q.isLoading);
+  const isError = queries.some((q) => q.isError);
+
+  // Create a map of goalId -> planStatus for easy lookup
+  const planStatusMap = useMemo(() => {
+    const map: Record<
+      string,
+      { status: PlanStatus; [key: string]: any } | undefined
+    > = {};
+    goalIds.forEach((goalId, index) => {
+      map[goalId] = queries[index]?.data;
+    });
+    return map;
+  }, [goalIds, queries]);
+
+  // Check if any plan is currently generating
+  const hasGeneratingPlan = useMemo(() => {
+    return queries.some((q) => {
+      const status = q.data?.status;
+      return status === "pending" || status === "generating";
+    });
+  }, [queries]);
+
+  // When a plan status changes to "completed", invalidate related queries
+  useEffect(() => {
+    queries.forEach((q, index) => {
+      const goalId = goalIds[index];
+      const currentStatus = q.data?.status;
+      const prevStatus = prevStatusesRef.current[goalId];
+
+      // Only invalidate when status CHANGES to completed (not on every render)
+      if (
+        currentStatus === "completed" &&
+        prevStatus !== "completed" &&
+        prevStatus !== undefined
+      ) {
+        logger.info(`Plan completed for goal ${goalId}, invalidating queries`);
+
+        // Invalidate goals to sync the active state
+        queryClient.invalidateQueries({ queryKey: goalsQueryKeys.active() });
+        queryClient.invalidateQueries({ queryKey: goalsQueryKeys.list() });
+
+        // Invalidate check-ins
+        queryClient.invalidateQueries({ queryKey: checkInsQueryKeys.today() });
+        queryClient.invalidateQueries({ queryKey: checkInsQueryKeys.all });
+      }
+
+      // Update previous status
+      if (currentStatus) {
+        prevStatusesRef.current[goalId] = currentStatus;
+      }
+    });
+  }, [queries, goalIds, queryClient]);
+
+  return {
+    planStatusMap,
+    isLoading,
+    isError,
+    queries,
+    hasGeneratingPlan, // Expose this so UI can show a loading indicator
+  };
 };
 
 /**
@@ -99,10 +194,27 @@ export const useGoalPlan = (goalId: string | undefined, enabled = true) => {
     queryKey: actionablePlansQueryKeys.plan(goalId || ""),
     queryFn: () => actionablePlansService.getGoalPlan(goalId!),
     enabled: enabled && !!goalId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    refetchOnMount: false,
+    staleTime: 5 * 60 * 1000, // 5 minutes - use cached data for 5 min
+    gcTime: 10 * 60 * 1000, // 10 minutes - keep in cache for 10 min
+    refetchOnMount: false, // Don't refetch if data exists in cache
     refetchOnWindowFocus: false,
   });
+};
+
+/**
+ * Hook to prefetch a goal's plan data
+ * Use this in PlanSection to warm up the cache before user clicks "Start Workout"
+ */
+export const usePrefetchGoalPlan = () => {
+  const queryClient = useQueryClient();
+
+  return (goalId: string) => {
+    queryClient.prefetchQuery({
+      queryKey: actionablePlansQueryKeys.plan(goalId),
+      queryFn: () => actionablePlansService.getGoalPlan(goalId),
+      staleTime: 5 * 60 * 1000,
+    });
+  };
 };
 
 /**

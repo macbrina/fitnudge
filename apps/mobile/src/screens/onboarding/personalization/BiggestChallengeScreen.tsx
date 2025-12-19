@@ -120,31 +120,33 @@ export default function BiggestChallengeScreen({
                     isSelected && styles.optionCardSelected,
                   ]}
                 >
-                  <View
-                    style={[
-                      styles.iconContainer,
-                      isSelected && styles.iconContainerSelected,
-                    ]}
-                  >
-                    <Text style={styles.optionIcon}>{challenge.icon}</Text>
-                  </View>
-                  <View style={styles.textContainer}>
-                    <Text
+                  <View style={styles.optionRow}>
+                    <View
                       style={[
-                        styles.optionTitle,
-                        isSelected && styles.optionTitleSelected,
+                        styles.iconContainer,
+                        isSelected && styles.iconContainerSelected,
                       ]}
                     >
-                      {t(challenge.title)}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.optionDescription,
-                        isSelected && styles.optionDescriptionSelected,
-                      ]}
-                    >
-                      {t(challenge.description)}
-                    </Text>
+                      <Text style={styles.optionIcon}>{challenge.icon}</Text>
+                    </View>
+                    <View style={styles.textContainer}>
+                      <Text
+                        style={[
+                          styles.optionTitle,
+                          isSelected && styles.optionTitleSelected,
+                        ]}
+                      >
+                        {t(challenge.title)}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.optionDescription,
+                          isSelected && styles.optionDescriptionSelected,
+                        ]}
+                      >
+                        {t(challenge.description)}
+                      </Text>
+                    </View>
                   </View>
                 </Card>
               </TouchableOpacity>
@@ -199,6 +201,8 @@ const makeBiggestChallengeScreenStyles = (
     },
     optionCard: {
       padding: toRN(tokens.spacing[5]),
+    },
+    optionRow: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
     },

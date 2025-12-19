@@ -43,7 +43,6 @@ This document outlines the complete Realtime implementation for FitNudge, enabli
 - ✅ `challenges` - Live challenges
 - ✅ `challenge_participants` - Join/leave updates
 - ✅ `challenge_leaderboard` - Competitive rankings
-- ✅ `group_goals` - Team collaboration
 
 #### Already Enabled: Social (4 tables)
 

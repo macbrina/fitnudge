@@ -70,7 +70,18 @@ export function ActionSheet({
           { paddingBottom: insets.bottom + toRN(tokens.spacing[4]) },
         ]}
       >
-        {title && <Text style={styles.title}>{title}</Text>}
+        {/* Header with title and close button */}
+        <View style={styles.header}>
+          <View style={styles.headerSpacer} />
+          {title && <Text style={styles.title}>{title}</Text>}
+          <TouchableOpacity
+            style={styles.closeButton}
+            onPress={onClose}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="close" size={24} color={colors.text.secondary} />
+          </TouchableOpacity>
+        </View>
 
         {options.map((option) => (
           <TouchableOpacity
@@ -146,12 +157,27 @@ const makeActionSheetStyles = (tokens: any, colors: any, brand: any) => ({
     borderTopRightRadius: toRN(tokens.borderRadius["2xl"]),
     padding: toRN(tokens.spacing[6]),
   },
+  header: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "space-between" as const,
+    marginBottom: toRN(tokens.spacing[4]),
+  },
+  headerSpacer: {
+    width: 32,
+  },
   title: {
+    flex: 1,
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.bold,
     color: colors.text.primary,
     textAlign: "center" as const,
-    marginBottom: toRN(tokens.spacing[4]),
+  },
+  closeButton: {
+    width: 32,
+    height: 32,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
   },
   option: {
     flexDirection: "row" as const,

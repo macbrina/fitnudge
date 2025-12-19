@@ -126,17 +126,40 @@ async def create_check_in(
     supabase = get_supabase_client()
 
     # Verify goal belongs to user
-    goal = (
-        supabase.table("goals")
-        .select("*")
-        .eq("id", checkin_data.goal_id)
-        .eq("user_id", current_user["id"])
-        .execute()
+    goal_result = (
+        supabase.table("goals").select("*").eq("id", checkin_data.goal_id).execute()
     )
-    if not goal.data:
+    if not goal_result.data:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Goal not found"
         )
+
+    goal = goal_result.data[0]
+    is_owner = goal.get("user_id") == current_user["id"]
+
+    if not is_owner:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have access to this goal",
+        )
+
+    # Check if user has already completed a check-in for this goal today
+    existing_checkin = (
+        supabase.table("check_ins")
+        .select("id, completed")
+        .eq("goal_id", checkin_data.goal_id)
+        .eq("user_id", current_user["id"])
+        .eq("date", checkin_data.date.isoformat())
+        .execute()
+    )
+
+    if existing_checkin.data and len(existing_checkin.data) > 0:
+        existing = existing_checkin.data[0]
+        if existing.get("completed"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="You have already completed your check-in for today.",
+            )
 
     checkin = {
         "goal_id": checkin_data.goal_id,
@@ -438,12 +461,18 @@ async def get_streak_info(
     current_user: dict = Depends(get_current_user),
     goal_id: Optional[str] = Query(None),
 ):
-    """Get streak information - calculates consecutive completed check-ins"""
+    """Get streak information - calculates consecutive days with completed check-ins"""
     from app.core.database import get_supabase_client
+    from datetime import timedelta
 
     supabase = get_supabase_client()
 
-    query = supabase.table("check_ins").select("*").eq("user_id", current_user["id"])
+    query = (
+        supabase.table("check_ins")
+        .select("date, completed")
+        .eq("user_id", current_user["id"])
+        .eq("completed", True)
+    )
 
     if goal_id:
         query = query.eq("goal_id", goal_id)
@@ -459,30 +488,60 @@ async def get_streak_info(
             streak_start=None,
         )
 
-    # Sort check-ins by date (newest first)
-    sorted_checkins = sorted(check_ins, key=lambda x: x["date"], reverse=True)
+    # Get unique dates with completed check-ins (a day counts if any check-in is completed)
+    completed_dates = sorted(list({c["date"] for c in check_ins}), reverse=True)
 
-    # Calculate streaks - same logic as /users/me/stats
+    if not completed_dates:
+        return StreakInfo(
+            current_streak=0,
+            longest_streak=0,
+            last_check_in=None,
+            streak_start=None,
+        )
+
+    last_check_in = completed_dates[0]
+    today = date.today()
+
+    # Calculate current streak (consecutive days backwards from today or yesterday)
     current_streak = 0
-    longest_streak = 0
-    temp_streak = 0
-    last_check_in = None
     streak_start = None
 
-    for checkin in sorted_checkins:
-        if checkin["completed"]:
-            temp_streak += 1
-            current_streak = max(current_streak, temp_streak)
-            # Track the most recent completed check-in
-            if last_check_in is None:
-                last_check_in = checkin["date"]
-            # Track the start of the current streak
-            streak_start = checkin["date"]
-        else:
-            longest_streak = max(longest_streak, temp_streak)
-            temp_streak = 0
+    # Convert to date objects for easier comparison
+    completed_date_set = {date.fromisoformat(d) for d in completed_dates}
 
-    longest_streak = max(longest_streak, temp_streak, current_streak)
+    # Start from today and count backwards
+    check_date = today
+    while check_date in completed_date_set:
+        current_streak += 1
+        streak_start = check_date.isoformat()
+        check_date = check_date - timedelta(days=1)
+
+    # If today not checked, check if streak continues from yesterday
+    if current_streak == 0:
+        check_date = today - timedelta(days=1)
+        while check_date in completed_date_set:
+            current_streak += 1
+            streak_start = check_date.isoformat()
+            check_date = check_date - timedelta(days=1)
+
+    # Calculate longest streak (iterate through all dates)
+    longest_streak = 0
+    if completed_dates:
+        # Sort dates oldest first for longest streak calculation
+        sorted_dates = sorted([date.fromisoformat(d) for d in completed_dates])
+        temp_streak = 1
+        longest_streak = 1
+
+        for i in range(1, len(sorted_dates)):
+            diff = (sorted_dates[i] - sorted_dates[i - 1]).days
+            if diff == 1:
+                temp_streak += 1
+                longest_streak = max(longest_streak, temp_streak)
+            elif diff > 1:
+                temp_streak = 1
+
+    # Ensure longest is at least as long as current
+    longest_streak = max(longest_streak, current_streak)
 
     return StreakInfo(
         current_streak=current_streak,

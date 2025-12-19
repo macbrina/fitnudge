@@ -169,13 +169,11 @@ class ChallengeService:
             if existing.data:
                 raise ValueError("Already joined this challenge")
 
-            # Join challenge
+            # Join challenge (membership only - no scoring data)
             participant = {
                 "challenge_id": challenge_id,
                 "user_id": user_id,
                 "goal_id": goal_id,
-                "progress_data": {},
-                "points": 0,
             }
 
             result = (
@@ -363,50 +361,38 @@ class ChallengeService:
         return streak
 
     async def _update_leaderboard(self, challenge_id: str) -> None:
-        """Update challenge leaderboard"""
+        """
+        Recalculate ranks for challenge leaderboard.
+
+        The leaderboard table stores all scoring data (rank, points, progress_data).
+        This method only recalculates ranks based on points already in the table.
+        """
         supabase = get_supabase_client()
 
         try:
-            # Get all participants ordered by points
-            participants = (
-                supabase.table("challenge_participants")
-                .select("user_id, points, progress_data")
+            # Get all leaderboard entries ordered by points
+            entries = (
+                supabase.table("challenge_leaderboard")
+                .select("id, user_id, points")
                 .eq("challenge_id", challenge_id)
                 .order("points", desc=True)
                 .execute()
             )
 
-            if not participants.data:
+            if not entries.data:
                 return
 
-            # Clear existing leaderboard
-            supabase.table("challenge_leaderboard").delete().eq(
-                "challenge_id", challenge_id
-            ).execute()
-
-            # Create new leaderboard entries
-            leaderboard_entries = []
-            for rank, participant in enumerate(participants.data, start=1):
-                leaderboard_entries.append(
-                    {
-                        "challenge_id": challenge_id,
-                        "user_id": participant["user_id"],
-                        "rank": rank,
-                        "points": participant.get("points", 0),
-                        "progress_data": participant.get("progress_data", {}),
-                    }
-                )
-
-            if leaderboard_entries:
-                supabase.table("challenge_leaderboard").insert(
-                    leaderboard_entries
+            # Update ranks based on point order
+            for rank, entry in enumerate(entries.data, start=1):
+                supabase.table("challenge_leaderboard").update({"rank": rank}).eq(
+                    "id", entry["id"]
                 ).execute()
 
             print(
-                f"Updated leaderboard for challenge {challenge_id}",
+                f"Updated leaderboard ranks for challenge {challenge_id}",
                 {
                     "challenge_id": challenge_id,
-                    "participant_count": len(leaderboard_entries),
+                    "entries_count": len(entries.data),
                 },
             )
 
@@ -457,22 +443,174 @@ class ChallengeService:
             )
             return []
 
+    async def get_my_challenges(
+        self,
+        user_id: str,
+        status: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Get all challenges the user has access to (created or joined).
+
+        Args:
+            user_id: User ID
+            status: Optional filter by status (upcoming, active, completed, cancelled)
+
+        Returns:
+            List of challenges with user's participation info
+
+        NOTE: Status is computed, not stored:
+        - is_active=false -> cancelled
+        - is_active=true, today < start_date -> upcoming
+        - is_active=true, start_date <= today <= end_date -> active
+        - is_active=true, today > end_date -> completed
+        """
+        from datetime import date
+
+        supabase = get_supabase_client()
+
+        def compute_status(challenge: dict) -> str:
+            """Compute status from is_active + dates."""
+            today = date.today()
+            start_date = (
+                date.fromisoformat(challenge["start_date"])
+                if challenge.get("start_date")
+                else None
+            )
+            end_date = (
+                date.fromisoformat(challenge["end_date"])
+                if challenge.get("end_date")
+                else None
+            )
+
+            if not challenge.get("is_active"):
+                return "cancelled"
+            elif end_date and today > end_date:
+                return "completed"
+            elif start_date and today < start_date:
+                return "upcoming"
+            else:
+                return "active"
+
+        try:
+            # Get challenges created by user
+            created_result = (
+                supabase.table("challenges")
+                .select("*")
+                .eq("created_by", user_id)
+                .execute()
+            )
+            created_challenges = created_result.data or []
+
+            # Get challenge IDs user has joined
+            participants_result = (
+                supabase.table("challenge_participants")
+                .select("challenge_id")
+                .eq("user_id", user_id)
+                .execute()
+            )
+            joined_challenge_ids = [
+                p["challenge_id"] for p in (participants_result.data or [])
+            ]
+
+            # Get challenges user has joined (excluding ones they created to avoid duplicates)
+            created_ids = {c["id"] for c in created_challenges}
+            joined_ids_to_fetch = [
+                cid for cid in joined_challenge_ids if cid not in created_ids
+            ]
+
+            joined_challenges = []
+            if joined_ids_to_fetch:
+                joined_result = (
+                    supabase.table("challenges")
+                    .select("*")
+                    .in_("id", joined_ids_to_fetch)
+                    .execute()
+                )
+                joined_challenges = joined_result.data or []
+
+            # Combine all challenges
+            all_challenges = created_challenges + joined_challenges
+
+            # Compute status for each challenge and filter if needed
+            for challenge in all_challenges:
+                challenge["status"] = compute_status(challenge)
+
+            # Filter by status if provided
+            if status:
+                all_challenges = [c for c in all_challenges if c["status"] == status]
+
+            # Sort by created_at
+            all_challenges.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+
+            # Add user context (is_creator, participation info)
+            for challenge in all_challenges:
+                challenge["is_creator"] = challenge.get("created_by") == user_id
+                challenge["is_participant"] = challenge["id"] in joined_challenge_ids
+
+                # Get user's scoring data from leaderboard (all in one place)
+                if challenge["is_participant"] or challenge["is_creator"]:
+                    try:
+                        leaderboard_result = (
+                            supabase.table("challenge_leaderboard")
+                            .select("rank, points, progress_data")
+                            .eq("challenge_id", challenge["id"])
+                            .eq("user_id", user_id)
+                            .maybe_single()
+                            .execute()
+                        )
+                        if leaderboard_result and leaderboard_result.data:
+                            challenge["my_rank"] = leaderboard_result.data.get("rank")
+                            challenge["my_progress"] = leaderboard_result.data.get(
+                                "points", 0
+                            )
+                        else:
+                            # Not in leaderboard yet (no check-ins)
+                            challenge["my_rank"] = None
+                            challenge["my_progress"] = 0
+                    except Exception:
+                        challenge["my_rank"] = None
+                        challenge["my_progress"] = 0
+
+                # Get participant count
+                try:
+                    count_result = (
+                        supabase.table("challenge_participants")
+                        .select("id", count="exact")
+                        .eq("challenge_id", challenge["id"])
+                        .execute()
+                    )
+                    challenge["participants_count"] = count_result.count or 0
+                except Exception:
+                    challenge["participants_count"] = 0
+
+            return all_challenges
+
+        except Exception as e:
+            logger.error(
+                f"Failed to get user's challenges: {str(e)}",
+                {"error": str(e), "user_id": user_id},
+            )
+            raise e  # Re-raise to see the full stack trace
+
     async def get_challenge_leaderboard(
         self, challenge_id: str, limit: int = 50
     ) -> List[Dict[str, Any]]:
         """
         Get challenge leaderboard.
 
+        All scoring data (rank, points, progress_data) is in challenge_leaderboard.
+
         Args:
             challenge_id: Challenge ID
             limit: Maximum number of entries to return
 
         Returns:
-            List of leaderboard entries
+            List of leaderboard entries with user info under 'user' key
         """
         supabase = get_supabase_client()
 
         try:
+            # Get leaderboard with all data and user info
             result = (
                 supabase.table("challenge_leaderboard")
                 .select("*, users(id, name, username, profile_picture_url)")
@@ -482,7 +620,18 @@ class ChallengeService:
                 .execute()
             )
 
-            return result.data or []
+            # Transform 'users' to 'user' for frontend compatibility
+            entries = []
+            for entry in result.data or []:
+                transformed = {**entry}
+                if "users" in transformed:
+                    transformed["user"] = transformed.pop("users")
+                # Add total_check_ins from progress_data
+                progress_data = entry.get("progress_data", {}) or {}
+                transformed["total_check_ins"] = progress_data.get("checkin_count", 0)
+                entries.append(transformed)
+
+            return entries
 
         except Exception as e:
             logger.error(

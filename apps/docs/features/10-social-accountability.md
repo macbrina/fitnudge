@@ -2,7 +2,7 @@
 
 ## Overview
 
-Social accountability features enable users to share goals with friends, find accountability partners, and create group goals for collaborative motivation.
+Social accountability features enable users to share goals with friends and find accountability partners for collaborative motivation.
 
 ## Features
 
@@ -66,28 +66,7 @@ Accept an accountability partner request.
 - Shared progress visibility
 - Partner-specific communication
 
-### 4. Group Goals
-
-**API Endpoint**: `POST /api/v1/social-accountability/goals/{goal_id}/group`
-
-Convert a goal into a group goal that multiple users can participate in.
-
-**API Endpoint**: `POST /api/v1/social-accountability/goals/{goal_id}/group/members`
-
-Add members to a group goal.
-
-**Database Table**: `group_goals`
-- Links goal to group participation
-- Tracks multiple users on same goal
-- Enables collaborative progress tracking
-
-**Features**:
-- Multiple users working toward same goal
-- Shared progress tracking
-- Group motivation and support
-- Combined statistics
-
-### 5. Social Accountability Service
+### 4. Social Accountability Service
 
 **Service**: `apps/api/app/services/social_accountability_service.py`
 
@@ -96,8 +75,6 @@ Add members to a group goal.
 - `get_shared_goals()`: Get goals shared with user
 - `request_accountability_partner()`: Request partnership
 - `accept_accountability_partner()`: Accept partnership
-- `create_group_goal()`: Convert goal to group goal
-- `add_group_goal_member()`: Add member to group goal
 
 ## Flow Diagrams
 
@@ -129,33 +106,17 @@ Add members to a group goal.
 6. Mutual Access to Progress
 ```
 
-### Group Goal Flow:
-```
-1. User Creates Group Goal (POST /goals/{id}/group)
-   ↓
-2. Goal Converted to Group Goal
-   ↓
-3. Members Added (POST /goals/{id}/group/members)
-   ↓
-4. All Members Track Progress on Same Goal
-   ↓
-5. Combined Statistics and Leaderboard
-```
-
 ## Key Files
 
 - **Backend**: `apps/api/app/api/v1/endpoints/social_accountability.py`
 - **Service**: `apps/api/app/services/social_accountability_service.py`
 - **Database**: `goal_shares` table
 - **Database**: `accountability_partners` table
-- **Database**: `group_goals` table
 
 ## Frontend Integration
 
 - Goal sharing interface
 - Permission level selection
 - Partner request/accept UI
-- Group goal creation
 - Shared goal viewing
-- Group progress dashboard
 

@@ -26,6 +26,10 @@ import { useExitOfferStore } from "@/stores/exitOfferStore";
 import { usePricingStore } from "@/stores/pricingStore";
 import { useSubscriptionStore } from "@/stores/subscriptionStore";
 import { isIOS } from "@/utils/platform";
+import {
+  subscriptionsService,
+  SyncSubscriptionRequest,
+} from "@/services/api/subscriptions";
 import type { SubscriptionPlan } from "@/services/api/subscriptionPlans";
 import type {
   IAPProduct,
@@ -50,9 +54,9 @@ try {
   Purchases = RNPurchases.default;
   LOG_LEVEL = RNPurchases.LOG_LEVEL;
 } catch (e) {
-  console.warn(
-    "[RevenueCat] react-native-purchases not installed. IAP features will be disabled."
-  );
+  // console.warn(
+  //   "[RevenueCat] react-native-purchases not installed. IAP features will be disabled."
+  // );
 }
 
 // RevenueCat API Keys - should be in environment variables
@@ -85,6 +89,7 @@ interface RevenueCatContextValue {
   purchaseProExitOffer: () => Promise<boolean>;
   restorePurchases: () => Promise<boolean>;
   refreshCustomerInfo: () => Promise<void>;
+  syncWithBackend: () => Promise<void>;
 
   // Getters
   getProduct: (period: BillingPeriod) => IAPProduct | null;
@@ -154,15 +159,15 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
         : REVENUECAT_API_KEY_ANDROID;
 
       if (!apiKey) {
-        console.error("[RevenueCat] API key not configured");
+        // console.error("[RevenueCat] API key not configured");
         initializingRef.current = false;
         return;
       }
 
-      // Enable debug logging in development
-      if (__DEV__ && LOG_LEVEL) {
-        Purchases.setLogLevel(LOG_LEVEL.DEBUG);
-      }
+      // Disable verbose RevenueCat logging (set to WARN to reduce console noise)
+      // if (LOG_LEVEL) {
+      //   Purchases.setLogLevel(LOG_LEVEL.WARN);
+      // }
 
       // Configure RevenueCat
       await Purchases.configure({
@@ -172,11 +177,51 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
 
       // Set up customer info listener
       customerInfoListenerRef.current = Purchases.addCustomerInfoUpdateListener(
-        (info: CustomerInfo) => {
-          console.info("[RevenueCat] Customer info updated");
+        async (info: CustomerInfo) => {
+          // console.info("[RevenueCat] Customer info updated");
           setCustomerInfo(info);
           updateSubscriptionStatus(info);
           refreshSubscription();
+
+          // Sync with backend in case webhook was missed
+          // This runs in background after customer info update
+          if (user?.id) {
+            try {
+              const tier = getTierFromCustomerInfo(info);
+              const isActive = hasActiveEntitlement(info);
+              const entitlementId = getEntitlementIdForTier(tier);
+              const entitlement = entitlementId
+                ? info.entitlements?.active?.[entitlementId]
+                : null;
+
+              const syncRequest: SyncSubscriptionRequest = {
+                tier,
+                is_active: isActive,
+                expires_at: entitlement?.expirationDate || null,
+                will_renew: entitlement?.willRenew || false,
+                platform:
+                  getPlatformFromStore(entitlement?.store || "") || null,
+                product_id:
+                  info.activeSubscriptions?.[0] ||
+                  entitlement?.productIdentifier ||
+                  null,
+              };
+
+              // Only sync if there's a potential mismatch
+              const currentPlan = user?.plan || "free";
+              const needsSync =
+                (isActive && tier !== "free" && currentPlan !== tier) ||
+                (!isActive && currentPlan !== "free");
+
+              if (needsSync) {
+                // console.info("[RevenueCat] Detected mismatch, syncing...");
+                await subscriptionsService.syncSubscription(syncRequest);
+                refreshSubscription();
+              }
+            } catch (err) {
+              // console.error("[RevenueCat] Background sync failed", err);
+            }
+          }
         }
       );
 
@@ -199,12 +244,46 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
       }
 
       setIsReady(true);
-      console.info("[RevenueCat] Initialized successfully", {
-        userId: await Purchases.getAppUserID(),
-        hasActiveSubscription: hasActiveEntitlement(info),
-      });
+      // console.info("[RevenueCat] Initialized successfully", {
+      //   userId: await Purchases.getAppUserID(),
+      //   hasActiveSubscription: hasActiveEntitlement(info),
+      // });
+
+      // Sync with backend after initialization to catch any missed webhooks
+      if (user?.id && info) {
+        const tier = getTierFromCustomerInfo(info);
+        const isActive = hasActiveEntitlement(info);
+        const currentPlan = user?.plan || "free";
+        const needsSync =
+          (isActive && tier !== "free" && currentPlan !== tier) ||
+          (!isActive && currentPlan !== "free");
+
+        if (needsSync) {
+          // console.info("[RevenueCat] Initial sync: detected mismatch", {
+          //   revenuecatTier: tier,
+          //   dbPlan: currentPlan,
+          // });
+          const entitlementId = getEntitlementIdForTier(tier);
+          const entitlement = entitlementId
+            ? info.entitlements?.active?.[entitlementId]
+            : null;
+
+          await subscriptionsService.syncSubscription({
+            tier,
+            is_active: isActive,
+            expires_at: entitlement?.expirationDate || null,
+            will_renew: entitlement?.willRenew || false,
+            platform: getPlatformFromStore(entitlement?.store || "") || null,
+            product_id:
+              info.activeSubscriptions?.[0] ||
+              entitlement?.productIdentifier ||
+              null,
+          });
+          refreshSubscription();
+        }
+      }
     } catch (err) {
-      console.error("[RevenueCat] Initialization failed", err);
+      // console.error("[RevenueCat] Initialization failed", err);
       setError({
         code: "INIT_FAILED",
         message: "Failed to initialize purchases",
@@ -235,9 +314,9 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
         await Purchases.setDisplayName(displayName);
       }
 
-      console.info("[RevenueCat] User logged in", { userId });
+      // console.info("[RevenueCat] User logged in", { userId });
     } catch (err) {
-      console.error("[RevenueCat] Failed to login user", err);
+      // console.error("[RevenueCat] Failed to login user", err);
     }
   };
 
@@ -246,9 +325,9 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
 
     try {
       await Purchases.logOut();
-      console.info("[RevenueCat] User logged out");
+      // console.info("[RevenueCat] User logged out");
     } catch (err) {
-      console.error("[RevenueCat] Failed to logout user", err);
+      // console.error("[RevenueCat] Failed to logout user", err);
     }
   };
 
@@ -259,7 +338,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
       const rcOfferings = await Purchases.getOfferings();
 
       if (!rcOfferings.current) {
-        console.warn("[RevenueCat] No current offering available");
+        // console.warn("[RevenueCat] No current offering available");
         return;
       }
 
@@ -271,11 +350,11 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
       setOfferings(convertedOfferings);
       setCurrentOffering(convertOffering(rcOfferings.current));
 
-      console.info("[RevenueCat] Offerings fetched", {
-        count: convertedOfferings.length,
-      });
+      // console.info("[RevenueCat] Offerings fetched", {
+      //   count: convertedOfferings.length,
+      // });
     } catch (err) {
-      console.error("[RevenueCat] Failed to fetch offerings", err);
+      // console.error("[RevenueCat] Failed to fetch offerings", err);
     }
   };
 
@@ -412,12 +491,12 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
     const hasSubscriptions =
       info.activeSubscriptions && info.activeSubscriptions.length > 0;
 
-    console.info("[RevenueCat] Checking active status:", {
-      hasEntitlements,
-      hasSubscriptions,
-      entitlements: Object.keys(info.entitlements?.active || {}),
-      subscriptions: info.activeSubscriptions,
-    });
+    // console.info("[RevenueCat] Checking active status:", {
+    //   hasEntitlements,
+    //   hasSubscriptions,
+    //   entitlements: Object.keys(info.entitlements?.active || {}),
+    //   subscriptions: info.activeSubscriptions,
+    // });
 
     return hasEntitlements || hasSubscriptions;
   };
@@ -505,9 +584,9 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
         setPurchaseState("purchasing");
         setError(null);
 
-        console.info("[RevenueCat] Starting purchase", {
-          productId: product.identifier,
-        });
+        // console.info("[RevenueCat] Starting purchase", {
+        //   productId: product.identifier,
+        // });
 
         const { customerInfo: info } = await Purchases.purchasePackage(
           product.rcPackage
@@ -517,9 +596,9 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
         updateSubscriptionStatus(info);
         setPurchaseState("success");
 
-        console.info("[RevenueCat] Purchase successful", {
-          productId: product.identifier,
-        });
+        // console.info("[RevenueCat] Purchase successful", {
+        //   productId: product.identifier,
+        // });
 
         // Mark user as subscribed so they don't see exit offers again
         await markAsSubscribed();
@@ -536,7 +615,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
       } catch (err: any) {
         if (err.userCancelled) {
           setPurchaseState("cancelled");
-          console.info("[RevenueCat] Purchase cancelled by user");
+          // console.info("[RevenueCat] Purchase cancelled by user");
           showAlert({
             title: t("onboarding.subscription.purchase_cancelled_title"),
             message: t("onboarding.subscription.purchase_cancelled_message"),
@@ -551,7 +630,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
           message: err.message || "Purchase failed",
           userCancelled: false,
         });
-        console.error("[RevenueCat] Purchase failed", err);
+        // console.error("[RevenueCat] Purchase failed", err);
         showAlert({
           title: t("onboarding.subscription.purchase_error_title"),
           message: t("onboarding.subscription.purchase_error_message"),
@@ -601,10 +680,10 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
       if (hasIntroOffer) {
         // User is eligible for intro offer - just purchase normally
         // The intro price is applied automatically by Apple/Google
-        console.info(
-          "[RevenueCat] User eligible for introductory offer:",
-          storeProduct?.introPrice?.priceString
-        );
+        // console.info(
+        //   "[RevenueCat] User eligible for introductory offer:",
+        //   storeProduct?.introPrice?.priceString
+        // );
         return purchasePackage(proAnnualPackage);
       }
 
@@ -612,15 +691,15 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
       // Check if there's an exit_offer offering for lapsed subscribers (Android or iOS promo)
       const exitOffering = offerings.find((o) => o.identifier === "exit_offer");
       if (exitOffering?.annualPackage) {
-        console.info("[RevenueCat] Using exit_offer offering for lapsed user");
+        // console.info("[RevenueCat] Using exit_offer offering for lapsed user");
         return purchasePackage(exitOffering.annualPackage);
       }
 
       // No discount available - user is not eligible
       // This happens if user previously subscribed and no win-back offer is configured
-      console.warn(
-        "[RevenueCat] User not eligible for intro offer (previously subscribed)"
-      );
+      // console.warn(
+      //   "[RevenueCat] User not eligible for intro offer (previously subscribed)"
+      // );
       setPurchaseState("error");
       showAlert({
         title: t("onboarding.subscription.promo_ineligible_title"),
@@ -631,7 +710,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
     } catch (err: any) {
       if (err.userCancelled) {
         setPurchaseState("cancelled");
-        console.info("[RevenueCat] Exit offer purchase cancelled by user");
+        // console.info("[RevenueCat] Exit offer purchase cancelled by user");
         showAlert({
           title: t("onboarding.subscription.purchase_cancelled_title"),
           message: t("onboarding.subscription.purchase_cancelled_message"),
@@ -645,7 +724,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
         code: err.code || "EXIT_OFFER_FAILED",
         message: err.message || "Exit offer purchase failed",
       });
-      console.error("[RevenueCat] Exit offer purchase failed", err);
+      // console.error("[RevenueCat] Exit offer purchase failed", err);
       showAlert({
         title: t("onboarding.subscription.purchase_error_title"),
         message: t("onboarding.subscription.purchase_error_message"),
@@ -666,7 +745,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
 
   const restorePurchases = useCallback(async (): Promise<boolean> => {
     if (!Purchases || !isReady) {
-      console.warn("[RevenueCat] Restore failed - not ready");
+      // console.warn("[RevenueCat] Restore failed - not ready");
       setError({
         code: "NOT_READY",
         message: "Purchases are not available yet",
@@ -683,20 +762,20 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
       setPurchaseState("restoring");
       setError(null);
 
-      console.info("[RevenueCat] Restoring purchases");
+      // console.info("[RevenueCat] Restoring purchases");
 
       const info = await Purchases.restorePurchases();
-      console.info("[RevenueCat] Restore response received");
+      // console.info("[RevenueCat] Restore response received");
 
       setCustomerInfo(info);
       updateSubscriptionStatus(info);
 
       const hasActive = hasActiveEntitlement(info);
-      console.info("[RevenueCat] Has active subscription:", hasActive);
+      // console.info("[RevenueCat] Has active subscription:", hasActive);
 
       if (hasActive) {
         setPurchaseState("success");
-        console.info("[RevenueCat] Purchases restored successfully");
+        // console.info("[RevenueCat] Purchases restored successfully");
 
         // Show success message
         showAlert({
@@ -710,7 +789,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
         return true;
       } else {
         setPurchaseState("idle");
-        console.info("[RevenueCat] No active purchases found");
+        // console.info("[RevenueCat] No active purchases found");
         setError({
           code: "NO_PURCHASES",
           message: "No previous purchases found",
@@ -730,7 +809,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
         code: err.code || "RESTORE_FAILED",
         message: err.message || "Failed to restore purchases",
       });
-      console.error("[RevenueCat] Restore failed", err);
+      // console.error("[RevenueCat] Restore failed", err);
 
       // Show error message
       showAlert({
@@ -750,9 +829,71 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
       setCustomerInfo(info);
       updateSubscriptionStatus(info);
     } catch (err) {
-      console.error("[RevenueCat] Failed to refresh customer info", err);
+      // console.error("[RevenueCat] Failed to refresh customer info", err);
     }
   }, []);
+
+  /**
+   * Sync RevenueCat subscription status with backend database.
+   * This is a fallback for missed webhooks.
+   */
+  const syncWithBackend = useCallback(async () => {
+    if (!customerInfo || !user?.id) {
+      // console.info("[RevenueCat] Skip sync - no customer info or user");
+      return;
+    }
+
+    try {
+      const tier = getTierFromCustomerInfo(customerInfo);
+      const isActive = hasActiveEntitlement(customerInfo);
+      const entitlementId = getEntitlementIdForTier(tier);
+      const entitlement = entitlementId
+        ? customerInfo.entitlements?.active?.[entitlementId]
+        : null;
+
+      // Get product ID from first active subscription
+      const productId =
+        customerInfo.activeSubscriptions?.[0] ||
+        entitlement?.productIdentifier ||
+        null;
+
+      const syncRequest: SyncSubscriptionRequest = {
+        tier,
+        is_active: isActive,
+        expires_at: entitlement?.expirationDate || null,
+        will_renew: entitlement?.willRenew || false,
+        platform: getPlatformFromStore(entitlement?.store || "") || null,
+        product_id: productId,
+      };
+
+      // console.info("[RevenueCat] Syncing with backend", {
+      //   tier,
+      //   isActive,
+      //   userPlan: user.plan,
+      // });
+
+      // Only sync if there's a potential mismatch
+      const needsSync =
+        (isActive && tier !== "free" && user.plan !== tier) ||
+        (!isActive && user.plan !== "free");
+
+      if (!needsSync) {
+        // console.info("[RevenueCat] Already in sync, skipping");
+        return;
+      }
+
+      const response = await subscriptionsService.syncSubscription(syncRequest);
+
+      if (response.data?.synced) {
+        // console.info("[RevenueCat] Backend synced", response.data);
+        // Refresh subscription store to get updated data
+        refreshSubscription();
+      }
+    } catch (err) {
+      // console.error("[RevenueCat] Failed to sync with backend", err);
+      // Don't throw - this is a background sync, shouldn't disrupt UX
+    }
+  }, [customerInfo, user, refreshSubscription]);
 
   // ====================
   // Getters
@@ -843,6 +984,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
     purchaseProExitOffer,
     restorePurchases,
     refreshCustomerInfo,
+    syncWithBackend,
 
     // Getters
     getProduct,

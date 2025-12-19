@@ -211,7 +211,7 @@ async def send_motivation(
 ):
     """Manually send a scheduled motivation"""
     from app.core.database import get_supabase_client
-    from app.core.notifications import send_push_notification
+    from app.services.expo_push_service import send_push_to_user
 
     supabase = get_supabase_client()
 
@@ -237,11 +237,24 @@ async def send_motivation(
 
     # Send push notification
     try:
-        await send_push_notification(
+        # Determine entity type based on whether motivation is for goal or challenge
+        entity_type = None
+        entity_id = None
+        if motivation_data.get("challenge_id"):
+            entity_type = "challenge"
+            entity_id = motivation_data["challenge_id"]
+        elif motivation_data.get("goal_id"):
+            entity_type = "goal"
+            entity_id = motivation_data["goal_id"]
+
+        await send_push_to_user(
             user_id=current_user["id"],
             title="💪 Your Daily Motivation",
             body=motivation_data["message"],
             data={"type": "motivation", "motivation_id": motivation_id},
+            notification_type="ai_motivation",
+            entity_type=entity_type,
+            entity_id=entity_id,
         )
 
         # Mark as sent

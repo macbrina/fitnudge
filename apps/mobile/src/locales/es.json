@@ -157,5 +157,43 @@
     "validation_error": "Por favor completa todos los campos",
     "authentication_error": "Error de inicio de sesión. Por favor intenta de nuevo.",
     "registration_error": "Error de registro. Por favor intenta de nuevo."
+  },
+  "social": {
+    "find_partner": "Buscar un Compañero",
+    "search_for_users": "Buscar Usuarios",
+    "search_description": "Ingresa un nombre o nombre de usuario para encontrar compañeros de responsabilidad.",
+    "search_users_placeholder": "Buscar por nombre o usuario...",
+    "no_users_found": "No se Encontraron Usuarios",
+    "no_suggestions": "Sin Sugerencias",
+    "no_suggestions_description": "Sigue a personas o invita amigos para ver sugerencias aquí.",
+    "already_partners": "Ya son Compañeros",
+    "already_partners_message": "Ya eres compañero de responsabilidad con este usuario.",
+    "request_pending_title": "Solicitud Pendiente",
+    "request_pending_message": "Ya tienes una solicitud pendiente con este usuario.",
+    "request_sent": "Solicitud Enviada",
+    "request_sent_message": "¡Solicitud de compañero enviada a {{name}}!",
+    "request_failed": "Error al enviar solicitud",
+    "try_different_search": "Intenta con otro término de búsqueda.",
+    "unknown_user": "Usuario Desconocido",
+    "partner_badge": "Compañero",
+    "pending_badge": "Pendiente",
+    "add_button": "Agregar",
+    "request_button": "Solicitar",
+    "requested_button": "Solicitado",
+    "accept_button": "Aceptar",
+    "cancel_request_title": "Cancelar Solicitud",
+    "cancel_request_message": "¿Cancelar tu solicitud de compañero a {{name}}?",
+    "cancel_request_confirm": "Cancelar Solicitud",
+    "request_cancelled": "Solicitud Cancelada",
+    "request_cancelled_message": "Tu solicitud de compañero ha sido cancelada.",
+    "cancel_failed": "Error al cancelar solicitud",
+    "request_accepted": "Solicitud Aceptada",
+    "request_accepted_message": "¡Ahora eres compañero de {{name}}!",
+    "accept_failed": "Error al aceptar solicitud",
+    "loading_more": "Cargando más...",
+    "tabs": {
+      "search": "Buscar",
+      "suggested": "Sugeridos"
+    }
   }
 }

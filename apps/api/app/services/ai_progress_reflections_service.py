@@ -47,7 +47,9 @@ class AIProgressReflectionsService:
                 start_date = today - timedelta(days=7)
                 end_date = today
 
-            # Get check-ins for the period
+            # =========================================
+            # 1. Get goal check-ins for the period
+            # =========================================
             query = (
                 supabase.table("check_ins")
                 .select(
@@ -65,12 +67,67 @@ class AIProgressReflectionsService:
                 query = query.eq("goal_id", goal_id)
 
             result = query.order("date", desc=True).execute()
-            check_ins = result.data if result.data else []
+            goal_check_ins = result.data if result.data else []
 
-            if not check_ins:
+            # =========================================
+            # 2. Get challenge check-ins for the period (completed only)
+            # =========================================
+            challenge_check_ins = []
+            try:
+                challenge_result = (
+                    supabase.table("challenge_check_ins")
+                    .select("*, challenges(id, title)")
+                    .eq("user_id", user_id)
+                    .eq("completed", True)
+                    .gte("check_in_date", start_date.isoformat())
+                    .lte("check_in_date", end_date.isoformat())
+                    .execute()
+                )
+                challenge_check_ins = challenge_result.data or []
+            except Exception:
+                pass
+
+            # =========================================
+            # 3. Get active personal goals
+            # =========================================
+            personal_goals = []
+            try:
+                goals_result = (
+                    supabase.table("goals")
+                    .select("id, title, category, description")
+                    .eq("user_id", user_id)
+                    .eq("is_active", True)
+                    .execute()
+                )
+                personal_goals = goals_result.data or []
+            except Exception:
+                pass
+
+            # =========================================
+            # 4. Get active challenges
+            # =========================================
+            active_challenges = []
+            try:
+                participant_result = (
+                    supabase.table("challenge_participants")
+                    .select("challenges(id, title, description)")
+                    .eq("user_id", user_id)
+                    .execute()
+                )
+                for p in participant_result.data or []:
+                    challenge = p.get("challenges")
+                    if challenge:
+                        active_challenges.append(challenge)
+            except Exception:
+                pass
+
+            # Check if we have any data
+            if not goal_check_ins and not challenge_check_ins:
                 return None
 
-            # Get user profile for personalization
+            # =========================================
+            # 5. Get user profile for personalization
+            # =========================================
             user_profile = (
                 supabase.table("user_fitness_profiles")
                 .select("*")
@@ -81,10 +138,31 @@ class AIProgressReflectionsService:
 
             profile_data = user_profile.data if user_profile.data else {}
 
-            # Calculate stats
-            stats = self._calculate_stats(check_ins, start_date, end_date)
+            # =========================================
+            # 6. Calculate combined stats
+            # =========================================
+            # Combine check-in dates for streak calculation
+            all_checkin_dates: set[str] = set()
+            for c in goal_check_ins:
+                if c.get("completed"):
+                    all_checkin_dates.add(c["date"])
+            for c in challenge_check_ins:
+                all_checkin_dates.add(c["check_in_date"])
 
-            # Get goal details
+            stats = self._calculate_stats(goal_check_ins, start_date, end_date)
+            # Add challenge stats
+            stats["challenge_check_ins"] = len(challenge_check_ins)
+            stats["total_all_check_ins"] = stats["total_completed"] + len(
+                challenge_check_ins
+            )
+            # Recalculate streak from combined dates
+            stats["current_streak"] = self._calculate_combined_streak(
+                all_checkin_dates, end_date
+            )
+
+            # =========================================
+            # 7. Get goal details (for backward compat)
+            # =========================================
             if goal_id:
                 goal = (
                     supabase.table("goals")
@@ -97,14 +175,26 @@ class AIProgressReflectionsService:
             else:
                 goal_data = None
 
-            # Get social context for enhanced reflections
+            # =========================================
+            # 8. Get social context for enhanced reflections
+            # =========================================
             social_context = await self._get_social_context(
                 supabase, user_id, goal_id, start_date, end_date
             )
 
-            # Generate AI reflection with social context
+            # =========================================
+            # 9. Generate AI reflection with full context
+            # =========================================
             reflection_text = await self._generate_ai_reflection(
-                check_ins, stats, goal_data, profile_data, period, social_context
+                goal_check_ins=goal_check_ins,
+                challenge_check_ins=challenge_check_ins,
+                personal_goals=personal_goals,
+                active_challenges=active_challenges,
+                stats=stats,
+                goal_data=goal_data,
+                profile_data=profile_data,
+                period=period,
+                social_context=social_context,
             )
 
             return {
@@ -125,6 +215,29 @@ class AIProgressReflectionsService:
             )
             raise
 
+    def _calculate_combined_streak(
+        self, checkin_dates: set[str], end_date: date
+    ) -> int:
+        """Calculate streak from combined goal and challenge check-in dates"""
+        if not checkin_dates:
+            return 0
+
+        streak = 0
+        check_date = end_date
+
+        while check_date.isoformat() in checkin_dates:
+            streak += 1
+            check_date = check_date - timedelta(days=1)
+
+        # If today not checked, check if streak continues from yesterday
+        if streak == 0:
+            check_date = end_date - timedelta(days=1)
+            while check_date.isoformat() in checkin_dates:
+                streak += 1
+                check_date = check_date - timedelta(days=1)
+
+        return streak
+
     async def _get_social_context(
         self,
         supabase,
@@ -137,14 +250,10 @@ class AIProgressReflectionsService:
         Fetch social context for the user and goal.
 
         Returns context about:
-        - Group goals and team members
         - Challenge participation and ranking
         - Accountability partners
         """
         social_context = {
-            "is_group_goal": False,
-            "group_members": [],
-            "group_total_progress": 0,
             "is_challenge": False,
             "challenge_rank": None,
             "challenge_participants": 0,
@@ -154,38 +263,6 @@ class AIProgressReflectionsService:
         }
 
         try:
-            # Check if this is a group goal
-            if goal_id:
-                group_members_result = (
-                    supabase.table("group_goal_members")
-                    .select("*, user:users(id, name)")
-                    .eq("goal_id", goal_id)
-                    .eq("is_active", True)
-                    .execute()
-                )
-
-                if group_members_result.data and len(group_members_result.data) > 1:
-                    social_context["is_group_goal"] = True
-                    social_context["group_members"] = [
-                        m.get("user", {}).get("name", "Unknown")
-                        for m in group_members_result.data
-                        if m.get("user", {}).get("id") != user_id
-                    ]
-
-                    # Get total check-ins for the group goal during this period
-                    group_checkins = (
-                        supabase.table("check_ins")
-                        .select("id", count="exact")
-                        .eq("goal_id", goal_id)
-                        .eq("completed", True)
-                        .gte("date", start_date.isoformat())
-                        .lte("date", end_date.isoformat())
-                        .execute()
-                    )
-                    social_context["group_total_progress"] = (
-                        group_checkins.count if hasattr(group_checkins, "count") else 0
-                    )
-
             # Check if user is in a challenge related to this goal
             if goal_id:
                 # Check if goal was converted to a challenge
@@ -334,31 +411,54 @@ class AIProgressReflectionsService:
 
     async def _generate_ai_reflection(
         self,
-        check_ins: List[Dict[str, Any]],
+        goal_check_ins: List[Dict[str, Any]],
+        challenge_check_ins: List[Dict[str, Any]],
+        personal_goals: List[Dict[str, Any]],
+        active_challenges: List[Dict[str, Any]],
         stats: Dict[str, Any],
         goal_data: Optional[Dict[str, Any]],
         profile_data: Dict[str, Any],
         period: str,
         social_context: Optional[Dict[str, Any]] = None,
     ) -> str:
-        """Generate AI-powered reflection text"""
+        """Generate AI-powered reflection text with full context"""
         from datetime import datetime
+
+        # Get motivation style and map to tone
+        motivation_style = profile_data.get("motivation_style", "friendly")
+        tone_map = {
+            "tough_love": "direct, challenging, and no-nonsense",
+            "gentle_encouragement": "warm, supportive, and compassionate",
+            "data_driven": "analytical, metric-focused, and logical",
+            "accountability_buddy": "friendly but firm, like a supportive friend",
+        }
+        tone_description = tone_map.get(motivation_style, "friendly and encouraging")
+
+        # Build personal goals section
+        personal_goals_str = ""
+        if personal_goals:
+            goals_list = [
+                f"- {g.get('title', 'Unknown')} ({g.get('category', 'general')})"
+                for g in personal_goals
+            ]
+            personal_goals_str = "\n".join(goals_list)
+        else:
+            personal_goals_str = "None"
+
+        # Build challenges section
+        challenges_str = ""
+        if active_challenges:
+            challenges_list = [
+                f"- {c.get('title', 'Unknown')}" for c in active_challenges
+            ]
+            challenges_str = "\n".join(challenges_list)
+        else:
+            challenges_str = "None"
 
         # Build social context section
         social_section = ""
         if social_context:
             social_parts = []
-
-            if social_context.get("is_group_goal") and social_context.get(
-                "group_members"
-            ):
-                members = ", ".join(social_context["group_members"][:3])
-                if len(social_context["group_members"]) > 3:
-                    members += f" and {len(social_context['group_members']) - 3} others"
-                social_parts.append(f"- Team Members: {members}")
-                social_parts.append(
-                    f"- Team Total Check-ins: {social_context.get('group_total_progress', 0)}"
-                )
 
             if social_context.get("is_challenge"):
                 social_parts.append(
@@ -386,39 +486,44 @@ class AIProgressReflectionsService:
 
         prompt = f"""You are an expert fitness coach and accountability partner providing a deep, personalized progress reflection for a premium subscriber.
 
-USER CONTEXT:
+PERSONAL GOALS ({len(personal_goals)} active):
+{personal_goals_str}
+
+ACTIVE CHALLENGES ({len(active_challenges)} active):
+{challenges_str}
+
+USER PREFERENCES:
 - Primary Goal: {goal_data.get('title', 'General fitness') if goal_data else 'Multiple goals'}
 - Fitness Level: {profile_data.get('fitness_level', 'unknown')}
-- Motivation Style: {profile_data.get('motivation_style', 'balanced')}
+- Motivation Style: {motivation_style} ({tone_description})
 - Biggest Challenge: {profile_data.get('biggest_challenge', 'consistency')}
 
 PERFORMANCE DATA ({period}):
+- Goal Check-ins: {stats['total_completed']} completed
+- Challenge Check-ins: {stats.get('challenge_check_ins', 0)}
+- Total All Check-ins: {stats.get('total_all_check_ins', stats['total_completed'])}
 - Completion Rate: {stats['completion_rate']}%
-- Total Check-ins: {stats['total_completed']} out of {stats['total_days']} days
-- Current Streak: {stats['current_streak']} days
+- Current Streak: {stats['current_streak']} days (combined goals + challenges)
 - Longest Streak: {stats['longest_streak']} days
 - Average Mood: {stats['average_mood'] if stats['average_mood'] else 'N/A'}{social_section}
 
 INSTRUCTIONS:
 1. Provide a comprehensive, deep analysis (not just a summary)
-2. Identify patterns and trends in their behavior
-3. Celebrate wins and acknowledge challenges
-4. Provide 2-3 actionable coaching recommendations
-5. Connect their progress to their stated goals and challenges
-6. Use a {profile_data.get('motivation_style', 'friendly')} tone but be professional
-7. Write 4-5 paragraphs with specific insights
-8. If they have social context (team, challenge, partner), reference it meaningfully:
-   - For team goals: Comment on team dynamics and collaboration
-   - For challenges: Reference their ranking and competitive spirit
-   - For accountability partners: Mention the value of their partnership
+2. Write in a {tone_description} tone - MATCH their preferred motivation style
+3. Reference their specific goals AND challenges
+4. If they have challenges, celebrate the power of community/accountability
+5. Identify patterns and trends in their behavior
+6. Celebrate wins and acknowledge challenges
+7. Provide 2-3 actionable coaching recommendations
+8. Write 4-5 paragraphs with specific insights
 
 FORMAT:
 - Opening: Context and overall assessment
-- Strengths: What they're doing well (including social aspects if applicable)
+- Strengths: What they're doing well across goals AND challenges
 - Challenges: Areas for improvement
-- Insights: Pattern analysis and observations (include team/challenge dynamics if relevant)
+- Insights: Pattern analysis (include challenge dynamics if relevant)
 - Recommendations: 2-3 specific, actionable next steps
-- Closing: Encouragement and motivation (reference partner/team if applicable)
+- Closing: Encouragement matching their motivation style
 
 Generate the reflection now:"""
 

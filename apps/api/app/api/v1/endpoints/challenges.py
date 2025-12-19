@@ -41,6 +41,49 @@ class ChallengeResponse(BaseModel):
     updated_at: str
 
 
+class ChallengeCreatorInfo(BaseModel):
+    """Creator info for challenge detail"""
+
+    id: str
+    name: Optional[str] = None
+    username: Optional[str] = None
+    profile_picture_url: Optional[str] = None
+
+
+class ChallengeDetailResponse(BaseModel):
+    """Extended response for GET /challenges/{id} with computed fields"""
+
+    id: str
+    title: str
+    description: Optional[str] = None
+    challenge_type: str
+    duration_days: Optional[int] = None
+    start_date: date
+    end_date: Optional[date] = None
+    join_deadline: Optional[date] = None
+    target_value: Optional[int] = None
+    is_public: bool
+    is_active: bool
+    max_participants: Optional[int] = None
+    created_by: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+    created_at: str
+    updated_at: str
+    # Computed fields
+    status: str  # upcoming, active, completed, cancelled
+    creator_id: Optional[str] = None  # Alias for created_by
+    creator: Optional[ChallengeCreatorInfo] = None
+    participants_count: int = 0
+    is_creator: bool = False
+    is_participant: bool = False
+    my_progress: Optional[int] = None
+    my_rank: Optional[int] = None
+    goal_template: Optional[Dict[str, Any]] = None
+
+    class Config:
+        extra = "allow"  # Allow extra fields from database
+
+
 class ChallengeParticipantResponse(BaseModel):
     id: str
     challenge_id: str
@@ -59,9 +102,42 @@ async def create_challenge(
     current_user: dict = Depends(get_current_user),
 ):
     """Create a new challenge"""
+    from app.core.database import get_supabase_client
+    from app.core.subscriptions import check_user_has_feature
+    from app.api.v1.endpoints.goals import (
+        get_user_challenge_limit,
+        get_user_challenge_participation_count,
+    )
+
+    supabase = get_supabase_client()
+    user_id = current_user["id"]
+    user_plan = current_user.get("plan", "free")
+
+    # 1. Check feature access: challenge_create (starter+ only)
+    if not check_user_has_feature(user_id, "challenge_create", user_plan, supabase):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Creating challenges is available on Starter plan and above. "
+            "Upgrade your plan to create challenges.",
+        )
+
+    # 2. Check challenge_limit (creating counts towards participation)
+    challenge_limit = get_user_challenge_limit(user_plan, supabase)
+    current_participation_count = get_user_challenge_participation_count(
+        user_id, supabase
+    )
+
+    if challenge_limit is not None and current_participation_count >= challenge_limit:
+        plan_name = user_plan.capitalize()
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"{plan_name} plan allows only {challenge_limit} challenge(s). "
+            f"Complete or leave a challenge first to create a new one.",
+        )
+
     try:
         challenge = await challenge_service.create_challenge(
-            user_id=current_user["id"],
+            user_id=user_id,
             title=challenge_data.title,
             description=challenge_data.description,
             challenge_type=challenge_data.challenge_type,
@@ -76,8 +152,8 @@ async def create_challenge(
 
     except Exception as e:
         logger.error(
-            f"Failed to create challenge for user {current_user['id']}",
-            {"error": str(e), "user_id": current_user["id"]},
+            f"Failed to create challenge for user {user_id}",
+            {"error": str(e), "user_id": user_id},
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -115,18 +191,54 @@ async def get_challenges(
         )
 
 
-@router.get("/{challenge_id}", response_model=ChallengeResponse)
+@router.get("/my")
+async def get_my_challenges(
+    current_user: dict = Depends(get_current_user),
+    status: Optional[str] = Query(
+        None, description="Filter by status: upcoming, active, completed, cancelled"
+    ),
+):
+    """
+    Get all challenges the user has access to.
+    This includes:
+    - Challenges created by the user
+    - Challenges the user has joined
+
+    For GoalsScreen - shows user's personal challenge library.
+    """
+    try:
+        challenges = await challenge_service.get_my_challenges(
+            user_id=current_user["id"],
+            status=status,
+        )
+
+        return challenges
+
+    except Exception as e:
+        logger.error(
+            f"Failed to get user's challenges",
+            {"error": str(e), "user_id": current_user["id"]},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve challenges",
+        )
+
+
+@router.get("/{challenge_id}", response_model=ChallengeDetailResponse)
 async def get_challenge(
     challenge_id: str, current_user: dict = Depends(get_current_user)
 ):
-    """Get challenge by ID"""
+    """Get challenge by ID with full details including computed fields"""
     from app.core.database import get_supabase_client
+    from datetime import date
 
     supabase = get_supabase_client()
 
+    # Get challenge with creator info
     result = (
         supabase.table("challenges")
-        .select("*")
+        .select("*, creator:created_by(id, name, username, profile_picture_url)")
         .eq("id", challenge_id)
         .maybe_single()
         .execute()
@@ -137,7 +249,78 @@ async def get_challenge(
             status_code=status.HTTP_404_NOT_FOUND, detail="Challenge not found"
         )
 
-    return result.data[0]
+    # maybe_single() returns a single object, not a list
+    challenge = result.data
+    user_id = current_user["id"]
+
+    # Compute status from dates and is_active
+    today = date.today()
+    start_date = (
+        date.fromisoformat(challenge.get("start_date"))
+        if challenge.get("start_date")
+        else None
+    )
+    end_date = (
+        date.fromisoformat(challenge.get("end_date"))
+        if challenge.get("end_date")
+        else None
+    )
+
+    if not challenge.get("is_active"):
+        challenge["status"] = "cancelled"
+    elif end_date and today > end_date:
+        challenge["status"] = "completed"
+    elif start_date and today < start_date:
+        challenge["status"] = "upcoming"
+    else:
+        challenge["status"] = "active"
+
+    # Add creator flag (column is created_by, not creator_id)
+    is_creator = challenge.get("created_by") == user_id
+    challenge["is_creator"] = is_creator
+    challenge["creator_id"] = challenge.get("created_by")  # Alias for frontend
+
+    # Get participants count
+    participants_count_result = (
+        supabase.table("challenge_participants")
+        .select("id", count="exact")
+        .eq("challenge_id", challenge_id)
+        .execute()
+    )
+    challenge["participants_count"] = participants_count_result.count or 0
+
+    # Check if user is a participant (membership only)
+    participant_result = (
+        supabase.table("challenge_participants")
+        .select("id")
+        .eq("challenge_id", challenge_id)
+        .eq("user_id", user_id)
+        .maybe_single()
+        .execute()
+    )
+
+    is_participant = bool(participant_result.data)
+    challenge["is_participant"] = is_participant or is_creator
+
+    # Get scoring data from leaderboard (rank, points, progress_data all in one place)
+    leaderboard_result = (
+        supabase.table("challenge_leaderboard")
+        .select("rank, points, progress_data")
+        .eq("challenge_id", challenge_id)
+        .eq("user_id", user_id)
+        .maybe_single()
+        .execute()
+    )
+
+    if leaderboard_result.data:
+        challenge["my_rank"] = leaderboard_result.data.get("rank")
+        challenge["my_progress"] = leaderboard_result.data.get("points", 0)
+    else:
+        # Not in leaderboard yet (no check-ins)
+        challenge["my_rank"] = None
+        challenge["my_progress"] = 0
+
+    return challenge
 
 
 @router.post("/{challenge_id}/join", response_model=ChallengeParticipantResponse)
@@ -149,55 +332,42 @@ async def join_challenge(
     """
     Join a challenge.
 
-    Checks the user's challenge_join_limit to ensure they haven't exceeded
-    the number of challenges they can participate in simultaneously.
+    Checks:
+    1. Feature access: challenge_join (available to all tiers)
+    2. Limit: challenge_limit (total created + joined)
     """
     from app.core.database import get_supabase_client
+    from app.core.subscriptions import check_user_has_feature
+    from app.api.v1.endpoints.goals import (
+        get_user_challenge_limit,
+        get_user_challenge_participation_count,
+    )
 
     supabase = get_supabase_client()
     user_id = current_user["id"]
     user_plan = current_user.get("plan", "free")
 
-    # Check challenge_join_limit from plan_features
-    limit_result = (
-        supabase.table("plan_features")
-        .select("feature_value")
-        .eq("plan_id", user_plan)
-        .eq("feature_key", "challenge_join_limit")
-        .eq("is_enabled", True)
-        .maybe_single()
-        .execute()
-    )
-
-    challenge_join_limit = 1  # Default for free
-    if limit_result.data and limit_result.data.get("feature_value"):
-        challenge_join_limit = limit_result.data["feature_value"]
-
-    # Count current active challenge participations (excluding challenges created by user)
-    active_participations = (
-        supabase.table("challenge_participants")
-        .select("id, challenge:challenges!inner(id, is_active, created_by)")
-        .eq("user_id", user_id)
-        .neq("challenge_id", challenge_id)  # Exclude the one we're trying to join
-        .execute()
-    )
-
-    # Filter to only count active challenges not created by this user
-    current_joined_count = 0
-    if active_participations.data:
-        for p in active_participations.data:
-            challenge_info = p.get("challenge", {})
-            # Only count if challenge is active and user is NOT the creator
-            if (
-                challenge_info.get("is_active")
-                and challenge_info.get("created_by") != user_id
-            ):
-                current_joined_count += 1
-
-    if current_joined_count >= challenge_join_limit:
+    # 1. Check feature access: challenge_join (available to all tiers)
+    if not check_user_has_feature(user_id, "challenge_join", user_plan, supabase):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"You can only join {challenge_join_limit} challenge(s) at a time. "
+            detail="Joining challenges is not available on your current plan.",
+        )
+
+    # 2. Check challenge_limit from plan_features (covers both created and joined)
+    challenge_limit = get_user_challenge_limit(user_plan, supabase)
+
+    # Count total challenges user is participating in (created + joined)
+    current_participation_count = get_user_challenge_participation_count(
+        user_id, supabase
+    )
+
+    # Check limit (None = unlimited)
+    if challenge_limit is not None and current_participation_count >= challenge_limit:
+        plan_name = user_plan.capitalize()
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"{plan_name} plan allows only {challenge_limit} challenge(s). "
             f"Complete or leave a challenge first to join a new one.",
         )
 
@@ -250,6 +420,88 @@ async def get_challenge_leaderboard(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve leaderboard",
         )
+
+
+class ParticipantWithUserResponse(BaseModel):
+    """Participant with user info for list endpoint"""
+
+    id: str
+    challenge_id: str
+    user_id: str
+    joined_at: str
+    points: int
+    rank: Optional[int] = None
+    user: Optional[Dict[str, Any]] = None
+
+
+@router.get("/{challenge_id}/participants")
+async def get_challenge_participants(
+    challenge_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Get all participants for a challenge with user info and rank"""
+    from app.core.database import get_supabase_client
+
+    supabase = get_supabase_client()
+
+    # Get participants from challenge_participants table
+    participants_result = (
+        supabase.table("challenge_participants")
+        .select("id, challenge_id, user_id, joined_at")
+        .eq("challenge_id", challenge_id)
+        .execute()
+    )
+
+    participants = participants_result.data or []
+
+    if not participants:
+        return []
+
+    # Get user ids to fetch user info
+    user_ids = [p["user_id"] for p in participants]
+
+    # Get user info
+    users_result = (
+        supabase.table("users")
+        .select("id, name, username, profile_picture_url")
+        .in_("id", user_ids)
+        .execute()
+    )
+
+    users_map = {u["id"]: u for u in (users_result.data or [])}
+
+    # Get leaderboard data for points and ranks
+    leaderboard_result = (
+        supabase.table("challenge_leaderboard")
+        .select("user_id, points, rank")
+        .eq("challenge_id", challenge_id)
+        .execute()
+    )
+
+    leaderboard_map = {l["user_id"]: l for l in (leaderboard_result.data or [])}
+
+    # Combine data
+    result = []
+    for p in participants:
+        user_info = users_map.get(p["user_id"])
+        leaderboard_info = leaderboard_map.get(p["user_id"], {})
+
+        result.append(
+            {
+                "id": p["id"],
+                "challenge_id": p["challenge_id"],
+                "user_id": p["user_id"],
+                "joined_at": p["joined_at"],
+                "points": leaderboard_info.get("points", 0),
+                "rank": leaderboard_info.get("rank"),
+                "user": user_info,
+            }
+        )
+
+    # Sort by rank (participants with no rank go to end)
+    result.sort(key=lambda x: (x["rank"] is None, x["rank"] or 0))
+
+    return result
 
 
 @router.post("/{challenge_id}/update-progress")
@@ -371,10 +623,10 @@ async def challenge_check_in(
             detail="Challenge has already ended",
         )
 
-    # Verify user is a participant
+    # Verify user is a participant (membership check only)
     participant_result = (
         supabase.table("challenge_participants")
-        .select("*")
+        .select("id, user_id, joined_at")
         .eq("challenge_id", challenge_id)
         .eq("user_id", user_id)
         .maybe_single()
@@ -387,7 +639,40 @@ async def challenge_check_in(
             detail="You must join this challenge before checking in",
         )
 
-    participant = participant_result.data
+    # Find pre-created check-in record for today
+    existing_checkin_result = (
+        supabase.table("challenge_check_ins")
+        .select("*")
+        .eq("challenge_id", challenge_id)
+        .eq("user_id", user_id)
+        .eq("check_in_date", check_in_date.isoformat())
+        .execute()
+    )
+
+    existing_checkin = (
+        existing_checkin_result.data[0] if existing_checkin_result.data else None
+    )
+
+    # Check if already checked in (is_checked_in=true)
+    if existing_checkin and existing_checkin.get("is_checked_in"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You have already checked in today. Check-ins are limited to once per day.",
+        )
+
+    # Get current leaderboard entry (for points and progress)
+    leaderboard_entry_result = (
+        supabase.table("challenge_leaderboard")
+        .select("*")
+        .eq("challenge_id", challenge_id)
+        .eq("user_id", user_id)
+        .execute()
+    )
+    leaderboard_entry = (
+        leaderboard_entry_result.data[0]
+        if leaderboard_entry_result.data and len(leaderboard_entry_result.data) > 0
+        else None
+    )
 
     # Validate mood if provided
     valid_moods = ["great", "good", "okay", "bad", "terrible"]
@@ -397,66 +682,103 @@ async def challenge_check_in(
             detail=f"Invalid mood. Must be one of: {', '.join(valid_moods)}",
         )
 
-    # Create the check-in
-    check_in_data = {
-        "challenge_id": challenge_id,
-        "user_id": user_id,
-        "check_in_date": check_in_date.isoformat(),
+    # Update or create the check-in
+    check_in_update_data = {
+        "completed": True,
+        "is_checked_in": True,
         "notes": data.notes,
         "mood": data.mood,
         "photo_url": data.photo_url,
     }
 
-    try:
-        check_in_result = (
-            supabase.table("challenge_check_ins").insert(check_in_data).execute()
-        )
-    except Exception as e:
-        error_msg = str(e)
-        if (
-            "duplicate key" in error_msg.lower()
-            or "unique constraint" in error_msg.lower()
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="You have already checked in for this date",
+    if existing_checkin:
+        # UPDATE the pre-created record
+        try:
+            check_in_result = (
+                supabase.table("challenge_check_ins")
+                .update(check_in_update_data)
+                .eq("id", existing_checkin["id"])
+                .execute()
             )
-        raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to update check-in: {str(e)}",
+            )
+    else:
+        # Fallback: INSERT new record (for backwards compatibility during transition)
+        check_in_insert_data = {
+            "challenge_id": challenge_id,
+            "user_id": user_id,
+            "check_in_date": check_in_date.isoformat(),
+            **check_in_update_data,
+        }
+        try:
+            check_in_result = (
+                supabase.table("challenge_check_ins")
+                .insert(check_in_insert_data)
+                .execute()
+            )
+        except Exception as e:
+            error_msg = str(e)
+            if (
+                "duplicate key" in error_msg.lower()
+                or "unique constraint" in error_msg.lower()
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="You have already checked in for this date",
+                )
+            raise
 
     if not check_in_result.data:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create check-in",
+            detail="Failed to save check-in",
         )
 
     check_in = check_in_result.data[0]
 
-    # Calculate points based on challenge type
-    challenge_type = challenge.get("challenge_type", "checkin_count")
-    points_earned = 0
+    # Get current points from leaderboard (or 0 if first check-in)
+    current_entry = leaderboard_entry if leaderboard_entry else {}
+    current_points = current_entry.get("points", 0)
 
-    if challenge_type == "streak":
-        # Streak challenges: points for consecutive days
-        points_earned = 10  # Base points per check-in
-    elif challenge_type == "checkin_count":
-        # Count challenges: fixed points per check-in
-        points_earned = 5
-    elif challenge_type == "community":
-        # Community: combination
-        points_earned = 10
+    # Check if user already checked in today (from progress_data.last_check_in)
+    # If so, don't add points - just keep the existing points
+    progress_data = current_entry.get("progress_data", {}) or {}
+    last_check_in_str = progress_data.get("last_check_in")
+    already_checked_in_today = last_check_in_str == check_in_date.isoformat()
+
+    if already_checked_in_today:
+        # User already checked in today, don't add points
+        new_total_points = current_points
+        points_earned = 0
     else:
-        points_earned = 5  # Default
+        # Calculate points based on challenge type
+        challenge_type = challenge.get("challenge_type", "checkin_count")
+        points_earned = 0
 
-    # Update participant points
-    current_points = participant.get("points", 0)
-    new_total_points = current_points + points_earned
+        if challenge_type == "streak":
+            # Streak challenges: points for consecutive days
+            points_earned = 10  # Base points per check-in
+        elif challenge_type == "checkin_count":
+            # Count challenges: fixed points per check-in
+            points_earned = 5
+        elif challenge_type == "community":
+            # Community: combination
+            points_earned = 10
+        else:
+            points_earned = 5  # Default
 
-    # Get check-in count for progress data
+        new_total_points = current_points + points_earned
+
+    # Get check-in count for progress data (completed only)
     check_ins_count_result = (
         supabase.table("challenge_check_ins")
         .select("id", count="exact")
         .eq("challenge_id", challenge_id)
         .eq("user_id", user_id)
+        .eq("completed", True)
         .execute()
     )
     check_in_count = (
@@ -465,19 +787,32 @@ async def challenge_check_in(
         else len(check_ins_count_result.data or [])
     )
 
-    # Update participant
-    progress_data = participant.get("progress_data", {})
+    # Update progress data with new check-in count and date
     progress_data["checkin_count"] = check_in_count
     progress_data["last_check_in"] = check_in_date.isoformat()
 
-    supabase.table("challenge_participants").update(
-        {
-            "points": new_total_points,
-            "progress_data": progress_data,
-        }
-    ).eq("id", participant["id"]).execute()
+    # Update or insert leaderboard entry (all scoring data goes here)
+    if current_entry:
+        # Update existing entry
+        supabase.table("challenge_leaderboard").update(
+            {
+                "points": new_total_points,
+                "progress_data": progress_data,
+            }
+        ).eq("challenge_id", challenge_id).eq("user_id", user_id).execute()
+    else:
+        # Create new entry (first check-in for this user)
+        supabase.table("challenge_leaderboard").insert(
+            {
+                "challenge_id": challenge_id,
+                "user_id": user_id,
+                "rank": 0,  # Will be calculated next
+                "points": new_total_points,
+                "progress_data": progress_data,
+            }
+        ).execute()
 
-    # Update leaderboard
+    # Recalculate ranks based on points
     await challenge_service._update_leaderboard(challenge_id)
 
     # Get updated rank
@@ -524,16 +859,17 @@ async def get_challenge_check_ins(
     user_id: Optional[str] = Query(None, description="Filter by user ID"),
     limit: int = Query(50, ge=1, le=200),
 ):
-    """Get check-ins for a challenge"""
+    """Get completed check-ins for a challenge (completed=true)"""
     from app.core.database import get_supabase_client
 
     supabase = get_supabase_client()
 
-    # Build query
+    # Build query - only return completed check-ins
     query = (
         supabase.table("challenge_check_ins")
         .select("*, users(id, name, username, profile_picture_url)")
         .eq("challenge_id", challenge_id)
+        .eq("completed", True)
         .order("check_in_date", desc=True)
         .limit(limit)
     )
@@ -566,6 +902,221 @@ async def get_my_challenge_check_ins(
     )
 
     return result.data or []
+
+
+class UpdateChallengeCheckInRequest(BaseModel):
+    """Request to update a challenge check-in"""
+
+    notes: Optional[str] = None
+    mood: Optional[str] = None  # great, good, okay, bad, terrible
+    photo_url: Optional[str] = None
+
+
+@router.put("/{challenge_id}/check-ins/{check_in_id}")
+async def update_challenge_check_in(
+    challenge_id: str,
+    check_in_id: str,
+    data: UpdateChallengeCheckInRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Update a challenge check-in (notes, mood, photo).
+    Only the user who created the check-in can update it.
+    """
+    from app.core.database import get_supabase_client
+    from datetime import datetime
+
+    supabase = get_supabase_client()
+    user_id = current_user["id"]
+
+    # Verify check-in exists and belongs to user
+    check_in_result = (
+        supabase.table("challenge_check_ins")
+        .select("*")
+        .eq("id", check_in_id)
+        .eq("challenge_id", challenge_id)
+        .eq("user_id", user_id)
+        .maybe_single()
+        .execute()
+    )
+
+    if not check_in_result.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Check-in not found or you don't have permission to update it",
+        )
+
+    # Build update data (only include non-None fields)
+    update_data = {"updated_at": datetime.utcnow().isoformat()}
+    if data.notes is not None:
+        update_data["notes"] = data.notes
+    if data.mood is not None:
+        if data.mood not in ["great", "good", "okay", "bad", "terrible"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid mood value. Must be: great, good, okay, bad, terrible",
+            )
+        update_data["mood"] = data.mood
+    if data.photo_url is not None:
+        update_data["photo_url"] = data.photo_url
+
+    # Update check-in
+    result = (
+        supabase.table("challenge_check_ins")
+        .update(update_data)
+        .eq("id", check_in_id)
+        .execute()
+    )
+
+    if not result.data:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update check-in",
+        )
+
+    return result.data[0]
+
+
+@router.delete("/{challenge_id}/check-ins/{check_in_id}")
+async def delete_challenge_check_in(
+    challenge_id: str,
+    check_in_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Delete a challenge check-in and recalculate participant points.
+
+    Only the user who created the check-in can delete it.
+    Points are recalculated based on remaining check-ins.
+    """
+    from app.core.database import get_supabase_client
+    from datetime import datetime
+
+    supabase = get_supabase_client()
+    user_id = current_user["id"]
+
+    # Verify check-in exists and belongs to user
+    check_in_result = (
+        supabase.table("challenge_check_ins")
+        .select("*")
+        .eq("id", check_in_id)
+        .eq("challenge_id", challenge_id)
+        .eq("user_id", user_id)
+        .maybe_single()
+        .execute()
+    )
+
+    if not check_in_result.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Check-in not found or you don't have permission to delete it",
+        )
+
+    # Get challenge to calculate points per check-in
+    challenge_result = (
+        supabase.table("challenges")
+        .select("challenge_type")
+        .eq("id", challenge_id)
+        .maybe_single()
+        .execute()
+    )
+
+    challenge_type = (
+        challenge_result.data.get("challenge_type", "checkin_count")
+        if challenge_result.data
+        else "checkin_count"
+    )
+
+    # Calculate points that were earned for this check-in
+    points_to_deduct = 5  # Default
+    if challenge_type == "streak":
+        points_to_deduct = 10
+    elif challenge_type == "community":
+        points_to_deduct = 10
+
+    # Delete the check-in
+    supabase.table("challenge_check_ins").delete().eq("id", check_in_id).execute()
+
+    # Get remaining check-ins count (completed only)
+    remaining_result = (
+        supabase.table("challenge_check_ins")
+        .select("id", count="exact")
+        .eq("challenge_id", challenge_id)
+        .eq("user_id", user_id)
+        .eq("completed", True)
+        .execute()
+    )
+    remaining_count = remaining_result.count or 0
+
+    # Get last check-in date (completed only)
+    last_check_in_result = (
+        supabase.table("challenge_check_ins")
+        .select("check_in_date")
+        .eq("challenge_id", challenge_id)
+        .eq("user_id", user_id)
+        .eq("completed", True)
+        .order("check_in_date", desc=True)
+        .limit(1)
+        .execute()
+    )
+    last_check_in_date = (
+        last_check_in_result.data[0]["check_in_date"]
+        if last_check_in_result.data
+        else None
+    )
+
+    # Update leaderboard entry (all scoring data is here)
+    leaderboard_result = (
+        supabase.table("challenge_leaderboard")
+        .select("*")
+        .eq("challenge_id", challenge_id)
+        .eq("user_id", user_id)
+        .maybe_single()
+        .execute()
+    )
+
+    if leaderboard_result.data:
+        entry = leaderboard_result.data
+        current_points = entry.get("points", 0)
+        new_points = max(0, current_points - points_to_deduct)
+
+        progress_data = entry.get("progress_data", {}) or {}
+        progress_data["checkin_count"] = remaining_count
+        progress_data["last_check_in"] = last_check_in_date
+
+        if remaining_count == 0:
+            # No more check-ins, remove from leaderboard
+            supabase.table("challenge_leaderboard").delete().eq(
+                "challenge_id", challenge_id
+            ).eq("user_id", user_id).execute()
+        else:
+            # Update points and progress
+            supabase.table("challenge_leaderboard").update(
+                {
+                    "points": new_points,
+                    "progress_data": progress_data,
+                }
+            ).eq("challenge_id", challenge_id).eq("user_id", user_id).execute()
+
+    # Recalculate ranks
+    await challenge_service._update_leaderboard(challenge_id)
+
+    logger.info(
+        f"Deleted check-in {check_in_id} for user {user_id} in challenge {challenge_id}",
+        {
+            "check_in_id": check_in_id,
+            "challenge_id": challenge_id,
+            "user_id": user_id,
+            "points_deducted": points_to_deduct,
+        },
+    )
+
+    return {
+        "message": "Check-in deleted successfully",
+        "check_in_id": check_in_id,
+        "points_deducted": points_to_deduct,
+        "remaining_check_ins": remaining_count,
+    }
 
 
 # =====================================================
@@ -810,10 +1361,18 @@ async def leave_challenge(
         "user_id", user_id
     ).execute()
 
+    # Remove leaderboard entry
+    supabase.table("challenge_leaderboard").delete().eq(
+        "challenge_id", challenge_id
+    ).eq("user_id", user_id).execute()
+
     # Remove participant from challenge
     supabase.table("challenge_participants").delete().eq(
         "challenge_id", challenge_id
     ).eq("user_id", user_id).execute()
+
+    # Recalculate ranks for remaining participants
+    await challenge_service._update_leaderboard(challenge_id)
 
     logger.info(
         f"User {user_id} left challenge {challenge_id}",
@@ -821,3 +1380,809 @@ async def leave_challenge(
     )
 
     return {"message": "You have left the challenge"}
+
+
+# =====================================================
+# Challenge Invite Endpoints
+# =====================================================
+
+
+def validate_challenge_join(challenge: dict, user_id: str, supabase) -> tuple:
+    """Validate if user can join challenge
+
+    Returns:
+        (can_join: bool, error_message: str or None)
+    """
+    # 1. Challenge must be active
+    if not challenge.get("is_active"):
+        return False, "This challenge is no longer active"
+
+    # 2. Challenge must not have ended
+    end_date_str = challenge.get("end_date")
+    if end_date_str:
+        from datetime import date as date_type
+
+        if isinstance(end_date_str, str):
+            end_date = date_type.fromisoformat(end_date_str)
+        else:
+            end_date = end_date_str
+        if end_date < date_type.today():
+            return False, "This challenge has already ended"
+
+    # 3. Check join deadline (if set, otherwise use start_date)
+    join_deadline_str = challenge.get("join_deadline") or challenge.get("start_date")
+    if join_deadline_str:
+        from datetime import date as date_type
+
+        if isinstance(join_deadline_str, str):
+            join_deadline = date_type.fromisoformat(join_deadline_str)
+        else:
+            join_deadline = join_deadline_str
+        if join_deadline < date_type.today():
+            return False, "The deadline to join this challenge has passed"
+
+    # 4. Check max participants (if set)
+    if challenge.get("max_participants"):
+        participant_count = (
+            supabase.table("challenge_participants")
+            .select("id", count="exact")
+            .eq("challenge_id", challenge["id"])
+            .execute()
+        )
+        current_count = participant_count.count or 0
+        if current_count >= challenge["max_participants"]:
+            return False, "This challenge is full"
+
+    # 5. User not already a participant
+    existing = (
+        supabase.table("challenge_participants")
+        .select("id")
+        .eq("challenge_id", challenge["id"])
+        .eq("user_id", user_id)
+        .maybe_single()
+        .execute()
+    )
+    if existing.data:
+        return False, "You have already joined this challenge"
+
+    return True, None
+
+
+class ChallengeInviteRequest(BaseModel):
+    user_id: str  # User to invite
+
+
+class ChallengeInviteResponse(BaseModel):
+    id: str
+    challenge_id: str
+    invited_user_id: Optional[str]
+    invite_code: Optional[str]
+    status: str
+    created_at: str
+
+
+@router.post("/{challenge_id}/invite")
+async def send_challenge_invite(
+    challenge_id: str,
+    invite_data: ChallengeInviteRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Send an in-app invite to a user to join a challenge"""
+    from app.core.database import get_supabase_client
+    from datetime import datetime, timezone, timedelta
+
+    supabase = get_supabase_client()
+    user_id = current_user["id"]
+
+    # Check if challenge exists
+    challenge = (
+        supabase.table("challenges")
+        .select("*")
+        .eq("id", challenge_id)
+        .maybe_single()
+        .execute()
+    )
+
+    if not challenge.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Challenge not found"
+        )
+
+    # Check if user can invite (must be creator or participant)
+    is_creator = challenge.data.get("created_by") == user_id
+    is_participant = (
+        supabase.table("challenge_participants")
+        .select("id")
+        .eq("challenge_id", challenge_id)
+        .eq("user_id", user_id)
+        .maybe_single()
+        .execute()
+    ).data
+
+    if not is_creator and not is_participant:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You must be a participant to invite others",
+        )
+
+    # Check if target user exists
+    target_user = (
+        supabase.table("users")
+        .select("id, username")
+        .eq("id", invite_data.user_id)
+        .maybe_single()
+        .execute()
+    )
+
+    if not target_user.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+
+    # Check if user is already a participant
+    existing_participant = (
+        supabase.table("challenge_participants")
+        .select("id")
+        .eq("challenge_id", challenge_id)
+        .eq("user_id", invite_data.user_id)
+        .maybe_single()
+        .execute()
+    )
+
+    if existing_participant and existing_participant.data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User is already a participant in this challenge",
+        )
+
+    # Check if invite already exists
+    existing_invite = (
+        supabase.table("challenge_invites")
+        .select("id, status")
+        .eq("challenge_id", challenge_id)
+        .eq("invited_user_id", invite_data.user_id)
+        .maybe_single()
+        .execute()
+    )
+
+    if existing_invite and existing_invite.data:
+        if existing_invite.data["status"] == "pending":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="An invite is already pending for this user",
+            )
+        # Update existing declined/expired invite to pending
+        result = (
+            supabase.table("challenge_invites")
+            .update(
+                {
+                    "status": "pending",
+                    "invited_by_user_id": user_id,
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "expires_at": (
+                        datetime.now(timezone.utc) + timedelta(days=7)
+                    ).isoformat(),
+                }
+            )
+            .eq("id", existing_invite.data["id"])
+            .execute()
+        )
+        return {
+            "message": "Invite resent successfully",
+            "invite_id": existing_invite.data["id"],
+        }
+
+    # Create new invite
+    invite_result = (
+        supabase.table("challenge_invites")
+        .insert(
+            {
+                "challenge_id": challenge_id,
+                "invited_by_user_id": user_id,
+                "invited_user_id": invite_data.user_id,
+                "status": "pending",
+                "expires_at": (
+                    datetime.now(timezone.utc) + timedelta(days=7)
+                ).isoformat(),
+            }
+        )
+        .execute()
+    )
+
+    logger.info(
+        f"Challenge invite sent",
+        {
+            "challenge_id": challenge_id,
+            "invited_by": user_id,
+            "invited_user": invite_data.user_id,
+        },
+    )
+
+    # Send push notification to invited user
+    try:
+        from app.services.social_notification_service import (
+            send_challenge_notification,
+            SocialNotificationType,
+        )
+
+        # Get sender's name
+        sender = (
+            supabase.table("users")
+            .select("username, name")
+            .eq("id", user_id)
+            .maybe_single()
+            .execute()
+        )
+        sender_name = (
+            sender.data.get("name") or sender.data.get("username") or "Someone"
+            if sender.data
+            else "Someone"
+        )
+
+        await send_challenge_notification(
+            notification_type=SocialNotificationType.CHALLENGE_INVITE,
+            recipient_id=invite_data.user_id,
+            sender_id=user_id,
+            challenge_title=challenge.data.get("title", "a challenge"),
+            sender_name=sender_name,
+            supabase=supabase,
+        )
+    except Exception as e:
+        # Don't fail the invite if notification fails
+        logger.warning(f"Failed to send challenge invite notification: {e}")
+
+    return {
+        "message": "Invite sent successfully",
+        "invite_id": invite_result.data[0]["id"],
+    }
+
+
+@router.post("/{challenge_id}/invite-link")
+async def generate_challenge_invite_link(
+    challenge_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Generate a shareable invite link for a challenge"""
+    from app.core.database import get_supabase_client
+    from app.services.referral_service import generate_invite_code
+    from datetime import datetime, timezone, timedelta
+
+    supabase = get_supabase_client()
+    user_id = current_user["id"]
+
+    # Check if challenge exists
+    challenge = (
+        supabase.table("challenges")
+        .select("*")
+        .eq("id", challenge_id)
+        .maybe_single()
+        .execute()
+    )
+
+    if not challenge.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Challenge not found"
+        )
+
+    # Check if user can invite (must be creator or participant)
+    is_creator = challenge.data.get("created_by") == user_id
+    is_participant = (
+        supabase.table("challenge_participants")
+        .select("id")
+        .eq("challenge_id", challenge_id)
+        .eq("user_id", user_id)
+        .maybe_single()
+        .execute()
+    ).data
+
+    if not is_creator and not is_participant:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You must be a participant to generate invite links",
+        )
+
+    # Generate invite code
+    invite_code = generate_invite_code()
+
+    # Get the sharer's referral code for tracking
+    sharer = (
+        supabase.table("users")
+        .select("referral_code")
+        .eq("id", user_id)
+        .maybe_single()
+        .execute()
+    )
+    sharer_referral_code = sharer.data.get("referral_code") if sharer.data else None
+
+    # Create invite record (with NULL invited_user_id for link invites)
+    invite_result = (
+        supabase.table("challenge_invites")
+        .insert(
+            {
+                "challenge_id": challenge_id,
+                "invited_by_user_id": user_id,
+                "invited_user_id": None,  # Link invite - user unknown
+                "invite_code": invite_code,
+                "status": "pending",
+                "expires_at": (
+                    datetime.now(timezone.utc) + timedelta(days=30)
+                ).isoformat(),
+            }
+        )
+        .execute()
+    )
+
+    # Build invite link with referral code for new user attribution
+    invite_link = f"https://fitnudge.app/challenge/join/{invite_code}"
+    if sharer_referral_code:
+        invite_link += f"?ref={sharer_referral_code}"
+
+    return {
+        "invite_code": invite_code,
+        "invite_link": invite_link,
+        "expires_in_days": 30,
+    }
+
+
+@router.post("/join/{invite_code}")
+async def join_challenge_via_invite(
+    invite_code: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Join a challenge via invite code
+
+    Validates the invite code and adds user to challenge if valid.
+    """
+    from app.core.database import get_supabase_client
+    from app.core.subscriptions import check_user_has_feature
+    from app.api.v1.endpoints.goals import (
+        get_user_challenge_limit,
+        get_user_challenge_participation_count,
+    )
+    from datetime import datetime, timezone
+
+    supabase = get_supabase_client()
+    user_id = current_user["id"]
+    user_plan = current_user.get("plan", "free")
+
+    # Find the invite
+    invite = (
+        supabase.table("challenge_invites")
+        .select("*, challenges(*)")
+        .eq("invite_code", invite_code)
+        .maybe_single()
+        .execute()
+    )
+
+    if not invite.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Invalid invite code"
+        )
+
+    invite_data = invite.data
+    challenge = invite_data.get("challenges")
+
+    # Check if invite is still valid
+    if invite_data.get("status") != "pending":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This invite is no longer valid",
+        )
+
+    # Check if expired
+    expires_at = invite_data.get("expires_at")
+    if expires_at:
+        from datetime import datetime
+
+        if isinstance(expires_at, str):
+            expires_dt = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
+        else:
+            expires_dt = expires_at
+        if expires_dt < datetime.now(timezone.utc):
+            # Mark as expired
+            supabase.table("challenge_invites").update({"status": "expired"}).eq(
+                "id", invite_data["id"]
+            ).execute()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This invite has expired",
+            )
+
+    # Validate challenge join conditions
+    can_join, error_message = validate_challenge_join(challenge, user_id, supabase)
+    if not can_join:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_message,
+        )
+
+    # Check feature access and limits
+    if not check_user_has_feature(user_id, "challenge_join", user_plan, supabase):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Joining challenges is not available on your current plan.",
+        )
+
+    challenge_limit = get_user_challenge_limit(user_plan, supabase)
+    current_count = get_user_challenge_participation_count(user_id, supabase)
+
+    if challenge_limit is not None and current_count >= challenge_limit:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"You have reached your challenge limit ({challenge_limit}). "
+            f"Complete or leave a challenge first.",
+        )
+
+    # Join the challenge
+    try:
+        participant = await challenge_service.join_challenge(
+            challenge_id=challenge["id"],
+            user_id=user_id,
+            goal_id=None,
+        )
+
+        # Mark invite as accepted and set the user who accepted
+        supabase.table("challenge_invites").update(
+            {
+                "status": "accepted",
+                "accepted_at": datetime.now(timezone.utc).isoformat(),
+                "invited_user_id": user_id,  # Set the user who accepted (for link invites)
+            }
+        ).eq("id", invite_data["id"]).execute()
+
+        logger.info(
+            f"User joined challenge via invite",
+            {
+                "challenge_id": challenge["id"],
+                "user_id": user_id,
+                "invite_code": invite_code,
+            },
+        )
+
+        return {
+            "message": "Successfully joined the challenge!",
+            "challenge": {
+                "id": challenge["id"],
+                "title": challenge.get("title"),
+            },
+        }
+
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        logger.error(
+            f"Failed to join challenge via invite",
+            {"error": str(e), "invite_code": invite_code, "user_id": user_id},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to join challenge: {str(e)}",
+        )
+
+
+# =====================================================
+# Challenge Invite Management Endpoints
+# =====================================================
+
+
+class ChallengeInviteWithDetails(BaseModel):
+    id: str
+    challenge_id: str
+    invited_by_user_id: str
+    invited_user_id: Optional[str]
+    status: str
+    created_at: str
+    expires_at: Optional[str]
+    challenge: Optional[Dict[str, Any]] = None
+    inviter: Optional[Dict[str, Any]] = None
+    invitee: Optional[Dict[str, Any]] = None
+
+
+@router.get("/invites/received", response_model=List[ChallengeInviteWithDetails])
+async def get_received_challenge_invites(
+    current_user: dict = Depends(get_current_user),
+):
+    """Get challenge invites received by the current user"""
+    from app.core.database import get_supabase_client
+
+    supabase = get_supabase_client()
+    user_id = current_user["id"]
+
+    try:
+        result = (
+            supabase.table("challenge_invites")
+            .select(
+                """
+                id,
+                challenge_id,
+                invited_by_user_id,
+                invited_user_id,
+                status,
+                created_at,
+                expires_at,
+                challenge:challenges!challenge_invites_challenge_id_fkey(id, title, description, start_date, end_date, is_public, challenge_type),
+                inviter:users!challenge_invites_invited_by_user_id_fkey(id, name, username, profile_picture_url)
+            """
+            )
+            .eq("invited_user_id", user_id)
+            .eq("status", "pending")
+            .order("created_at", desc=True)
+            .execute()
+        )
+
+        invites = []
+        for row in result.data or []:
+            invites.append(
+                {
+                    "id": row["id"],
+                    "challenge_id": row["challenge_id"],
+                    "invited_by_user_id": row["invited_by_user_id"],
+                    "invited_user_id": row["invited_user_id"],
+                    "status": row["status"],
+                    "created_at": row["created_at"],
+                    "expires_at": row.get("expires_at"),
+                    "challenge": row.get("challenge"),
+                    "inviter": row.get("inviter"),
+                }
+            )
+
+        return invites
+
+    except Exception as e:
+        logger.error(
+            f"Failed to get received challenge invites for user {user_id}",
+            {"error": str(e), "user_id": user_id},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get challenge invites",
+        )
+
+
+@router.get("/invites/sent", response_model=List[ChallengeInviteWithDetails])
+async def get_sent_challenge_invites(
+    current_user: dict = Depends(get_current_user),
+):
+    """Get challenge invites sent by the current user"""
+    from app.core.database import get_supabase_client
+
+    supabase = get_supabase_client()
+    user_id = current_user["id"]
+
+    try:
+        result = (
+            supabase.table("challenge_invites")
+            .select(
+                """
+                id,
+                challenge_id,
+                invited_by_user_id,
+                invited_user_id,
+                status,
+                created_at,
+                expires_at,
+                challenge:challenges!challenge_invites_challenge_id_fkey(id, title, description, start_date, end_date, is_public, challenge_type),
+                invitee:users!challenge_invites_invited_user_id_fkey(id, name, username, profile_picture_url)
+            """
+            )
+            .eq("invited_by_user_id", user_id)
+            .eq("status", "pending")
+            .order("created_at", desc=True)
+            .execute()
+        )
+
+        invites = []
+        for row in result.data or []:
+            invites.append(
+                {
+                    "id": row["id"],
+                    "challenge_id": row["challenge_id"],
+                    "invited_by_user_id": row["invited_by_user_id"],
+                    "invited_user_id": row["invited_user_id"],
+                    "status": row["status"],
+                    "created_at": row["created_at"],
+                    "expires_at": row.get("expires_at"),
+                    "challenge": row.get("challenge"),
+                    "invitee": row.get("invitee"),
+                }
+            )
+
+        return invites
+
+    except Exception as e:
+        logger.error(
+            f"Failed to get sent challenge invites for user {user_id}",
+            {"error": str(e), "user_id": user_id},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get sent challenge invites",
+        )
+
+
+@router.post("/invites/{invite_id}/accept")
+async def accept_challenge_invite(
+    invite_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Accept a challenge invite"""
+    from app.core.database import get_supabase_client
+    from datetime import datetime, timezone
+
+    supabase = get_supabase_client()
+    user_id = current_user["id"]
+
+    try:
+        # Get the invite
+        invite = (
+            supabase.table("challenge_invites")
+            .select("*, challenges(*)")
+            .eq("id", invite_id)
+            .eq("invited_user_id", user_id)
+            .eq("status", "pending")
+            .maybe_single()
+            .execute()
+        )
+
+        if not invite.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Invite not found or already processed",
+            )
+
+        challenge = invite.data.get("challenges")
+        if not challenge:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Challenge not found",
+            )
+
+        # Join the challenge
+        participant = await challenge_service.join_challenge(
+            challenge_id=challenge["id"],
+            user_id=user_id,
+            goal_id=None,
+        )
+
+        # Mark invite as accepted
+        supabase.table("challenge_invites").update(
+            {
+                "status": "accepted",
+                "accepted_at": datetime.now(timezone.utc).isoformat(),
+            }
+        ).eq("id", invite_id).execute()
+
+        logger.info(
+            f"Challenge invite accepted",
+            {
+                "invite_id": invite_id,
+                "challenge_id": challenge["id"],
+                "user_id": user_id,
+            },
+        )
+
+        return {
+            "message": "Successfully joined the challenge!",
+            "challenge": {
+                "id": challenge["id"],
+                "title": challenge.get("title"),
+            },
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to accept challenge invite",
+            {"error": str(e), "invite_id": invite_id, "user_id": user_id},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to accept invite: {str(e)}",
+        )
+
+
+@router.post("/invites/{invite_id}/decline")
+async def decline_challenge_invite(
+    invite_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Decline a challenge invite"""
+    from app.core.database import get_supabase_client
+
+    supabase = get_supabase_client()
+    user_id = current_user["id"]
+
+    try:
+        # Get the invite
+        invite = (
+            supabase.table("challenge_invites")
+            .select("id")
+            .eq("id", invite_id)
+            .eq("invited_user_id", user_id)
+            .eq("status", "pending")
+            .maybe_single()
+            .execute()
+        )
+
+        if not invite.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Invite not found or already processed",
+            )
+
+        # Update to declined
+        supabase.table("challenge_invites").update({"status": "declined"}).eq(
+            "id", invite_id
+        ).execute()
+
+        logger.info(
+            f"Challenge invite declined",
+            {"invite_id": invite_id, "user_id": user_id},
+        )
+
+        return {"message": "Invite declined"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to decline challenge invite",
+            {"error": str(e), "invite_id": invite_id, "user_id": user_id},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to decline invite",
+        )
+
+
+@router.delete("/invites/{invite_id}")
+async def cancel_challenge_invite(
+    invite_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Cancel a challenge invite that the current user sent"""
+    from app.core.database import get_supabase_client
+
+    supabase = get_supabase_client()
+    user_id = current_user["id"]
+
+    try:
+        # Get the invite (must be sender)
+        invite = (
+            supabase.table("challenge_invites")
+            .select("id")
+            .eq("id", invite_id)
+            .eq("invited_by_user_id", user_id)
+            .eq("status", "pending")
+            .maybe_single()
+            .execute()
+        )
+
+        if not invite.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Invite not found or you are not the sender",
+            )
+
+        # Delete the invite
+        supabase.table("challenge_invites").delete().eq("id", invite_id).execute()
+
+        logger.info(
+            f"Challenge invite cancelled",
+            {"invite_id": invite_id, "user_id": user_id},
+        )
+
+        return {"message": "Invite cancelled"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to cancel challenge invite",
+            {"error": str(e), "invite_id": invite_id, "user_id": user_id},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to cancel invite",
+        )

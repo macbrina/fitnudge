@@ -60,6 +60,7 @@ def check_achievements_task(
                     )
 
                     try:
+                        achievement_id = achievement.get("id")
                         notification_result = loop.run_until_complete(
                             send_push_to_user(
                                 user_id=user_id,
@@ -67,10 +68,12 @@ def check_achievements_task(
                                 body=f"{achievement_title}: {achievement_description}",
                                 data={
                                     "type": "achievement",
-                                    "achievementId": achievement.get("id"),
+                                    "achievementId": achievement_id,
                                     "deepLink": "/achievements",
                                 },
                                 notification_type="achievement",
+                                entity_type="achievement",
+                                entity_id=achievement_id,
                             )
                         )
 

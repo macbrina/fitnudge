@@ -30,6 +30,25 @@ export default function UserLayout() {
             headerShown: false,
           }}
         />
+        <Stack.Screen
+          name="challenges"
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="social"
+          options={{
+            headerShown: false,
+          }}
+        />
+
+        <Stack.Screen
+          name="workout"
+          options={{
+            headerShown: false,
+          }}
+        />
       </Stack.Protected>
     </Stack>
   );

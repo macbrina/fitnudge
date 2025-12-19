@@ -17,7 +17,7 @@ import { STORAGE_KEYS, storageUtil } from "@/utils/storageUtil";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RefreshControl, ScrollView, View } from "react-native";
-import { ActiveGoalsList } from "./components/ActiveGoalsList";
+import { ActiveItemsSummary } from "./components/ActiveItemsSummary";
 import { CheckInModal } from "./components/CheckInModal";
 import { HeroSection } from "./components/HeroSection";
 import { MotivationCard } from "./components/MotivationCard";
@@ -25,6 +25,7 @@ import { QuickActionsSection } from "./components/QuickActionsSection";
 import { QuickStatsGrid } from "./components/QuickStatsGrid";
 import { AchievementsSection } from "./components/AchievementsSection";
 import { TodaysActionsCard } from "./components/TodaysActionsCard";
+import { PartnersCard } from "./components/PartnersCard";
 import { useHomeScreenData } from "./hooks/useHomeScreenData";
 
 export default function HomeScreen() {
@@ -77,6 +78,9 @@ export default function HomeScreen() {
   const { subscriptionStatus, isReady: isRevenueCatReady } = useRevenueCat();
 
   const {
+    activeItems,
+    todayPendingCheckIns,
+    dashboardStats,
     activeGoals,
     todayCheckIns,
     userStats,
@@ -402,15 +406,22 @@ export default function HomeScreen() {
 
         <View style={styles.content}>
           <TodaysActionsCard
+            pendingCheckIns={todayPendingCheckIns}
             todayCheckIns={todayCheckIns}
             isLoading={isLoading}
           />
 
-          <QuickStatsGrid userStats={userStats} isLoading={isLoading} />
+          <QuickStatsGrid
+            dashboardStats={dashboardStats}
+            userStats={userStats}
+            isLoading={isLoading}
+          />
 
           <MotivationCard currentStreak={currentStreak} />
 
-          <ActiveGoalsList goals={activeGoals} isLoading={isLoading} />
+          <ActiveItemsSummary items={activeItems} isLoading={isLoading} />
+
+          <PartnersCard isLoading={isLoading} />
 
           <AchievementsSection />
 

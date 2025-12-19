@@ -197,6 +197,15 @@ class NotificationService {
       return;
     }
 
+    // Handle url field from notification data (used by push notifications)
+    if (data.url) {
+      const urlPath = typeof data.url === "string" ? data.url : "";
+      if (urlPath) {
+        routeDeepLink(`fitnudge://app${urlPath.startsWith("/") ? urlPath : `/${urlPath}`}`);
+        return;
+      }
+    }
+
     // Fallback: route based on notification type
     switch (data.type) {
       case "reminder":
@@ -209,6 +218,12 @@ class NotificationService {
         break;
       case "social":
         routeDeepLink("fitnudge://app/notifications");
+        break;
+      case "plan_ready":
+        // Navigate to goal detail screen
+        if (data.goalId) {
+          routeDeepLink(`fitnudge://app/goal?id=${data.goalId}`);
+        }
         break;
       default:
         // No specific route, just open the app

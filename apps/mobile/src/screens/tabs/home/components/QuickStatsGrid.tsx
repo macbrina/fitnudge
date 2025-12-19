@@ -8,8 +8,13 @@ import { StatCard } from "./StatCard";
 import { useTranslation } from "@/lib/i18n";
 import { SkeletonBox } from "@/components/ui/SkeletonBox";
 
+import { DashboardStats } from "@/services/api/home";
+
 interface QuickStatsGridProps {
-  userStats: {
+  /** New combined dashboard stats */
+  dashboardStats?: DashboardStats | null;
+  /** Legacy user stats format */
+  userStats?: {
     active_goals: number;
     current_streak: number;
     total_check_ins: number;
@@ -18,11 +23,25 @@ interface QuickStatsGridProps {
   isLoading: boolean;
 }
 
-export function QuickStatsGrid({ userStats, isLoading }: QuickStatsGridProps) {
+export function QuickStatsGrid({
+  dashboardStats,
+  userStats,
+  isLoading,
+}: QuickStatsGridProps) {
   const styles = useStyles(makeQuickStatsGridStyles);
   const { t } = useTranslation();
 
-  if (isLoading || !userStats) {
+  // Use dashboardStats if available, fallback to userStats
+  const stats = dashboardStats
+    ? {
+        active_goals: dashboardStats.active_count,
+        current_streak: dashboardStats.current_streak,
+        total_check_ins: dashboardStats.total_check_ins,
+        completion_rate: dashboardStats.completion_rate,
+      }
+    : userStats;
+
+  if (isLoading || !stats) {
     return (
       <View style={styles.container}>
         {[1, 2, 3, 4].map((i) => (
@@ -50,22 +69,22 @@ export function QuickStatsGrid({ userStats, isLoading }: QuickStatsGridProps) {
     <View style={styles.container}>
       <StatCard
         label={t("home.active_goals")}
-        value={userStats.active_goals}
+        value={stats.active_goals}
         // icon="🎯"
       />
       <StatCard
         label={t("home.current_streak")}
-        value={userStats.current_streak}
+        value={stats.current_streak}
         // icon="🔥"
       />
       <StatCard
         label={t("home.total_checkins")}
-        value={userStats.total_check_ins}
+        value={stats.total_check_ins}
         // icon="✓"
       />
       <StatCard
         label={t("home.completion_rate")}
-        value={`${userStats.completion_rate}%`}
+        value={`${Math.round(stats.completion_rate)}%`}
         // icon="📊"
       />
     </View>

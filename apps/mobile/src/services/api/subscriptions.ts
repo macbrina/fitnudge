@@ -51,6 +51,24 @@ export interface FeaturesResponse {
   features_list: PlanFeature[]; // Full feature objects with metadata
 }
 
+// Sync subscription request/response
+export interface SyncSubscriptionRequest {
+  tier: "free" | "starter" | "pro" | "elite";
+  is_active: boolean;
+  expires_at?: string | null;
+  will_renew: boolean;
+  platform?: "ios" | "android" | "stripe" | null;
+  product_id?: string | null;
+}
+
+export interface SyncSubscriptionResponse {
+  synced: boolean;
+  message: string;
+  previous_plan?: string;
+  new_plan?: string;
+  plan?: string;
+}
+
 // Subscriptions Service
 export class SubscriptionsService extends BaseApiService {
   /**
@@ -87,6 +105,19 @@ export class SubscriptionsService extends BaseApiService {
     return this.post<SubscriptionResponse>(
       `${ROUTES.SUBSCRIPTIONS.ME}/restore`,
       {}
+    );
+  }
+
+  /**
+   * Sync subscription from RevenueCat to backend database
+   * Called when app detects potential mismatch between RevenueCat and backend
+   */
+  async syncSubscription(
+    request: SyncSubscriptionRequest
+  ): Promise<ApiResponse<SyncSubscriptionResponse>> {
+    return this.post<SyncSubscriptionResponse>(
+      ROUTES.SUBSCRIPTIONS.SYNC,
+      request
     );
   }
 }

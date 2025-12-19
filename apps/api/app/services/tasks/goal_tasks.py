@@ -16,21 +16,26 @@ from app.services.tasks.base import celery_app, get_supabase_client, logger
 )
 def auto_create_daily_checkins_task(self) -> Dict[str, Any]:
     """
-    Celery task to automatically create check-ins for active goals.
+    Celery task to automatically create check-ins for active goals AND challenges.
     TIMEZONE-AWARE: Runs hourly to ensure today's check-in exists.
-    - Daily goals: creates check-in for today if missing
-    - Weekly goals: creates check-in for today if today is in days_of_week
+    - Daily goals/challenges: creates check-in for today if missing
+    - Weekly goals/challenges: creates check-in for today if today is in days_of_week
     - Prevents duplicates: checks for existing check-in before creating
     """
-    from datetime import datetime
+    from datetime import datetime, date
     import pytz
 
     try:
         supabase = get_supabase_client()
-        created_count = 0
-        skipped_count = 0
+        goal_created_count = 0
+        goal_skipped_count = 0
+        challenge_created_count = 0
+        challenge_skipped_count = 0
         processed_users = set()
 
+        # =========================================
+        # PART 1: Create Goal Check-ins
+        # =========================================
         # Get all active goals with user timezone
         # Join with users table to get timezone
         active_goals_result = (
@@ -42,11 +47,7 @@ def auto_create_daily_checkins_task(self) -> Dict[str, Any]:
             .execute()
         )
 
-        if not active_goals_result.data:
-            print("❌ [CHECK-IN TASK] No active goals found for check-in creation")
-            return {"success": True, "processed": 0, "created": 0, "skipped": 0}
-
-        for goal in active_goals_result.data:
+        for goal in active_goals_result.data or []:
             goal_id = goal["id"]
             user_id = goal["user_id"]
             goal_title = goal.get("title", "Unknown")
@@ -61,27 +62,12 @@ def auto_create_daily_checkins_task(self) -> Dict[str, Any]:
                 user_tz = pytz.timezone(user_timezone_str)
                 user_now = datetime.now(user_tz)
                 user_today = user_now.date()
-                user_hour = user_now.hour
-                user_minute = user_now.minute
 
                 # Mark this user as processed (for logging)
                 processed_users.add(user_id)
 
                 # Check if today is a valid day for this goal
-                should_create = False
-
-                if frequency == "daily":
-                    should_create = True
-                elif frequency == "weekly":
-                    # Convert user's today to day_of_week (0=Sunday, 1=Monday, ..., 6=Saturday)
-                    user_weekday = user_today.weekday()  # Python: 0=Mon, 6=Sun
-                    user_day_of_week = (user_weekday + 1) % 7  # Convert to 0=Sun
-
-                    if (
-                        isinstance(days_of_week, list)
-                        and user_day_of_week in days_of_week
-                    ):
-                        should_create = True
+                should_create = _is_scheduled_day(frequency, days_of_week, user_today)
 
                 if not should_create:
                     continue
@@ -97,7 +83,7 @@ def auto_create_daily_checkins_task(self) -> Dict[str, Any]:
                 )
 
                 if existing_checkin.data:
-                    skipped_count += 1
+                    goal_skipped_count += 1
                     continue
 
                 # Create new check-in for user's today
@@ -112,13 +98,11 @@ def auto_create_daily_checkins_task(self) -> Dict[str, Any]:
                 result = supabase.table("check_ins").insert(checkin_data).execute()
 
                 if result.data:
-                    created_count += 1
+                    goal_created_count += 1
                     print(
-                        f"✅ [CHECK-IN TASK] Created check-in for goal '{goal_title}': "
+                        f"✅ [GOAL CHECK-IN] Created for '{goal_title}': "
                         f"date={user_today.isoformat()}, timezone={user_timezone_str}"
                     )
-                    # NOTE: No notification here - check-in prompts are sent separately
-                    # by send_checkin_prompts task (30 min after last reminder time)
 
             except pytz.exceptions.UnknownTimeZoneError:
                 logger.error(
@@ -133,20 +117,149 @@ def auto_create_daily_checkins_task(self) -> Dict[str, Any]:
                 )
                 continue
 
+        # =========================================
+        # PART 2: Create Challenge Check-ins
+        # =========================================
+        # Get all active challenge participants with challenge and user data
+        try:
+            participants_result = (
+                supabase.table("challenge_participants")
+                .select(
+                    "user_id, challenge_id, "
+                    "challenges!inner(id, title, is_active, start_date, end_date, goal_template), "
+                    "users!inner(timezone)"
+                )
+                .execute()
+            )
+
+            for participant in participants_result.data or []:
+                user_id = participant["user_id"]
+                challenge = participant.get("challenges", {})
+                challenge_id = challenge.get("id")
+                challenge_title = challenge.get("title", "Unknown")
+
+                # Skip if challenge is not active
+                if not challenge.get("is_active"):
+                    continue
+
+                # Get user's timezone
+                user_timezone_str = (
+                    participant.get("users", {}).get("timezone") or "UTC"
+                )
+
+                try:
+                    user_tz = pytz.timezone(user_timezone_str)
+                    user_now = datetime.now(user_tz)
+                    user_today = user_now.date()
+
+                    processed_users.add(user_id)
+
+                    # Check if challenge is within date range
+                    start_date_str = challenge.get("start_date")
+                    end_date_str = challenge.get("end_date")
+
+                    if start_date_str:
+                        start_date = date.fromisoformat(start_date_str)
+                        if user_today < start_date:
+                            continue  # Challenge hasn't started yet
+
+                    if end_date_str:
+                        end_date = date.fromisoformat(end_date_str)
+                        if user_today > end_date:
+                            continue  # Challenge has ended
+
+                    # Check if today is a scheduled day based on goal_template
+                    goal_template = challenge.get("goal_template") or {}
+                    frequency = goal_template.get("frequency", "daily")
+                    days_of_week = goal_template.get("days_of_week") or []
+
+                    should_create = _is_scheduled_day(
+                        frequency, days_of_week, user_today
+                    )
+
+                    if not should_create:
+                        continue
+
+                    # Check if check-in already exists for this date
+                    existing_checkin = (
+                        supabase.table("challenge_check_ins")
+                        .select("id")
+                        .eq("challenge_id", challenge_id)
+                        .eq("user_id", user_id)
+                        .eq("check_in_date", user_today.isoformat())
+                        .execute()
+                    )
+
+                    if existing_checkin.data:
+                        challenge_skipped_count += 1
+                        continue
+
+                    # Create new challenge check-in
+                    checkin_data = {
+                        "challenge_id": challenge_id,
+                        "user_id": user_id,
+                        "check_in_date": user_today.isoformat(),
+                        "completed": False,
+                        "is_checked_in": False,
+                    }
+
+                    result = (
+                        supabase.table("challenge_check_ins")
+                        .insert(checkin_data)
+                        .execute()
+                    )
+
+                    if result.data:
+                        challenge_created_count += 1
+                        print(
+                            f"✅ [CHALLENGE CHECK-IN] Created for '{challenge_title}': "
+                            f"user={user_id}, date={user_today.isoformat()}"
+                        )
+
+                except pytz.exceptions.UnknownTimeZoneError:
+                    logger.error(
+                        f"Invalid timezone for user {user_id}: {user_timezone_str}",
+                        {"user_id": user_id, "timezone": user_timezone_str},
+                    )
+                    continue
+                except Exception as e:
+                    logger.error(
+                        f"Failed to create challenge check-in for user {user_id}",
+                        {
+                            "challenge_id": challenge_id,
+                            "user_id": user_id,
+                            "error": str(e),
+                        },
+                    )
+                    continue
+
+        except Exception as e:
+            logger.error(
+                f"Failed to fetch challenge participants: {e}",
+                {"error": str(e)},
+            )
+
+        # =========================================
+        # Summary
+        # =========================================
+        total_created = goal_created_count + challenge_created_count
+        total_skipped = goal_skipped_count + challenge_skipped_count
+
         print(
-            f"Auto-created {created_count} check-ins, skipped {skipped_count} existing for {len(processed_users)} users",
-            {
-                "created": created_count,
-                "skipped": skipped_count,
-                "users_processed": len(processed_users),
-            },
+            f"Auto-created {total_created} check-ins "
+            f"(goals: {goal_created_count}, challenges: {challenge_created_count}), "
+            f"skipped {total_skipped} existing for {len(processed_users)} users"
         )
 
         return {
             "success": True,
             "processed": len(processed_users),
-            "created": created_count,
-            "skipped": skipped_count,
+            "goal_created": goal_created_count,
+            "goal_skipped": goal_skipped_count,
+            "challenge_created": challenge_created_count,
+            "challenge_skipped": challenge_skipped_count,
+            "total_created": total_created,
+            "total_skipped": total_skipped,
         }
 
     except Exception as e:
@@ -157,6 +270,30 @@ def auto_create_daily_checkins_task(self) -> Dict[str, Any]:
         if self.request.retries < self.max_retries:
             raise self.retry(exc=e)
         return {"success": False, "error": str(e)}
+
+
+def _is_scheduled_day(frequency: str, days_of_week: list, check_date) -> bool:
+    """
+    Check if a given date is a scheduled check-in day based on frequency and days_of_week.
+
+    Args:
+        frequency: 'daily' or 'weekly'
+        days_of_week: List of day indices (0=Sunday, 1=Monday, ..., 6=Saturday)
+        check_date: The date to check
+
+    Returns:
+        True if check_date is a scheduled day
+    """
+    if frequency == "daily":
+        return True
+    elif frequency == "weekly" or frequency == "custom":
+        if not days_of_week:
+            return True  # If no days specified, treat as daily
+        # Convert Python weekday (0=Mon, 6=Sun) to our format (0=Sun, 1=Mon, ..., 6=Sat)
+        python_weekday = check_date.weekday()
+        our_weekday = (python_weekday + 1) % 7
+        return our_weekday in days_of_week
+    return True  # Default to daily if unknown frequency
 
 
 @celery_app.task(
@@ -175,11 +312,10 @@ def check_goal_completions_task(self) -> Dict[str, Any]:
     Should be scheduled to run daily (e.g., at 00:05 UTC).
     """
     from datetime import datetime, date, timedelta
-    from app.services.expo_push_service import ExpoPushService
+    from app.services.expo_push_service import send_push_message_sync
 
     try:
         supabase = get_supabase_client()
-        push_service = ExpoPushService()
         today = date.today()
 
         completed_count = 0
@@ -292,8 +428,8 @@ def check_goal_completions_task(self) -> Dict[str, Any]:
                         celebration_emoji = "✅"
                         message = f"Your '{goal['title']}' challenge ended. You completed {completed_days}/{total_scheduled_days} check-ins."
 
-                    push_service.send_notification(
-                        push_token=user_result.data["expo_push_token"],
+                    send_push_message_sync(
+                        token=user_result.data["expo_push_token"],
                         title=f"{celebration_emoji} Challenge Complete!",
                         body=message,
                         data={
@@ -358,8 +494,8 @@ def check_goal_completions_task(self) -> Dict[str, Any]:
                     )
 
                     if user_result.data and user_result.data.get("expo_push_token"):
-                        push_service.send_notification(
-                            push_token=user_result.data["expo_push_token"],
+                        send_push_message_sync(
+                            token=user_result.data["expo_push_token"],
                             title="🎉 Target Reached!",
                             body=f"Amazing! You hit {completed_checkins}/{target} check-ins for '{goal['title']}'!",
                             data={

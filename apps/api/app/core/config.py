@@ -38,9 +38,9 @@ class Settings(BaseSettings):
     SECRET_KEY: str = os.getenv("SUPABASE_JWT_SECRET", os.getenv("SECRET_KEY", ""))
     ALGORITHM: str = os.getenv("ALGORITHM", "HS256")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(
-        os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "15")
+        os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60")
     )
-    REFRESH_TOKEN_EXPIRE_DAYS: int = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
+    REFRESH_TOKEN_EXPIRE_DAYS: int = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "30"))
 
     # CORS
     ALLOWED_ORIGINS: str = os.getenv("ALLOWED_ORIGINS", "*")
@@ -167,6 +167,9 @@ class Settings(BaseSettings):
                 seen.add(client_id)
                 unique_ids.append(client_id)
         return unique_ids
+
+    # RevenueCat (for promotional entitlements / referral bonuses)
+    REVENUECAT_SECRET_KEY: str = os.getenv("REVENUECAT_SECRET_KEY", "")
 
     # Rate Limiting
     RATE_LIMIT_PER_MINUTE: int = int(os.getenv("RATE_LIMIT_PER_MINUTE", "100"))

@@ -16,9 +16,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Button from "@/components/ui/Button";
 import TextInput from "@/components/ui/TextInput";
 import SocialSignInContainer from "@/components/ui/SocialSignInContainer";
-import BackButton from "@/components/ui/BackButton";
 import LinkText from "@/components/ui/LinkText";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { tokens, lineHeight } from "@/themes/tokens";
 import { useTheme } from "@/themes";
 import { MOBILE_ROUTES } from "@/lib/routes";
@@ -40,13 +39,27 @@ import {
 } from "@/lib/auth/apple";
 
 export default function SignupScreen() {
+  // Get query params from deep links
+  const params = useLocalSearchParams<{
+    referral?: string;
+    redirectTo?: string;
+  }>();
+
+  // Extract referral param (handle array case from expo-router)
+  const referral = Array.isArray(params.referral)
+    ? params.referral[0]
+    : params.referral;
+
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [referralCode, setReferralCode] = useState("");
+  const [showReferralInput, setShowReferralInput] = useState(false);
   const [errors, setErrors] = useState<{
     username?: string;
     email?: string;
     password?: string;
+    referralCode?: string;
   }>({});
 
   const { login } = useAuthStore();
@@ -65,6 +78,43 @@ export default function SignupScreen() {
 
   const showGoogle = hasGoogleSignInConfiguration();
   const showApple = Platform.OS === "ios" && appleAvailable;
+
+  // Fetch subscription data after login (non-blocking)
+  const fetchSubscriptionData = async () => {
+    try {
+      const [{ useSubscriptionStore }, { usePricingStore }] = await Promise.all(
+        [import("@/stores/subscriptionStore"), import("@/stores/pricingStore")]
+      );
+
+      // Fetch subscription, features, and pricing plans in parallel
+      await Promise.all([
+        useSubscriptionStore.getState().fetchSubscription(),
+        useSubscriptionStore.getState().fetchFeatures(),
+        usePricingStore.getState().fetchPlans(),
+      ]);
+    } catch (error) {
+      console.warn("[Signup] Failed to fetch subscription data:", error);
+    }
+  };
+
+  // Check if user has fitness profile (for personalization skip)
+  const checkFitnessProfile = async (): Promise<boolean> => {
+    try {
+      const { useOnboardingStore } = await import("@/stores/onboardingStore");
+      return await useOnboardingStore.getState().checkHasFitnessProfile();
+    } catch (error) {
+      console.warn("[Signup] Failed to check fitness profile:", error);
+      return false;
+    }
+  };
+
+  // Sync referral code from URL params
+  useEffect(() => {
+    if (referral) {
+      setReferralCode(referral);
+      setShowReferralInput(true);
+    }
+  }, [referral]);
 
   useEffect(() => {
     let isMounted = true;
@@ -91,8 +141,13 @@ export default function SignupScreen() {
   const handleSocialSuccess = async (payload: LoginResponse) => {
     await login(payload.user, payload.access_token, payload.refresh_token);
 
+    // Fetch subscription data immediately after login (non-blocking for navigation)
+    fetchSubscriptionData();
+
     try {
-      const destination = await getRedirection();
+      // Check if user has fitness profile (skip personalization if they do - e.g., existing user via OAuth)
+      const hasFitnessProfile = await checkFitnessProfile();
+      const destination = await getRedirection({ hasFitnessProfile });
       router.replace(destination);
     } catch (redirectError) {
       console.warn("[Signup] Failed to compute redirection", redirectError);
@@ -156,6 +211,7 @@ export default function SignupScreen() {
         username: username.trim(),
         email: email.trim().toLowerCase(),
         password,
+        referral_code: referralCode.trim() || undefined,
       },
       {
         onSuccess: async (response) => {
@@ -167,9 +223,11 @@ export default function SignupScreen() {
               response.data.refresh_token
             );
 
+            // Fetch subscription data immediately after login (non-blocking for navigation)
+            fetchSubscriptionData();
+
             // Check if email verification is required
             const user = response.data.user;
-            console.log("USER", user);
             if (
               user &&
               !user.email_verified &&
@@ -179,7 +237,9 @@ export default function SignupScreen() {
               router.replace(MOBILE_ROUTES.AUTH.VERIFY_EMAIL);
             } else {
               try {
-                const destination = await getRedirection();
+                // Check if user has fitness profile (skip personalization if they do)
+                const hasFitnessProfile = await checkFitnessProfile();
+                const destination = await getRedirection({ hasFitnessProfile });
                 router.replace(destination);
               } catch (redirectError) {
                 console.warn(
@@ -248,7 +308,11 @@ export default function SignupScreen() {
       setIsGoogleLoading(true);
       const { idToken } = await performNativeGoogleSignIn();
 
-      const response = await authService.loginWithGoogle(idToken);
+      // Pass referral code if available
+      const response = await authService.loginWithGoogle(
+        idToken,
+        referralCode.trim() || undefined
+      );
 
       if (response.data) {
         await handleSocialSuccess(response.data);
@@ -292,17 +356,21 @@ export default function SignupScreen() {
         return;
       }
 
-      const response = await authService.loginWithApple({
-        identityToken: credential.identityToken,
-        authorizationCode: credential.authorizationCode,
-        email: credential.email ?? undefined,
-        fullName: credential.fullName
-          ? {
-              givenName: credential.fullName.givenName ?? undefined,
-              familyName: credential.fullName.familyName ?? undefined,
-            }
-          : undefined,
-      });
+      // Pass referral code if available
+      const response = await authService.loginWithApple(
+        {
+          identityToken: credential.identityToken,
+          authorizationCode: credential.authorizationCode,
+          email: credential.email ?? undefined,
+          fullName: credential.fullName
+            ? {
+                givenName: credential.fullName.givenName ?? undefined,
+                familyName: credential.fullName.familyName ?? undefined,
+              }
+            : undefined,
+        },
+        referralCode.trim() || undefined
+      );
 
       if (response.data) {
         await handleSocialSuccess(response.data);
@@ -337,9 +405,6 @@ export default function SignupScreen() {
           }}
           showsVerticalScrollIndicator={false}
         >
-          {/* Header with back button */}
-          {/* <BackButton onPress={() => router.back()} /> */}
-
           {/* Logo */}
           <View style={styles.logoContainer}>
             <Image
@@ -415,6 +480,32 @@ export default function SignupScreen() {
               autoCapitalize="none"
               error={errors.password}
             />
+
+            {/* Referral Code Input - Collapsible */}
+            {showReferralInput ? (
+              <TextInput
+                label={t("auth.signup.referral_code_label")}
+                placeholder={t("auth.signup.referral_code_placeholder")}
+                value={referralCode}
+                onChangeText={(text) => {
+                  setReferralCode(text.toUpperCase());
+                  if (errors.referralCode) {
+                    setErrors((prev) => ({ ...prev, referralCode: undefined }));
+                  }
+                }}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                error={errors.referralCode}
+              />
+            ) : (
+              <Button
+                title={t("auth.signup.have_referral_code")}
+                onPress={() => setShowReferralInput(true)}
+                variant="text"
+                size="sm"
+                style={styles.referralToggle}
+              />
+            )}
 
             {/* Sign Up Button */}
             <Button
@@ -509,10 +600,12 @@ const makeSignupScreenStyles = (tokens: any, colors: any, brand: any) => {
       paddingHorizontal: toRN(tokens.spacing[6]),
       flex: 1,
     },
-
+    referralToggle: {
+      alignSelf: "flex-start" as const,
+      marginBottom: toRN(tokens.spacing[2]),
+    },
     loginLinkContainer: {
       alignItems: "center" as const,
-      // marginBottom: toRN(tokens.spacing[2]),
       marginTop: toRN(tokens.spacing[4]),
     },
     loginLinkText: {

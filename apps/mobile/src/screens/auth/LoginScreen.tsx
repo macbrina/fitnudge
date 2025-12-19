@@ -61,9 +61,39 @@ export default function LoginScreen() {
   const [appleAvailable, setAppleAvailable] = useState(false);
   const [alertHandled, setAlertHandled] = useState(false);
   const [initialAlertShown, setInitialAlertShown] = useState(false);
+  const [manualLoginAttempt, setManualLoginAttempt] = useState(false);
 
   const showGoogle = hasGoogleSignInConfiguration();
   const showApple = Platform.OS === "ios" && appleAvailable;
+
+  // Fetch subscription data after login (non-blocking)
+  const fetchSubscriptionData = async () => {
+    try {
+      const [{ useSubscriptionStore }, { usePricingStore }] = await Promise.all(
+        [import("@/stores/subscriptionStore"), import("@/stores/pricingStore")]
+      );
+
+      // Fetch subscription, features, and pricing plans in parallel
+      await Promise.all([
+        useSubscriptionStore.getState().fetchSubscription(),
+        useSubscriptionStore.getState().fetchFeatures(),
+        usePricingStore.getState().fetchPlans(),
+      ]);
+    } catch (error) {
+      console.warn("[Login] Failed to fetch subscription data:", error);
+    }
+  };
+
+  // Check if user has fitness profile (for personalization skip)
+  const checkFitnessProfile = async (): Promise<boolean> => {
+    try {
+      const { useOnboardingStore } = await import("@/stores/onboardingStore");
+      return await useOnboardingStore.getState().checkHasFitnessProfile();
+    } catch (error) {
+      console.warn("[Login] Failed to check fitness profile:", error);
+      return false;
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -98,8 +128,13 @@ export default function LoginScreen() {
       user_id: payload.user.id,
     });
 
+    // Fetch subscription data immediately after login (non-blocking for navigation)
+    fetchSubscriptionData();
+
     try {
-      const destination = await getRedirection();
+      // Check if user has fitness profile (skip personalization if they do)
+      const hasFitnessProfile = await checkFitnessProfile();
+      const destination = await getRedirection({ hasFitnessProfile });
       router.replace(destination);
     } catch (redirectError) {
       console.warn("[Login] Failed to compute redirection", redirectError);
@@ -190,6 +225,8 @@ export default function LoginScreen() {
       return;
     }
 
+    setManualLoginAttempt(true);
+
     // Call the API
     loginMutation.mutate(
       {
@@ -229,8 +266,14 @@ export default function LoginScreen() {
               user_id: response.data.user.id,
             });
 
+            // Fetch subscription data immediately after login (non-blocking for navigation)
+            fetchSubscriptionData();
+
             try {
-              const destination = await getRedirection();
+              // Check if user has fitness profile (skip personalization if they do)
+              const hasFitnessProfile = await checkFitnessProfile();
+              const destination = await getRedirection({ hasFitnessProfile });
+              console.log("destination", destination);
               router.replace(destination);
             } catch (redirectError) {
               router.replace(MOBILE_ROUTES.MAIN.HOME);
@@ -239,6 +282,7 @@ export default function LoginScreen() {
         },
         onError: async (error: unknown) => {
           console.error("Login error:", error);
+          setManualLoginAttempt(false);
 
           const {
             status: errorStatus,
@@ -518,8 +562,8 @@ export default function LoginScreen() {
               }
               onPress={handleLogin}
               size="lg"
-              disabled={loginMutation.isPending}
-              loading={loginMutation.isPending}
+              disabled={loginMutation.isPending || manualLoginAttempt}
+              loading={loginMutation.isPending || manualLoginAttempt}
               // style={styles.signInButton}
             />
 

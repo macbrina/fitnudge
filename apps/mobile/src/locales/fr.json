@@ -157,5 +157,43 @@
     "validation_error": "Veuillez remplir tous les champs",
     "authentication_error": "Échec de la connexion. Veuillez réessayer.",
     "registration_error": "Échec de l'inscription. Veuillez réessayer."
+  },
+  "social": {
+    "find_partner": "Trouver un Partenaire",
+    "search_for_users": "Rechercher des Utilisateurs",
+    "search_description": "Entrez un nom ou un pseudo pour trouver des partenaires de responsabilité.",
+    "search_users_placeholder": "Rechercher par nom ou pseudo...",
+    "no_users_found": "Aucun Utilisateur Trouvé",
+    "no_suggestions": "Aucune Suggestion",
+    "no_suggestions_description": "Suivez des personnes ou invitez des amis pour voir des suggestions ici.",
+    "already_partners": "Déjà Partenaires",
+    "already_partners_message": "Vous êtes déjà partenaires de responsabilité avec cet utilisateur.",
+    "request_pending_title": "Demande en Attente",
+    "request_pending_message": "Vous avez déjà une demande en attente avec cet utilisateur.",
+    "request_sent": "Demande Envoyée",
+    "request_sent_message": "Demande de partenariat envoyée à {{name}} !",
+    "request_failed": "Échec de l'envoi de la demande",
+    "try_different_search": "Essayez un autre terme de recherche.",
+    "unknown_user": "Utilisateur Inconnu",
+    "partner_badge": "Partenaire",
+    "pending_badge": "En attente",
+    "add_button": "Ajouter",
+    "request_button": "Demander",
+    "requested_button": "Demandé",
+    "accept_button": "Accepter",
+    "cancel_request_title": "Annuler la Demande",
+    "cancel_request_message": "Annuler votre demande de partenariat à {{name}}?",
+    "cancel_request_confirm": "Annuler la Demande",
+    "request_cancelled": "Demande Annulée",
+    "request_cancelled_message": "Votre demande de partenariat a été annulée.",
+    "cancel_failed": "Échec de l'annulation",
+    "request_accepted": "Demande Acceptée",
+    "request_accepted_message": "Vous êtes maintenant partenaires avec {{name}}!",
+    "accept_failed": "Échec de l'acceptation",
+    "loading_more": "Chargement en cours...",
+    "tabs": {
+      "search": "Recherche",
+      "suggested": "Suggérés"
+    }
   }
 }

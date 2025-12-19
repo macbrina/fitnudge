@@ -236,7 +236,6 @@ api/
 - `challenge_participants` — user participation in challenges.
 - `goal_shares` — goal sharing permissions for social accountability.
 - `accountability_partners` — accountability partner matching and relationships.
-- `group_goals` — collaborative goals shared by multiple users.
 - `meal_logs` — meal tracking with nutritional data.
 - `daily_nutrition_summaries` — aggregated nutrition data per day.
 - `habit_chains` — visual chain data for streak visualization.

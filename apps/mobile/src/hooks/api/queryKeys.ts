@@ -82,6 +82,19 @@ export const partnersQueryKeys = {
   all: ["partners"] as const,
   list: () => [...partnersQueryKeys.all, "list"] as const,
   pending: () => [...partnersQueryKeys.all, "pending"] as const,
+  sent: () => [...partnersQueryKeys.all, "sent"] as const,
   search: (query: string) =>
     [...partnersQueryKeys.all, "search", query] as const,
+  searchInfinite: (query: string) =>
+    [...partnersQueryKeys.all, "search-infinite", query] as const,
+  suggested: () => [...partnersQueryKeys.all, "suggested"] as const,
+  suggestedInfinite: () =>
+    [...partnersQueryKeys.all, "suggested-infinite"] as const,
+} as const;
+
+// Challenge Invites Query Keys
+export const challengeInvitesQueryKeys = {
+  all: ["challenge-invites"] as const,
+  received: () => [...challengeInvitesQueryKeys.all, "received"] as const,
+  sent: () => [...challengeInvitesQueryKeys.all, "sent"] as const,
 } as const;

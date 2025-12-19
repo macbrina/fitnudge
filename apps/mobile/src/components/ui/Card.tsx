@@ -82,6 +82,8 @@ const Card = forwardRef<View, CardProps>(function Card(
   const baseStyle: ViewStyle = {
     backgroundColor: backgroundColor ?? colors.bg.card,
     borderRadius: toRN(tokens.borderRadius.xl),
+    borderWidth: 1,
+    borderColor: colors.border.subtle,
   };
 
   if (padded) {
@@ -99,7 +101,7 @@ const Card = forwardRef<View, CardProps>(function Card(
   }
 
   if (disabled) {
-    baseStyle.opacity = 0.5;
+    baseStyle.opacity = 1.0;
   }
 
   return (

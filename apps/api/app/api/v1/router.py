@@ -26,6 +26,9 @@ from app.api.v1.endpoints import (
     webhooks,
     nudges,
     partners,
+    home,
+    workout_sessions,
+    exercises,
 )
 
 # Create main API router
@@ -95,4 +98,19 @@ api_router.include_router(
     partners.router,
     prefix="/partners",
     tags=["Accountability Partners"],
+)
+api_router.include_router(
+    home.router,
+    prefix="/home",
+    tags=["Home Dashboard"],
+)
+api_router.include_router(
+    workout_sessions.router,
+    prefix="/workout-sessions",
+    tags=["Workout Sessions"],
+)
+api_router.include_router(
+    exercises.router,
+    prefix="/exercises",
+    tags=["Exercises"],
 )

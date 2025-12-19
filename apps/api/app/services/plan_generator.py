@@ -366,6 +366,7 @@ class PlanGenerator:
         user_profile: Optional[Dict[str, Any]] = None,
         user_plan: Optional[str] = None,
         user_id: Optional[str] = None,
+        use_multi_agent: bool = True,
     ) -> Optional[Dict[str, Any]]:
         """
         Generate an actionable plan from a goal using AI.
@@ -375,9 +376,128 @@ class PlanGenerator:
             user_profile: Optional user profile for personalization
             user_plan: User's subscription plan (free, starter, pro, elite)
             user_id: User ID for feature checking (optional, for sanitization)
+            use_multi_agent: Use multi-agent system for fitness plans (default: True)
 
         Returns:
             Structured plan dictionary matching database schema or None if generation fails
+        """
+        category = goal.get("category", "custom")
+        
+        # Use multi-agent system for fitness category (workout plans)
+        if use_multi_agent and category == "fitness":
+            logger.info(
+                "Using multi-agent system for fitness plan generation",
+                {"goal_id": goal.get("id"), "category": category}
+            )
+            return await self._generate_with_multi_agent(
+                goal, user_profile, user_plan, user_id
+            )
+        
+        # Use single-prompt approach for other plan types
+        return await self._generate_with_single_prompt(
+            goal, user_profile, user_plan, user_id
+        )
+    
+    async def _generate_with_multi_agent(
+        self,
+        goal: Dict[str, Any],
+        user_profile: Optional[Dict[str, Any]],
+        user_plan: Optional[str],
+        user_id: Optional[str],
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Generate a workout plan using the multi-agent system.
+        
+        The orchestrator coordinates multiple specialized agents:
+        - Exercise Selector: Picks appropriate exercises
+        - Timing Calculator: Calculates work/rest durations
+        - Warmup/Cooldown: Generates warm-up and cool-down routines
+        - Progression: Creates 4-week progression schedule
+        """
+        try:
+            from app.services.agents import OrchestratorAgent
+            from app.services.exercise_service import get_exercises_for_ai_prompt
+            
+            # Get available exercises for the orchestrator
+            available_exercises = get_exercises_for_ai_prompt(user_profile, limit=150)
+            
+            # Fetch user's workout feedback to improve plan generation
+            workout_feedback = None
+            if user_id:
+                workout_feedback = self._fetch_workout_feedback(user_id)
+            
+            # Create orchestrator and generate plan
+            orchestrator = OrchestratorAgent()
+            plan_json = await orchestrator.generate_workout_plan(
+                goal=goal,
+                user_profile=user_profile,
+                available_exercises=available_exercises,
+                workout_feedback=workout_feedback,
+            )
+            
+            if not plan_json:
+                logger.warning(
+                    "Multi-agent system returned empty plan, falling back to single prompt"
+                )
+                return await self._generate_with_single_prompt(
+                    goal, user_profile, user_plan, user_id
+                )
+            
+            # Validate plan structure
+            if not self._validate_plan(plan_json):
+                logger.warning(
+                    "Multi-agent plan failed validation, falling back to single prompt"
+                )
+                return await self._generate_with_single_prompt(
+                    goal, user_profile, user_plan, user_id
+                )
+            
+            # Sanitize plan to remove unavailable features
+            if user_plan and user_id:
+                plan_json = self._sanitize_plan_for_user(plan_json, user_plan, user_id)
+            
+            # Enhance exercises with MP4 video demos and instructions
+            plan_json = self._enhance_exercises_with_demos(plan_json)
+            
+            # Also enhance warm-up and cool-down exercises
+            plan_json = self._enhance_warmup_cooldown_with_demos(plan_json)
+            
+            logger.info(
+                "Multi-agent system successfully generated workout plan",
+                {
+                    "goal_id": goal.get("id"),
+                    "exercise_count": len(
+                        plan_json.get("structure", {})
+                        .get("main_workout", {})
+                        .get("exercises", [])
+                    ),
+                    "total_duration": plan_json.get("structure", {}).get(
+                        "total_duration_minutes", 0
+                    ),
+                }
+            )
+            
+            return plan_json
+            
+        except Exception as e:
+            logger.error(
+                f"Multi-agent plan generation failed: {str(e)}, falling back to single prompt",
+                {"goal_id": goal.get("id"), "error": str(e)},
+            )
+            return await self._generate_with_single_prompt(
+                goal, user_profile, user_plan, user_id
+            )
+    
+    async def _generate_with_single_prompt(
+        self,
+        goal: Dict[str, Any],
+        user_profile: Optional[Dict[str, Any]],
+        user_plan: Optional[str],
+        user_id: Optional[str],
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Generate a plan using the original single-prompt approach.
+        Used for non-fitness plans or as fallback.
         """
         try:
             # Build enhanced system prompt with feature context
@@ -428,7 +548,7 @@ class PlanGenerator:
             if user_plan and user_id:
                 plan_json = self._sanitize_plan_for_user(plan_json, user_plan, user_id)
 
-            # Enhance exercises with GIF demos and instructions
+            # Enhance exercises with MP4 video demos and instructions
             plan_json = self._enhance_exercises_with_demos(plan_json)
 
             return plan_json
@@ -971,6 +1091,51 @@ Generate the complete plan JSON now."""
             logger.error(f"Error extracting JSON from response: {e}")
             return None
 
+    def _fetch_workout_feedback(self, user_id: str) -> Optional[List[Dict[str, Any]]]:
+        """
+        Fetch user's past workout feedback to improve plan generation.
+        
+        Returns recent feedback (last 30 days, max 50 entries) with reasons
+        why user quit workouts. This helps AI avoid exercises that are:
+        - Too hard for the user
+        - Too easy (boring)
+        - User doesn't know how to do
+        """
+        try:
+            from app.db.supabase import get_supabase_client
+            from datetime import datetime, timedelta, timezone
+            
+            supabase = get_supabase_client()
+            
+            # Get feedback from last 30 days
+            thirty_days_ago = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+            
+            result = (
+                supabase.table("workout_feedback")
+                .select("quit_reason, created_at, plan_id, exercise_name")
+                .eq("user_id", user_id)
+                .gte("created_at", thirty_days_ago)
+                .order("created_at", desc=True)
+                .limit(50)
+                .execute()
+            )
+            
+            if result.data:
+                logger.info(
+                    f"Fetched {len(result.data)} workout feedback entries for user",
+                    {"user_id": user_id, "feedback_count": len(result.data)}
+                )
+                return result.data
+            
+            return None
+            
+        except Exception as e:
+            logger.warning(
+                f"Failed to fetch workout feedback: {e}",
+                {"user_id": user_id, "error": str(e)}
+            )
+            return None
+
     def _validate_plan(self, plan: Dict[str, Any]) -> bool:
         """Validate that plan has required structure"""
         # Check required top-level fields
@@ -1366,12 +1531,12 @@ Generate the complete plan JSON now."""
 
     def _enhance_exercises_with_demos(self, plan: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Enhance workout plan exercises with GIF demonstrations and instructions.
+        Enhance workout plan exercises with MP4 video demonstrations and instructions.
 
         Uses exercise_id for guaranteed matching (if available), falls back to name search.
 
         Looks up each exercise in the local database and adds:
-        - GIF URLs (180px and 360px resolutions)
+        - MP4 video URL
         - Step-by-step instructions
         - Target muscles and equipment
         - Difficulty level
@@ -1392,7 +1557,13 @@ Generate the complete plan JSON now."""
             return plan
 
         # Get exercises from plan structure
-        exercises = plan.get("structure", {}).get("routine", {}).get("exercises", [])
+        # Support both legacy format (routine.exercises) and new format (main_workout.exercises)
+        structure = plan.get("structure", {})
+        exercises = structure.get("routine", {}).get("exercises", [])
+        
+        # Also check main_workout.exercises (multi-agent format)
+        if not exercises:
+            exercises = structure.get("main_workout", {}).get("exercises", [])
 
         if not exercises or not isinstance(exercises, list):
             return plan
@@ -1415,8 +1586,7 @@ Generate the complete plan JSON now."""
                 if exercise_data:
                     demo_data = {
                         "id": exercise_data["id"],
-                        "gif_url": exercise_data["gif_url_360"],
-                        "gif_url_thumb": exercise_data["gif_url_180"],
+                        "mp4_url": exercise_data["mp4_url"],
                         "target_muscle": exercise_data["target_muscle"],
                         "body_part": exercise_data["body_part"],
                         "equipment": exercise_data["equipment"],
@@ -1438,12 +1608,87 @@ Generate the complete plan JSON now."""
 
             if demo_data:
                 exercise["demo"] = demo_data
+                # Also add mp4_url directly for easier access on frontend
+                if demo_data.get("mp4_url") and not exercise.get("mp4_url"):
+                    exercise["mp4_url"] = demo_data["mp4_url"]
                 enhanced_count += 1
             else:
-                logger.warning(
-                    f"No demo found for exercise: {exercise_name} (ID: {exercise_id or 'none'})"
+                logger.error(
+                    f"CRITICAL: No demo found for exercise: {exercise_name} (ID: {exercise_id or 'none'}). "
+                    f"This exercise will not display properly!"
                 )
 
         logger.info(f"Enhanced {enhanced_count}/{len(exercises)} exercises with demos")
+
+        return plan
+
+    def _enhance_warmup_cooldown_with_demos(self, plan: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Enhance warm-up and cool-down exercises with MP4 video demonstrations.
+
+        Similar to _enhance_exercises_with_demos but for warm-up/cool-down sections
+        generated by the multi-agent system.
+
+        Args:
+            plan: Generated plan dictionary with warm_up and cool_down sections
+
+        Returns:
+            Enhanced plan with demo data for warm-up/cool-down exercises
+        """
+        from app.services.exercise_service import (
+            get_exercise_by_id,
+            get_exercise_by_name,
+        )
+
+        if plan.get("plan_type") != "workout_plan":
+            return plan
+
+        structure = plan.get("structure", {})
+
+        # Helper to enhance an exercise
+        def enhance_exercise(exercise: Dict[str, Any], section_name: str) -> None:
+            if not isinstance(exercise, dict):
+                return
+            
+            exercise_id = exercise.get("exercise_id")
+            exercise_name = exercise.get("name", "")
+            exercise_data = None
+            
+            if exercise_id:
+                exercise_data = get_exercise_by_id(exercise_id)
+            
+            if not exercise_data and exercise_name:
+                exercise_data = get_exercise_by_name(exercise_name)
+                if exercise_data:
+                    exercise["exercise_id"] = exercise_data["id"]
+            
+            if exercise_data:
+                exercise["demo"] = {
+                    "id": exercise_data["id"],
+                    "mp4_url": exercise_data["mp4_url"],
+                    "target_muscle": exercise_data["target_muscle"],
+                    "instructions": exercise_data["instructions"],
+                }
+                # Also add mp4_url directly for easier frontend access
+                if not exercise.get("mp4_url"):
+                    exercise["mp4_url"] = exercise_data["mp4_url"]
+                logger.info(f"Enhanced {section_name} exercise: {exercise_name}")
+            else:
+                logger.error(
+                    f"CRITICAL: Could not find {section_name} exercise: {exercise_name} "
+                    f"(ID: {exercise_id or 'none'})"
+                )
+
+        # Enhance warm-up exercises
+        warm_up = structure.get("warm_up", {})
+        warm_up_exercises = warm_up.get("exercises", [])
+        for exercise in warm_up_exercises:
+            enhance_exercise(exercise, "warmup")
+
+        # Enhance cool-down exercises
+        cool_down = structure.get("cool_down", {})
+        cool_down_exercises = cool_down.get("exercises", [])
+        for exercise in cool_down_exercises:
+            enhance_exercise(exercise, "cooldown")
 
         return plan

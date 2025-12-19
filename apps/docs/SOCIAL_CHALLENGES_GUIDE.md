@@ -1,6 +1,6 @@
 # Social & Challenge Features Guide
 
-This document explains how social accountability, goal sharing, group goals, and challenges work in FitNudge. Use this as a reference for implementation and help center content.
+This document explains how social accountability and challenges work in FitNudge. Use this as a reference for implementation and help center content.
 
 ---
 
@@ -9,21 +9,19 @@ This document explains how social accountability, goal sharing, group goals, and
 1. [Overview](#overview)
 2. [Feature Summary](#feature-summary)
 3. [Accountability Partners](#1-accountability-partners)
-4. [Goal Sharing](#2-goal-sharing)
-5. [Group Goals](#3-group-goals-collaborative)
-6. [Challenges](#4-challenges-competitive)
-   - [Private Challenges](#41-private-challenges-solo)
-   - [Shared Challenges](#42-shared-challenges-social)
-   - [Challenge Lifecycle](#43-challenge-lifecycle)
-7. [Check-In Systems](#5-check-in-systems)
-8. [Feature Access by Plan](#6-feature-access-by-plan)
-9. [GoalCard Menu Items](#7-goalcard-menu-items)
-10. [Database Schema](#8-database-schema)
-11. [Social Nudges & Motivation](#11-social-nudges--motivation)
-12. [Push Notifications](#12-push-notifications)
-13. [AI Integration](#13-ai-integration)
-14. [Implementation Priority](#14-implementation-priority)
-15. [Help Center FAQs](#help-center-faqs)
+4. [Challenges](#2-challenges-competitive)
+   - [Private Challenges](#21-private-challenges-solo)
+   - [Shared Challenges](#22-shared-challenges-social)
+   - [Challenge Lifecycle](#23-challenge-lifecycle)
+5. [Check-In Systems](#3-check-in-systems)
+6. [Feature Access by Plan](#4-feature-access-by-plan)
+7. [GoalCard Menu Items](#5-goalcard-menu-items)
+8. [Database Schema](#6-database-schema)
+9. [Social Nudges & Motivation](#7-social-nudges--motivation)
+10. [Push Notifications](#8-push-notifications)
+11. [AI Integration](#9-ai-integration)
+12. [Implementation Priority](#10-implementation-priority)
+13. [Help Center FAQs](#help-center-faqs)
 
 ---
 
@@ -31,12 +29,16 @@ This document explains how social accountability, goal sharing, group goals, and
 
 FitNudge offers several ways for users to connect and stay motivated:
 
-| Feature                     | Purpose                        | Competition?       |
-| --------------------------- | ------------------------------ | ------------------ |
-| **Accountability Partners** | 1-on-1 mutual support          | No                 |
-| **Goal Sharing**            | Let friends view your progress | No                 |
-| **Group Goals**             | Work together on the same goal | No (collaborative) |
-| **Challenges**              | Compete with others            | Yes (leaderboard)  |
+| Feature                     | Purpose               | Competition?      |
+| --------------------------- | --------------------- | ----------------- |
+| **Accountability Partners** | 1-on-1 mutual support | No                |
+| **Challenges**              | Compete with others   | Yes (leaderboard) |
+
+> **Important Notes:**
+>
+> - There is **no follows/following system** in FitNudge
+> - All social connections are made through **accountability partners** or **challenge invitations**
+> - To invite someone to a challenge, you send them a partner request or share an invite link
 
 ---
 
@@ -47,26 +49,16 @@ FitNudge offers several ways for users to connect and stay motivated:
 │                        SOCIAL FEATURES                          │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  Accountability Partners     Goal Sharing                       │
-│  ┌─────┐    ┌─────┐         ┌─────┐                            │
-│  │User │◄──►│User │         │User │──► Friends can VIEW        │
-│  │  A  │    │  B  │         │     │    (view/comment/motivate) │
-│  └─────┘    └─────┘         └─────┘                            │
-│  Mutual visibility          One-way visibility                  │
-│  Each has own goals         Only owner checks in                │
-│                                                                 │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  Group Goals (Collaborative)    Challenges (Competitive)        │
-│  ┌─────────────────┐            ┌─────────────────┐            │
-│  │   SAME GOAL     │            │   SAME CHALLENGE │            │
-│  │  ┌───┐ ┌───┐   │            │  ┌───┐ ┌───┐    │            │
-│  │  │ A │ │ B │   │            │  │ A │ │ B │    │            │
-│  │  └───┘ └───┘   │            │  └───┘ └───┘    │            │
-│  │  Combined: 50   │            │  A: 25  B: 20   │            │
-│  └─────────────────┘            │  🏆 Leaderboard │            │
-│  Everyone contributes           └─────────────────┘            │
-│  to team total                  Everyone competes               │
+│  Accountability Partners        Challenges (Competitive)        │
+│  ┌─────┐    ┌─────┐            ┌─────────────────┐            │
+│  │User │◄──►│User │            │   SAME CHALLENGE │            │
+│  │  A  │    │  B  │            │  ┌───┐ ┌───┐    │            │
+│  └─────┘    └─────┘            │  │ A │ │ B │    │            │
+│  Mutual visibility             │  └───┘ └───┘    │            │
+│  Each has own goals            │  A: 25  B: 20   │            │
+│                                 │  🏆 Leaderboard │            │
+│                                 └─────────────────┘            │
+│                                 Everyone competes               │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -121,104 +113,9 @@ John's App:
 
 ---
 
-## 2. Goal Sharing
+## 2. Challenges (Competitive)
 
-### What It Is
-
-One-way sharing where a user lets specific friends view their goal progress.
-
-### How It Works
-
-1. User selects a goal to share
-2. Chooses friends to share with
-3. Sets permission level for each friend
-
-### Permission Levels
-
-| Level      | Can View | Can Comment | Can Send Motivation |
-| ---------- | -------- | ----------- | ------------------- |
-| `view`     | ✅       | ❌          | ❌                  |
-| `comment`  | ✅       | ✅          | ❌                  |
-| `motivate` | ✅       | ✅          | ✅                  |
-
-### Check-Ins
-
-- **Only the goal owner checks in**
-- Shared users can only view (and optionally comment/motivate)
-
-### Database Table
-
-```sql
-goal_shares
-- goal_id
-- shared_with_user_id
-- shared_by_user_id
-- permission_level: 'view' | 'comment' | 'motivate'
-- is_active
-```
-
----
-
-## 3. Group Goals (Collaborative)
-
-### What It Is
-
-Multiple users working together on the SAME goal, with combined progress.
-
-### How It Works
-
-1. User creates a goal
-2. Converts it to a group goal
-3. Invites members (friends, accountability partners)
-4. All members check into the SAME goal
-5. Progress is combined (e.g., "Team total: 50 workouts")
-
-### Check-Ins
-
-- **All members check into the SAME goal_id**
-- Each member's check-in is tracked separately
-- Combined progress shown on goal card
-
-### Database Table
-
-```sql
-group_goals
-- goal_id
-- user_id
-- role: 'owner' | 'admin' | 'member'
-- joined_at
-- is_active
-```
-
-### Roles
-
-| Role   | Can Invite | Can Remove | Can Edit Goal | Can Delete Goal |
-| ------ | ---------- | ---------- | ------------- | --------------- |
-| Owner  | ✅         | ✅         | ✅            | ✅              |
-| Admin  | ✅         | ✅         | ❌            | ❌              |
-| Member | ❌         | ❌         | ❌            | ❌              |
-
-### User Experience
-
-```
-Group Goal: "Team 100 Workouts"
-┌────────────────────────────┐
-│ 💪 Team 100 Workouts       │
-│ ─────────────────────────  │
-│ Team Progress: 67/100      │
-│ ████████████░░░░░░ 67%     │
-│                            │
-│ 👤 John: 25 check-ins      │
-│ 👤 Jane: 22 check-ins      │
-│ 👤 Mike: 20 check-ins      │
-└────────────────────────────┘
-```
-
----
-
-## 4. Challenges (Competitive)
-
-### 4.1 Private Challenges (Solo)
+### 2.1 Private Challenges (Solo)
 
 #### What It Is
 
@@ -245,7 +142,7 @@ A personal challenge that is NOT shared with others. It's just a goal with chall
 
 ---
 
-### 4.2 Shared Challenges (Social)
+### 2.2 Shared Challenges (Social)
 
 #### What It Is
 
@@ -357,7 +254,7 @@ challenge_check_ins (NEW)
 
 ---
 
-### 4.3 Challenge Lifecycle
+### 2.3 Challenge Lifecycle
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -435,33 +332,18 @@ challenge_check_ins (NEW)
 
 ---
 
-## 5. Check-In Systems
+## 3. Check-In Systems
 
 ### Summary Table
 
-| Feature                 | Check-In Table        | Who Checks In             |
-| ----------------------- | --------------------- | ------------------------- |
-| Regular Goal            | `check_ins`           | Owner only                |
-| Goal Sharing            | `check_ins`           | Owner only                |
-| Accountability Partners | `check_ins`           | Each their own goals      |
-| Group Goals             | `check_ins`           | All members, same goal_id |
-| Private Challenge       | `check_ins`           | Owner only                |
-| Shared Challenge        | `challenge_check_ins` | All participants          |
+| Feature                 | Check-In Table        | Who Checks In        |
+| ----------------------- | --------------------- | -------------------- |
+| Regular Goal            | `check_ins`           | Owner only           |
+| Accountability Partners | `check_ins`           | Each their own goals |
+| Private Challenge       | `check_ins`           | Owner only           |
+| Shared Challenge        | `challenge_check_ins` | All participants     |
 
-### Required Changes
-
-#### For Group Goals
-
-Modify `check_ins` unique constraint:
-
-```sql
--- FROM: UNIQUE(goal_id, check_in_date)
--- TO: UNIQUE(user_id, goal_id, check_in_date)
-```
-
-#### For Shared Challenges
-
-Create new table:
+### Database Table: challenge_check_ins
 
 ```sql
 CREATE TABLE challenge_check_ins (
@@ -480,18 +362,16 @@ CREATE TABLE challenge_check_ins (
 
 ---
 
-## 6. Feature Access by Plan
+## 4. Feature Access by Plan
 
 Feature access is controlled by the `plan_features` database table. All access checks should use the `check_user_has_feature()` function.
 
 ### Feature Keys
 
-| Feature Key               | Description                      | Minimum Tier |
-| ------------------------- | -------------------------------- | ------------ |
-| `goal_shares`             | Share goals with friends         | Starter (1)  |
-| `challenge_create`        | Create and share challenges      | Starter (1)  |
-| `group_goals`             | Create collaborative group goals | Pro (2)      |
-| `accountability_partners` | Find accountability partners     | Pro (2)      |
+| Feature Key             | Description                  | Minimum Tier |
+| ----------------------- | ---------------------------- | ------------ |
+| `challenge_create`      | Create and share challenges  | Starter (1)  |
+| `social_accountability` | Find accountability partners | Starter (1)  |
 
 ### Limits by Plan
 
@@ -544,7 +424,7 @@ const canCreateChallenge = subscriptionStore.hasFeature("challenge_create");
 
 ---
 
-## 7. GoalCard Menu Items
+## 5. GoalCard Menu Items
 
 ### For ALL Goals
 
@@ -571,12 +451,6 @@ Users can delete any goal, including those with check-ins. However, the frontend
 
 **Note:** Goals with `archived_reason = 'converted_to_challenge'` can also be deleted since challenges are self-contained.
 
-### For Habits (`goal_type = 'habit'`)
-
-```
-• Share Goal        (requires goal_shares feature)
-```
-
 ### For Challenges (`goal_type = 'time_challenge'` or `'target_challenge'`)
 
 ```
@@ -584,14 +458,6 @@ Users can delete any goal, including those with check-ins. However, the frontend
                         (only if NOT already converted)
 • View Challenge        (if converted_to_challenge_id exists)
 • Make Private          (if shared, removes from challenges)
-```
-
-### For Group Goals (`is_group_goal = true`)
-
-```
-• Invite Members        (requires group_goals feature)
-• View Members
-• Leave Group           (if member, not owner)
 ```
 
 ### Menu Visibility Logic
@@ -606,11 +472,6 @@ if (goal.is_active) {
   menuOptions.push({ id: "activate", label: "Activate Goal" });
 }
 
-// Goal sharing (for any goal type)
-if (hasFeature("goal_shares") && !goal.is_group_goal) {
-  menuOptions.push({ id: "share", label: "Share Goal" });
-}
-
 // Challenge sharing (for challenge types only)
 if (
   hasFeature("challenge_create") &&
@@ -620,62 +481,49 @@ if (
   menuOptions.push({ id: "share_challenge", label: "Share as Challenge" });
 }
 
-// Group goals
-if (hasFeature("group_goals") && goal.is_group_goal) {
-  menuOptions.push({ id: "invite", label: "Invite Members" });
-  menuOptions.push({ id: "members", label: "View Members" });
-}
-
 // Delete (always last)
 menuOptions.push({ id: "delete", label: "Delete Goal", destructive: true });
 ```
 
 ---
 
-## 8. Database Schema
+## 6. Database Schema
 
-### Existing Tables (No Changes Needed)
+### Core Tables
 
-- `accountability_partners` ✅
-- `goal_shares` ✅
-- `group_goals` ✅
+- `accountability_partners` ✅ - Used for all partner/friend connections and challenge invitations
 - `challenges` ✅
 - `challenge_participants` ✅
 - `challenge_leaderboard` ✅
+- `challenge_check_ins` ✅
 
-### Tables Needing Modification
+> **Note:** There are no `goal_shares` or `follows` tables. All social connections are managed through the `accountability_partners` table.
 
-#### `goals` table
+### Database Table: accountability_partners
 
-```sql
--- Add column for tracking converted challenges
-ALTER TABLE goals
-ADD COLUMN converted_to_challenge_id UUID REFERENCES challenges(id);
-```
-
-#### `challenges` table
+This table is the **single source of truth** for all social connections:
 
 ```sql
--- Add columns for goal template and join deadline
-ALTER TABLE challenges
-ADD COLUMN goal_template JSONB,
-ADD COLUMN join_deadline DATE;
+accountability_partners
+- id UUID PRIMARY KEY
+- user_id UUID                    -- User who initiated
+- partner_user_id UUID            -- User who receives request
+- status: 'pending' | 'accepted' | 'rejected' | 'blocked'
+- initiated_by_user_id UUID       -- Track who sent the request
+- scope: 'global' | 'goal' | 'challenge'  -- Context of partnership
+- goal_id UUID (optional)         -- If scoped to a specific goal
+- challenge_id UUID (optional)    -- If scoped to a specific challenge
+- invite_code TEXT (optional)     -- For shareable invite links
+- created_at, accepted_at, updated_at
 ```
 
-#### `check_ins` table
+### How Partner Invitations Work
 
-```sql
--- Modify unique constraint for group goals
--- (Allows multiple users to check into same goal on same day)
-ALTER TABLE check_ins
-DROP CONSTRAINT IF EXISTS check_ins_unique_constraint,
-ADD CONSTRAINT check_ins_user_goal_date_unique
-    UNIQUE(user_id, goal_id, check_in_date);
-```
+1. **Direct Partner Request**: User A sends request to User B → creates `accountability_partners` record with `status: 'pending'`
+2. **Invite Link**: User A generates shareable link → creates placeholder record with `invite_code`
+3. **Challenge Invitation**: Same flow as partner request but with `scope: 'challenge'` and `challenge_id` set
 
-### New Tables
-
-#### `challenge_check_ins`
+### Database Table: challenge_check_ins
 
 ```sql
 CREATE TABLE challenge_check_ins (
@@ -722,7 +570,7 @@ WITH CHECK (user_id = auth.uid());
 
 ---
 
-## 11. Social Nudges & Motivation
+## 7. Social Nudges & Motivation
 
 Social nudges allow users to motivate each other across all social features. This is crucial for engagement and retention.
 
@@ -736,15 +584,6 @@ Social nudges allow users to motivate each other across all social features. Thi
 | **Cheer**              | "🎉 Great job!" quick reaction    | When partner checks in                     |
 | **Streak Celebration** | "Jane hit a 7-day streak!"        | Automatic milestone                        |
 | **Custom Message**     | Send personalized encouragement   | Manual                                     |
-
-#### Group Goals (Collaborative)
-
-| Mechanic                  | Description                               | Trigger               |
-| ------------------------- | ----------------------------------------- | --------------------- |
-| **Team Nudge**            | "Team needs 3 more check-ins today!"      | Manual by owner/admin |
-| **Contribution Alert**    | "Jane just added 1 workout! Team: 67/100" | Automatic on check-in |
-| **Milestone Celebration** | "🎉 Team hit 50%!"                        | Automatic             |
-| **Shoutout**              | Highlight top contributor                 | Weekly/manual         |
 
 #### Challenges (Competitive)
 
@@ -878,15 +717,15 @@ To prevent spam:
 
 ### Feature Access
 
-| Feature             | Who Can Use                                                                 |
-| ------------------- | --------------------------------------------------------------------------- |
-| Send Nudge          | Anyone with the relationship (partner, group member, challenge participant) |
-| AI-Generated Nudges | Pro+ (ties into AI features)                                                |
-| Custom Messages     | All users                                                                   |
+| Feature             | Who Can Use                                                   |
+| ------------------- | ------------------------------------------------------------- |
+| Send Nudge          | Anyone with the relationship (partner, challenge participant) |
+| AI-Generated Nudges | Pro+ (ties into AI features)                                  |
+| Custom Messages     | All users                                                     |
 
 ---
 
-## 12. Push Notifications
+## 8. Push Notifications
 
 Push notifications are essential for engagement in social features. All social interactions trigger notifications.
 
@@ -903,15 +742,6 @@ Push notifications are essential for engagement in social features. All social i
 | Partner hits streak milestone | "🔥 Jane hit a 7-day streak!"                               | Low      |
 | Partner missed 2+ days        | "💙 Jane hasn't checked in for 2 days. Send encouragement?" | Low      |
 
-#### Group Goals
-
-| Event                  | Push Notification                            | Priority |
-| ---------------------- | -------------------------------------------- | -------- |
-| Added to group goal    | "👥 John invited you to 'Team 100 Workouts'" | High     |
-| Team milestone reached | "🎉 Your team hit 50 workouts!"              | Medium   |
-| Team nudge sent        | "💪 John: Team needs 5 more today!"          | Medium   |
-| Someone contributed    | "✅ Jane added 1 workout. Team: 67/100"      | Low      |
-
 #### Challenges
 
 | Event                         | Push Notification                           | Priority |
@@ -924,13 +754,6 @@ Push notifications are essential for engagement in social features. All social i
 | Challenge starts tomorrow     | "⏰ '30 Day Challenge' starts tomorrow!"    | High     |
 | Challenge ending soon         | "⏰ 3 days left! You're in #2 place"        | High     |
 | Challenge ended               | "🏆 Challenge complete! You finished #2!"   | High     |
-
-#### Goal Sharing
-
-| Event                       | Push Notification                         | Priority |
-| --------------------------- | ----------------------------------------- | -------- |
-| Goal shared with you        | "👀 John shared 'Daily Workout' with you" | Medium   |
-| Motivation message received | "💪 John: You've got this!"               | Medium   |
 
 ### Notification Templates
 
@@ -945,12 +768,6 @@ SOCIAL_NOTIFICATION_TEMPLATES = {
     "partner_streak": "🔥 Your partner {sender_name} just hit a {count}-day streak!",
     "partner_inactive": "💙 {sender_name} hasn't checked in for {days} days. Send encouragement?",
 
-    # Group Goals
-    "group_invite": "👥 {sender_name} invited you to '{goal_title}'",
-    "group_milestone": "🎉 Your team hit {milestone}!",
-    "group_nudge": "💪 {sender_name}: {message}",
-    "group_contribution": "✅ {sender_name} contributed! Team progress: {progress}",
-
     # Challenges
     "challenge_invite": "🏆 {sender_name} invited you to '{challenge_title}'",
     "challenge_joined": "🙌 {sender_name} joined your challenge!",
@@ -961,9 +778,6 @@ SOCIAL_NOTIFICATION_TEMPLATES = {
     "challenge_ending": "⏰ {days} days left in '{challenge_title}'! You're #{rank}",
     "challenge_ended": "🏆 '{challenge_title}' complete! You finished #{rank}!",
 
-    # Goal Sharing
-    "goal_shared": "👀 {sender_name} shared '{goal_title}' with you",
-    "motivation_message": "💪 {sender_name}: {message}",
 }
 ```
 
@@ -978,16 +792,10 @@ ADD COLUMN IF NOT EXISTS social_partner_requests BOOLEAN DEFAULT true,
 ADD COLUMN IF NOT EXISTS social_partner_nudges BOOLEAN DEFAULT true,
 ADD COLUMN IF NOT EXISTS social_partner_cheers BOOLEAN DEFAULT true,
 ADD COLUMN IF NOT EXISTS social_partner_milestones BOOLEAN DEFAULT true,
-ADD COLUMN IF NOT EXISTS social_group_invites BOOLEAN DEFAULT true,
-ADD COLUMN IF NOT EXISTS social_group_milestones BOOLEAN DEFAULT true,
-ADD COLUMN IF NOT EXISTS social_group_nudges BOOLEAN DEFAULT true,
-ADD COLUMN IF NOT EXISTS social_group_contributions BOOLEAN DEFAULT false,  -- Off by default (noisy)
 ADD COLUMN IF NOT EXISTS social_challenge_invites BOOLEAN DEFAULT true,
 ADD COLUMN IF NOT EXISTS social_challenge_leaderboard BOOLEAN DEFAULT true,
 ADD COLUMN IF NOT EXISTS social_challenge_nudges BOOLEAN DEFAULT true,
-ADD COLUMN IF NOT EXISTS social_challenge_reminders BOOLEAN DEFAULT true,
-ADD COLUMN IF NOT EXISTS social_goal_shared BOOLEAN DEFAULT true,
-ADD COLUMN IF NOT EXISTS social_motivation_messages BOOLEAN DEFAULT true;
+ADD COLUMN IF NOT EXISTS social_challenge_reminders BOOLEAN DEFAULT true;
 ```
 
 ### Notification Preferences UI
@@ -1004,24 +812,12 @@ ADD COLUMN IF NOT EXISTS social_motivation_messages BOOLEAN DEFAULT true;
 │ Cheers on check-ins        [✓]         │
 │ Partner milestones         [✓]         │
 │                                        │
-│ GROUP GOALS                            │
-│ ─────────────────────────────────────  │
-│ Group invitations          [✓]         │
-│ Team milestones            [✓]         │
-│ Team nudges                [✓]         │
-│ Member contributions       [ ]         │
-│                                        │
 │ CHALLENGES                             │
 │ ─────────────────────────────────────  │
 │ Challenge invitations      [✓]         │
 │ Leaderboard updates        [✓]         │
 │ Competitive nudges         [✓]         │
 │ Start/end reminders        [✓]         │
-│                                        │
-│ GOAL SHARING                           │
-│ ─────────────────────────────────────  │
-│ When goals shared with me  [✓]         │
-│ Motivation messages        [✓]         │
 │                                        │
 └────────────────────────────────────────┘
 ```
@@ -1041,12 +837,6 @@ class SocialNotificationType(Enum):
     PARTNER_MILESTONE = "partner_milestone"
     PARTNER_INACTIVE = "partner_inactive"
 
-    # Group Goals
-    GROUP_INVITE = "group_invite"
-    GROUP_MILESTONE = "group_milestone"
-    GROUP_NUDGE = "group_nudge"
-    GROUP_CONTRIBUTION = "group_contribution"
-
     # Challenges
     CHALLENGE_INVITE = "challenge_invite"
     CHALLENGE_JOINED = "challenge_joined"
@@ -1056,10 +846,6 @@ class SocialNotificationType(Enum):
     CHALLENGE_STARTING = "challenge_starting"
     CHALLENGE_ENDING = "challenge_ending"
     CHALLENGE_ENDED = "challenge_ended"
-
-    # Goal Sharing
-    GOAL_SHARED = "goal_shared"
-    MOTIVATION_MESSAGE = "motivation_message"
 
 
 async def send_social_notification(
@@ -1082,8 +868,20 @@ async def send_social_notification(
     template = SOCIAL_NOTIFICATION_TEMPLATES[notification_type.value]
     message = template.format(**data)
 
+    # Determine entity_type and entity_id for notification_history tracking
+    # This allows handling deleted entities gracefully on the frontend
+    entity_type = None
+    entity_id = None
+
+    if notification_type.value.startswith("challenge_"):
+        entity_type = "challenge"
+        entity_id = data.get("challenge_id")
+    elif notification_type.value.startswith("partner_"):
+        entity_type = "partner_request"
+        entity_id = data.get("request_id")
+
     # Send push notification
-    await send_push_notification(
+    await send_push_to_user(
         user_id=recipient_id,
         title=get_notification_title(notification_type),
         body=message,
@@ -1091,13 +889,50 @@ async def send_social_notification(
             "type": notification_type.value,
             "sender_id": sender_id,
             **data
-        }
+        },
+        notification_type=notification_type.value,
+        entity_type=entity_type,  # For tracking deleted entities
+        entity_id=entity_id,
     )
+```
+
+### Entity Reference Pattern
+
+All notifications are stored in `notification_history` with optional entity references:
+
+```sql
+-- Generic entity reference (NO foreign keys for flexibility)
+entity_type TEXT,  -- 'goal', 'challenge', 'post', 'achievement', 'partner_request', etc.
+entity_id UUID,    -- The ID of the referenced entity
+```
+
+**Why no foreign keys?**
+
+- Flexibility to add new entity types without schema changes
+- Performance at scale (no FK overhead on writes)
+- Handle deleted entities at application level
+
+**Frontend handling for deleted entities:**
+
+```typescript
+const handleNotificationPress = async (notification) => {
+  if (notification.entity_type && notification.entity_id) {
+    const exists = await checkEntityExists(
+      notification.entity_type,
+      notification.entity_id
+    );
+    if (!exists) {
+      showToast("This item is no longer available");
+      return;
+    }
+  }
+  router.push(notification.data.deepLink);
+};
 ```
 
 ---
 
-## 13. AI Integration
+## 9. AI Integration
 
 The following AI services have been updated to support social/challenge features:
 
@@ -1111,9 +946,6 @@ The service now fetches social context and includes it in AI prompts for more pe
 
 ```python
 social_context = {
-    "is_group_goal": bool,              # Is this a team goal?
-    "group_members": ["Jane", "Mike"],  # Team member names
-    "group_total_progress": 67,         # Combined team check-ins
     "is_challenge": bool,               # Is user in a challenge?
     "challenge_rank": 2,                # Current leaderboard position
     "challenge_participants": 5,        # Total participants
@@ -1127,7 +959,6 @@ social_context = {
 
 The AI now receives context like:
 
-- "Your team has completed 67 check-ins together"
 - "You're currently in 2nd place out of 5 participants"
 - "Your accountability partner Jane is on a 7-day streak"
 
@@ -1190,7 +1021,6 @@ The AI is instructed to:
 
 Future updates should include:
 
-- Group goal awareness (motivate the team)
 - Challenge progress references ("You're in 2nd place!")
 - Partner encouragement ("Jane just checked in!")
 
@@ -1207,7 +1037,7 @@ Future updates should include:
 
 ---
 
-## 14. Implementation Priority
+## 10. Implementation Priority
 
 ### Phase 1: Goal Activation/Deactivation
 
@@ -1215,37 +1045,25 @@ Future updates should include:
 - Enforce `active_goal_limit` from subscription
 - No database changes needed
 
-### Phase 2: Goal Sharing
-
-- Implement share modal
-- Use existing `goal_shares` table
-- Add shared goals view
-
-### Phase 3: Private Challenges
+### Phase 2: Private Challenges
 
 - Already works with `goal_type`
 - Just UI polish
 
-### Phase 4: Shared Challenges
+### Phase 3: Shared Challenges
 
 - Create `challenge_check_ins` table
 - Implement "Share as Challenge" flow
 - Build challenge detail screen
 - Build leaderboard component
 
-### Phase 5: Group Goals
-
-- Modify `check_ins` constraint
-- Implement group invitation flow
-- Build combined progress view
-
-### Phase 6: Accountability Partners
+### Phase 4: Accountability Partners
 
 - Implement partner request flow
 - Build partner dashboard
 - Add partner visibility to goals
 
-### Phase 7: Social Nudges & Notifications
+### Phase 5: Social Nudges & Notifications
 
 - Create `social_nudges` table
 - Implement nudge/cheer/message UI
@@ -1257,15 +1075,9 @@ Future updates should include:
 
 ## Help Center FAQs
 
-### What's the difference between sharing a goal and creating a challenge?
-
-**Goal Sharing:** Your friends can see your progress, but they don't participate. It's one-way visibility.
-
-**Challenge:** Your friends JOIN and compete with you. Everyone does the same activity and there's a leaderboard.
-
 ### Can I convert a private challenge to a shared challenge?
 
-Yes! Go to your goal, tap the menu (•••), and select "Share as Challenge." Your friends can then join.
+Yes! Go to your goal, tap the menu (•••), and select "Share as Challenge." Your friends can then join via the invite link or by accepting your partner request.
 
 ### What happens when a challenge ends?
 
@@ -1275,21 +1087,24 @@ The leaderboard is frozen, no more check-ins are accepted, and a winner is decla
 
 No. To keep things fair, challenges are locked once they start. Make sure to invite friends before the start date!
 
-### What's a Group Goal?
-
-A Group Goal is collaborative - everyone contributes to the SAME goal. For example, "Team 100 Workouts" where your team works together to reach 100 total workouts.
-
 ### What's an Accountability Partner?
 
-An Accountability Partner is like a fitness buddy. You can see each other's goals and progress, helping you both stay motivated.
+An Accountability Partner is like a fitness buddy. You can see each other's goals and progress, helping you both stay motivated. To add a partner, search for users and send them a partner request.
 
-### How do I send a nudge to my partner or teammate?
+### How do I invite someone to a challenge?
+
+You can either:
+
+1. Send them a partner request with the challenge scope
+2. Share an invite link that they can use to join
+
+### How do I send a nudge to my partner?
 
 On their profile card, you'll see quick action buttons: 👋 Nudge, 🎉 Cheer, and 💬 Message. Tap any of these to send encouragement!
 
 ### Can I turn off social notifications?
 
-Yes! Go to Settings → Notifications → Social. You can customize which notifications you receive for partners, group goals, challenges, and more.
+Yes! Go to Settings → Notifications → Social. You can customize which notifications you receive for partners, challenges, and more.
 
 ### What's the difference between a Nudge and a Cheer?
 

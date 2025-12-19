@@ -1,5 +1,5 @@
-import FeedScreen from "@/screens/tabs/FeedScreen";
+import SocialScreen from "@/screens/tabs/social/SocialScreen";
 
 export default function Feed() {
-  return <FeedScreen />;
+  return <SocialScreen />;
 }

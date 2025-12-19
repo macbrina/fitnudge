@@ -11,6 +11,7 @@ All tasks are organized into domain-specific modules:
 - notification_tasks: Push notifications (AI motivations, re-engagement, check-in prompts)
 - analytics_tasks: Weekly recaps and materialized view refresh
 - media_tasks: R2 media file deletion
+- auth_tasks: Refresh token cleanup
 """
 
 # Plan generation tasks
@@ -43,6 +44,7 @@ from app.services.tasks.notification_tasks import (
     send_scheduled_ai_motivations_task,
     send_reengagement_notifications_task,
     send_checkin_prompts_task,
+    cleanup_orphaned_notifications_task,
 )
 
 # Analytics tasks
@@ -54,6 +56,19 @@ from app.services.tasks.analytics_tasks import (
 # Media tasks
 from app.services.tasks.media_tasks import (
     delete_media_from_r2_task,
+)
+
+# Subscription tasks
+from app.services.tasks.subscription_tasks import (
+    check_expiring_subscriptions_task,
+    update_challenge_statuses_task,
+    cleanup_abandoned_challenges_task,
+    process_failed_webhook_events_task,
+)
+
+# Auth tasks
+from app.services.tasks.auth_tasks import (
+    cleanup_expired_refresh_tokens_task,
 )
 
 __all__ = [
@@ -74,9 +89,17 @@ __all__ = [
     "send_scheduled_ai_motivations_task",
     "send_reengagement_notifications_task",
     "send_checkin_prompts_task",
+    "cleanup_orphaned_notifications_task",
     # Analytics tasks
     "generate_weekly_recaps_task",
     "refresh_analytics_views_task",
     # Media tasks
     "delete_media_from_r2_task",
+    # Subscription tasks
+    "check_expiring_subscriptions_task",
+    "update_challenge_statuses_task",
+    "cleanup_abandoned_challenges_task",
+    "process_failed_webhook_events_task",
+    # Auth tasks
+    "cleanup_expired_refresh_tokens_task",
 ]

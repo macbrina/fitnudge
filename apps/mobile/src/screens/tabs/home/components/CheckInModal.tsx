@@ -72,7 +72,6 @@ export function CheckInModal({
   } = useMediaPermissions();
 
   // Local state
-  const [completed, setCompleted] = useState<boolean | null>(null);
   const [reflection, setReflection] = useState(checkIn?.reflection || "");
   const [selectedMood, setSelectedMood] = useState<number | null>(
     checkIn?.mood || null
@@ -85,7 +84,6 @@ export function CheckInModal({
   // Reset state when modal opens/closes or checkIn changes
   useEffect(() => {
     if (visible && checkIn) {
-      setCompleted(checkIn.completed ?? null);
       setReflection(checkIn.reflection || "");
       setSelectedMood(checkIn.mood || null);
       setSelectedPhotos(checkIn.photo_urls || []);
@@ -271,13 +269,13 @@ export function CheckInModal({
   };
 
   const handleSave = () => {
-    if (completed === null || !checkIn?.id) return;
+    if (!checkIn?.id) return;
 
     updateCheckIn(
       {
         checkInId: checkIn?.id,
         updates: {
-          completed,
+          completed: true, // Always true - checking in means completed
           reflection: reflection.trim() || undefined,
           mood: selectedMood || undefined,
           photo_urls: selectedPhotos.length > 0 ? selectedPhotos : undefined,
@@ -290,17 +288,18 @@ export function CheckInModal({
         },
         onError: (error) => {
           console.error("Error updating check-in:", error);
-          // TODO: Show error toast
+          showAlert({
+            title: t("common.error"),
+            message: t("checkin.update_error") || "Failed to save check-in",
+            variant: "error",
+            confirmLabel: t("common.ok"),
+          });
         },
       }
     );
   };
 
-  const canSave =
-    completed !== null &&
-    !isSaving &&
-    !isUploading &&
-    uploadingPhotos.length === 0;
+  const canSave = !isSaving && !isUploading && uploadingPhotos.length === 0;
 
   // Don't render anything if not visible (after close animation completes)
   if (!internalVisible && !visible) {
@@ -363,53 +362,32 @@ export function CheckInModal({
               {/* Loading Skeleton */}
               {isLoading || !checkIn ? (
                 <View style={styles.loadingContainer}>
-                  {/* Goal icon skeleton */}
-                  <View style={styles.goalContext}>
-                    <SkeletonBox
-                      width={60}
-                      height={60}
-                      borderRadius={30}
-                      style={{
-                        alignSelf: "center",
-                        marginBottom: toRN(tokens.spacing[4]),
-                      }}
-                    />
-                    {/* Question skeleton */}
-                    <SkeletonBox
-                      width="80%"
-                      height={28}
-                      borderRadius={toRN(tokens.borderRadius.md)}
-                      style={{
-                        alignSelf: "center",
-                        marginBottom: toRN(tokens.spacing[2]),
-                      }}
-                    />
-                    <SkeletonBox
-                      width="60%"
-                      height={28}
-                      borderRadius={toRN(tokens.borderRadius.md)}
-                      style={{ alignSelf: "center" }}
-                    />
-                  </View>
-
-                  {/* Yes/No buttons skeleton */}
-                  <View
-                    style={[
-                      styles.yesNoContainer,
-                      { marginTop: toRN(tokens.spacing[6]) },
-                    ]}
-                  >
-                    <SkeletonBox
-                      width="48%"
-                      height={56}
-                      borderRadius={toRN(tokens.borderRadius.xl)}
-                    />
-                    <SkeletonBox
-                      width="48%"
-                      height={56}
-                      borderRadius={toRN(tokens.borderRadius.xl)}
-                    />
-                  </View>
+                  {/* Icon skeleton */}
+                  <SkeletonBox
+                    width={60}
+                    height={60}
+                    borderRadius={30}
+                    style={{
+                      alignSelf: "center",
+                      marginBottom: toRN(tokens.spacing[4]),
+                    }}
+                  />
+                  {/* Title skeleton */}
+                  <SkeletonBox
+                    width="60%"
+                    height={28}
+                    borderRadius={toRN(tokens.borderRadius.md)}
+                    style={{
+                      alignSelf: "center",
+                      marginBottom: toRN(tokens.spacing[2]),
+                    }}
+                  />
+                  <SkeletonBox
+                    width="40%"
+                    height={20}
+                    borderRadius={toRN(tokens.borderRadius.md)}
+                    style={{ alignSelf: "center" }}
+                  />
 
                   {/* Loading indicator */}
                   <View
@@ -434,198 +412,147 @@ export function CheckInModal({
                 </View>
               ) : (
                 <>
-                  {/* Goal Context */}
-                  <View style={styles.goalContext}>
-                    <View style={styles.goalIcon}>
+                  {/* Header Section */}
+                  <View style={styles.headerSection}>
+                    <View style={styles.checkInIcon}>
                       <Ionicons
-                        name="flag"
+                        name="checkmark-circle"
                         size={toRN(tokens.typography.fontSize["3xl"])}
                         color={brandColors.primary}
                       />
                     </View>
-                    {/* Question */}
-                    <Text style={styles.question}>
-                      {t("checkin.did_you_complete", { goal: goalTitle })}
+                    <Text style={styles.title}>{goalTitle}</Text>
+                  </View>
+
+                  {/* Mood Section */}
+                  <View style={styles.moodSection}>
+                    <Text style={styles.sectionLabel}>
+                      {t("checkin.mood_label") || "How are you feeling?"}
                     </Text>
-                    {/* <Text style={styles.goalTitle}>{goalTitle}</Text> */}
-                  </View>
-
-                  {/* Yes/No Buttons */}
-                  <View style={styles.yesNoContainer}>
-                    <TouchableOpacity
-                      style={[
-                        styles.yesNoButton,
-                        styles.yesButton,
-                        completed === true && styles.yesButtonActive,
-                      ]}
-                      onPress={() => setCompleted(true)}
-                      activeOpacity={0.7}
-                    >
-                      <Text
-                        style={[
-                          styles.yesNoText,
-                          completed === true && styles.yesNoTextActive,
-                        ]}
-                      >
-                        {t("common.yes")}
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[
-                        styles.yesNoButton,
-                        styles.noButton,
-                        completed === false && styles.noButtonActive,
-                      ]}
-                      onPress={() => setCompleted(false)}
-                      activeOpacity={0.7}
-                    >
-                      <Text
-                        style={[
-                          styles.yesNoText,
-                          completed === false && styles.yesNoTextActive,
-                        ]}
-                      >
-                        {t("common.no")}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Optional Fields - Show after Yes/No selection */}
-                  {completed !== null && (
-                    <View style={styles.optionalFields}>
-                      {/* Reflection */}
-                      <Card shadow="sm" style={styles.reflectionCard}>
-                        <Text style={styles.optionalLabel}>
-                          {t("checkin.reflection_label")}
-                          <Text style={styles.optionalText}>
-                            {" "}
-                            ({t("common.optional")})
-                          </Text>
-                        </Text>
-                        <TextInput
-                          style={styles.reflectionInput}
-                          placeholder={t("checkin.reflection_placeholder")}
-                          placeholderTextColor={colors.text.tertiary}
-                          value={reflection}
-                          onChangeText={setReflection}
-                          multiline
-                          numberOfLines={4}
-                          textAlignVertical="top"
-                        />
-                      </Card>
-
-                      {/* Mood Rating */}
-                      <View style={styles.moodSection}>
-                        <Text style={styles.optionalLabel}>
-                          {t("checkin.mood_label")}
-                          <Text style={styles.optionalText}>
-                            {" "}
-                            ({t("common.optional")})
-                          </Text>
-                        </Text>
-                        <View style={styles.moodContainer}>
-                          {MOOD_EMOJIS.map((emoji, index) => {
-                            const moodValue = index + 1;
-                            const isSelected = selectedMood === moodValue;
-                            return (
-                              <TouchableOpacity
-                                key={moodValue}
-                                style={[
-                                  styles.moodButton,
-                                  isSelected && styles.moodButtonActive,
-                                ]}
-                                onPress={() =>
-                                  setSelectedMood(isSelected ? null : moodValue)
-                                }
-                                activeOpacity={0.7}
-                              >
-                                <Text style={styles.moodEmoji}>{emoji}</Text>
-                                {isSelected && (
-                                  <View style={styles.moodCheck}>
-                                    <Ionicons
-                                      name="checkmark"
-                                      size={16}
-                                      color={brandColors.primary}
-                                    />
-                                  </View>
-                                )}
-                              </TouchableOpacity>
-                            );
-                          })}
-                        </View>
-                        {selectedMood && (
-                          <Text style={styles.moodLabel}>
-                            {MOOD_LABELS[selectedMood - 1]}
-                          </Text>
-                        )}
-                      </View>
-
-                      {/* Progress Photo Section */}
-                      <View style={styles.photoSection}>
-                        <Text style={styles.optionalLabel}>
-                          {t("checkin.photo_label")}
-                          <Text style={styles.optionalText}>
-                            {" "}
-                            ({t("common.optional")})
-                          </Text>
-                        </Text>
-
-                        {/* Selected Photos Grid */}
-                        {selectedPhotos.length > 0 && (
-                          <View style={styles.photosGrid}>
-                            {selectedPhotos.map((photoUrl, index) => (
-                              <View key={index} style={styles.photoContainer}>
-                                <Image
-                                  source={{ uri: photoUrl }}
-                                  style={styles.photoPreview}
-                                  resizeMode="cover"
+                    <View style={styles.moodContainer}>
+                      {MOOD_EMOJIS.map((emoji, index) => {
+                        const moodValue = index + 1;
+                        const isSelected = selectedMood === moodValue;
+                        return (
+                          <TouchableOpacity
+                            key={moodValue}
+                            style={[
+                              styles.moodButton,
+                              isSelected && styles.moodButtonActive,
+                            ]}
+                            onPress={() =>
+                              setSelectedMood(isSelected ? null : moodValue)
+                            }
+                            activeOpacity={0.7}
+                          >
+                            <Text style={styles.moodEmoji}>{emoji}</Text>
+                            {isSelected && (
+                              <View style={styles.moodCheck}>
+                                <Ionicons
+                                  name="checkmark"
+                                  size={12}
+                                  color={brandColors.onPrimary}
                                 />
-                                <TouchableOpacity
-                                  style={styles.removePhotoButton}
-                                  onPress={() => handleRemovePhoto(photoUrl)}
-                                >
-                                  <Ionicons
-                                    name="close-circle"
-                                    size={24}
-                                    color={colors.feedback.error}
-                                  />
-                                </TouchableOpacity>
                               </View>
-                            ))}
-                          </View>
-                        )}
-
-                        {/* Uploading Photos */}
-                        {uploadingPhotos.length > 0 && (
-                          <View style={styles.uploadingContainer}>
-                            <ActivityIndicator
-                              size="small"
-                              color={brandColors.primary}
-                            />
-                            <Text style={styles.uploadingText}>
-                              Uploading photo...
-                            </Text>
-                          </View>
-                        )}
-
-                        {/* Add Photo Button */}
-                        <TouchableOpacity
-                          style={styles.addPhotoButton}
-                          onPress={handleAddPhoto}
-                          disabled={isUploading || uploadingPhotos.length > 0}
-                        >
-                          <Ionicons
-                            name="camera-outline"
-                            size={toRN(tokens.typography.fontSize.xl)}
-                            color={brandColors.primary}
-                          />
-                          <Text style={styles.addPhotoText}>
-                            {t("checkin.add_photo")}
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
+                            )}
+                          </TouchableOpacity>
+                        );
+                      })}
                     </View>
-                  )}
+                    {selectedMood && (
+                      <Text style={styles.moodLabel}>
+                        {MOOD_LABELS[selectedMood - 1]}
+                      </Text>
+                    )}
+                  </View>
+
+                  {/* Notes Section */}
+                  <Card shadow="sm" style={styles.notesCard}>
+                    <Text style={styles.sectionLabel}>
+                      {t("checkin.reflection_label") || "Notes"}
+                      <Text style={styles.optionalText}>
+                        {" "}
+                        ({t("common.optional")})
+                      </Text>
+                    </Text>
+                    <TextInput
+                      style={styles.notesInput}
+                      placeholder={
+                        t("checkin.reflection_placeholder") || "How did it go?"
+                      }
+                      placeholderTextColor={colors.text.tertiary}
+                      value={reflection}
+                      onChangeText={setReflection}
+                      multiline
+                      numberOfLines={4}
+                      textAlignVertical="top"
+                    />
+                  </Card>
+
+                  {/* Photo Section */}
+                  <View style={styles.photoSection}>
+                    <Text style={styles.sectionLabel}>
+                      {t("checkin.photo_label") || "Progress Photo"}
+                      <Text style={styles.optionalText}>
+                        {" "}
+                        ({t("common.optional")})
+                      </Text>
+                    </Text>
+
+                    {/* Selected Photos Grid */}
+                    {selectedPhotos.length > 0 && (
+                      <View style={styles.photosGrid}>
+                        {selectedPhotos.map((photoUrl, index) => (
+                          <View key={index} style={styles.photoContainer}>
+                            <Image
+                              source={{ uri: photoUrl }}
+                              style={styles.photoPreview}
+                              resizeMode="cover"
+                            />
+                            <TouchableOpacity
+                              style={styles.removePhotoButton}
+                              onPress={() => handleRemovePhoto(photoUrl)}
+                            >
+                              <Ionicons
+                                name="close-circle"
+                                size={24}
+                                color={colors.feedback.error}
+                              />
+                            </TouchableOpacity>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+
+                    {/* Uploading Photos */}
+                    {uploadingPhotos.length > 0 && (
+                      <View style={styles.uploadingContainer}>
+                        <ActivityIndicator
+                          size="small"
+                          color={brandColors.primary}
+                        />
+                        <Text style={styles.uploadingText}>
+                          {t("checkin.uploading") || "Uploading photo..."}
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* Add Photo Button */}
+                    <TouchableOpacity
+                      style={styles.addPhotoButton}
+                      onPress={handleAddPhoto}
+                      disabled={isUploading || uploadingPhotos.length > 0}
+                    >
+                      <Ionicons
+                        name="camera-outline"
+                        size={toRN(tokens.typography.fontSize.xl)}
+                        color={brandColors.primary}
+                      />
+                      <Text style={styles.addPhotoText}>
+                        {t("checkin.add_photo") || "Add Photo"}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
 
                   {/* Save Button */}
                   <TouchableOpacity
@@ -732,75 +659,33 @@ const makeCheckInModalStyles = (tokens: any, colors: any, brand: any) => ({
     paddingHorizontal: toRN(tokens.spacing[4]),
     paddingBottom: toRN(tokens.spacing[6]),
   },
-  goalContext: {
-    alignItems: "center",
+  headerSection: {
+    alignItems: "center" as const,
+    marginBottom: toRN(tokens.spacing[6]),
   },
-  goalIcon: {
+  checkInIcon: {
     width: toRN(tokens.spacing[16]),
     height: toRN(tokens.spacing[16]),
     borderRadius: toRN(tokens.borderRadius.full),
     backgroundColor: colors.bg.muted,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
     marginBottom: toRN(tokens.spacing[3]),
   },
-  goalTitle: {
-    fontSize: toRN(tokens.typography.fontSize.xl),
+  title: {
+    fontSize: toRN(tokens.typography.fontSize["2xl"]),
     fontFamily: fontFamily.bold,
     color: colors.text.primary,
-    textAlign: "center",
+    textAlign: "center" as const,
+    marginBottom: toRN(tokens.spacing[1]),
   },
-  question: {
-    fontSize: toRN(tokens.typography.fontSize.xl),
-    fontFamily: fontFamily.bold,
-    color: colors.text.primary,
-    textAlign: "center",
-    marginBottom: toRN(tokens.spacing[6]),
-    lineHeight: toRN(tokens.typography.fontSize["2xl"]) * 1.3,
+  subtitle: {
+    fontSize: toRN(tokens.typography.fontSize.base),
+    fontFamily: fontFamily.regular,
+    color: colors.text.secondary,
+    textAlign: "center" as const,
   },
-  yesNoContainer: {
-    flexDirection: "row",
-    gap: toRN(tokens.spacing[4]),
-    marginBottom: toRN(tokens.spacing[8]),
-  },
-  yesNoButton: {
-    flex: 1,
-    paddingVertical: toRN(tokens.spacing[5]),
-    borderRadius: toRN(tokens.borderRadius.xl),
-    borderWidth: 2,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  yesButton: {
-    borderColor: colors.feedback.success,
-    backgroundColor: "transparent",
-  },
-  yesButtonActive: {
-    backgroundColor: colors.feedback.success,
-  },
-  noButton: {
-    borderColor: colors.feedback.error,
-    backgroundColor: "transparent",
-  },
-  noButtonActive: {
-    backgroundColor: colors.feedback.error,
-  },
-  yesNoText: {
-    fontSize: toRN(tokens.typography.fontSize.xl),
-    fontFamily: fontFamily.bold,
-    color: colors.text.primary,
-  },
-  yesNoTextActive: {
-    color: "#FFFFFF",
-  },
-  optionalFields: {
-    gap: toRN(tokens.spacing[6]),
-    marginBottom: toRN(tokens.spacing[6]),
-  },
-  reflectionCard: {
-    padding: toRN(tokens.spacing[4]),
-  },
-  optionalLabel: {
+  sectionLabel: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.semiBold,
     color: colors.text.primary,
@@ -810,7 +695,55 @@ const makeCheckInModalStyles = (tokens: any, colors: any, brand: any) => ({
     fontFamily: fontFamily.regular,
     color: colors.text.secondary,
   },
-  reflectionInput: {
+  moodSection: {
+    marginBottom: toRN(tokens.spacing[6]),
+  },
+  moodContainer: {
+    flexDirection: "row" as const,
+    justifyContent: "space-between" as const,
+    gap: toRN(tokens.spacing[2]),
+  },
+  moodButton: {
+    flex: 1,
+    aspectRatio: 1,
+    borderRadius: toRN(tokens.borderRadius.xl),
+    backgroundColor: colors.bg.muted,
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+    borderWidth: 2,
+    borderColor: "transparent",
+    position: "relative" as const,
+  },
+  moodButtonActive: {
+    borderColor: brand.primary,
+    backgroundColor: brand.primary + "10",
+  },
+  moodEmoji: {
+    fontSize: toRN(tokens.typography.fontSize["2xl"]),
+  },
+  moodCheck: {
+    position: "absolute" as const,
+    top: toRN(tokens.spacing[1]),
+    right: toRN(tokens.spacing[1]),
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: brand.primary,
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+  },
+  moodLabel: {
+    fontSize: toRN(tokens.typography.fontSize.sm),
+    fontFamily: fontFamily.medium,
+    color: brand.primary,
+    textAlign: "center" as const,
+    marginTop: toRN(tokens.spacing[2]),
+  },
+  notesCard: {
+    padding: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[6]),
+  },
+  notesInput: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.regular,
     color: colors.text.primary,
@@ -818,53 +751,6 @@ const makeCheckInModalStyles = (tokens: any, colors: any, brand: any) => ({
     padding: toRN(tokens.spacing[3]),
     backgroundColor: colors.bg.muted,
     borderRadius: toRN(tokens.borderRadius.lg),
-  },
-  moodSection: {
-    marginTop: toRN(tokens.spacing[2]),
-    backgroundColor: colors.bg.card,
-    padding: toRN(tokens.spacing[4]),
-  },
-  moodContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: toRN(tokens.spacing[2]),
-    marginTop: toRN(tokens.spacing[3]),
-  },
-  moodButton: {
-    flex: 1,
-    aspectRatio: 1,
-    borderRadius: toRN(tokens.borderRadius.xl),
-    backgroundColor: colors.bg.muted,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 2,
-    borderColor: "transparent",
-    position: "relative",
-  },
-  moodButtonActive: {
-    borderColor: brand.primary,
-    backgroundColor: colors.bg.subtle,
-  },
-  moodEmoji: {
-    fontSize: toRN(tokens.typography.fontSize["3xl"]),
-  },
-  moodCheck: {
-    position: "absolute",
-    top: toRN(tokens.spacing[1]),
-    right: toRN(tokens.spacing[1]),
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: brand.primary,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  moodLabel: {
-    fontSize: toRN(tokens.typography.fontSize.sm),
-    fontFamily: fontFamily.regular,
-    color: colors.text.secondary,
-    textAlign: "center",
-    marginTop: toRN(tokens.spacing[2]),
   },
   saveButton: {
     backgroundColor: brand.primary,
@@ -887,7 +773,7 @@ const makeCheckInModalStyles = (tokens: any, colors: any, brand: any) => ({
     color: colors.text.tertiary,
   },
   photoSection: {
-    marginTop: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[6]),
   },
   photosGrid: {
     flexDirection: "row",

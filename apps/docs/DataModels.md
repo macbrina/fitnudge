@@ -584,7 +584,6 @@ INSERT INTO blog_categories (name, slug, description) VALUES
 - ✅ **`challenges`** - Live challenge updates
 - ✅ **`challenge_participants`** - Join/leave updates
 - ✅ **`challenge_leaderboard`** - Live competitive rankings
-- ✅ **`group_goals`** - Team collaboration updates
 
 #### 🌐 **Already Enabled: Social Features**
 

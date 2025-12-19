@@ -13,7 +13,8 @@
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
     "shadcn": "cd packages/ui && pnpm dlx shadcn@latest",
-    "precommit:dry": "lint-staged --no-stash"
+    "precommit:dry": "lint-staged --no-stash",
+    "prepare": "husky"
   },
   "lint-staged": {
     "apps/mobile/**/*.{ts,tsx}": [
@@ -44,6 +45,8 @@
   "devDependencies": {
     "@types/node": "^20.0.0",
     "eslint": "^8.57.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.1",
     "prettier": "^3.6.2",
     "turbo": "^2.5.8",
     "typescript": "5.9.2"

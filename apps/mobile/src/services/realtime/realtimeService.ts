@@ -24,10 +24,23 @@ import { useAuthStore } from "@/stores/authStore";
 import { useSubscriptionStore } from "@/stores/subscriptionStore";
 import { TokenManager } from "@/services/api/base";
 import { achievementsQueryKeys } from "@/hooks/api/useAchievements";
+import {
+  challengesQueryKeys,
+  goalsQueryKeys,
+  checkInsQueryKeys,
+  actionablePlansQueryKeys,
+  partnersQueryKeys,
+  nudgesQueryKeys,
+  challengeInvitesQueryKeys,
+} from "@/hooks/api/queryKeys";
+import { dailyMotivationsQueryKeys } from "@/hooks/api/useDailyMotivations";
+import { socialQueryKeys } from "@/hooks/api/useSocial";
+import { homeDashboardQueryKeys } from "@/hooks/api/useHomeDashboard";
+import type { ChallengeCheckIn } from "@/services/api/challenges";
 
-// Realtime-enabled tables (18 total)
+// Realtime-enabled tables (19 total)
 // NOTE: Cache updates are handled by mutations in hooks (useGoals.ts, useCheckIns.ts, etc.)
-// Realtime is kept for: 1) User status changes (security), 2) Future external sync
+// Realtime is kept for: 1) User status changes (security), 2) External sync (admin, DB changes)
 const REALTIME_TABLES = [
   // Security
   "users",
@@ -48,10 +61,12 @@ const REALTIME_TABLES = [
   "achievement_types",
   "user_achievements",
   "accountability_partners",
+  // Challenges
   "challenges",
   "challenge_participants",
   "challenge_leaderboard",
-  "group_goals",
+  "challenge_check_ins",
+  "challenge_invites",
   // Social (already enabled)
   "posts",
   "comments",
@@ -60,6 +75,43 @@ const REALTIME_TABLES = [
 ] as const;
 
 type RealtimeTable = (typeof REALTIME_TABLES)[number];
+
+/**
+ * Mapping from table names to their base query keys for generic cache invalidation
+ * Used for UPDATE and DELETE events from admin/external sources
+ */
+const TABLE_QUERY_KEY_MAP: Record<RealtimeTable, readonly string[]> = {
+  // Security
+  users: ["user"],
+  // Core
+  check_ins: checkInsQueryKeys.all,
+  goals: goalsQueryKeys.all,
+  actionable_plans: actionablePlansQueryKeys.all,
+  daily_motivations: dailyMotivationsQueryKeys.all,
+  // Subscriptions
+  subscriptions: ["subscriptions"],
+  // Notifications
+  motivations: ["motivations"],
+  notification_history: ["notifications"],
+  // Meal Tracking
+  meal_logs: ["mealLogs"],
+  daily_nutrition_summaries: ["nutritionSummaries"],
+  // Gamification
+  achievement_types: achievementsQueryKeys.all,
+  user_achievements: achievementsQueryKeys.all,
+  accountability_partners: partnersQueryKeys.all,
+  // Challenges
+  challenges: challengesQueryKeys.all,
+  challenge_participants: challengesQueryKeys.all,
+  challenge_leaderboard: challengesQueryKeys.all,
+  challenge_check_ins: challengesQueryKeys.all,
+  challenge_invites: challengeInvitesQueryKeys.all,
+  // Social
+  posts: socialQueryKeys.posts.all,
+  comments: ["social", "comments"],
+  likes: ["social", "likes"],
+  follows: ["social", "follows"],
+};
 
 class RealtimeService {
   private queryClient: QueryClient | null = null;
@@ -283,31 +335,10 @@ class RealtimeService {
             // No filter here - we filter in the handler
           },
           (payload: RealtimePostgresChangesPayload<any>) => {
-            // DEBUG: Log ALL events received (before filtering)
-            const oldRecord = payload.old as any;
-            const newRecord = payload.new as any;
-
-            console.log(
-              `[Realtime] 📥 RAW EVENT: ${table} ${payload.eventType}`,
-              {
-                hasOld: !!oldRecord,
-                hasNew: !!newRecord,
-                oldId: oldRecord?.id,
-                newId: newRecord?.id,
-                oldUserId: oldRecord?.user_id,
-                newUserId: newRecord?.user_id,
-                expectedUserId: userId,
-              }
-            );
-
             // NO CLIENT-SIDE FILTERING NEEDED!
             // Backend RLS already ensures users only receive/modify their own data
             // With RLS enabled, even REPLICA IDENTITY FULL doesn't include user_id in DELETE events
             // So we trust the backend and process all events we receive
-
-            console.log(
-              `[Realtime]   ✅ Processing event (backend RLS trusted)`
-            );
             this.handleTableChange(table, payload);
           }
         )
@@ -334,6 +365,17 @@ class RealtimeService {
     }
   }
 
+  // Tables with specific handlers - skip generic handler for these
+  private static TABLES_WITH_SPECIFIC_HANDLERS: Set<RealtimeTable> = new Set([
+    "users",
+    "user_achievements",
+    "subscriptions",
+    "challenge_check_ins",
+    "challenge_participants",
+    "challenge_leaderboard",
+    "challenges",
+  ]);
+
   /**
    * Handle table change events
    *
@@ -341,34 +383,216 @@ class RealtimeService {
    * Mutations in useGoals.ts, useCheckIns.ts etc. handle instant UI feedback.
    * Realtime is kept for:
    * 1. CRITICAL: User status changes (ban/suspend) - security
-   * 2. Future: External changes from other devices, backend tasks, etc.
+   * 2. External changes from admin panel, other devices, backend tasks, etc.
    */
   private async handleTableChange(
     table: RealtimeTable,
     payload: RealtimePostgresChangesPayload<any>
   ) {
-    console.log(`[Realtime] 📡 ${table} ${payload.eventType}`, {
-      old: (payload.old as any)?.id || "N/A",
-      new: (payload.new as any)?.id || "N/A",
-    });
+    // Log changes (minimal for performance)
+    if (__DEV__) {
+      console.log(`[Realtime] 📡 ${table} ${payload.eventType}`, {
+        id: (payload.new as any)?.id || (payload.old as any)?.id || "N/A",
+      });
+    }
 
-    // CRITICAL: Handle user status changes (ban/suspend)
-    if (table === "users" && payload.eventType === "UPDATE") {
+    // CRITICAL: Handle user status changes (ban/suspend/delete)
+    if (
+      table === "users" &&
+      (payload.eventType === "UPDATE" || payload.eventType === "DELETE")
+    ) {
       await this.handleUserStatusChange(payload);
+      return; // Specific handler fully handles this
     }
 
     // Handle new achievements (unlocked via backend/Celery tasks)
     if (table === "user_achievements" && payload.eventType === "INSERT") {
       this.handleNewAchievement(payload);
+      return; // Specific handler fully handles this
     }
 
     // Handle subscription changes (RevenueCat webhook updates)
     if (table === "subscriptions") {
       this.handleSubscriptionChange(payload);
+      return; // Specific handler fully handles this
     }
 
-    // NOTE: No cache updates here - mutations handle optimistic updates
-    // Realtime events are logged for debugging, can add sync logic later if needed
+    // Handle challenge check-ins (external changes from admin/DB/tasks)
+    if (table === "challenge_check_ins") {
+      this.handleChallengeCheckInsChange(payload);
+      return; // Specific handler fully handles this
+    }
+
+    // Handle challenge participants changes (points, progress updates)
+    if (table === "challenge_participants") {
+      this.handleChallengeParticipantsChange(payload);
+      return; // Specific handler fully handles this
+    }
+
+    // Handle challenge leaderboard changes
+    if (table === "challenge_leaderboard") {
+      this.handleChallengeLeaderboardChange(payload);
+      return; // Specific handler fully handles this
+    }
+
+    // Handle challenges table changes (for main challenge data)
+    if (table === "challenges") {
+      this.handleChallengesChange(payload);
+      return; // Specific handler fully handles this
+    }
+
+    // Generic handler for all OTHER tables without specific handlers
+    this.handleGenericTableChange(table, payload);
+  }
+
+  /**
+   * Generic handler for UPDATE and DELETE events on all tables
+   * This catches admin/external changes that don't have specific handlers above
+   *
+   * - DELETE: Invalidate queries (only id is available)
+   * - UPDATE: Try to update cache optimistically, then invalidate for fresh data
+   */
+  private handleGenericTableChange(
+    table: RealtimeTable,
+    payload: RealtimePostgresChangesPayload<any>
+  ) {
+    if (!this.queryClient) return;
+
+    const oldRecord = payload.old as any;
+    const newRecord = payload.new as any;
+    const baseQueryKey = TABLE_QUERY_KEY_MAP[table];
+
+    if (!baseQueryKey) {
+      console.warn(`[Realtime] No query key mapping for table: ${table}`);
+      return;
+    }
+
+    if (payload.eventType === "DELETE") {
+      // DELETE: Only id is available, invalidate queries to refetch
+      console.log(
+        `[Realtime] 🗑️ DELETE on ${table}, invalidating queries:`,
+        baseQueryKey
+      );
+      this.queryClient.invalidateQueries({
+        queryKey: baseQueryKey,
+      });
+
+      // Also invalidate home dashboard since it aggregates data
+      this.queryClient.invalidateQueries({
+        queryKey: homeDashboardQueryKeys.dashboard(),
+      });
+    } else if (payload.eventType === "UPDATE") {
+      // UPDATE: Full record available, try optimistic update then invalidate
+      console.log(
+        `[Realtime] ✏️ UPDATE on ${table}, updating cache:`,
+        newRecord?.id
+      );
+
+      // For list queries, try to update the item in place
+      this.queryClient.setQueriesData(
+        { queryKey: baseQueryKey },
+        (oldData: any) => {
+          if (!oldData) return oldData;
+
+          // Handle array data (list queries)
+          if (Array.isArray(oldData)) {
+            const index = oldData.findIndex(
+              (item: any) => item?.id === newRecord?.id
+            );
+            if (index !== -1) {
+              const updated = [...oldData];
+              updated[index] = { ...updated[index], ...newRecord };
+              return updated;
+            }
+          }
+
+          // Handle { data: [...] } format
+          if (oldData?.data && Array.isArray(oldData.data)) {
+            const index = oldData.data.findIndex(
+              (item: any) => item?.id === newRecord?.id
+            );
+            if (index !== -1) {
+              const updatedData = [...oldData.data];
+              updatedData[index] = { ...updatedData[index], ...newRecord };
+              return { ...oldData, data: updatedData };
+            }
+          }
+
+          // Handle single object (detail queries)
+          if (oldData?.id === newRecord?.id) {
+            return { ...oldData, ...newRecord };
+          }
+
+          return oldData;
+        }
+      );
+
+      // Also invalidate to ensure computed fields are fresh
+      this.queryClient.invalidateQueries({
+        queryKey: baseQueryKey,
+      });
+
+      // Invalidate home dashboard for aggregate updates
+      this.queryClient.invalidateQueries({
+        queryKey: homeDashboardQueryKeys.dashboard(),
+      });
+    } else if (payload.eventType === "INSERT") {
+      // INSERT: Add to cache if not already exists (avoid duplicates from optimistic updates)
+      const newId = newRecord?.id;
+
+      if (newId) {
+        // Try to add to existing cache data if not already present
+        let wasAdded = false;
+
+        this.queryClient.setQueriesData(
+          { queryKey: baseQueryKey },
+          (oldData: any) => {
+            if (!oldData) return oldData;
+
+            // Handle array data (list queries)
+            if (Array.isArray(oldData)) {
+              const exists = oldData.some((item: any) => item?.id === newId);
+              if (!exists) {
+                wasAdded = true;
+                return [newRecord, ...oldData];
+              }
+              return oldData;
+            }
+
+            // Handle { data: [...] } format
+            if (oldData?.data && Array.isArray(oldData.data)) {
+              const exists = oldData.data.some(
+                (item: any) => item?.id === newId
+              );
+              if (!exists) {
+                wasAdded = true;
+                return { ...oldData, data: [newRecord, ...oldData.data] };
+              }
+              return oldData;
+            }
+
+            return oldData;
+          }
+        );
+
+        if (__DEV__) {
+          console.log(
+            `[Realtime] ➕ INSERT on ${table}:`,
+            wasAdded ? "added to cache" : "already exists, skipped"
+          );
+        }
+      }
+
+      // Also invalidate to ensure computed fields and aggregates are fresh
+      this.queryClient.invalidateQueries({
+        queryKey: baseQueryKey,
+      });
+
+      // Invalidate home dashboard for new items
+      this.queryClient.invalidateQueries({
+        queryKey: homeDashboardQueryKeys.dashboard(),
+      });
+    }
   }
 
   /**
@@ -462,7 +686,7 @@ class RealtimeService {
 
   /**
    * Handle user record changes:
-   * - CRITICAL: Force logout if user is banned/suspended/disabled
+   * - CRITICAL: Force logout if user is banned/suspended/disabled/deleted
    * - Update auth store if plan or other fields changed
    */
   private async handleUserStatusChange(
@@ -470,6 +694,15 @@ class RealtimeService {
   ) {
     const oldRecord = payload.old as any;
     const newRecord = payload.new as any;
+
+    // Handle DELETE - force logout if user is deleted
+    if (payload.eventType === "DELETE") {
+      console.log(`[Realtime] 🚨 User deleted, forcing logout`);
+      await handleAutoLogout("disabled");
+      return;
+    }
+
+    // Handle UPDATE
     const oldStatus = oldRecord?.status;
     const newStatus = newRecord?.status;
 
@@ -505,6 +738,272 @@ class RealtimeService {
     if (this.queryClient) {
       this.queryClient.invalidateQueries({
         queryKey: ["user", "current"],
+      });
+    }
+  }
+
+  /**
+   * Handle challenge check-ins changes (external: admin, direct DB changes)
+   * - DELETE: Remove from cache, recalculate progress
+   * - UPDATE: Update existing check-in in cache
+   * - INSERT: Only add if not already in cache (avoid dupes from optimistic updates)
+   */
+  private handleChallengeCheckInsChange(
+    payload: RealtimePostgresChangesPayload<any>
+  ) {
+    const oldRecord = payload.old as any;
+    const newRecord = payload.new as any;
+    const challengeId = newRecord?.challenge_id || oldRecord?.challenge_id;
+    const checkInId = newRecord?.id || oldRecord?.id;
+
+    if (!this.queryClient) return;
+
+    if (payload.eventType === "DELETE") {
+      if (challengeId) {
+        // Remove from cache directly for immediate feedback
+        const queryKeys = [
+          challengesQueryKeys.checkIns(challengeId),
+          challengesQueryKeys.myCheckIns(challengeId),
+        ];
+
+        for (const queryKey of queryKeys) {
+          this.queryClient.setQueryData(queryKey, (old: any) => {
+            if (!old?.data) return old;
+            const filtered = old.data.filter(
+              (ci: ChallengeCheckIn) => ci.id !== oldRecord?.id
+            );
+            console.log(
+              `[Realtime]   ✅ Removed check-in from cache: ${oldRecord?.id}`
+            );
+            return { ...old, data: filtered };
+          });
+        }
+
+        // Invalidate related queries to refetch updated totals
+        this.queryClient.invalidateQueries({
+          queryKey: challengesQueryKeys.detail(challengeId),
+        });
+        this.queryClient.invalidateQueries({
+          queryKey: challengesQueryKeys.leaderboard(challengeId),
+        });
+      } else {
+        // Fallback: no challenge_id, invalidate all
+        console.log(
+          `[Realtime]   ⚠️ No challenge_id in DELETE payload, invalidating all challenges`
+        );
+        this.queryClient.invalidateQueries({
+          queryKey: challengesQueryKeys.all,
+        });
+      }
+
+      // Invalidate home dashboard so TodaysActionsCard updates
+      this.queryClient.invalidateQueries({
+        queryKey: homeDashboardQueryKeys.dashboard(),
+      });
+    } else if (payload.eventType === "UPDATE") {
+      if (challengeId) {
+        // Update existing check-in in cache
+        const queryKeys = [
+          challengesQueryKeys.checkIns(challengeId),
+          challengesQueryKeys.myCheckIns(challengeId),
+        ];
+
+        for (const queryKey of queryKeys) {
+          this.queryClient.setQueryData(queryKey, (old: any) => {
+            if (!old?.data) return old;
+            const updated = old.data.map((ci: ChallengeCheckIn) =>
+              ci.id === newRecord?.id ? { ...ci, ...newRecord } : ci
+            );
+            return { ...old, data: updated };
+          });
+        }
+      } else {
+        // Fallback: no challenge_id, invalidate all
+        this.queryClient.invalidateQueries({
+          queryKey: challengesQueryKeys.all,
+        });
+      }
+
+      // Invalidate home dashboard so TodaysActionsCard updates
+      this.queryClient.invalidateQueries({
+        queryKey: homeDashboardQueryKeys.dashboard(),
+      });
+    } else if (payload.eventType === "INSERT") {
+      if (challengeId) {
+        // Check if already exists (avoid duplicates from optimistic updates)
+        const checkInsQueryKey = challengesQueryKeys.checkIns(challengeId);
+        const myCheckInsQueryKey = challengesQueryKeys.myCheckIns(challengeId);
+        const existingData = this.queryClient.getQueryData(checkInsQueryKey) as
+          | { data?: ChallengeCheckIn[] }
+          | undefined;
+
+        const alreadyExists = existingData?.data?.some(
+          (ci) => ci.id === newRecord?.id || ci.id?.startsWith?.("temp-")
+        );
+
+        if (!alreadyExists) {
+          // Add to cache for both checkIns and myCheckIns
+          for (const queryKey of [checkInsQueryKey, myCheckInsQueryKey]) {
+            this.queryClient.setQueryData(queryKey, (old: any) => {
+              if (!old) return old;
+              if (Array.isArray(old)) return [newRecord, ...old];
+              if (old?.data) return { ...old, data: [newRecord, ...old.data] };
+              return old;
+            });
+          }
+        }
+
+        // Always invalidate to get fresh totals
+        this.queryClient.invalidateQueries({
+          queryKey: challengesQueryKeys.detail(challengeId),
+        });
+        this.queryClient.invalidateQueries({
+          queryKey: challengesQueryKeys.leaderboard(challengeId),
+        });
+      } else {
+        // Fallback: no challenge_id, invalidate all
+        this.queryClient.invalidateQueries({
+          queryKey: challengesQueryKeys.all,
+        });
+      }
+
+      // Invalidate home dashboard so TodaysActionsCard shows new pending check-ins
+      this.queryClient.invalidateQueries({
+        queryKey: homeDashboardQueryKeys.dashboard(),
+      });
+    }
+  }
+
+  /**
+   * Handle challenge participants changes (points, progress_data updates)
+   * This is triggered when points are recalculated after check-in add/delete
+   */
+  private handleChallengeParticipantsChange(
+    payload: RealtimePostgresChangesPayload<any>
+  ) {
+    const newRecord = payload.new as any;
+    const oldRecord = payload.old as any;
+    const challengeId = newRecord?.challenge_id || oldRecord?.challenge_id;
+
+    if (!this.queryClient) return;
+
+    if (challengeId) {
+      // Invalidate participants query
+      this.queryClient.invalidateQueries({
+        queryKey: challengesQueryKeys.participants(challengeId),
+      });
+
+      // Also invalidate challenge detail (to get updated my_progress, my_rank)
+      this.queryClient.invalidateQueries({
+        queryKey: challengesQueryKeys.detail(challengeId),
+      });
+
+      // Leaderboard depends on participants
+      this.queryClient.invalidateQueries({
+        queryKey: challengesQueryKeys.leaderboard(challengeId),
+      });
+    } else {
+      // Fallback: challenge_id not in payload (REPLICA IDENTITY not set)
+      this.queryClient.invalidateQueries({
+        queryKey: challengesQueryKeys.all,
+      });
+    }
+  }
+
+  /**
+   * Handle challenge leaderboard changes
+   * Leaderboard is updated after check-ins affect points/rankings
+   */
+  private handleChallengeLeaderboardChange(
+    payload: RealtimePostgresChangesPayload<any>
+  ) {
+    const newRecord = payload.new as any;
+    const oldRecord = payload.old as any;
+    const challengeId = newRecord?.challenge_id || oldRecord?.challenge_id;
+
+    if (!this.queryClient) return;
+
+    if (challengeId) {
+      // Invalidate specific leaderboard query
+      this.queryClient.invalidateQueries({
+        queryKey: challengesQueryKeys.leaderboard(challengeId),
+      });
+
+      // Also update challenge detail for my_rank
+      this.queryClient.invalidateQueries({
+        queryKey: challengesQueryKeys.detail(challengeId),
+      });
+    } else {
+      // Fallback: challenge_id not in payload (REPLICA IDENTITY not set)
+      // Invalidate all challenge queries to ensure UI stays in sync
+      this.queryClient.invalidateQueries({
+        queryKey: challengesQueryKeys.all,
+      });
+    }
+  }
+
+  /**
+   * Handle challenges table changes
+   * For when challenge details are updated (title, status, etc.)
+   */
+  private handleChallengesChange(payload: RealtimePostgresChangesPayload<any>) {
+    const newRecord = payload.new as any;
+    const oldRecord = payload.old as any;
+    const challengeId = newRecord?.id || oldRecord?.id;
+
+    if (!this.queryClient) return;
+
+    if (payload.eventType === "DELETE") {
+      // Remove from list cache
+      this.queryClient.setQueryData(challengesQueryKeys.list(), (old: any) => {
+        if (!old?.data) return old;
+        const filtered = old.data.filter((c: any) => c.id !== oldRecord?.id);
+        return { ...old, data: filtered };
+      });
+
+      // Remove specific detail cache
+      this.queryClient.removeQueries({
+        queryKey: challengesQueryKeys.detail(oldRecord?.id),
+      });
+
+      // Invalidate home dashboard (TodaysActionsCard uses this)
+      this.queryClient.invalidateQueries({
+        queryKey: homeDashboardQueryKeys.dashboard(),
+      });
+    } else if (payload.eventType === "UPDATE") {
+      // Update in list cache
+      this.queryClient.setQueryData(challengesQueryKeys.list(), (old: any) => {
+        if (!old?.data) return old;
+        const updated = old.data.map((c: any) =>
+          c.id === newRecord?.id ? { ...c, ...newRecord } : c
+        );
+        return { ...old, data: updated };
+      });
+
+      // Invalidate detail to get fresh computed fields
+      this.queryClient.invalidateQueries({
+        queryKey: challengesQueryKeys.detail(challengeId),
+      });
+
+      // Invalidate home dashboard (TodaysActionsCard uses this)
+      this.queryClient.invalidateQueries({
+        queryKey: homeDashboardQueryKeys.dashboard(),
+      });
+    } else if (payload.eventType === "INSERT") {
+      // For new challenges, invalidate all challenge queries
+      this.queryClient.invalidateQueries({
+        queryKey: challengesQueryKeys.all,
+      });
+      this.queryClient.invalidateQueries({
+        queryKey: challengesQueryKeys.list(),
+      });
+      this.queryClient.invalidateQueries({
+        queryKey: challengesQueryKeys.public(),
+      });
+
+      // Invalidate home dashboard so TodaysActionsCard shows new pending check-ins
+      this.queryClient.invalidateQueries({
+        queryKey: homeDashboardQueryKeys.dashboard(),
       });
     }
   }

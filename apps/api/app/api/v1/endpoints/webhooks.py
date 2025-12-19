@@ -14,32 +14,33 @@ Events handled:
 - UNCANCELLATION: User re-enables auto-renew
 - TRANSFER: Subscription transferred to different app user
 
+Features:
+- Idempotency: Each event is processed only once
+- Async processing: Heavy operations don't block webhook response
+- Deactivation handling: Automatic goal/challenge cleanup on expiry
+- Audit logging: All subscription changes are logged
+
 Setup in RevenueCat Dashboard:
 1. Go to Project Settings > Integrations > Webhooks
 2. Add your webhook URL: https://your-api.com/api/v1/webhooks/revenuecat
 3. Set Authorization header value (e.g., "Bearer your-secret-token")
 4. Add to environment: REVENUECAT_WEBHOOK_SECRET=Bearer your-secret-token
-
-Security:
-- RevenueCat uses Authorization header for webhook security (not signature)
-- Set the same value in RevenueCat Dashboard and your environment variable
 """
 
-from fastapi import APIRouter, HTTPException, Request, Header
+from fastapi import APIRouter, HTTPException, Request, Header, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
 import hmac
 import os
+import json
 import logging
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(redirect_slashes=False)
 
-# RevenueCat webhook secret - this is the Authorization header value
-# Set the same value in RevenueCat Dashboard > Webhooks > Authorization header
-# Example: "Bearer super_long_random_string_here"
+# RevenueCat webhook secret
 REVENUECAT_WEBHOOK_SECRET = os.getenv("REVENUECAT_WEBHOOK_SECRET", "")
 
 
@@ -72,26 +73,24 @@ class RevenueCatEvent(BaseModel):
     environment: Optional[str] = None  # SANDBOX or PRODUCTION
     event_timestamp_ms: Optional[int] = None
     expiration_at_ms: Optional[int] = None
-    grace_period_expiration_at_ms: Optional[int] = (
-        None  # Grace period end for billing issues
-    )
+    grace_period_expiration_at_ms: Optional[int] = None
     id: Optional[str] = None
     is_family_share: Optional[bool] = None
     offer_code: Optional[str] = None
     original_app_user_id: Optional[str] = None
     original_transaction_id: Optional[str] = None
-    period_type: Optional[str] = None  # TRIAL, INTRO, NORMAL
+    period_type: Optional[str] = None
     presented_offering_id: Optional[str] = None
     price: Optional[float] = None
     price_in_purchased_currency: Optional[float] = None
     product_id: Optional[str] = None
     purchased_at_ms: Optional[int] = None
-    store: Optional[str] = None  # APP_STORE, PLAY_STORE, STRIPE, etc.
+    store: Optional[str] = None
     subscriber_attributes: Optional[dict] = None
     takehome_percentage: Optional[float] = None
     tax_percentage: Optional[float] = None
     transaction_id: Optional[str] = None
-    type: str  # Event type
+    type: str
 
 
 class RevenueCatWebhook(BaseModel):
@@ -106,7 +105,7 @@ def get_plan_from_product_id(product_id: str) -> str:
 
     product_id_lower = product_id.lower()
 
-    if "coach" in product_id_lower:
+    if "elite" in product_id_lower:
         return "elite"
     elif "pro" in product_id_lower:
         return "pro"
@@ -129,20 +128,104 @@ def get_platform_from_store(store: str) -> str:
     return store_map.get(store, "unknown")
 
 
+async def is_event_already_processed(supabase, event_id: str) -> bool:
+    """Check if event has already been processed (idempotency check)."""
+    if not event_id:
+        return False
+
+    try:
+        result = (
+            supabase.table("webhook_events")
+            .select("id, status")
+            .eq("event_id", event_id)
+            .execute()
+        )
+
+        if result.data:
+            status = result.data[0].get("status")
+            # If already completed or processing, skip
+            return status in ["completed", "processing"]
+
+        return False
+    except Exception as e:
+        logger.error(f"Error checking event idempotency: {e}")
+        return False
+
+
+async def mark_event_processing(
+    supabase, event_id: str, event_type: str, user_id: str, payload: dict
+):
+    """Mark event as being processed."""
+    try:
+        supabase.table("webhook_events").upsert(
+            {
+                "event_id": event_id,
+                "event_type": event_type,
+                "user_id": user_id,
+                "status": "processing",
+                "payload": payload,
+                "created_at": datetime.utcnow().isoformat(),
+                "updated_at": datetime.utcnow().isoformat(),
+            },
+            on_conflict="event_id",
+        ).execute()
+    except Exception as e:
+        logger.error(f"Error marking event as processing: {e}")
+
+
+async def mark_event_completed(supabase, event_id: str):
+    """Mark event as successfully completed."""
+    try:
+        supabase.table("webhook_events").update(
+            {
+                "status": "completed",
+                "processed_at": datetime.utcnow().isoformat(),
+                "updated_at": datetime.utcnow().isoformat(),
+            }
+        ).eq("event_id", event_id).execute()
+    except Exception as e:
+        logger.error(f"Error marking event as completed: {e}")
+
+
+async def mark_event_failed(supabase, event_id: str, error_message: str):
+    """Mark event as failed with error message."""
+    try:
+        # Get current retry count
+        result = (
+            supabase.table("webhook_events")
+            .select("retry_count")
+            .eq("event_id", event_id)
+            .execute()
+        )
+
+        retry_count = (result.data[0].get("retry_count", 0) if result.data else 0) + 1
+
+        supabase.table("webhook_events").update(
+            {
+                "status": "failed",
+                "error_message": error_message,
+                "retry_count": retry_count,
+                "updated_at": datetime.utcnow().isoformat(),
+            }
+        ).eq("event_id", event_id).execute()
+    except Exception as e:
+        logger.error(f"Error marking event as failed: {e}")
+
+
 @router.post("/revenuecat")
 async def revenuecat_webhook(
     request: Request,
+    background_tasks: BackgroundTasks,
     authorization: Optional[str] = Header(None),
 ):
     """
-    Handle RevenueCat webhook events
+    Handle RevenueCat webhook events with idempotency.
 
-    This endpoint receives subscription events from RevenueCat and updates
-    the subscriptions table accordingly.
-
-    Security:
-    - Verifies Authorization header against REVENUECAT_WEBHOOK_SECRET
-    - Set the same value in RevenueCat Dashboard and your environment variable
+    This endpoint:
+    1. Validates the authorization header
+    2. Checks if the event was already processed (idempotency)
+    3. Processes the event
+    4. Returns quickly (heavy operations run in background)
     """
     from app.core.database import get_supabase_client
 
@@ -152,21 +235,16 @@ async def revenuecat_webhook(
             logger.warning("Missing Authorization header")
             raise HTTPException(status_code=401, detail="Missing Authorization header")
 
-        # Use timing-safe comparison to prevent timing attacks
         if not hmac.compare_digest(authorization, REVENUECAT_WEBHOOK_SECRET):
             logger.warning("Invalid Authorization header")
             raise HTTPException(status_code=401, detail="Unauthorized")
     else:
-        # Allow in development if not configured
         logger.warning("REVENUECAT_WEBHOOK_SECRET not configured, skipping auth check")
 
-    # Get raw body for parsing
+    # Parse webhook payload
     body = await request.body()
 
-    # Parse webhook payload
     try:
-        import json
-
         payload = json.loads(body)
         webhook = RevenueCatWebhook(**payload)
         event = webhook.event
@@ -176,55 +254,62 @@ async def revenuecat_webhook(
 
     print(f"Received RevenueCat webhook: {event.type} for user {event.app_user_id}")
 
-    # Skip sandbox events in production (optional)
-    # if event.environment == "SANDBOX" and os.getenv("ENVIRONMENT") == "production":
-    #     logger.info("Skipping sandbox event in production")
-    #     return {"status": "skipped", "reason": "sandbox_event"}
-
     supabase = get_supabase_client()
 
-    # Get user ID (RevenueCat app_user_id should be our user ID)
+    # Get event ID for idempotency
+    event_id = (
+        event.id or f"{event.type}_{event.app_user_id}_{event.event_timestamp_ms}"
+    )
+
+    # Idempotency check
+    if await is_event_already_processed(supabase, event_id):
+        logger.info(f"Event {event_id} already processed, skipping")
+        return {"status": "already_processed", "event_id": event_id}
+
+    # Get user ID
     user_id = event.app_user_id or event.original_app_user_id
 
     if not user_id:
         print("No user ID in webhook event")
         return {"status": "skipped", "reason": "no_user_id"}
 
-    # Handle different event types
+    # Mark as processing
+    await mark_event_processing(supabase, event_id, event.type, user_id, payload)
+
+    # Process event
     try:
         if event.type in ["INITIAL_PURCHASE", "RENEWAL", "UNCANCELLATION"]:
-            # Active subscription events
             await handle_subscription_active(supabase, event, user_id)
 
         elif event.type == "CANCELLATION":
-            # User cancelled but subscription still active until expiry
             await handle_subscription_cancelled(supabase, event, user_id)
 
         elif event.type == "EXPIRATION":
-            # Subscription expired
+            # This is the critical one - needs deactivation logic
             await handle_subscription_expired(supabase, event, user_id)
 
         elif event.type == "BILLING_ISSUE":
-            # Payment failed - subscription may enter grace period
             await handle_billing_issue(supabase, event, user_id)
 
         elif event.type == "PRODUCT_CHANGE":
-            # User changed plan (upgrade/downgrade)
             await handle_product_change(supabase, event, user_id)
 
         elif event.type == "TRANSFER":
-            # Subscription transferred to different user
             await handle_subscription_transfer(supabase, event, user_id)
 
         else:
             logger.info(f"Unhandled event type: {event.type}")
 
+        # Mark as completed
+        await mark_event_completed(supabase, event_id)
+
     except Exception as e:
         logger.error(f"Error processing webhook: {e}")
-        # Don't raise - RevenueCat will retry on 5xx errors
-        return {"status": "error", "message": str(e)}
+        await mark_event_failed(supabase, event_id, str(e))
+        # Don't raise - return 200 to prevent RevenueCat retries for processing errors
+        return {"status": "error", "message": str(e), "event_id": event_id}
 
-    return {"status": "success", "event_type": event.type}
+    return {"status": "success", "event_type": event.type, "event_id": event_id}
 
 
 async def handle_subscription_active(supabase, event: RevenueCatEvent, user_id: str):
@@ -232,7 +317,6 @@ async def handle_subscription_active(supabase, event: RevenueCatEvent, user_id: 
     plan = get_plan_from_product_id(event.product_id)
     platform = get_platform_from_store(event.store or "")
 
-    # Convert timestamps
     expires_at = None
     if event.expiration_at_ms:
         expires_at = datetime.fromtimestamp(event.expiration_at_ms / 1000).isoformat()
@@ -246,6 +330,10 @@ async def handle_subscription_active(supabase, event: RevenueCatEvent, user_id: 
         supabase.table("subscriptions").select("id").eq("user_id", user_id).execute()
     )
 
+    # auto_renew is True for active subscription events
+    # INITIAL_PURCHASE, RENEWAL, UNCANCELLATION all indicate user intends to keep subscription
+    auto_renew = event.type in ["INITIAL_PURCHASE", "RENEWAL", "UNCANCELLATION"]
+
     subscription_data = {
         "user_id": user_id,
         "plan": plan,
@@ -254,36 +342,33 @@ async def handle_subscription_active(supabase, event: RevenueCatEvent, user_id: 
         "product_id": event.product_id,
         "purchase_date": purchased_at,
         "expires_date": expires_at,
-        "auto_renew": event.type != "CANCELLATION",
+        "auto_renew": auto_renew,
         "revenuecat_event_id": event.id,
         "environment": event.environment,
-        "grace_period_ends_at": None,  # Clear grace period when subscription is active
+        "grace_period_ends_at": None,
         "updated_at": datetime.utcnow().isoformat(),
     }
 
     if existing.data:
-        # Update existing subscription
         supabase.table("subscriptions").update(subscription_data).eq(
             "user_id", user_id
         ).execute()
         logger.info(f"Updated subscription for user {user_id}: {plan}")
     else:
-        # Create new subscription
         subscription_data["created_at"] = datetime.utcnow().isoformat()
         supabase.table("subscriptions").insert(subscription_data).execute()
         logger.info(f"Created subscription for user {user_id}: {plan}")
 
-    # Update user's plan in users table
+    # Update user's plan
     supabase.table("users").update({"plan": plan}).eq("id", user_id).execute()
 
 
 async def handle_subscription_cancelled(supabase, event: RevenueCatEvent, user_id: str):
     """Handle subscription cancellation (still active until expiry)"""
-    # Update subscription to mark as cancelled but still active
     supabase.table("subscriptions").update(
         {
             "auto_renew": False,
-            "status": "cancelled",  # Still active until expires_date
+            "status": "cancelled",
             "updated_at": datetime.utcnow().isoformat(),
         }
     ).eq("user_id", user_id).execute()
@@ -294,7 +379,28 @@ async def handle_subscription_cancelled(supabase, event: RevenueCatEvent, user_i
 
 
 async def handle_subscription_expired(supabase, event: RevenueCatEvent, user_id: str):
-    """Handle subscription expiration"""
+    """
+    Handle subscription expiration.
+
+    This is the critical handler that:
+    1. Updates subscription status to 'expired'
+    2. Downgrades user to free plan
+    3. Deactivates excess goals beyond free tier limit
+    4. Cancels challenges created by the user
+    5. Removes user from group goals
+    """
+    from app.services.subscription_service import (
+        handle_subscription_expiry_deactivation,
+    )
+
+    # Get current plan before expiring
+    user_result = (
+        supabase.table("users").select("plan").eq("id", user_id).single().execute()
+    )
+    previous_plan = (
+        user_result.data.get("plan", "unknown") if user_result.data else "unknown"
+    )
+
     # Update subscription status
     supabase.table("subscriptions").update(
         {
@@ -307,21 +413,59 @@ async def handle_subscription_expired(supabase, event: RevenueCatEvent, user_id:
     # Downgrade user to free plan
     supabase.table("users").update({"plan": "free"}).eq("id", user_id).execute()
 
-    logger.info(f"Subscription expired for user {user_id}, downgraded to free")
+    # Handle all deactivations
+    try:
+        summary = await handle_subscription_expiry_deactivation(
+            supabase, user_id, previous_plan, reason="subscription_expired"
+        )
+
+        logger.info(f"Subscription expired for user {user_id}: {summary}")
+
+        # Send push notification about subscription expiry
+        try:
+            from app.services.expo_push_service import send_push_to_user
+
+            goals_msg = ""
+            if summary["goals_deactivated"] > 0:
+                goals_msg = f"{summary['goals_deactivated']} goal(s) paused"
+            if summary["challenges_cancelled"] > 0:
+                if goals_msg:
+                    goals_msg += ", "
+                goals_msg += f"{summary['challenges_cancelled']} challenge(s) ended"
+
+            body = "Your premium features are no longer active."
+            if goals_msg:
+                body = f"{goals_msg}. Upgrade to reactivate them."
+
+            await send_push_to_user(
+                user_id,
+                title="Subscription Expired",
+                body=body,
+                data={
+                    "type": "subscription_expired",
+                    "previous_plan": previous_plan,
+                    "goals_deactivated": summary["goals_deactivated"],
+                    "challenges_cancelled": summary["challenges_cancelled"],
+                },
+                notification_type="subscription",
+            )
+        except Exception as notify_error:
+            logger.error(
+                f"Failed to send expiry notification to {user_id}: {notify_error}"
+            )
+
+    except Exception as e:
+        logger.error(
+            f"Error handling subscription expiry deactivation for {user_id}: {e}"
+        )
+        # Don't re-raise - subscription status is already updated
 
 
 async def handle_billing_issue(supabase, event: RevenueCatEvent, user_id: str):
     """
-    Handle billing issue (payment failed)
-
-    During grace period:
-    - Apple: Up to 16 days automatic retry
-    - Google: 3-30 days (configurable in Play Console)
-
-    User retains full access until grace_period_ends_at.
-    If grace period expires without successful payment, EXPIRATION event is sent.
+    Handle billing issue (payment failed).
+    User retains access during grace period.
     """
-    # Convert grace period expiry timestamp
     grace_period_ends_at = None
     if event.grace_period_expiration_at_ms:
         grace_period_ends_at = datetime.fromtimestamp(
@@ -334,7 +478,6 @@ async def handle_billing_issue(supabase, event: RevenueCatEvent, user_id: str):
         "revenuecat_event_id": event.id,
     }
 
-    # Store grace period end date if available
     if grace_period_ends_at:
         update_data["grace_period_ends_at"] = grace_period_ends_at
         logger.warning(
@@ -345,16 +488,49 @@ async def handle_billing_issue(supabase, event: RevenueCatEvent, user_id: str):
 
     supabase.table("subscriptions").update(update_data).eq("user_id", user_id).execute()
 
-    # Note: User retains access during grace period
-    # RevenueCat SDK handles this automatically on the client side
-    # For server-side checks, compare current time with grace_period_ends_at
+    # Send push notification about billing issue
+    try:
+        from app.services.expo_push_service import send_push_to_user
 
-    # TODO: Send email/notification to user about billing issue
+        if grace_period_ends_at:
+            # Parse the date to format nicely
+            grace_date = datetime.fromisoformat(
+                grace_period_ends_at.replace("Z", "+00:00")
+            )
+            formatted_date = grace_date.strftime("%B %d")
+            body = f"Please update your payment method by {formatted_date} to keep your premium features."
+        else:
+            body = "Please update your payment method to continue your subscription."
+
+        await send_push_to_user(
+            user_id,
+            title="Payment Issue",
+            body=body,
+            data={
+                "type": "billing_issue",
+                "grace_period_ends_at": grace_period_ends_at,
+            },
+            notification_type="subscription",
+        )
+    except Exception as notify_error:
+        logger.error(
+            f"Failed to send billing issue notification to {user_id}: {notify_error}"
+        )
 
 
 async def handle_product_change(supabase, event: RevenueCatEvent, user_id: str):
     """Handle plan change (upgrade/downgrade)"""
+    from app.services.subscription_service import (
+        handle_subscription_expiry_deactivation,
+    )
+
     new_plan = get_plan_from_product_id(event.product_id)
+
+    # Get current plan
+    user_result = (
+        supabase.table("users").select("plan").eq("id", user_id).single().execute()
+    )
+    previous_plan = user_result.data.get("plan", "free") if user_result.data else "free"
 
     expires_at = None
     if event.expiration_at_ms:
@@ -373,14 +549,24 @@ async def handle_product_change(supabase, event: RevenueCatEvent, user_id: str):
     # Update user's plan
     supabase.table("users").update({"plan": new_plan}).eq("id", user_id).execute()
 
-    logger.info(f"Plan changed for user {user_id} to {new_plan}")
+    logger.info(f"Plan changed for user {user_id} from {previous_plan} to {new_plan}")
+
+    # Check if this is a downgrade that requires deactivation
+    plan_tiers = {"free": 0, "starter": 1, "pro": 2, "elite": 3}
+
+    if plan_tiers.get(new_plan, 0) < plan_tiers.get(previous_plan, 0):
+        # This is a downgrade - may need to deactivate excess items
+        try:
+            summary = await handle_subscription_expiry_deactivation(
+                supabase, user_id, previous_plan, reason="manual"  # Voluntary downgrade
+            )
+            logger.info(f"Downgrade deactivation for user {user_id}: {summary}")
+        except Exception as e:
+            logger.error(f"Error handling downgrade deactivation for {user_id}: {e}")
 
 
 async def handle_subscription_transfer(supabase, event: RevenueCatEvent, user_id: str):
     """Handle subscription transfer to different user"""
-    # This is rare - usually happens when user creates new account
-    # The new user_id is in app_user_id, original_app_user_id has the old one
-
     old_user_id = event.original_app_user_id
     new_user_id = event.app_user_id
 
@@ -393,8 +579,22 @@ async def handle_subscription_transfer(supabase, event: RevenueCatEvent, user_id
             }
         ).eq("user_id", old_user_id).execute()
 
-        # Downgrade old user to free
+        # Downgrade old user to free and handle deactivations
         supabase.table("users").update({"plan": "free"}).eq("id", old_user_id).execute()
+
+        from app.services.subscription_service import (
+            handle_subscription_expiry_deactivation,
+        )
+
+        try:
+            await handle_subscription_expiry_deactivation(
+                supabase,
+                old_user_id,
+                "unknown",  # We don't know their previous plan
+                reason="transfer",
+            )
+        except Exception as e:
+            logger.error(f"Error handling transfer deactivation for {old_user_id}: {e}")
 
         # Handle new user as active subscription
         await handle_subscription_active(supabase, event, new_user_id)
@@ -402,7 +602,7 @@ async def handle_subscription_transfer(supabase, event: RevenueCatEvent, user_id
         logger.info(f"Subscription transferred from {old_user_id} to {new_user_id}")
 
 
-# Health check endpoint for webhook testing
+# Health check endpoint
 @router.get("/revenuecat/health")
 async def webhook_health():
     """Health check for webhook endpoint"""

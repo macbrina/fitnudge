@@ -24,9 +24,15 @@ import {
 } from "@/hooks/api/useGoals";
 import { useAlertModal } from "@/contexts/AlertModalContext";
 import { useSubscriptionStore } from "@/stores/subscriptionStore";
-import { PlanStatusBadge } from "@/screens/goals/components/PlanStatusBadge";
+import { PlanStatusBadge } from "@/screens/tabs/goals/components/PlanStatusBadge";
 import { Ionicons } from "@expo/vector-icons";
 import { MOBILE_ROUTES } from "@/lib/routes";
+import { PlanStatus } from "@/services/api/actionablePlans";
+
+interface PlanStatusData {
+  status: PlanStatus;
+  [key: string]: any;
+}
 
 interface GoalCardProps {
   goal: {
@@ -35,8 +41,6 @@ interface GoalCardProps {
     category: string;
     current_streak?: number;
     is_active?: boolean;
-    is_group_goal?: boolean;
-    group_goal_role?: "owner" | "admin" | "member"; // For group goals
     converted_to_challenge_id?: string;
     archived_reason?: string | null;
     // Goal type fields
@@ -48,6 +52,7 @@ interface GoalCardProps {
     // Progress data (populated externally)
     completed_checkins?: number;
   };
+  planStatus?: PlanStatusData; // Optional: pass from parent to avoid individual fetching
   onPress?: () => void;
   onDeleted?: () => void;
   onActivated?: () => void;
@@ -65,6 +70,7 @@ interface GoalCardProps {
 
 export function GoalCard({
   goal,
+  planStatus: planStatusProp,
   onPress,
   onDeleted,
   onActivated,
@@ -87,7 +93,13 @@ export function GoalCard({
   const router = useRouter();
 
   // Hooks
-  const { data: planStatus } = usePlanStatus(goal.id);
+  // Use passed planStatus if available, otherwise fetch (for backward compatibility with HomeScreen)
+  const { data: fetchedPlanStatus } = usePlanStatus(
+    goal.id,
+    !planStatusProp // Only fetch if not passed from parent
+  );
+  const planStatus = planStatusProp || fetchedPlanStatus;
+
   const deleteGoal = useDeleteGoal();
   const activateGoal = useActivateGoal();
   const deactivateGoal = useDeactivateGoal();
@@ -105,9 +117,7 @@ export function GoalCard({
   const hasFeature = useSubscriptionStore((state) => state.hasFeature);
 
   // Feature checks
-  const canShareGoal = hasFeature?.("goal_shares") ?? false;
   const canCreateChallenge = hasFeature?.("challenge_create") ?? false;
-  const canUseGroupGoals = hasFeature?.("group_goals") ?? false;
 
   // Category info with emoji, label, and color
   const CATEGORY_INFO: Record<
@@ -216,7 +226,6 @@ export function GoalCard({
     });
 
     if (confirmed) {
-      console.log(`[GoalCard] Deleting goal ${goal.id} via mobile app...`);
       try {
         await deleteGoal.mutateAsync(goal.id);
         console.log(`[GoalCard] ✅ Goal deleted successfully!`);
@@ -344,19 +353,6 @@ export function GoalCard({
     // === Section 2: Sharing Actions ===
     const sharingOptions: BottomMenuOption[] = [];
 
-    // Share Goal (for habits, requires goal_shares feature)
-    if (goalType === "habit" && !goal.is_group_goal) {
-      sharingOptions.push({
-        id: "share_goal",
-        label: t("goals.share_goal") || "Share Goal",
-        description:
-          t("goals.share_goal_desc") || "Let friends view your progress",
-        icon: "share-social-outline",
-        onPress: () => onShareGoal?.(),
-        disabled: !canShareGoal,
-      });
-    }
-
     // Share as Challenge (for time/target challenges, requires challenge_create)
     if (
       (goalType === "time_challenge" || goalType === "target_challenge") &&
@@ -399,54 +395,7 @@ export function GoalCard({
       sections.push({ id: "sharing", options: sharingOptions });
     }
 
-    // === Section 3: Group Goal Actions ===
-    if (goal.is_group_goal) {
-      const groupOptions: BottomMenuOption[] = [];
-      const isOwner = goal.group_goal_role === "owner";
-      const isAdmin =
-        goal.group_goal_role === "admin" || goal.group_goal_role === "owner";
-
-      // Invite Members (owner/admin only)
-      if (isAdmin) {
-        groupOptions.push({
-          id: "invite_members",
-          label: t("goals.invite_members") || "Invite Members",
-          description:
-            t("goals.invite_members_desc") || "Add friends to this group goal",
-          icon: "person-add-outline",
-          onPress: () => onInviteMembers?.(),
-          disabled: !canUseGroupGoals,
-        });
-      }
-
-      // View Members (everyone)
-      groupOptions.push({
-        id: "view_members",
-        label: t("goals.view_members") || "View Members",
-        description: t("goals.view_members_desc") || "See who's in this group",
-        icon: "people-outline",
-        onPress: () => onViewMembers?.(),
-      });
-
-      // Leave Group (non-owner only)
-      if (!isOwner) {
-        groupOptions.push({
-          id: "leave_group",
-          label: t("goals.leave_group") || "Leave Group",
-          description:
-            t("goals.leave_group_desc") || "Remove yourself from this group",
-          icon: "exit-outline",
-          onPress: () => onLeaveGroup?.(),
-          destructive: true,
-        });
-      }
-
-      if (groupOptions.length > 0) {
-        sections.push({ id: "group", options: groupOptions });
-      }
-    }
-
-    // === Section 4: Danger Zone (Delete) ===
+    // === Section 3: Danger Zone (Delete) ===
     const dangerOptions: BottomMenuOption[] = [];
 
     dangerOptions.push({
@@ -552,6 +501,10 @@ export function GoalCard({
 
     return null;
   };
+
+  // Note: We no longer show a skeleton here while loading actionable plans.
+  // The main screen skeleton handles initial loading. Plan status badge
+  // will appear when data loads, avoiding double-loading visual effect.
 
   return (
     <TouchableOpacity

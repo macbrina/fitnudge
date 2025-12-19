@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, Request
 from pydantic import BaseModel, EmailStr
 from typing import Optional, Dict, Any, List
 import json
@@ -13,6 +13,7 @@ from app.core.auth import (
     generate_verification_code,
     get_user_by_id,
     ensure_auth_user_exists,
+    rotate_refresh_token,
 )
 from app.core.database import get_supabase_client
 from app.core.config import settings
@@ -30,6 +31,14 @@ router = APIRouter(
 
 
 # Pydantic models
+class DeviceInfo(BaseModel):
+    """Device information for session tracking"""
+
+    device_name: Optional[str] = None  # e.g., "iPhone 14 Pro", "Chrome on Windows"
+    device_id: Optional[str] = None  # Unique device identifier
+    device_type: Optional[str] = None  # "ios", "android", "web"
+
+
 class UserSignup(BaseModel):
     email: EmailStr
     password: str
@@ -38,12 +47,15 @@ class UserSignup(BaseModel):
     timezone: Optional[str] = (
         None  # IANA timezone string (e.g., 'America/New_York'), defaults to UTC if not provided
     )
+    device_info: Optional[DeviceInfo] = None
+    referral_code: Optional[str] = None  # Code of user who referred them
 
 
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
     remember_me: Optional[bool] = False
+    device_info: Optional[DeviceInfo] = None
 
 
 class AppleOAuth(BaseModel):
@@ -51,11 +63,15 @@ class AppleOAuth(BaseModel):
     authorization_code: Optional[str] = None
     email: Optional[str] = None
     full_name: Optional[dict] = None
+    device_info: Optional[DeviceInfo] = None
+    referral_code: Optional[str] = None  # Referral code for new users
 
 
 class GoogleOAuth(BaseModel):
     id_token: str
     access_token: Optional[str] = None
+    device_info: Optional[DeviceInfo] = None
+    referral_code: Optional[str] = None  # Referral code for new users
 
 
 class TokenRefresh(BaseModel):
@@ -89,6 +105,43 @@ from app.core.flexible_auth import get_current_user
 
 
 APPLE_KEYS_CACHE: Dict[str, Any] = {"keys": None, "expires_at": None}
+
+
+def build_device_info(
+    request: Request, device_info: Optional[DeviceInfo] = None
+) -> Dict[str, Any]:
+    """Build device info dict from request headers and optional body data
+
+    Combines:
+    - IP address from request (X-Forwarded-For or client.host)
+    - User-Agent from request headers
+    - Device name, ID, type from client-provided device_info
+    """
+    result: Dict[str, Any] = {}
+
+    # Get IP address (handle proxy headers)
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if forwarded_for:
+        # Take first IP if multiple (comma-separated)
+        result["ip_address"] = forwarded_for.split(",")[0].strip()
+    elif request.client:
+        result["ip_address"] = request.client.host
+
+    # Get User-Agent
+    user_agent = request.headers.get("User-Agent")
+    if user_agent:
+        result["user_agent"] = user_agent
+
+    # Add client-provided device info
+    if device_info:
+        if device_info.device_name:
+            result["device_name"] = device_info.device_name
+        if device_info.device_id:
+            result["device_id"] = device_info.device_id
+        if device_info.device_type:
+            result["device_type"] = device_info.device_type
+
+    return result
 
 
 def normalize_username_candidate(value: str) -> Optional[str]:
@@ -370,7 +423,7 @@ async def verify_apple_identity_token(identity_token: str) -> Dict[str, Any]:
 
 
 @router.post("/signup", status_code=status.HTTP_201_CREATED)
-async def signup(user_data: UserSignup):
+async def signup(user_data: UserSignup, request: Request):
     """Create new user account"""
     supabase = get_supabase_client()
 
@@ -398,15 +451,61 @@ async def signup(user_data: UserSignup):
 
     try:
         # Create user (this should NOT fail even if email sending fails)
-        user = await create_user(user_data.dict())
+        # Exclude device_info and referral_code from user data (handled separately)
+        user_dict = user_data.dict(exclude={"device_info", "referral_code"})
+        user = await create_user(user_dict)
+
+        # Handle referral system
+        from app.services.referral_service import (
+            generate_referral_code,
+            get_referrer_by_code,
+            process_referral_bonus,
+        )
+        import asyncio
+
+        # Generate referral code for new user
+        new_referral_code = generate_referral_code(user_data.username)
+        referrer_id = None
+
+        # Handle referral if provided
+        if user_data.referral_code:
+            referrer = await get_referrer_by_code(user_data.referral_code)
+            if referrer:
+                referrer_id = referrer["id"]
+                logger.info(
+                    f"User {user['id']} was referred by {referrer_id}",
+                    {"referral_code": user_data.referral_code},
+                )
+
+        # Update user with referral info
+        supabase.table("users").update(
+            {
+                "referral_code": new_referral_code,
+                "referred_by_user_id": referrer_id,
+            }
+        ).eq("id", user["id"]).execute()
+
+        # Grant referral bonuses (async, fire-and-forget)
+        if referrer_id:
+            asyncio.create_task(process_referral_bonus(user["id"], referrer_id))
+
+        # Build device info from request and body
+        device_info = build_device_info(request, user_data.device_info)
+
+        # Clean up any existing tokens (shouldn't exist for new user, but just in case)
+        supabase.table("refresh_tokens").delete().eq("user_id", user["id"]).execute()
 
         # Create tokens
         access_token = create_access_token({"user_id": user["id"]})
-        refresh_token = create_refresh_token({"user_id": user["id"]})
+        refresh_token = create_refresh_token(
+            {"user_id": user["id"]}, device_info=device_info
+        )
 
         # Serialize user (might fail if oauth_accounts query fails)
         try:
             serialized_user = serialize_user(user)
+            # Add referral code to response
+            serialized_user["referral_code"] = new_referral_code
         except Exception as serialize_error:
             # If serialization fails, create a minimal user object
             logger.warning(
@@ -422,6 +521,7 @@ async def signup(user_data: UserSignup):
                 "timezone": user.get("timezone", "UTC"),
                 "email_verified": user.get("email_verified", False),
                 "auth_provider": user.get("auth_provider", "email"),
+                "referral_code": new_referral_code,
             }
 
         return {
@@ -447,7 +547,7 @@ async def signup(user_data: UserSignup):
 
 
 @router.post("/login")
-async def login(credentials: UserLogin):
+async def login(credentials: UserLogin, request: Request):
     """Authenticate user with email/password"""
     user = await authenticate_user(credentials.email, credentials.password)
 
@@ -474,6 +574,16 @@ async def login(credentials: UserLogin):
     # Ensure existing user is in auth.users (for Realtime to work)
     await ensure_auth_user_exists(user)
 
+    # Build device info from request and body
+    device_info = build_device_info(request, credentials.device_info)
+
+    # Get supabase client for database operations
+    supabase = get_supabase_client()
+
+    # Clean up ALL old refresh tokens for this user on fresh login
+    # This prevents token accumulation from reinstalls/multiple logins
+    supabase.table("refresh_tokens").delete().eq("user_id", user["id"]).execute()
+
     # Create tokens with different expiration based on remember_me
     if credentials.remember_me:
         # Extended tokens for remember me (30 days access, 90 days refresh)
@@ -481,15 +591,18 @@ async def login(credentials: UserLogin):
             {"user_id": user["id"]}, expires_delta=timedelta(days=30)
         )
         refresh_token = create_refresh_token(
-            {"user_id": user["id"]}, expires_delta=timedelta(days=90)
+            {"user_id": user["id"]},
+            expires_delta=timedelta(days=90),
+            device_info=device_info,
         )
     else:
         # Standard tokens (1 hour access, 7 days refresh)
         access_token = create_access_token({"user_id": user["id"]})
-        refresh_token = create_refresh_token({"user_id": user["id"]})
+        refresh_token = create_refresh_token(
+            {"user_id": user["id"]}, device_info=device_info
+        )
 
     # Update last login
-    supabase = get_supabase_client()
     current_timestamp = datetime.now(timezone.utc).isoformat()
     supabase.table("users").update({"last_login_at": current_timestamp}).eq(
         "id", user["id"]
@@ -505,7 +618,7 @@ async def login(credentials: UserLogin):
 
 
 @router.post("/oauth/google")
-async def google_oauth(oauth_data: GoogleOAuth):
+async def google_oauth(oauth_data: GoogleOAuth, request: Request):
     """Sign in with Google (iOS + Android)"""
 
     token_data = await verify_google_id_token(oauth_data.id_token)
@@ -554,6 +667,7 @@ async def google_oauth(oauth_data: GoogleOAuth):
             user = existing_user
 
     # Step 3: Create a new user if none found
+    is_new_user = False
     if not user:
         if not email:
             raise HTTPException(
@@ -584,6 +698,30 @@ async def google_oauth(oauth_data: GoogleOAuth):
                 "profile_picture_url": picture,
             }
         )
+        is_new_user = True
+
+        # Handle referral for new OAuth users
+        if oauth_data.referral_code:
+            from app.services.referral_service import (
+                generate_referral_code,
+                get_referrer_by_code,
+                process_referral_bonus,
+            )
+            import asyncio
+
+            new_referral_code = generate_referral_code(username)
+            referrer = await get_referrer_by_code(oauth_data.referral_code)
+            referrer_id = referrer["id"] if referrer else None
+
+            supabase.table("users").update(
+                {
+                    "referral_code": new_referral_code,
+                    "referred_by_user_id": referrer_id,
+                }
+            ).eq("id", user["id"]).execute()
+
+            if referrer_id:
+                asyncio.create_task(process_referral_bonus(user["id"], referrer_id))
     else:
         # Ensure existing user is in auth.users (for Realtime to work)
         await ensure_auth_user_exists(user)
@@ -619,8 +757,16 @@ async def google_oauth(oauth_data: GoogleOAuth):
     ).execute()
     user["last_login_at"] = current_timestamp
 
+    # Build device info from request and body
+    device_info = build_device_info(request, oauth_data.device_info)
+
+    # Clean up ALL old refresh tokens for this user on fresh login
+    supabase.table("refresh_tokens").delete().eq("user_id", user["id"]).execute()
+
     access_token = create_access_token({"user_id": user["id"]})
-    refresh_token = create_refresh_token({"user_id": user["id"]})
+    refresh_token = create_refresh_token(
+        {"user_id": user["id"]}, device_info=device_info
+    )
 
     return {
         "access_token": access_token,
@@ -630,7 +776,7 @@ async def google_oauth(oauth_data: GoogleOAuth):
 
 
 @router.post("/oauth/apple")
-async def apple_oauth(oauth_data: AppleOAuth):
+async def apple_oauth(oauth_data: AppleOAuth, request: Request):
     """Sign in with Apple"""
 
     payload = await verify_apple_identity_token(oauth_data.identity_token)
@@ -711,6 +857,29 @@ async def apple_oauth(oauth_data: AppleOAuth):
                 "language": payload.get("locale", "en"),
             }
         )
+
+        # Handle referral for new OAuth users
+        if oauth_data.referral_code:
+            from app.services.referral_service import (
+                generate_referral_code,
+                get_referrer_by_code,
+                process_referral_bonus,
+            )
+            import asyncio
+
+            new_referral_code = generate_referral_code(username)
+            referrer = await get_referrer_by_code(oauth_data.referral_code)
+            referrer_id = referrer["id"] if referrer else None
+
+            supabase.table("users").update(
+                {
+                    "referral_code": new_referral_code,
+                    "referred_by_user_id": referrer_id,
+                }
+            ).eq("id", user["id"]).execute()
+
+            if referrer_id:
+                asyncio.create_task(process_referral_bonus(user["id"], referrer_id))
     else:
         # Ensure existing user is in auth.users (for Realtime to work)
         await ensure_auth_user_exists(user)
@@ -739,8 +908,16 @@ async def apple_oauth(oauth_data: AppleOAuth):
     ).execute()
     user["last_login_at"] = current_timestamp
 
+    # Build device info from request and body
+    device_info = build_device_info(request, oauth_data.device_info)
+
+    # Clean up ALL old refresh tokens for this user on fresh login
+    supabase.table("refresh_tokens").delete().eq("user_id", user["id"]).execute()
+
     access_token = create_access_token({"user_id": user["id"]})
-    refresh_token = create_refresh_token({"user_id": user["id"]})
+    refresh_token = create_refresh_token(
+        {"user_id": user["id"]}, device_info=device_info
+    )
 
     return {
         "access_token": access_token,
@@ -751,9 +928,25 @@ async def apple_oauth(oauth_data: AppleOAuth):
 
 @router.post("/refresh")
 async def refresh_token(token_data: TokenRefresh):
-    """Refresh access token"""
+    """Refresh access token with proper token rotation
+
+    This endpoint:
+    1. Validates the refresh token
+    2. Checks the token family in the database
+    3. Deletes the old token
+    4. Creates new access + refresh tokens
+    5. Returns the new tokens (client MUST use the new refresh token)
+    """
     from app.core.database import get_supabase_client
 
+    # First, try proper token rotation (validates, deletes old, creates new)
+    rotated = rotate_refresh_token(token_data.refresh_token)
+
+    if rotated:
+        return rotated
+
+    # Fallback: If rotation fails (e.g., token not in DB), try basic validation
+    # This handles tokens created before rotation tracking was added
     payload = verify_token(token_data.refresh_token)
 
     if not payload or payload.get("type") != "refresh":
@@ -767,7 +960,7 @@ async def refresh_token(token_data: TokenRefresh):
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token"
         )
 
-    # Check if user exists before creating tokens
+    # Check if user exists
     supabase = get_supabase_client()
     user_result = supabase.table("users").select("id").eq("id", user_id).execute()
 
@@ -776,17 +969,114 @@ async def refresh_token(token_data: TokenRefresh):
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
 
-    # Create new tokens
+    # CLEANUP: Delete old tokens in this family
+    # If user reinstalls app or has stale tokens, this cleans them all up
+    token_family = payload.get("token_family")
+    token_id = payload.get("token_id")
+
+    if token_family:
+        # Delete ALL tokens in this family - user only needs the new one
+        supabase.table("refresh_tokens").delete().eq(
+            "token_family", token_family
+        ).execute()
+    elif token_id:
+        # Fallback: delete by token_id only (legacy tokens without family)
+        supabase.table("refresh_tokens").delete().eq("token_id", token_id).execute()
+
+    # Create new tokens with same token_family if available (maintains session identity)
     access_token = create_access_token({"user_id": user_id})
-    new_refresh_token = create_refresh_token({"user_id": user_id})
+    new_refresh_token = create_refresh_token(
+        {"user_id": user_id},
+        token_family=token_family,  # Reuse family if exists, else creates new
+    )
 
     return {"access_token": access_token, "refresh_token": new_refresh_token}
 
 
 @router.post("/logout")
 async def logout(current_user: dict = Depends(get_current_user)):
-    """Logout user (client should discard tokens)"""
+    """Logout user and revoke all refresh tokens for this user
+
+    This invalidates all sessions for the user (logout from all devices).
+    Client should also discard tokens locally.
+    """
+    from app.core.auth import revoke_all_user_tokens
+
+    user_id = current_user.get("id")
+    if user_id:
+        revoke_all_user_tokens(user_id)
+
     return {"message": "Successfully logged out"}
+
+
+@router.get("/sessions")
+async def get_sessions(current_user: dict = Depends(get_current_user)):
+    """Get all active sessions for the current user
+
+    Returns a list of sessions with device info so users can see
+    where they're logged in and manage their sessions.
+    """
+    from app.core.auth import get_user_sessions
+
+    user_id = current_user.get("id")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+        )
+
+    sessions = get_user_sessions(user_id)
+
+    # Format sessions for client display
+    formatted_sessions = []
+    for session in sessions:
+        formatted_sessions.append(
+            {
+                "id": session.get("id"),
+                "device_name": session.get("device_name") or "Unknown device",
+                "device_type": session.get("device_type") or "unknown",
+                "ip_address": (
+                    str(session.get("ip_address"))
+                    if session.get("ip_address")
+                    else None
+                ),
+                "created_at": session.get("created_at"),
+                "last_used_at": session.get("last_used_at"),
+                # Include token_family so client can identify current session
+                "token_family": session.get("token_family"),
+            }
+        )
+
+    return {"sessions": formatted_sessions, "count": len(formatted_sessions)}
+
+
+@router.delete("/sessions/{session_id}")
+async def revoke_session_endpoint(
+    session_id: str, current_user: dict = Depends(get_current_user)
+):
+    """Revoke a specific session (logout from one device)
+
+    Allows users to sign out of a specific device without affecting
+    other sessions.
+    """
+    from app.core.auth import revoke_session
+
+    user_id = current_user.get("id")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+        )
+
+    success = revoke_session(user_id, session_id)
+
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found or already revoked",
+        )
+
+    return {"message": "Session revoked successfully"}
 
 
 @router.post("/verify-email")
