@@ -3,6 +3,7 @@ import { ROUTES } from "@/lib/routes";
 import { logger } from "@/services/logger";
 
 export interface FitnessProfileRequest {
+  biological_sex?: string; // 'male', 'female', 'prefer_not_to_say'
   fitness_level: string;
   primary_goal: string;
   current_frequency: string;
@@ -10,11 +11,13 @@ export interface FitnessProfileRequest {
   available_time: string;
   motivation_style: string;
   biggest_challenge: string;
+  available_equipment?: string[];
 }
 
 export interface FitnessProfileResponse {
   id: string;
   user_id: string;
+  biological_sex?: string; // 'male', 'female', 'prefer_not_to_say'
   fitness_level: string;
   primary_goal: string;
   current_frequency: string;
@@ -22,6 +25,7 @@ export interface FitnessProfileResponse {
   available_time: string;
   motivation_style: string;
   biggest_challenge: string;
+  available_equipment?: string[];
   completed_at: string;
 }
 
@@ -61,14 +65,14 @@ class OnboardingApiService extends BaseApiService {
    * Save user's fitness profile
    */
   async saveProfile(
-    profileData: FitnessProfileRequest
+    profileData: FitnessProfileRequest,
   ): Promise<FitnessProfileResponse> {
     try {
       // Saving profile - tracked via PostHog in component
 
       const response = await this.post<FitnessProfileResponse>(
         ROUTES.ONBOARDING.PROFILE,
-        profileData
+        profileData,
       );
 
       // Profile saved successfully - tracked via PostHog in component
@@ -90,7 +94,7 @@ class OnboardingApiService extends BaseApiService {
       // Fetching profile - tracked via PostHog in component
 
       const response = await this.get<FitnessProfileResponse>(
-        ROUTES.ONBOARDING.PROFILE
+        ROUTES.ONBOARDING.PROFILE,
       );
 
       // Profile fetched successfully - tracked via PostHog in component
@@ -113,12 +117,12 @@ class OnboardingApiService extends BaseApiService {
       | "habit"
       | "time_challenge"
       | "target_challenge"
-      | "mixed" = "habit"
+      | "mixed" = "habit",
   ): Promise<SuggestedGoalsStatusResponse> {
     try {
       const response = await this.post<SuggestedGoalsStatusResponse>(
         ROUTES.ONBOARDING.SUGGESTED_GOALS,
-        { goal_type: goalType }
+        { goal_type: goalType },
       );
       return response.data!;
     } catch (error) {
@@ -136,7 +140,7 @@ class OnboardingApiService extends BaseApiService {
   async getSuggestedGoalsStatus(): Promise<SuggestedGoalsStatusResponse> {
     try {
       const response = await this.get<SuggestedGoalsStatusResponse>(
-        ROUTES.ONBOARDING.SUGGESTED_GOALS
+        ROUTES.ONBOARDING.SUGGESTED_GOALS,
       );
       return response.data!;
     } catch (error) {
@@ -159,12 +163,12 @@ class OnboardingApiService extends BaseApiService {
       | "habit"
       | "time_challenge"
       | "target_challenge"
-      | "mixed" = "habit"
+      | "mixed" = "habit",
   ): Promise<SuggestedGoalsStatusResponse> {
     try {
       const response = await this.put<SuggestedGoalsStatusResponse>(
         `${ROUTES.ONBOARDING.SUGGESTED_GOALS}/regenerate`,
-        { goal_type: goalType }
+        { goal_type: goalType },
       );
       return response.data!;
     } catch (error) {

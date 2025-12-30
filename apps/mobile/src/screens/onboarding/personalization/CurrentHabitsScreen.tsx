@@ -4,66 +4,55 @@ import { useTranslation } from "@/lib/i18n";
 import { fontFamily } from "@/lib/fonts";
 import { toRN } from "@/lib/units";
 import { useStyles } from "@/themes/makeStyles";
-import { tokens, lineHeight } from "@/themes/tokens";
+import { lineHeight } from "@/themes/tokens";
 import { useTheme } from "@/themes";
 import PersonalizationLayout from "./PersonalizationLayout";
 import { useOnboardingStore } from "@/stores/onboardingStore";
-import { Card } from "@/components/ui/Card";
 
 interface CurrentHabitsScreenProps {
   onContinue: (currentFrequency: string) => void;
   onBack?: () => void;
+  currentStep: number;
+  totalSteps: number;
 }
 
 const FREQUENCY_OPTIONS = [
   {
     id: "never",
-    title: "onboarding.personalization.current_habits.never.title",
-    description: "onboarding.personalization.current_habits.never.description",
-    icon: "🚀",
+    label: "onboarding.personalization.current_habits.never.title",
   },
   {
     id: "1-2x_week",
-    title: "onboarding.personalization.current_habits.1-2x_week.title",
-    description:
-      "onboarding.personalization.current_habits.1-2x_week.description",
-    icon: "🌱",
+    label: "onboarding.personalization.current_habits.1-2x_week.title",
   },
   {
     id: "3-4x_week",
-    title: "onboarding.personalization.current_habits.3-4x_week.title",
-    description:
-      "onboarding.personalization.current_habits.3-4x_week.description",
-    icon: "💪",
+    label: "onboarding.personalization.current_habits.3-4x_week.title",
   },
   {
     id: "5+_week",
-    title: "onboarding.personalization.current_habits.5+_week.title",
-    description:
-      "onboarding.personalization.current_habits.5+_week.description",
-    icon: "🔥",
+    label: "onboarding.personalization.current_habits.5+_week.title",
   },
   {
     id: "daily",
-    title: "onboarding.personalization.current_habits.daily.title",
-    description: "onboarding.personalization.current_habits.daily.description",
-    icon: "🏆",
+    label: "onboarding.personalization.current_habits.daily.title",
   },
 ];
 
 export default function CurrentHabitsScreen({
   onContinue,
   onBack,
+  currentStep,
+  totalSteps,
 }: CurrentHabitsScreenProps) {
   const { current_frequency } = useOnboardingStore();
   const [selectedFrequency, setSelectedFrequency] = useState<string>(
-    current_frequency || ""
+    current_frequency || "",
   );
   const { t } = useTranslation();
-  const styles = useStyles(makeCurrentHabitsScreenStyles);
-  const { colors, brand } = useTheme();
+  const styles = useStyles(makeStyles);
+  const { brandColors } = useTheme();
 
-  // Sync with store when component mounts or store value changes
   useEffect(() => {
     setSelectedFrequency(current_frequency || "");
   }, [current_frequency]);
@@ -76,8 +65,8 @@ export default function CurrentHabitsScreen({
 
   return (
     <PersonalizationLayout
-      currentStep={4}
-      totalSteps={8}
+      currentStep={currentStep}
+      totalSteps={totalSteps}
       onContinue={handleContinue}
       onBack={onBack}
       canContinue={!!selectedFrequency}
@@ -98,46 +87,26 @@ export default function CurrentHabitsScreen({
               <TouchableOpacity
                 key={option.id}
                 onPress={() => setSelectedFrequency(option.id)}
-                style={styles.optionCardTouchable}
                 activeOpacity={0.7}
+                style={[
+                  styles.optionCard,
+                  isSelected && [
+                    styles.optionCardSelected,
+                    { borderColor: brandColors.primary },
+                  ],
+                ]}
               >
-                <Card
-                  padded={false}
-                  shadow={isSelected ? "xl" : "md"}
+                <Text
                   style={[
-                    styles.optionCard,
-                    isSelected && styles.optionCardSelected,
+                    styles.optionLabel,
+                    isSelected && [
+                      styles.optionLabelSelected,
+                      { color: brandColors.primary },
+                    ],
                   ]}
                 >
-                  <View style={styles.optionRow}>
-                    <View
-                      style={[
-                        styles.iconContainer,
-                        isSelected && styles.iconContainerSelected,
-                      ]}
-                    >
-                      <Text style={styles.optionIcon}>{option.icon}</Text>
-                    </View>
-                    <View style={styles.textContainer}>
-                      <Text
-                        style={[
-                          styles.optionTitle,
-                          isSelected && styles.optionTitleSelected,
-                        ]}
-                      >
-                        {t(option.title)}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.optionDescription,
-                          isSelected && styles.optionDescriptionSelected,
-                        ]}
-                      >
-                        {t(option.description)}
-                      </Text>
-                    </View>
-                  </View>
-                </Card>
+                  {t(option.label)}
+                </Text>
               </TouchableOpacity>
             );
           })}
@@ -147,105 +116,53 @@ export default function CurrentHabitsScreen({
   );
 }
 
-const makeCurrentHabitsScreenStyles = (
-  tokens: any,
-  colors: any,
-  brand: any
-) => {
+const makeStyles = (tokens: any, colors: any, brand: any) => {
   return {
     content: {
       flex: 1,
-      paddingTop: toRN(tokens.spacing[4]),
+      paddingTop: toRN(tokens.spacing[2]),
     },
     title: {
-      fontSize: toRN(tokens.typography.fontSize["3xl"]),
+      fontSize: toRN(tokens.typography.fontSize["2xl"]),
       fontWeight: tokens.typography.fontWeight.bold,
       color: colors.text.primary,
-      textAlign: "center" as const,
-      marginBottom: toRN(tokens.spacing[3]),
+      marginBottom: toRN(tokens.spacing[2]),
       fontFamily: fontFamily.groteskBold,
       lineHeight: lineHeight(
-        tokens.typography.fontSize["3xl"],
-        tokens.typography.lineHeight.tight
+        tokens.typography.fontSize["2xl"],
+        tokens.typography.lineHeight.tight,
       ),
     },
     subtitle: {
       fontSize: toRN(tokens.typography.fontSize.base),
       color: colors.text.secondary,
-      textAlign: "center" as const,
-      marginBottom: toRN(tokens.spacing[10]),
+      marginBottom: toRN(tokens.spacing[6]),
       fontFamily: fontFamily.groteskRegular,
       lineHeight: lineHeight(
         tokens.typography.fontSize.base,
-        tokens.typography.lineHeight.relaxed
+        tokens.typography.lineHeight.relaxed,
       ),
-      paddingHorizontal: toRN(tokens.spacing[4]),
     },
     optionsContainer: {
-      gap: toRN(tokens.spacing[4]),
-      marginBottom: toRN(tokens.spacing[6]),
-    },
-    optionCardTouchable: {
-      borderRadius: toRN(tokens.borderRadius.xl),
+      gap: toRN(tokens.spacing[3]),
     },
     optionCard: {
-      padding: toRN(tokens.spacing[5]),
-    },
-    optionRow: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
+      backgroundColor: colors.bg.muted,
+      borderRadius: toRN(tokens.borderRadius.xl),
+      paddingVertical: toRN(tokens.spacing[5]),
+      paddingHorizontal: toRN(tokens.spacing[5]),
+      borderWidth: 2,
+      borderColor: colors.border.subtle,
     },
     optionCardSelected: {
-      borderColor: brand.primary,
       backgroundColor: brand.primary + "08",
-      borderWidth: 2,
-      borderRadius: toRN(tokens.borderRadius.xl),
     },
-    iconContainer: {
-      width: 64,
-      height: 64,
-      borderRadius: 32,
-      backgroundColor: colors.bg.muted,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-      marginRight: toRN(tokens.spacing[4]),
-      flexShrink: 0,
-    },
-    iconContainerSelected: {
-      backgroundColor: brand.primary + "15",
-    },
-    optionIcon: {
-      fontSize: 32,
-    },
-    textContainer: {
-      flex: 1,
-      justifyContent: "center" as const,
-    },
-    optionTitle: {
+    optionLabel: {
       fontSize: toRN(tokens.typography.fontSize.lg),
       fontWeight: tokens.typography.fontWeight.semibold,
       color: colors.text.primary,
-      marginBottom: toRN(tokens.spacing[1]),
       fontFamily: fontFamily.groteskSemiBold,
-      lineHeight: lineHeight(
-        tokens.typography.fontSize.lg,
-        tokens.typography.lineHeight.normal
-      ),
     },
-    optionTitleSelected: {
-      color: brand.primary,
-    },
-    optionDescription: {
-      fontSize: toRN(tokens.typography.fontSize.sm),
-      color: colors.text.secondary,
-      fontFamily: fontFamily.groteskRegular,
-      lineHeight: lineHeight(
-        tokens.typography.fontSize.sm,
-        tokens.typography.lineHeight.relaxed
-      ),
-    },
-    optionDescriptionSelected: {
-      color: brand.primary + "DD",
-    },
+    optionLabelSelected: {},
   };
 };

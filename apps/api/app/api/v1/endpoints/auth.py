@@ -47,6 +47,9 @@ class UserSignup(BaseModel):
     timezone: Optional[str] = (
         None  # IANA timezone string (e.g., 'America/New_York'), defaults to UTC if not provided
     )
+    country: Optional[str] = (
+        None  # ISO 3166-1 alpha-2 country code (e.g., 'US', 'NG', 'GB'), auto-detected from client
+    )
     device_info: Optional[DeviceInfo] = None
     referral_code: Optional[str] = None  # Code of user who referred them
 
@@ -233,6 +236,7 @@ def serialize_user(user: Dict[str, Any]) -> Dict[str, Any]:
         "username": user.get("username"),
         "plan": user.get("plan", "free"),
         "timezone": user.get("timezone", "UTC"),
+        "country": user.get("country"),  # ISO 3166-1 alpha-2 code
         "email_verified": user.get("email_verified", False),
         "auth_provider": user.get("auth_provider", "email"),
         "created_at": user.get("created_at"),
@@ -452,6 +456,7 @@ async def signup(user_data: UserSignup, request: Request):
     try:
         # Create user (this should NOT fail even if email sending fails)
         # Exclude device_info and referral_code from user data (handled separately)
+        # country is included in user_dict for storage
         user_dict = user_data.dict(exclude={"device_info", "referral_code"})
         user = await create_user(user_dict)
 
@@ -488,6 +493,13 @@ async def signup(user_data: UserSignup, request: Request):
         # Grant referral bonuses (async, fire-and-forget)
         if referrer_id:
             asyncio.create_task(process_referral_bonus(user["id"], referrer_id))
+
+        # Create default audio preferences for workout music
+        from app.api.v1.endpoints.audio_preferences import (
+            create_default_audio_preferences,
+        )
+
+        create_default_audio_preferences(user["id"])
 
         # Build device info from request and body
         device_info = build_device_info(request, user_data.device_info)
@@ -722,6 +734,13 @@ async def google_oauth(oauth_data: GoogleOAuth, request: Request):
 
             if referrer_id:
                 asyncio.create_task(process_referral_bonus(user["id"], referrer_id))
+
+        # Create default audio preferences for new OAuth user
+        from app.api.v1.endpoints.audio_preferences import (
+            create_default_audio_preferences,
+        )
+
+        create_default_audio_preferences(user["id"])
     else:
         # Ensure existing user is in auth.users (for Realtime to work)
         await ensure_auth_user_exists(user)
@@ -880,6 +899,13 @@ async def apple_oauth(oauth_data: AppleOAuth, request: Request):
 
             if referrer_id:
                 asyncio.create_task(process_referral_bonus(user["id"], referrer_id))
+
+        # Create default audio preferences for new Apple OAuth user
+        from app.api.v1.endpoints.audio_preferences import (
+            create_default_audio_preferences,
+        )
+
+        create_default_audio_preferences(user["id"])
     else:
         # Ensure existing user is in auth.users (for Realtime to work)
         await ensure_auth_user_exists(user)

@@ -28,7 +28,7 @@ export function PlanStatusBadge({ status, size = "sm" }: PlanStatusBadgeProps) {
           toValue: 1,
           duration: 1000,
           useNativeDriver: true,
-        })
+        }),
       );
       animation.start();
       return () => animation.stop();

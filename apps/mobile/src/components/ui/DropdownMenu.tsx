@@ -95,7 +95,7 @@ export function DropdownMenu({
       handleClose();
       await item.onPress();
     },
-    [handleClose]
+    [handleClose],
   );
 
   const handleTriggerLayout = (event: LayoutChangeEvent) => {
@@ -233,7 +233,7 @@ const makeStyles = (
   colors: any,
   brandColors: any,
   position: "left" | "right",
-  minWidth: number
+  minWidth: number,
 ) =>
   StyleSheet.create({
     container: {

@@ -40,8 +40,8 @@ class SocialNotificationType(Enum):
 # Notification templates with placeholders
 SOCIAL_NOTIFICATION_TEMPLATES = {
     # Accountability Partners
-    "partner_request": "👋 {sender_name} wants to be your accountability partner",
-    "partner_accepted": "🎉 {sender_name} accepted your partner request!",
+    "partner_request": "👋 {sender_name} wants to be your accountability partner! As partners, you'll be able to see each other's goals, progress, and can send motivational nudges.",
+    "partner_accepted": "🎉 {sender_name} accepted your partner request! You can now see their goals, track their progress, and nudge them to stay on track.",
     "partner_nudge": "👋 {sender_name}: {message}",
     "partner_cheer": "🎉 {sender_name} cheered your check-in!",
     "partner_milestone": "🔥 Your partner {sender_name} just hit a {count}-day streak!",
@@ -191,37 +191,49 @@ async def send_social_notification(
             **data,
         }
 
-        # Determine entity type and ID based on notification type
-        entity_type = None
-        entity_id = None
-        
-        if notification_type in [
-            SocialNotificationType.CHALLENGE_INVITE,
-            SocialNotificationType.CHALLENGE_JOINED,
-            SocialNotificationType.CHALLENGE_OVERTAKEN,
-            SocialNotificationType.CHALLENGE_LEAD,
-            SocialNotificationType.CHALLENGE_NUDGE,
-            SocialNotificationType.CHALLENGE_STARTING,
-            SocialNotificationType.CHALLENGE_ENDING,
-            SocialNotificationType.CHALLENGE_ENDED,
-        ]:
-            entity_type = "challenge"
-            entity_id = data.get("challenge_id")
-        elif notification_type in [
-            SocialNotificationType.PARTNER_REQUEST,
-            SocialNotificationType.PARTNER_ACCEPTED,
-        ]:
-            entity_type = "partner_request"
-            entity_id = data.get("request_id") or data.get("partnership_id")
-        elif notification_type in [
-            SocialNotificationType.PARTNER_NUDGE,
-            SocialNotificationType.PARTNER_CHEER,
-            SocialNotificationType.PARTNER_MILESTONE,
-            SocialNotificationType.PARTNER_INACTIVE,
-        ]:
-            # These are partner-related but may reference a goal
-            entity_type = "goal" if data.get("goal_id") else "user"
-            entity_id = data.get("goal_id") or sender_id
+        # Determine entity type and ID
+        # First check if explicitly passed in data, otherwise infer from notification type
+        entity_type = data.get("entity_type")
+        entity_id = data.get("entity_id")
+
+        if not entity_type or not entity_id:
+            # Infer entity type and ID based on notification type
+            if notification_type in [
+                SocialNotificationType.CHALLENGE_INVITE,
+                SocialNotificationType.CHALLENGE_JOINED,
+                SocialNotificationType.CHALLENGE_OVERTAKEN,
+                SocialNotificationType.CHALLENGE_LEAD,
+                SocialNotificationType.CHALLENGE_NUDGE,
+                SocialNotificationType.CHALLENGE_STARTING,
+                SocialNotificationType.CHALLENGE_ENDING,
+                SocialNotificationType.CHALLENGE_ENDED,
+            ]:
+                entity_type = entity_type or "challenge"
+                entity_id = entity_id or data.get("challenge_id")
+            elif notification_type in [
+                SocialNotificationType.PARTNER_REQUEST,
+                SocialNotificationType.PARTNER_ACCEPTED,
+            ]:
+                entity_type = entity_type or "partner_request"
+                entity_id = (
+                    entity_id or data.get("request_id") or data.get("partnership_id")
+                )
+            elif notification_type in [
+                SocialNotificationType.PARTNER_NUDGE,
+                SocialNotificationType.PARTNER_CHEER,
+                SocialNotificationType.PARTNER_MILESTONE,
+                SocialNotificationType.PARTNER_INACTIVE,
+            ]:
+                # These are partner-related but may reference a goal or challenge
+                if data.get("goal_id"):
+                    entity_type = entity_type or "goal"
+                    entity_id = entity_id or data.get("goal_id")
+                elif data.get("challenge_id"):
+                    entity_type = entity_type or "challenge"
+                    entity_id = entity_id or data.get("challenge_id")
+                else:
+                    entity_type = entity_type or "user"
+                    entity_id = entity_id or sender_id
 
         # Send push notification
         await send_push_to_user(
@@ -265,14 +277,40 @@ async def send_partner_notification(
     message: Optional[str] = None,
     count: Optional[int] = None,
     days: Optional[int] = None,
+    partnership_id: Optional[str] = None,
+    goal_id: Optional[str] = None,
+    challenge_id: Optional[str] = None,
+    entity_type: Optional[str] = None,
+    entity_id: Optional[str] = None,
     supabase=None,
 ) -> bool:
-    """Convenience function for partner notifications"""
+    """Convenience function for partner notifications
+
+    Args:
+        notification_type: Type of notification
+        recipient_id: User ID to send to
+        sender_id: User ID who triggered the notification
+        sender_name: Display name of sender
+        message: Optional message content
+        count: Optional count (for milestones)
+        days: Optional days count (for inactive)
+        partnership_id: ID of the accountability_partners record
+        goal_id: ID of related goal (if any)
+        challenge_id: ID of related challenge (if any)
+        entity_type: Entity type for notification_history (e.g., 'partner_request', 'goal', 'challenge')
+        entity_id: Entity ID for notification_history
+        supabase: Supabase client
+    """
     data = {
         "sender_name": sender_name,
         "message": message or "",
         "count": count or 0,
         "days": days or 0,
+        "partnership_id": partnership_id,
+        "goal_id": goal_id,
+        "challenge_id": challenge_id,
+        "entity_type": entity_type,
+        "entity_id": entity_id,
     }
     return await send_social_notification(
         notification_type, recipient_id, sender_id, data, supabase
@@ -284,19 +322,40 @@ async def send_challenge_notification(
     recipient_id: str,
     sender_id: Optional[str],
     challenge_title: str,
+    challenge_id: Optional[str] = None,
     sender_name: Optional[str] = None,
     message: Optional[str] = None,
     rank: Optional[int] = None,
     days: Optional[int] = None,
+    entity_type: Optional[str] = None,
+    entity_id: Optional[str] = None,
     supabase=None,
 ) -> bool:
-    """Convenience function for challenge notifications"""
+    """Convenience function for challenge notifications
+
+    Args:
+        notification_type: Type of notification
+        recipient_id: User ID to send to
+        sender_id: User ID who triggered the notification (optional)
+        challenge_title: Title of the challenge
+        challenge_id: ID of the challenge
+        sender_name: Display name of sender
+        message: Optional message content
+        rank: Optional rank in challenge
+        days: Optional days count
+        entity_type: Entity type for notification_history (default: 'challenge')
+        entity_id: Entity ID for notification_history (default: challenge_id)
+        supabase: Supabase client
+    """
     data = {
         "sender_name": sender_name or "FitNudge",
         "challenge_title": challenge_title,
+        "challenge_id": challenge_id,
         "message": message or "",
         "rank": rank or 0,
         "days": days or 0,
+        "entity_type": entity_type or "challenge",
+        "entity_id": entity_id or challenge_id,
     }
     return await send_social_notification(
         notification_type, recipient_id, sender_id, data, supabase

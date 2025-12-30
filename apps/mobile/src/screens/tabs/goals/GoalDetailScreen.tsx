@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   View,
   Text,
@@ -19,14 +19,19 @@ import { Tabs } from "@/components/ui/Tabs";
 import { SkeletonBox } from "@/components/ui/SkeletonBox";
 import { useGoal } from "@/hooks/api/useGoals";
 import { useTodayCheckIns, useCheckIns } from "@/hooks/api/useCheckIns";
+import { usePartners } from "@/hooks/api/usePartners";
+import { useAlertModal } from "@/contexts/AlertModalContext";
 import { CheckInModal } from "@/screens/tabs/home/components/CheckInModal";
+import { HydrationModal } from "@/components/tracking/HydrationModal";
+import { MealLogModal } from "@/components/tracking/MealLogModal";
 import { CheckIn } from "@/services/api/checkins";
 import { Ionicons } from "@expo/vector-icons";
 import { formatDate } from "@/utils/helper";
 import { PlanSection } from "./components/PlanSection";
 import { GoalProgressSection } from "./components/GoalProgressSection";
-import { usePlanStatus } from "@/hooks/api/useActionablePlans";
+import { usePlanStatus, useGoalPlan } from "@/hooks/api/useActionablePlans";
 import Button from "@/components/ui/Button";
+import { NotFoundState } from "@/components/ui/NotFoundState";
 
 // Tab IDs
 const TAB_OVERVIEW = "overview";
@@ -34,12 +39,44 @@ const TAB_PROGRESS = "progress";
 const TAB_PLAN = "plan";
 
 export default function GoalDetailScreen() {
-  const params = useLocalSearchParams<{ id?: string }>();
-  const goalId = params.id;
+  const params = useLocalSearchParams<{
+    id?: string;
+    viewMode?: string;
+    partnerId?: string;
+  }>();
+  const { id: goalId, viewMode, partnerId } = params;
+  const isPartnerView = viewMode === "partner";
+
   const styles = useStyles(makeGoalDetailScreenStyles);
   const { colors, brandColors } = useTheme();
   const { t } = useTranslation();
   const router = useRouter();
+  const { showToast, showAlert } = useAlertModal();
+
+  // For partner view - verify partnership exists
+  const { data: partnersData } = usePartners();
+  const isValidPartner = useMemo(() => {
+    if (!isPartnerView) return true; // Not partner view, always valid
+    if (!partnersData?.data || !partnerId) return true; // Still loading, assume valid
+    return partnersData.data.some(
+      (p) => p.partner?.id === partnerId || p.partner_user_id === partnerId,
+    );
+  }, [partnersData?.data, partnerId, isPartnerView]);
+
+  // Navigate away if partner view but not valid partner
+  useEffect(() => {
+    if (isPartnerView && partnersData?.data && !isValidPartner) {
+      showAlert({
+        title: t("partners.access_denied") || "Access Denied",
+        message:
+          t("partners.not_partners_anymore") ||
+          "You are no longer accountability partners",
+        variant: "error",
+        confirmLabel: t("common.ok"),
+      });
+      router.back();
+    }
+  }, [isPartnerView, isValidPartner, partnersData?.data]);
 
   const {
     data: goalResponse,
@@ -65,10 +102,34 @@ export default function GoalDetailScreen() {
     planStatus === "pending" || planStatus === "generating";
 
   const [showCheckInModal, setShowCheckInModal] = useState(false);
+  const [showHydrationModal, setShowHydrationModal] = useState(false);
+  const [showMealLogModal, setShowMealLogModal] = useState(false);
   const [selectedCheckIn, setSelectedCheckIn] = useState<CheckIn | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState(TAB_OVERVIEW);
   const [showAllCheckIns, setShowAllCheckIns] = useState(false);
+
+  // Fetch plan data to get plan_type and targets
+  const { data: goalPlanData } = useGoalPlan(
+    goalId,
+    planStatus === "completed",
+  );
+  const planType = goalPlanData?.plan?.plan_type;
+
+  // Extract meal targets from plan for MealLogModal
+  const mealPlanTargets = useMemo(() => {
+    const structure = goalPlanData?.plan?.structured_data?.structure;
+    if (!structure)
+      return { calorieTarget: undefined, proteinTarget: undefined };
+
+    const dailyTargets = structure.daily_targets || {};
+    const nutritionalTargets = structure.nutritional_targets || {}; // Legacy fallback
+
+    return {
+      calorieTarget: dailyTargets.calories || nutritionalTargets.calories,
+      proteinTarget: dailyTargets.protein_grams || nutritionalTargets.protein,
+    };
+  }, [goalPlanData]);
 
   // Number of check-ins to show initially
   const INITIAL_CHECKINS_COUNT = 3;
@@ -79,7 +140,7 @@ export default function GoalDetailScreen() {
     const today = new Date().toISOString().split("T")[0];
     return (
       todayCheckInsResponse.data.find(
-        (ci: CheckIn) => ci.goal_id === goalId && ci.date === today
+        (ci: CheckIn) => ci.goal_id === goalId && ci.check_in_date === today,
       ) || null
     );
   }, [todayCheckInsResponse, goalId]);
@@ -124,7 +185,33 @@ export default function GoalDetailScreen() {
   }, [t]);
 
   // Use is_checked_in (user has responded) not completed (user did the goal)
-  const canCheckIn = todayCheckIn && !todayCheckIn.is_checked_in;
+  // Also require goal to be active
+  const isGoalActive = goal?.status === "active";
+  const trackingType = goal?.tracking_type || "manual";
+
+  // Determine if user can perform action based on tracking type
+  const canCheckIn =
+    isGoalActive && todayCheckIn && !todayCheckIn.is_checked_in;
+
+  // For workout tracking, check-in is auto-completed after workout
+  // For meal/hydration, user logs via respective modals
+  const isWorkoutTracking = trackingType === "workout";
+  const isMealTracking = trackingType === "meal";
+  const isHydrationTracking = trackingType === "hydration";
+  const isManualTracking =
+    !isWorkoutTracking && !isMealTracking && !isHydrationTracking;
+
+  // Check if today is a scheduled day for this goal
+  // Daily goals: always scheduled, Weekly goals: only on selected days
+  const isScheduledDay = useMemo(() => {
+    if (!goal) return false;
+    if (goal.frequency === "daily") return true;
+    if (goal.frequency === "weekly" && goal.days_of_week) {
+      const today = new Date().getDay(); // 0 = Sunday, 1 = Monday, etc.
+      return goal.days_of_week.includes(today);
+    }
+    return true; // Default to true for other cases
+  }, [goal]);
 
   // Render Overview Tab
   const renderOverviewTab = () => {
@@ -243,31 +330,103 @@ export default function GoalDetailScreen() {
           </View>
         )}
 
-        {/* Check In Button */}
-        {canCheckIn && (
-          <Button
-            title={t("home.complete_checkin")}
-            onPress={handleCheckInPress}
-            leftIcon="checkmark-circle"
-          />
-        )}
-
-        {/* No check-in scheduled for today */}
-        {!todayCheckIn && goal.is_active && (
-          <View style={styles.noCheckInCard}>
+        {/* Partner View Banner */}
+        {isPartnerView && (
+          <View style={styles.partnerBanner}>
             <Ionicons
-              name="calendar-outline"
-              size={toRN(tokens.typography.fontSize.xl)}
-              color={colors.text.tertiary}
+              name="eye-outline"
+              size={18}
+              color={brandColors.primary}
             />
-            <Text style={styles.noCheckInText}>
-              {t("home.no_checkins_message")}
+            <Text style={styles.partnerBannerText}>
+              {t("partners.viewing_partner_goal") ||
+                "Viewing partner's goal (read-only)"}
             </Text>
           </View>
         )}
 
+        {/* Action Buttons - Based on tracking type and scheduled day */}
+        {/* Hide in partner view - they can only view, not interact */}
+        {!isPartnerView && isGoalActive && isScheduledDay && (
+          <>
+            {/* Manual/Checkin tracking - show Check In button */}
+            {isManualTracking && canCheckIn && (
+              <Button
+                title={t("home.complete_checkin")}
+                onPress={handleCheckInPress}
+                leftIcon="checkmark-circle"
+              />
+            )}
+
+            {/* Meal tracking - show Log Meal button */}
+            {isMealTracking && (
+              <Button
+                title={t("meals.log_meal") || "Log Meal"}
+                onPress={() => setShowMealLogModal(true)}
+                leftIcon="restaurant"
+              />
+            )}
+
+            {/* Hydration tracking - show Log Water button */}
+            {isHydrationTracking && (
+              <Button
+                title={t("hydration.log_water") || "Log Water"}
+                onPress={() => setShowHydrationModal(true)}
+                leftIcon="water"
+              />
+            )}
+
+            {/* Workout tracking - action is in Plan tab */}
+            {isWorkoutTracking && planStatus === "completed" && (
+              <View style={styles.workoutHint}>
+                <Ionicons
+                  name="fitness-outline"
+                  size={20}
+                  color={brandColors.primary}
+                />
+                <Text style={styles.workoutHintText}>
+                  {t("goals.start_workout_hint") ||
+                    "Go to the Plan tab to start your workout"}
+                </Text>
+              </View>
+            )}
+          </>
+        )}
+
+        {/* Rest day indicator - show when goal is active but not a scheduled day (not in partner view) */}
+        {!isPartnerView && isGoalActive && !isScheduledDay && (
+          <View style={styles.restDayCard}>
+            <Ionicons
+              name="moon-outline"
+              size={20}
+              color={colors.text.tertiary}
+            />
+            <Text style={styles.restDayText}>
+              {t("goals.rest_day") ||
+                "Rest day - no action scheduled for today"}
+            </Text>
+          </View>
+        )}
+
+        {/* No check-in scheduled for today (for manual tracking, not in partner view) */}
+        {!isPartnerView &&
+          isManualTracking &&
+          !todayCheckIn &&
+          goal.status === "active" && (
+            <View style={styles.noCheckInCard}>
+              <Ionicons
+                name="calendar-outline"
+                size={toRN(tokens.typography.fontSize.xl)}
+                color={colors.text.tertiary}
+              />
+              <Text style={styles.noCheckInText}>
+                {t("home.no_checkins_message")}
+              </Text>
+            </View>
+          )}
+
         {/* Already checked in today */}
-        {todayCheckIn?.is_checked_in && (
+        {/* {todayCheckIn?.is_checked_in && (
           <View style={styles.checkedInBadge}>
             <Ionicons
               name={
@@ -291,6 +450,24 @@ export default function GoalDetailScreen() {
                 : t("checkin.marked_incomplete") || "Marked as incomplete"}
             </Text>
           </View>
+        )} */}
+
+        {/* Goal is not active - show status message */}
+        {!isGoalActive && goal.status && (
+          <View style={styles.inactiveGoalCard}>
+            <Ionicons
+              name="pause-circle-outline"
+              size={20}
+              color={colors.text.tertiary}
+            />
+            <Text style={styles.inactiveGoalText}>
+              {goal.status === "archived"
+                ? t("goals.goal_paused") || "This goal is paused"
+                : goal.status === "completed"
+                  ? t("goals.goal_completed") || "This goal is completed"
+                  : t("goals.goal_not_active") || "This goal is not active"}
+            </Text>
+          </View>
         )}
       </>
     );
@@ -305,119 +482,129 @@ export default function GoalDetailScreen() {
         {/* Goal Progress Section */}
         <GoalProgressSection
           goalId={goal.id}
-          goalType={goal.goal_type}
-          targetCheckins={goal.target_checkins}
-          challengeStartDate={goal.challenge_start_date}
-          challengeEndDate={goal.challenge_end_date}
+          trackingType={(goal.tracking_type as any) || "checkin"}
           frequency={goal.frequency}
           daysOfWeek={goal.days_of_week}
+          isPartnerView={isPartnerView}
         />
 
-        {/* Check-Ins History */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>
-              {t("checkin.checkin_history")}
-            </Text>
-            {checkIns.length > 0 && (
-              <Text style={styles.sectionCount}>
-                {checkIns.length} {t("checkin.total") || "total"}
+        {/* Check-Ins History - Hidden for partner view */}
+        {!isPartnerView && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>
+                {t("checkin.checkin_history")}
               </Text>
+              {checkIns.length > 0 && (
+                <Text style={styles.sectionCount}>
+                  {checkIns.length} {t("checkin.total") || "total"}
+                </Text>
+              )}
+            </View>
+
+            {checkInsLoading ? (
+              <View>
+                {[1, 2, 3].map((i) => (
+                  <SkeletonBox
+                    key={i}
+                    width="100%"
+                    height={60}
+                    style={{ marginBottom: toRN(tokens.spacing[3]) }}
+                  />
+                ))}
+              </View>
+            ) : checkIns.length === 0 ? (
+              <Card shadow="sm" style={styles.emptyCard}>
+                <Text style={styles.emptyText}>
+                  {t("checkin.no_checkins_yet")}
+                </Text>
+              </Card>
+            ) : (
+              <>
+                <View style={styles.checkInsList}>
+                  {checkIns
+                    .slice(
+                      0,
+                      showAllCheckIns
+                        ? checkIns.length
+                        : INITIAL_CHECKINS_COUNT,
+                    )
+                    .map((checkIn: CheckIn) => (
+                      <Card
+                        key={checkIn.id}
+                        shadow="sm"
+                        style={styles.checkInCard}
+                      >
+                        <View style={styles.checkInCardContent}>
+                          <View style={styles.checkInCardLeft}>
+                            <Text style={styles.checkInDate}>
+                              {formatDate(checkIn.check_in_date, "short")}
+                            </Text>
+                            {checkIn.notes && (
+                              <Text
+                                style={styles.checkInReflection}
+                                numberOfLines={2}
+                              >
+                                {checkIn.notes}
+                              </Text>
+                            )}
+                          </View>
+                          <View style={styles.checkInCardRight}>
+                            {checkIn.completed ? (
+                              <Ionicons
+                                name="checkmark-circle"
+                                size={24}
+                                color={colors.feedback.success}
+                              />
+                            ) : (
+                              <Ionicons
+                                name="ellipse-outline"
+                                size={24}
+                                color={colors.text.tertiary}
+                              />
+                            )}
+                            {checkIn.mood && (
+                              <Text style={styles.checkInMood}>
+                                {
+                                  {
+                                    terrible: "😞",
+                                    bad: "😐",
+                                    okay: "😊",
+                                    good: "😄",
+                                    great: "🤩",
+                                  }[checkIn.mood]
+                                }
+                              </Text>
+                            )}
+                          </View>
+                        </View>
+                      </Card>
+                    ))}
+                </View>
+
+                {/* View All / Show Less Button */}
+                {checkIns.length > INITIAL_CHECKINS_COUNT && (
+                  <TouchableOpacity
+                    style={styles.viewAllButton}
+                    onPress={() => setShowAllCheckIns(!showAllCheckIns)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.viewAllButtonText}>
+                      {showAllCheckIns
+                        ? t("common.show_less") || "Show Less"
+                        : `${t("common.view_all") || "View All"} (${checkIns.length - INITIAL_CHECKINS_COUNT} ${t("common.more") || "more"})`}
+                    </Text>
+                    <Ionicons
+                      name={showAllCheckIns ? "chevron-up" : "chevron-down"}
+                      size={16}
+                      color={brandColors.primary}
+                    />
+                  </TouchableOpacity>
+                )}
+              </>
             )}
           </View>
-
-          {checkInsLoading ? (
-            <View>
-              {[1, 2, 3].map((i) => (
-                <SkeletonBox
-                  key={i}
-                  width="100%"
-                  height={60}
-                  style={{ marginBottom: toRN(tokens.spacing[3]) }}
-                />
-              ))}
-            </View>
-          ) : checkIns.length === 0 ? (
-            <Card shadow="sm" style={styles.emptyCard}>
-              <Text style={styles.emptyText}>
-                {t("checkin.no_checkins_yet")}
-              </Text>
-            </Card>
-          ) : (
-            <>
-              <View style={styles.checkInsList}>
-                {checkIns
-                  .slice(
-                    0,
-                    showAllCheckIns ? checkIns.length : INITIAL_CHECKINS_COUNT
-                  )
-                  .map((checkIn: CheckIn) => (
-                    <Card
-                      key={checkIn.id}
-                      shadow="sm"
-                      style={styles.checkInCard}
-                    >
-                      <View style={styles.checkInCardContent}>
-                        <View style={styles.checkInCardLeft}>
-                          <Text style={styles.checkInDate}>
-                            {formatDate(checkIn.date, "short")}
-                          </Text>
-                          {checkIn.reflection && (
-                            <Text
-                              style={styles.checkInReflection}
-                              numberOfLines={2}
-                            >
-                              {checkIn.reflection}
-                            </Text>
-                          )}
-                        </View>
-                        <View style={styles.checkInCardRight}>
-                          {checkIn.completed ? (
-                            <Ionicons
-                              name="checkmark-circle"
-                              size={24}
-                              color={colors.feedback.success}
-                            />
-                          ) : (
-                            <Ionicons
-                              name="ellipse-outline"
-                              size={24}
-                              color={colors.text.tertiary}
-                            />
-                          )}
-                          {checkIn.mood && (
-                            <Text style={styles.checkInMood}>
-                              {["😞", "😐", "😊", "😄", "🤩"][checkIn.mood - 1]}
-                            </Text>
-                          )}
-                        </View>
-                      </View>
-                    </Card>
-                  ))}
-              </View>
-
-              {/* View All / Show Less Button */}
-              {checkIns.length > INITIAL_CHECKINS_COUNT && (
-                <TouchableOpacity
-                  style={styles.viewAllButton}
-                  onPress={() => setShowAllCheckIns(!showAllCheckIns)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.viewAllButtonText}>
-                    {showAllCheckIns
-                      ? t("common.show_less") || "Show Less"
-                      : `${t("common.view_all") || "View All"} (${checkIns.length - INITIAL_CHECKINS_COUNT} ${t("common.more") || "more"})`}
-                  </Text>
-                  <Ionicons
-                    name={showAllCheckIns ? "chevron-up" : "chevron-down"}
-                    size={16}
-                    color={brandColors.primary}
-                  />
-                </TouchableOpacity>
-              )}
-            </>
-          )}
-        </View>
+        )}
       </>
     );
   };
@@ -427,7 +614,15 @@ export default function GoalDetailScreen() {
     if (!goal) return null;
 
     // Pass planStatus prop to avoid duplicate polling
-    return <PlanSection goalId={goal.id} planStatus={planStatusData} />;
+    return (
+      <PlanSection
+        goalId={goal.id}
+        planStatus={planStatusData}
+        entityStatus={goal.status}
+        isScheduledDay={isScheduledDay}
+        isPartnerView={isPartnerView}
+      />
+    );
   };
 
   // Render tab content
@@ -541,9 +736,11 @@ export default function GoalDetailScreen() {
     return (
       <View style={styles.container}>
         <BackButton onPress={() => router.back()} />
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{t("common.error")}</Text>
-        </View>
+        <NotFoundState
+          title={t("errors.goal_not_found_title")}
+          description={t("errors.goal_not_found_description")}
+          icon="flag-outline"
+        />
       </View>
     );
   }
@@ -584,17 +781,50 @@ export default function GoalDetailScreen() {
         {renderTabContent()}
       </ScrollView>
 
-      {/* Check-In Modal */}
-      {selectedCheckIn && (
-        <CheckInModal
-          visible={showCheckInModal}
-          checkIn={selectedCheckIn}
-          onClose={() => {
-            setShowCheckInModal(false);
-            setSelectedCheckIn(null);
-          }}
-          onComplete={handleCheckInComplete}
-        />
+      {/* Modals - Only show when not in partner view */}
+      {!isPartnerView && (
+        <>
+          {/* Check-In Modal */}
+          {selectedCheckIn && (
+            <CheckInModal
+              visible={showCheckInModal}
+              checkIn={selectedCheckIn}
+              onClose={() => {
+                setShowCheckInModal(false);
+                setSelectedCheckIn(null);
+              }}
+              onComplete={handleCheckInComplete}
+            />
+          )}
+
+          {/* Meal Log Modal */}
+          {goalId && (
+            <MealLogModal
+              visible={showMealLogModal}
+              onClose={() => setShowMealLogModal(false)}
+              goalId={goalId}
+              calorieTarget={mealPlanTargets.calorieTarget}
+              proteinTarget={mealPlanTargets.proteinTarget}
+              onSuccess={() => {
+                refetchTodayCheckIns();
+                refetchCheckIns();
+              }}
+            />
+          )}
+
+          {/* Hydration Modal */}
+          {goalId && (
+            <HydrationModal
+              visible={showHydrationModal}
+              onClose={() => setShowHydrationModal(false)}
+              goalId={goalId}
+              onSuccess={() => {
+                refetchTodayCheckIns();
+                refetchCheckIns();
+              }}
+            />
+          )}
+        </>
       )}
     </View>
   );
@@ -603,7 +833,7 @@ export default function GoalDetailScreen() {
 const makeGoalDetailScreenStyles = (
   tokens: any,
   colors: any,
-  brandColors: any
+  brandColors: any,
 ) => ({
   container: {
     flex: 1,
@@ -643,6 +873,25 @@ const makeGoalDetailScreenStyles = (
     fontFamily: fontFamily.groteskRegular,
     color: colors.text.primary,
     lineHeight: toRN(tokens.typography.fontSize.base) * 1.6,
+  },
+  // Partner view banner
+  partnerBanner: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: toRN(tokens.spacing[2]),
+    paddingHorizontal: toRN(tokens.spacing[4]),
+    paddingVertical: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[4]),
+    backgroundColor: `${brandColors.primary}15`,
+    borderRadius: toRN(tokens.borderRadius.lg),
+    borderWidth: 1,
+    borderColor: `${brandColors.primary}30`,
+  },
+  partnerBannerText: {
+    fontSize: toRN(tokens.typography.fontSize.sm),
+    fontFamily: fontFamily.medium,
+    color: brandColors.primary,
+    flex: 1,
   },
   goalTitle: {
     fontSize: toRN(tokens.typography.fontSize.lg),
@@ -784,6 +1033,51 @@ const makeGoalDetailScreenStyles = (
     gap: toRN(tokens.spacing[2]),
   },
   noCheckInText: {
+    fontSize: toRN(tokens.typography.fontSize.sm),
+    fontFamily: fontFamily.regular,
+    color: colors.text.tertiary,
+  },
+  restDayCard: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    backgroundColor: colors.bg.muted,
+    padding: toRN(tokens.spacing[4]),
+    borderRadius: toRN(tokens.borderRadius.xl),
+    marginBottom: toRN(tokens.spacing[4]),
+    gap: toRN(tokens.spacing[2]),
+  },
+  restDayText: {
+    fontSize: toRN(tokens.typography.fontSize.sm),
+    fontFamily: fontFamily.regular,
+    color: colors.text.tertiary,
+  },
+  workoutHint: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    backgroundColor: brandColors.primary + "15",
+    padding: toRN(tokens.spacing[4]),
+    borderRadius: toRN(tokens.borderRadius.xl),
+    marginBottom: toRN(tokens.spacing[4]),
+    gap: toRN(tokens.spacing[2]),
+  },
+  workoutHintText: {
+    fontSize: toRN(tokens.typography.fontSize.sm),
+    fontFamily: fontFamily.medium,
+    color: brandColors.primary,
+  },
+  inactiveGoalCard: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    backgroundColor: colors.bg.muted,
+    padding: toRN(tokens.spacing[4]),
+    borderRadius: toRN(tokens.borderRadius.xl),
+    marginBottom: toRN(tokens.spacing[4]),
+    gap: toRN(tokens.spacing[2]),
+  },
+  inactiveGoalText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
     color: colors.text.tertiary,

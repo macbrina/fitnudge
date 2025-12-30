@@ -75,7 +75,7 @@ const Card = forwardRef<View, CardProps>(function Card(
     disabled = false,
     ...rest
   },
-  ref
+  ref,
 ) {
   const { colors } = useTheme();
 

@@ -40,7 +40,7 @@ export default function LeaderboardScreen() {
 
   // Data hooks
   const { data: challengeResponse, isLoading: challengeLoading } = useChallenge(
-    challengeId || ""
+    challengeId || "",
   );
 
   const {

@@ -171,16 +171,16 @@ def send_scheduled_ai_motivations_task(self) -> Dict[str, Any]:
         active_goals_result = (
             supabase.table("goals")
             .select(
-                "id, user_id, title, reminder_times, frequency, days_of_week, created_at, is_active"
+                "id, user_id, title, reminder_times, frequency, days_of_week, created_at, status"
             )
-            .eq("is_active", True)
+            .eq("status", "active")
             .in_("user_id", active_user_ids)
             .execute()
         )
 
         # ============================================================
         # STEP 4: Get challenges with reminder times (user is participant)
-        # Challenge data is in goal_template JSONB, not direct columns
+        # Challenge fields are now direct columns (standalone challenges)
         # challenge_participants has no status - existence means participation
         # ============================================================
         challenge_participants_result = (
@@ -192,7 +192,8 @@ def send_scheduled_ai_motivations_task(self) -> Dict[str, Any]:
                 joined_at,
                 challenges!inner(
                     id, title, start_date, end_date, 
-                    challenge_type, is_active, goal_template
+                    challenge_type, status,
+                    frequency, days_of_week, reminder_times
                 )
                 """
             )
@@ -205,9 +206,9 @@ def send_scheduled_ai_motivations_task(self) -> Dict[str, Any]:
         # ============================================================
         all_checkins_result = (
             supabase.table("check_ins")
-            .select("user_id, goal_id, date, completed")
+            .select("user_id, goal_id, check_in_date, completed")
             .in_("user_id", active_user_ids)
-            .order("date", desc=True)
+            .order("check_in_date", desc=True)
             .execute()
         )
 
@@ -240,10 +241,10 @@ def send_scheduled_ai_motivations_task(self) -> Dict[str, Any]:
         # ============================================================
         items_to_process = []
 
-        # Add goals (already filtered by is_active=True in query, but double-check)
+        # Add goals (already filtered by status='active' in query, but double-check)
         for goal in active_goals_result.data or []:
             # Safety check - skip if somehow inactive goal got through
-            if not goal.get("is_active", True):
+            if goal.get("status") != "active":
                 continue
 
             items_to_process.append(
@@ -268,12 +269,11 @@ def send_scheduled_ai_motivations_task(self) -> Dict[str, Any]:
                 continue
 
             # Only process active challenges
-            if not challenge.get("is_active", False):
+            if challenge.get("status") not in ("upcoming", "active"):
                 continue
 
-            # Extract goal_template JSONB which contains reminder_times, frequency, days_of_week
-            goal_template = challenge.get("goal_template") or {}
-            reminder_times = goal_template.get("reminder_times") or []
+            # Get challenge fields directly (standalone challenges)
+            reminder_times = challenge.get("reminder_times") or []
 
             # Skip if no reminder times configured
             if not reminder_times:
@@ -286,8 +286,8 @@ def send_scheduled_ai_motivations_task(self) -> Dict[str, Any]:
                     "user_id": participant["user_id"],
                     "title": challenge["title"],
                     "reminder_times": reminder_times,
-                    "frequency": goal_template.get("frequency", "daily"),
-                    "days_of_week": goal_template.get("days_of_week") or [],
+                    "frequency": challenge.get("frequency", "daily"),
+                    "days_of_week": challenge.get("days_of_week") or [],
                     "created_at": participant.get("joined_at")
                     or challenge.get("start_date"),
                     "start_date": challenge.get("start_date"),
@@ -393,7 +393,9 @@ def send_scheduled_ai_motivations_task(self) -> Dict[str, Any]:
                 if item_checkins:
                     expected_date = user_today
                     for checkin in item_checkins:
-                        checkin_date = datetime.fromisoformat(checkin["date"]).date()
+                        checkin_date = datetime.fromisoformat(
+                            checkin["check_in_date"]
+                        ).date()
                         if checkin_date == expected_date and checkin.get("completed"):
                             current_streak += 1
                             expected_date = expected_date - timedelta(days=1)
@@ -431,7 +433,8 @@ def send_scheduled_ai_motivations_task(self) -> Dict[str, Any]:
                 recent_checkins = [
                     c
                     for c in item_checkins
-                    if datetime.fromisoformat(c["date"]).date() >= seven_days_ago
+                    if datetime.fromisoformat(c["check_in_date"]).date()
+                    >= seven_days_ago
                 ]
                 recent_completed = len(
                     [c for c in recent_checkins if c.get("completed")]
@@ -474,6 +477,13 @@ def send_scheduled_ai_motivations_task(self) -> Dict[str, Any]:
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
 
+                # Deep link uses Expo Router paths for direct in-app navigation
+                deep_link = (
+                    f"/(user)/(goals)/details?id={item_id}"
+                    if item_type == "goal"
+                    else f"/(user)/challenges/{item_id}"
+                )
+
                 notification_result = loop.run_until_complete(
                     send_push_to_user(
                         user_id=user_id,
@@ -483,11 +493,7 @@ def send_scheduled_ai_motivations_task(self) -> Dict[str, Any]:
                             "type": "ai_motivation",
                             "itemType": item_type,
                             "itemId": item_id,
-                            "deepLink": (
-                                f"/motivation/{item_id}"
-                                if item_type == "goal"
-                                else f"/challenges/{item_id}"
-                            ),
+                            "deepLink": deep_link,
                         },
                         notification_type="ai_motivation",
                         # Generic entity reference for tracking
@@ -587,7 +593,7 @@ def send_reengagement_notifications_task(self) -> Dict[str, Any]:
         active_users_result = (
             supabase.table("goals")
             .select("user_id, users!inner(name, timezone)")
-            .eq("is_active", True)
+            .eq("status", "active")
             .execute()
         )
 
@@ -604,48 +610,68 @@ def send_reengagement_notifications_task(self) -> Dict[str, Any]:
                     "timezone": goal.get("users", {}).get("timezone", "UTC"),
                 }
 
-        # Check each user's last activity
+        user_ids = list(unique_users.keys())
+
+        if not user_ids:
+            return {"success": True, "sent": 0, "skipped": 0}
+
+        # =========================================
+        # SCALABILITY: Batch fetch all data upfront instead of N+1 queries
+        # =========================================
+
+        # Batch fetch: Last check-in for all users
+        # Using a raw query approach with GROUP BY would be ideal, but
+        # with Supabase REST we fetch recent check-ins and process in Python
+        all_checkins_result = (
+            supabase.table("check_ins")
+            .select("user_id, check_in_date")
+            .in_("user_id", user_ids)
+            .order("check_in_date", desc=True)
+            .execute()
+        )
+
+        # Build map of user_id -> last_check_in_date
+        last_checkin_by_user = {}
+        for checkin in all_checkins_result.data or []:
+            uid = checkin["user_id"]
+            if uid not in last_checkin_by_user:  # First entry is most recent
+                last_checkin_by_user[uid] = checkin["check_in_date"]
+
+        # Batch fetch: Notification preferences for all users
+        prefs_result = (
+            supabase.table("notification_preferences")
+            .select("user_id, enabled, reengagement")
+            .in_("user_id", user_ids)
+            .execute()
+        )
+
+        # Build map of user_id -> preferences
+        prefs_by_user = {}
+        for pref in prefs_result.data or []:
+            prefs_by_user[pref["user_id"]] = pref
+
+        today = datetime.now().date()
+
+        # Now process each user (no DB calls in loop!)
         for user_id, user_info in unique_users.items():
             try:
-                # Get user's last check-in
-                last_checkin_result = (
-                    supabase.table("check_ins")
-                    .select("date, completed")
-                    .eq("user_id", user_id)
-                    .order("date", desc=True)
-                    .limit(1)
-                    .execute()
-                )
-
-                # Determine if user is inactive
-                days_inactive = 0
-                if not last_checkin_result.data:
-                    # No check-ins at all - send re-engagement
-                    days_inactive = 999
+                # Calculate days inactive from pre-fetched data
+                last_checkin_date_str = last_checkin_by_user.get(user_id)
+                if not last_checkin_date_str:
+                    days_inactive = 999  # No check-ins at all
                 else:
-                    last_checkin = last_checkin_result.data[0]
-                    last_date = datetime.fromisoformat(last_checkin["date"]).date()
-                    today = datetime.now().date()
+                    last_date = datetime.fromisoformat(last_checkin_date_str).date()
                     days_inactive = (today - last_date).days
 
                 # Send re-engagement if inactive for 2+ days
                 if days_inactive >= 2:
-                    # Check notification preferences
-                    prefs_result = (
-                        supabase.table("notification_preferences")
-                        .select("enabled, reengagement")
-                        .eq("user_id", user_id)
-                        .execute()
-                    )
-
-                    # Skip if reengagement notifications disabled
-                    if prefs_result.data:
-                        prefs = prefs_result.data[0]
-                        if not prefs.get("enabled", True) or not prefs.get(
-                            "reengagement", True
-                        ):
-                            skipped_count += 1
-                            continue
+                    # Check notification preferences from pre-fetched data
+                    prefs = prefs_by_user.get(user_id, {})
+                    if not prefs.get("enabled", True) or not prefs.get(
+                        "reengagement", True
+                    ):
+                        skipped_count += 1
+                        continue
 
                     # Personalize message based on inactivity duration
                     user_name = user_info["name"]
@@ -678,7 +704,7 @@ def send_reengagement_notifications_task(self) -> Dict[str, Any]:
                             body=body,
                             data={
                                 "type": "reengagement",
-                                "deepLink": "/home",
+                                "deepLink": "/(user)/(tabs)",
                             },
                             notification_type="reengagement",
                         )
@@ -757,7 +783,7 @@ def send_checkin_prompts_task(self) -> Dict[str, Any]:
         active_goals_result = (
             supabase.table("goals")
             .select("id, user_id, title, reminder_times, users!inner(timezone, name)")
-            .eq("is_active", True)
+            .eq("status", "active")
             .execute()
         )
 
@@ -831,7 +857,7 @@ def send_checkin_prompts_task(self) -> Dict[str, Any]:
                     .select("id, completed")
                     .eq("goal_id", goal_id)
                     .eq("user_id", user_id)
-                    .eq("date", user_today.isoformat())
+                    .eq("check_in_date", user_today.isoformat())
                     .execute()
                 )
 
@@ -882,6 +908,7 @@ def send_checkin_prompts_task(self) -> Dict[str, Any]:
                         asyncio.set_event_loop(loop)
 
                     # Send check-in prompt push notification (uses "reminder" type)
+                    # Deep link uses Expo Router path for direct in-app navigation
                     notification_result = loop.run_until_complete(
                         send_push_to_user(
                             user_id=user_id,
@@ -891,7 +918,7 @@ def send_checkin_prompts_task(self) -> Dict[str, Any]:
                                 "type": "reminder",
                                 "subtype": "checkin_prompt",
                                 "goalId": goal_id,
-                                "deepLink": f"/checkin/{goal_id}",
+                                "deepLink": f"/(user)/(goals)/details?id={goal_id}",
                             },
                             notification_type="reminder",
                             entity_type="goal",
@@ -905,20 +932,9 @@ def send_checkin_prompts_task(self) -> Dict[str, Any]:
                             f"   ✅ Sent check-in prompt for goal '{goal_title}' to {user_name}"
                         )
 
-                        # Record in notification_history to prevent duplicates
-                        # Uses "reminder" type with subtype in data to identify check-in prompts
-                        supabase.table("notification_history").insert(
-                            {
-                                "user_id": user_id,
-                                "notification_type": "reminder",
-                                "title": f"How did your {goal_title} go? ✅",
-                                "body": f"Take a moment to check in, {user_name}!",
-                                "data": {
-                                    "subtype": "checkin_prompt",
-                                    "goalId": goal_id,
-                                },
-                            }
-                        ).execute()
+                        # Note: notification_history record is already created by send_push_to_user
+                        # with entity_type="goal" and entity_id=goal_id
+                        # No need for duplicate insert here
 
                 except Exception as push_error:
                     logger.warning(
@@ -942,6 +958,184 @@ def send_checkin_prompts_task(self) -> Dict[str, Any]:
                     {"goal_id": goal_id, "user_id": user_id, "error": str(e)},
                 )
                 continue
+
+        # ==================== CHALLENGE CHECK-IN PROMPTS ====================
+        # Now process challenges the same way as goals
+
+        # Get all active challenges with participants
+        active_challenges_result = (
+            supabase.table("challenges")
+            .select(
+                "id, title, reminder_times, status, "
+                "challenge_participants!inner(user_id, users!inner(timezone, name))"
+            )
+            .eq("status", "active")
+            .execute()
+        )
+
+        if active_challenges_result.data:
+            for challenge in active_challenges_result.data:
+                challenge_id = challenge["id"]
+                challenge_title = challenge["title"]
+                reminder_times = challenge.get("reminder_times") or []
+
+                # Skip if no reminder times set
+                if not reminder_times or not isinstance(reminder_times, list):
+                    skipped_no_reminders += 1
+                    continue
+
+                # Process each participant
+                participants = challenge.get("challenge_participants") or []
+                for participant in participants:
+                    user_id = participant["user_id"]
+                    user_info = participant.get("users", {})
+                    user_name = user_info.get("name") or "Champion"
+                    user_timezone_str = user_info.get("timezone") or "UTC"
+
+                    try:
+                        user_tz = pytz.timezone(user_timezone_str)
+                        user_now = datetime.now(user_tz)
+                        user_today = user_now.date()
+                        current_time_str = user_now.strftime("%H:%M")
+
+                        # Find the LAST reminder time of the day
+                        sorted_reminders = sorted(reminder_times)
+                        last_reminder_str = sorted_reminders[-1]
+
+                        # Calculate prompt time (last reminder + 30 min)
+                        last_reminder_parts = last_reminder_str.split(":")
+                        last_reminder_hour = int(last_reminder_parts[0])
+                        last_reminder_minute = int(last_reminder_parts[1])
+
+                        last_reminder_dt = user_now.replace(
+                            hour=last_reminder_hour,
+                            minute=last_reminder_minute,
+                            second=0,
+                            microsecond=0,
+                        )
+
+                        prompt_dt = last_reminder_dt + timedelta(
+                            minutes=CHECKIN_PROMPT_DELAY_MINUTES
+                        )
+                        prompt_time_str = prompt_dt.strftime("%H:%M")
+
+                        if current_time_str != prompt_time_str:
+                            continue
+
+                        print(
+                            f"📋 [CHALLENGE CHECK-IN PROMPT] Checking challenge '{challenge_title}' for user {user_id}"
+                        )
+
+                        # Check 1: Is check-in already completed today?
+                        today_checkin = (
+                            supabase.table("challenge_check_ins")
+                            .select("id, completed")
+                            .eq("challenge_id", challenge_id)
+                            .eq("user_id", user_id)
+                            .eq("check_in_date", user_today.isoformat())
+                            .execute()
+                        )
+
+                        if today_checkin.data and today_checkin.data[0].get(
+                            "completed"
+                        ):
+                            print(
+                                f"   ⏭️ Skipping - already checked in for challenge '{challenge_title}'"
+                            )
+                            skipped_already_completed += 1
+                            continue
+
+                        # Check 2: Did we already send a check-in prompt today for this challenge?
+                        today_reminders = (
+                            supabase.table("notification_history")
+                            .select("id, data")
+                            .eq("user_id", user_id)
+                            .eq("notification_type", "reminder")
+                            .gte("created_at", user_today.isoformat())
+                            .execute()
+                        )
+
+                        already_prompted = any(
+                            p.get("data", {}).get("subtype") == "checkin_prompt"
+                            and p.get("data", {}).get("challengeId") == challenge_id
+                            for p in (today_reminders.data or [])
+                        )
+
+                        if already_prompted:
+                            print(
+                                f"   ⏭️ Skipping - already prompted today for challenge '{challenge_title}'"
+                            )
+                            skipped_already_prompted += 1
+                            continue
+
+                        # ✅ Send the check-in prompt notification
+                        try:
+                            from app.services.expo_push_service import send_push_to_user
+                            import asyncio
+
+                            try:
+                                loop = asyncio.get_event_loop()
+                                if loop.is_closed():
+                                    loop = asyncio.new_event_loop()
+                                    asyncio.set_event_loop(loop)
+                            except RuntimeError:
+                                loop = asyncio.new_event_loop()
+                                asyncio.set_event_loop(loop)
+
+                            # Deep link uses Expo Router path for direct in-app navigation
+                            notification_result = loop.run_until_complete(
+                                send_push_to_user(
+                                    user_id=user_id,
+                                    title=f"How did your {challenge_title} go? ✅",
+                                    body=f"Take a moment to check in, {user_name}!",
+                                    data={
+                                        "type": "reminder",
+                                        "subtype": "checkin_prompt",
+                                        "challengeId": challenge_id,
+                                        "deepLink": f"/(user)/challenges/{challenge_id}",
+                                    },
+                                    notification_type="reminder",
+                                    entity_type="challenge",
+                                    entity_id=challenge_id,
+                                )
+                            )
+
+                            if notification_result.get("notification_id"):
+                                sent_count += 1
+                                print(
+                                    f"   ✅ Sent check-in prompt for challenge '{challenge_title}' to {user_name}"
+                                )
+
+                                # Note: notification_history record is already created by send_push_to_user
+                                # with entity_type="challenge" and entity_id=challenge_id
+                                # No need for duplicate insert here
+
+                        except Exception as push_error:
+                            logger.warning(
+                                f"Failed to send check-in prompt for challenge {challenge_id}",
+                                {
+                                    "error": str(push_error),
+                                    "challenge_id": challenge_id,
+                                    "user_id": user_id,
+                                },
+                            )
+
+                    except pytz.exceptions.UnknownTimeZoneError:
+                        logger.error(
+                            f"Invalid timezone for user {user_id}: {user_timezone_str}",
+                            {"user_id": user_id, "timezone": user_timezone_str},
+                        )
+                        continue
+                    except Exception as e:
+                        logger.error(
+                            f"Failed to process check-in prompt for challenge {challenge_id}",
+                            {
+                                "challenge_id": challenge_id,
+                                "user_id": user_id,
+                                "error": str(e),
+                            },
+                        )
+                        continue
 
         print(
             f"[CHECK-IN PROMPTS] Sent: {sent_count}, "
@@ -974,14 +1168,13 @@ def send_checkin_prompts_task(self) -> Dict[str, Any]:
     max_retries=2,
     default_retry_delay=60,
 )
-def cleanup_orphaned_notifications_task(self, days_old: int = 30) -> Dict[str, Any]:
+def cleanup_orphaned_notifications_task(self) -> Dict[str, Any]:
     """
     Periodic task to clean up orphaned notifications.
 
     An orphaned notification is one where:
     - entity_type and entity_id are set
     - But the referenced entity no longer exists (was deleted)
-    - AND the notification is older than `days_old` days
 
     This task:
     1. Finds notification_history records with entity references
@@ -990,44 +1183,45 @@ def cleanup_orphaned_notifications_task(self, days_old: int = 30) -> Dict[str, A
 
     Runs weekly to keep notification_history table clean.
 
-    Args:
-        days_old: Only clean up notifications older than this many days (default: 30)
-
     Returns:
         Dict with counts of cleaned up notifications by entity type
     """
-    from datetime import datetime, timedelta
-
     try:
         supabase = get_supabase_client()
-        cutoff_date = (datetime.utcnow() - timedelta(days=days_old)).isoformat()
-
-        cleanup_stats = {
-            "goal": 0,
-            "challenge": 0,
-            "achievement": 0,
-            "post": 0,
-            "total": 0,
-        }
 
         # Entity type to table mapping
+        # Maps entity_type in notification_history to the source table
+        # This must match all entity_type values used when sending notifications
         entity_table_map = {
+            # Core entities
             "goal": "goals",
             "challenge": "challenges",
             "achievement": "user_achievements",
-            "post": "posts",
+            # Social entities
             "partner_request": "accountability_partners",
+            "social_nudge": "social_nudges",
+            # Content entities (future use)
+            "post": "posts",
+            "comment": "comments",
+            "like": "likes",
+            # Other entities
             "checkin": "check_ins",
+            "weekly_recap": "weekly_recaps",
+            # Note: "user" entity_type references the users table but we don't
+            # clean up user notifications since user deletion cascades properly
         }
+
+        # Initialize stats for all entity types
+        cleanup_stats = {entity_type: 0 for entity_type in entity_table_map}
+        cleanup_stats["total"] = 0
 
         for entity_type, table_name in entity_table_map.items():
             try:
-                # Get notifications with this entity type older than cutoff
+                # Get notifications with this entity type
                 notifications_result = (
                     supabase.table("notification_history")
                     .select("id, entity_id")
                     .eq("entity_type", entity_type)
-                    .lt("created_at", cutoff_date)
                     .not_.is_("entity_id", "null")
                     .execute()
                 )

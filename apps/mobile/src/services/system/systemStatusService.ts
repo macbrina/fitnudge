@@ -16,7 +16,9 @@ interface HealthReport {
 const buildReasonFromChecks = (checks: HealthCheckResult[] = []): string => {
   const problematic = checks.filter(
     (check) =>
-      check.status && check.status !== "ok" && check.status !== "not_configured"
+      check.status &&
+      check.status !== "ok" &&
+      check.status !== "not_configured",
   );
 
   if (problematic.length === 0) {
@@ -36,7 +38,7 @@ type FetchHealthOptions = {
 };
 
 export const fetchBackendHealth = async (
-  options: FetchHealthOptions = {}
+  options: FetchHealthOptions = {},
 ): Promise<void> => {
   const baseUrl = `${resolveApiRootUrl()}/health`;
   const healthUrl = options.force ? `${baseUrl}?force=true` : baseUrl;
@@ -53,7 +55,7 @@ export const fetchBackendHealth = async (
         .getState()
         .setBackendStatus(
           response.status >= 500 ? "offline" : "degraded",
-          `Health check failed (HTTP ${response.status})`
+          `Health check failed (HTTP ${response.status})`,
         );
       return;
     }
@@ -69,7 +71,7 @@ export const fetchBackendHealth = async (
           .getState()
           .setBackendStatus(
             "degraded",
-            buildReasonFromChecks(payload.checks ?? [])
+            buildReasonFromChecks(payload.checks ?? []),
           );
         break;
       case "critical":
@@ -77,7 +79,7 @@ export const fetchBackendHealth = async (
           .getState()
           .setBackendStatus(
             "offline",
-            buildReasonFromChecks(payload.checks ?? [])
+            buildReasonFromChecks(payload.checks ?? []),
           );
         break;
       default:
@@ -90,7 +92,7 @@ export const fetchBackendHealth = async (
       .getState()
       .setBackendStatus(
         "offline",
-        error instanceof Error ? error.message : "Network error"
+        error instanceof Error ? error.message : "Network error",
       );
   }
 };

@@ -138,7 +138,7 @@ export const TextInput: React.FC<TextInputProps> = ({
   };
 
   const getInputStyle = () => {
-    let style = [styles.input];
+    const style = [styles.input];
 
     if (multiline) style.push(styles.inputMultiline);
     if (isFocused) style.push(styles.inputFocused);

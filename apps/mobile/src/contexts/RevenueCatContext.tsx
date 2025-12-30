@@ -19,6 +19,8 @@ import React, {
   ReactNode,
 } from "react";
 import { Platform } from "react-native";
+import { useQueryClient } from "@tanstack/react-query";
+import { partnersQueryKeys } from "@/hooks/api/queryKeys";
 import { useAlertModal } from "@/contexts/AlertModalContext";
 import { useTranslation } from "@/lib/i18n";
 import { useAuthStore } from "@/stores/authStore";
@@ -43,13 +45,12 @@ import type {
 } from "@/services/iap/types";
 
 // Conditionally import RevenueCat
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 let Purchases: any = null;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 let LOG_LEVEL: any = null;
 
 try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const RNPurchases = require("react-native-purchases");
   Purchases = RNPurchases.default;
   LOG_LEVEL = RNPurchases.LOG_LEVEL;
@@ -72,6 +73,9 @@ const ENTITLEMENTS = {
   ELITE: "elite_access",
 } as const;
 
+// Trial eligibility result per product ID
+export type TrialEligibilityMap = Record<string, boolean>;
+
 // Context value interface
 interface RevenueCatContextValue {
   // State
@@ -90,6 +94,7 @@ interface RevenueCatContextValue {
   restorePurchases: () => Promise<boolean>;
   refreshCustomerInfo: () => Promise<void>;
   syncWithBackend: () => Promise<void>;
+  checkTrialEligibility: (productIds: string[]) => Promise<TrialEligibilityMap>;
 
   // Getters
   getProduct: (period: BillingPeriod) => IAPProduct | null;
@@ -124,7 +129,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
   const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
   const [offerings, setOfferings] = useState<IAPOffering[]>([]);
   const [currentOffering, setCurrentOffering] = useState<IAPOffering | null>(
-    null
+    null,
   );
   const [purchaseState, setPurchaseState] = useState<PurchaseState>("idle");
   const [error, setError] = useState<IAPError | null>(null);
@@ -138,8 +143,12 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
   // External stores
   const { user, isAuthenticated, isVerifyingUser } = useAuthStore();
   const { plans, fetchPlans } = usePricingStore();
-  const { refresh: refreshSubscription } = useSubscriptionStore();
+  const { refresh: refreshSubscription, setOptimisticPlan } =
+    useSubscriptionStore();
   const { markAsSubscribed } = useExitOfferStore();
+
+  // Query client for cache invalidation
+  const queryClient = useQueryClient();
 
   // Alert modal for showing messages
   const { showAlert } = useAlertModal();
@@ -169,11 +178,15 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
       //   Purchases.setLogLevel(LOG_LEVEL.WARN);
       // }
 
-      // Configure RevenueCat
-      await Purchases.configure({
-        apiKey,
-        appUserID: user?.id || null,
-      });
+      // Check if RevenueCat is already configured to avoid duplicate initialization
+      const alreadyConfigured = await Purchases.isConfigured();
+      if (!alreadyConfigured) {
+        // Configure RevenueCat
+        await Purchases.configure({
+          apiKey,
+          appUserID: user?.id || null,
+        });
+      }
 
       // Set up customer info listener
       customerInfoListenerRef.current = Purchases.addCustomerInfoUpdateListener(
@@ -222,7 +235,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
               // console.error("[RevenueCat] Background sync failed", err);
             }
           }
-        }
+        },
       );
 
       // Fetch initial customer info
@@ -300,7 +313,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
   const loginUser = async (
     userId: string,
     email?: string | null,
-    displayName?: string | null
+    displayName?: string | null,
   ) => {
     if (!Purchases) return;
 
@@ -344,7 +357,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
 
       // Convert to our format
       const convertedOfferings = Object.values(rcOfferings.all).map(
-        (offering: any) => convertOffering(offering)
+        (offering: any) => convertOffering(offering),
       );
 
       setOfferings(convertedOfferings);
@@ -360,7 +373,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
 
   const convertOffering = (offering: any): IAPOffering => {
     const packages = offering.availablePackages.map((pkg: any) =>
-      convertPackage(pkg)
+      convertPackage(pkg),
     );
 
     return {
@@ -463,7 +476,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
   };
 
   const getPlatformFromStore = (
-    store: string
+    store: string,
   ): "ios" | "android" | "stripe" | null => {
     switch (store) {
       case "APP_STORE":
@@ -477,6 +490,29 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
       default:
         return null;
     }
+  };
+
+  /**
+   * Extract subscription tier from product identifier
+   * Product IDs follow pattern: com.fitnudge.{tier}.{period}
+   * e.g., com.fitnudge.pro.monthly, com.fitnudge.elite.annual
+   */
+  const getTierFromProductId = (
+    productId: string,
+  ): "starter" | "pro" | "elite" | "free" => {
+    const lowerProductId = productId.toLowerCase();
+
+    if (lowerProductId.includes("elite")) {
+      return "elite";
+    }
+    if (lowerProductId.includes("pro")) {
+      return "pro";
+    }
+    if (lowerProductId.includes("starter")) {
+      return "starter";
+    }
+
+    return "free";
   };
 
   const hasActiveEntitlement = (info: CustomerInfo | null): boolean => {
@@ -506,7 +542,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
       const pkg = offering.packages.find(
         (p) =>
           p.rcPackage?.identifier === packageId ||
-          p.identifier.includes(packageId)
+          p.identifier.includes(packageId),
       );
       if (pkg) return pkg;
     }
@@ -515,7 +551,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
       const pkg = currentOffering.packages.find(
         (p) =>
           p.rcPackage?.identifier === packageId ||
-          p.identifier.includes(packageId)
+          p.identifier.includes(packageId),
       );
       if (pkg) return pkg;
     }
@@ -562,7 +598,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
 
       return purchasePackage(product);
     },
-    [isReady, currentOffering, showAlert, t]
+    [isReady, currentOffering, showAlert, t],
   );
 
   const purchasePackage = useCallback(
@@ -589,7 +625,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
         // });
 
         const { customerInfo: info } = await Purchases.purchasePackage(
-          product.rcPackage
+          product.rcPackage,
         );
 
         setCustomerInfo(info);
@@ -600,17 +636,22 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
         //   productId: product.identifier,
         // });
 
+        // 🆕 Optimistically update subscription store immediately
+        // This provides instant UI feedback without waiting for API
+        const purchasedTier = getTierFromProductId(product.identifier);
+        if (purchasedTier && purchasedTier !== "free") {
+          setOptimisticPlan(purchasedTier);
+        }
+
         // Mark user as subscribed so they don't see exit offers again
         await markAsSubscribed();
 
-        // Show success message
-        showAlert({
-          title: t("onboarding.subscription.purchase_success_title"),
-          message: t("onboarding.subscription.purchase_success_message"),
-          variant: "success",
-        });
-
+        // Note: No success alert here - Apple/Google already show their own confirmation
         refreshSubscription();
+
+        // Invalidate partner limits cache so new feature limits are reflected
+        queryClient.invalidateQueries({ queryKey: partnersQueryKeys.limits() });
+
         return true;
       } catch (err: any) {
         if (err.userCancelled) {
@@ -639,7 +680,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
         return false;
       }
     },
-    [isReady, refreshSubscription, markAsSubscribed, showAlert, t]
+    [isReady, refreshSubscription, markAsSubscribed, showAlert, t],
   );
 
   const purchaseProExitOffer = useCallback(async (): Promise<boolean> => {
@@ -777,6 +818,12 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
         setPurchaseState("success");
         // console.info("[RevenueCat] Purchases restored successfully");
 
+        // 🆕 Optimistically update subscription store from restored customer info
+        const restoredTier = getTierFromCustomerInfo(info);
+        if (restoredTier && restoredTier !== "free") {
+          setOptimisticPlan(restoredTier);
+        }
+
         // Show success message
         showAlert({
           title: t("onboarding.subscription.restore_success_title"),
@@ -786,6 +833,10 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
 
         await markAsSubscribed();
         refreshSubscription();
+
+        // Invalidate partner limits cache so new feature limits are reflected
+        queryClient.invalidateQueries({ queryKey: partnersQueryKeys.limits() });
+
         return true;
       } else {
         setPurchaseState("idle");
@@ -895,6 +946,70 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
     }
   }, [customerInfo, user, refreshSubscription]);
 
+  /**
+   * Check trial/introductory offer eligibility for given product IDs.
+   * iOS: Uses RevenueCat's checkTrialOrIntroductoryEligibility method
+   * Android: Falls back to checking if user has any previous purchases
+   *
+   * @param productIds Array of product identifiers to check
+   * @returns Map of productId -> boolean (true if eligible for trial)
+   */
+  const checkTrialEligibility = useCallback(
+    async (productIds: string[]): Promise<TrialEligibilityMap> => {
+      if (!Purchases || !isReady || productIds.length === 0) {
+        // Default to false for all products if not ready
+        const result: TrialEligibilityMap = {};
+        for (const id of productIds) {
+          result[id] = false;
+        }
+        return result;
+      }
+
+      try {
+        if (Platform.OS === "ios") {
+          // iOS: Use RevenueCat's proper eligibility check
+          const eligibilityResult =
+            await Purchases.checkTrialOrIntroductoryEligibility(productIds);
+
+          const result: TrialEligibilityMap = {};
+          for (const [productId, eligibility] of Object.entries(
+            eligibilityResult,
+          )) {
+            // INTRO_ELIGIBILITY_STATUS.ELIGIBLE = 2
+            result[productId] =
+              (eligibility as any)?.status === 2 ||
+              (eligibility as any)?.status ===
+                "INTRO_ELIGIBILITY_STATUS_ELIGIBLE";
+          }
+          return result;
+        } else {
+          // Android: Check if user has ever had any subscription
+          // If they have previous purchases, they're not eligible for trial
+          const info = await Purchases.getCustomerInfo();
+          const hasPreviousPurchases =
+            info?.allPurchasedProductIdentifiers?.length > 0 ||
+            Object.keys(info?.entitlements?.all || {}).length > 0;
+
+          // If no previous purchases, all products are eligible for trial
+          const result: TrialEligibilityMap = {};
+          for (const id of productIds) {
+            result[id] = !hasPreviousPurchases;
+          }
+          return result;
+        }
+      } catch (err) {
+        // console.error("[RevenueCat] Failed to check trial eligibility", err);
+        // Default to false (not eligible) on error
+        const result: TrialEligibilityMap = {};
+        for (const id of productIds) {
+          result[id] = false;
+        }
+        return result;
+      }
+    },
+    [isReady],
+  );
+
   // ====================
   // Getters
   // ====================
@@ -906,7 +1021,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
         ? currentOffering.annualPackage || null
         : currentOffering.monthlyPackage || null;
     },
-    [currentOffering]
+    [currentOffering],
   );
 
   const getCurrentTier = useCallback((): SubscriptionTier => {
@@ -922,7 +1037,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
       if (!customerInfo?.entitlements?.active) return false;
       return !!customerInfo.entitlements.active[entitlementId];
     },
-    [customerInfo]
+    [customerInfo],
   );
 
   const clearError = useCallback(() => {
@@ -985,6 +1100,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
     restorePurchases,
     refreshCustomerInfo,
     syncWithBackend,
+    checkTrialEligibility,
 
     // Getters
     getProduct,

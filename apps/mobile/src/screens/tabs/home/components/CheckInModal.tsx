@@ -24,30 +24,55 @@ import { fontFamily } from "@/lib/fonts";
 import { useTranslation } from "@/lib/i18n";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { CheckIn } from "@/services/api/checkins";
+import { CheckIn, CheckInMood } from "@/services/api/checkins";
+import { ChallengeCheckIn } from "@/services/api/challenges";
 import { useUpdateCheckIn } from "@/hooks/api/useCheckIns";
+import {
+  useChallengeCheckIn,
+  useUpdateChallengeCheckIn,
+} from "@/hooks/api/useChallenges";
+import { getApiErrorDetails } from "@/services/api/errors";
 import { Card } from "@/components/ui/Card";
 import { ActionSheet } from "@/components/ui/ActionSheet";
 import { SkeletonBox } from "@/components/ui/SkeletonBox";
 import { useMediaPermissions } from "@/hooks/media/useMediaPermissions";
 import { useUploadMedia, useDeleteMediaByUrl } from "@/hooks/api/useMedia";
 import { useAlertModal } from "@/contexts/AlertModalContext";
+import { MoodIcon, MOODS, type MoodType } from "@/components/icons/MoodIcons";
+
+// Unified check-in data that works for both goals and challenges
+type UnifiedCheckIn = {
+  id: string;
+  notes?: string | null;
+  mood?: string | null; // Text: great, good, okay, bad, terrible
+  photo_url?: string | null;
+  check_in_date?: string;
+  goal?: { title?: string } | null;
+  challenge?: { title?: string } | null;
+};
 
 interface CheckInModalProps {
   visible: boolean;
-  checkIn?: CheckIn | null; // Optional when loading
+  // For goal check-ins
+  goalId?: string;
+  checkIn?: CheckIn | null;
+  // For challenge check-ins
+  challengeId?: string;
+  challengeCheckIn?: ChallengeCheckIn | null;
+  // Common props
   onClose: () => void;
   onComplete?: () => void;
-  isLoading?: boolean; // Show skeleton while loading check-in data
+  isLoading?: boolean;
 }
 
-// Mood emoji mapping
-const MOOD_EMOJIS = ["😞", "😐", "😊", "😄", "🤩"];
-const MOOD_LABELS = ["Very Low", "Low", "Neutral", "Good", "Excellent"];
+// Mood values for iteration - using imported MOODS from MoodIcons
 
 export function CheckInModal({
   visible,
+  goalId,
   checkIn,
+  challengeId,
+  challengeCheckIn,
   onClose,
   onComplete,
   isLoading = false,
@@ -59,9 +84,49 @@ export function CheckInModal({
   const screenHeight = Dimensions.get("window").height;
   const { showAlert, showConfirm, showToast } = useAlertModal();
 
-  const { mutate: updateCheckIn, isPending: isSaving } = useUpdateCheckIn();
+  // Determine if this is a goal or challenge check-in
+  const isChallenge = !!challengeId;
+  const entityId = challengeId || goalId;
+
+  // Normalize the check-in data to a unified format
+  const normalizedCheckIn: UnifiedCheckIn | null = useMemo(() => {
+    if (isChallenge && challengeCheckIn) {
+      return {
+        id: challengeCheckIn.id,
+        notes: challengeCheckIn.notes,
+        mood: challengeCheckIn.mood,
+        photo_url: challengeCheckIn.photo_url,
+        check_in_date: challengeCheckIn.check_in_date,
+        challenge: challengeCheckIn.challenge,
+      };
+    } else if (!isChallenge && checkIn) {
+      return {
+        id: checkIn.id,
+        notes: checkIn.notes,
+        mood: checkIn.mood,
+        photo_url: checkIn.photo_url,
+        check_in_date: checkIn.check_in_date,
+        goal: checkIn.goal,
+      };
+    }
+    return null;
+  }, [isChallenge, checkIn, challengeCheckIn]);
+
+  // API hooks for goal check-ins
+  const { mutate: updateGoalCheckIn, isPending: isUpdatingGoal } =
+    useUpdateCheckIn();
+
+  // API hooks for challenge check-ins
+  const { mutate: createChallengeCheckIn, isPending: isCreatingChallenge } =
+    useChallengeCheckIn();
+  const { mutate: updateChallengeCheckIn, isPending: isUpdatingChallenge } =
+    useUpdateChallengeCheckIn();
+
   const { mutate: uploadMedia, isPending: isUploading } = useUploadMedia();
   const { mutate: deleteMediaByUrl } = useDeleteMediaByUrl();
+
+  const isEditing = !!normalizedCheckIn;
+  const isSaving = isUpdatingGoal || isCreatingChallenge || isUpdatingChallenge;
 
   // Media permissions hook
   const {
@@ -72,24 +137,28 @@ export function CheckInModal({
   } = useMediaPermissions();
 
   // Local state
-  const [reflection, setReflection] = useState(checkIn?.reflection || "");
-  const [selectedMood, setSelectedMood] = useState<number | null>(
-    checkIn?.mood || null
-  );
-  const [selectedPhotos, setSelectedPhotos] = useState<string[]>(
-    checkIn?.photo_urls || []
-  );
-  const [uploadingPhotos, setUploadingPhotos] = useState<string[]>([]);
+  const [notes, setNotes] = useState("");
+  const [selectedMood, setSelectedMood] = useState<string | null>(null);
+  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [showPhotoOptions, setShowPhotoOptions] = useState(false);
 
   // Reset state when modal opens/closes or checkIn changes
   useEffect(() => {
-    if (visible && checkIn) {
-      setReflection(checkIn.reflection || "");
-      setSelectedMood(checkIn.mood || null);
-      setSelectedPhotos(checkIn.photo_urls || []);
-      setUploadingPhotos([]);
+    if (visible) {
+      if (normalizedCheckIn) {
+        setNotes(normalizedCheckIn.notes || "");
+        setSelectedMood(normalizedCheckIn.mood || null);
+        setSelectedPhoto(normalizedCheckIn.photo_url || null);
+      } else {
+        // Creating new check-in - reset to empty state
+        setNotes("");
+        setSelectedMood(null);
+        setSelectedPhoto(null);
+      }
+      setUploadingPhoto(false);
     }
-  }, [visible, checkIn]);
+  }, [visible, normalizedCheckIn]);
 
   // Animation values - starts off-screen at the bottom
   const translateY = useMemo(() => new Animated.Value(screenHeight), []);
@@ -100,7 +169,6 @@ export function CheckInModal({
   // Handle modal visibility animation - slide from bottom to top
   useEffect(() => {
     if (visible) {
-      // Show modal immediately, then animate in
       setInternalVisible(true);
       Animated.spring(translateY, {
         toValue: 0,
@@ -110,25 +178,26 @@ export function CheckInModal({
         useNativeDriver: true,
       }).start();
     } else if (internalVisible) {
-      // Animate out, then hide modal
       Animated.timing(translateY, {
         toValue: screenHeight,
         duration: 300,
         easing: Easing.in(Easing.ease),
         useNativeDriver: true,
       }).start(() => {
-        // Only hide modal after animation completes
         setInternalVisible(false);
       });
     }
   }, [visible, translateY, screenHeight, internalVisible]);
 
-  const goalTitle = checkIn?.goal?.title || t("common.goal");
+  const title =
+    normalizedCheckIn?.goal?.title ||
+    normalizedCheckIn?.challenge?.title ||
+    (isChallenge ? t("common.challenge") : t("common.goal"));
 
   // Handle photo selection from library
   const handlePickPhoto = async () => {
+    setShowPhotoOptions(false);
     try {
-      // Request permission if needed
       let hasPermission = hasLibraryPermission;
       if (!hasPermission) {
         hasPermission = await requestLibraryPermission();
@@ -148,12 +217,10 @@ export function CheckInModal({
         mediaTypes: ["images"],
         allowsEditing: false,
         quality: 0.8,
-        allowsMultipleSelection: false,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        const asset = result.assets[0];
-        handleUploadPhoto(asset.uri);
+        handleUploadPhoto(result.assets[0].uri);
       }
     } catch (error) {
       console.error("Error picking photo:", error);
@@ -168,8 +235,8 @@ export function CheckInModal({
 
   // Handle taking a photo with camera
   const handleTakePhoto = async () => {
+    setShowPhotoOptions(false);
     try {
-      // Request permission if needed
       let hasPermission = hasCameraPermission;
       if (!hasPermission) {
         hasPermission = await requestCameraPermission();
@@ -191,8 +258,7 @@ export function CheckInModal({
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        const asset = result.assets[0];
-        handleUploadPhoto(asset.uri);
+        handleUploadPhoto(result.assets[0].uri);
       }
     } catch (error) {
       console.error("Error taking photo:", error);
@@ -207,8 +273,7 @@ export function CheckInModal({
 
   // Handle photo upload
   const handleUploadPhoto = (fileUri: string) => {
-    // Add to uploading list
-    setUploadingPhotos((prev) => [...prev, fileUri]);
+    setUploadingPhoto(true);
 
     uploadMedia(
       { fileUri, options: { mediaType: "checkin" } },
@@ -216,15 +281,8 @@ export function CheckInModal({
         onSuccess: (response) => {
           const uploadedUrl = response.data?.url;
           if (uploadedUrl) {
-            setSelectedPhotos((prev) => [...prev, uploadedUrl]);
-            showToast({
-              title: t("common.success"),
-              message:
-                t("checkin.photo_upload_success") ||
-                "Photo uploaded successfully",
-              variant: "success",
-              duration: 2000,
-            });
+            setSelectedPhoto(uploadedUrl);
+            // No toast needed - the visible photo is confirmation enough
           } else {
             showAlert({
               title: t("common.error"),
@@ -246,62 +304,128 @@ export function CheckInModal({
           });
         },
         onSettled: () => {
-          setUploadingPhotos((prev) => prev.filter((uri) => uri !== fileUri));
+          setUploadingPhoto(false);
         },
-      }
+      },
     );
   };
 
   // Handle removing a photo
-  const handleRemovePhoto = (photoUrl: string) => {
-    // Remove from UI immediately
-    setSelectedPhotos((prev) => prev.filter((url) => url !== photoUrl));
-
-    // Delete from Cloudflare R2 in background (fire and forget)
-    deleteMediaByUrl(photoUrl);
-  };
-
-  // Show photo selection options - using state for action sheet
-  const [showPhotoOptions, setShowPhotoOptions] = useState(false);
-
-  const handleAddPhoto = () => {
-    setShowPhotoOptions(true);
+  const handleRemovePhoto = () => {
+    if (selectedPhoto) {
+      deleteMediaByUrl(selectedPhoto);
+      setSelectedPhoto(null);
+    }
   };
 
   const handleSave = () => {
-    if (!checkIn?.id) return;
+    const checkInData = {
+      notes: notes.trim() || undefined,
+      mood: selectedMood || undefined,
+      photo_url: selectedPhoto || undefined,
+    };
 
-    updateCheckIn(
-      {
-        checkInId: checkIn?.id,
-        updates: {
-          completed: true, // Always true - checking in means completed
-          reflection: reflection.trim() || undefined,
-          mood: selectedMood || undefined,
-          photo_urls: selectedPhotos.length > 0 ? selectedPhotos : undefined,
-        },
-      },
-      {
-        onSuccess: () => {
-          onComplete?.();
-          onClose();
-        },
-        onError: (error) => {
-          console.error("Error updating check-in:", error);
-          showAlert({
-            title: t("common.error"),
-            message: t("checkin.update_error") || "Failed to save check-in",
-            variant: "error",
-            confirmLabel: t("common.ok"),
-          });
-        },
+    if (isChallenge && challengeId) {
+      // Challenge check-in
+      if (isEditing && normalizedCheckIn) {
+        updateChallengeCheckIn(
+          {
+            challengeId,
+            checkInId: normalizedCheckIn.id,
+            data: checkInData,
+          },
+          {
+            onSuccess: () => {
+              showToast({
+                title: t("common.success"),
+                message: t("checkin.updated") || "Check-in updated!",
+                variant: "success",
+              });
+              onComplete?.();
+              onClose();
+            },
+            onError: (error) => {
+              const errorDetails = getApiErrorDetails(error);
+              showAlert({
+                title: t("common.error"),
+                message:
+                  errorDetails.backendMessage ||
+                  t("checkin.update_error") ||
+                  "Failed to update check-in",
+                variant: "error",
+              });
+            },
+          },
+        );
+      } else {
+        createChallengeCheckIn(
+          {
+            challengeId,
+            data: checkInData,
+          },
+          {
+            onSuccess: () => {
+              showToast({
+                title: t("common.success"),
+                message: t("checkin.created") || "Check-in complete!",
+                variant: "success",
+              });
+              onComplete?.();
+              onClose();
+            },
+            onError: (error) => {
+              const errorDetails = getApiErrorDetails(error);
+              showAlert({
+                title: t("common.error"),
+                message:
+                  errorDetails.backendMessage ||
+                  t("checkin.create_error") ||
+                  "Failed to check in",
+                variant: "error",
+              });
+            },
+          },
+        );
       }
-    );
+    } else if (goalId && normalizedCheckIn) {
+      // Goal check-in (update only - goals create check-ins via scheduled tasks)
+      updateGoalCheckIn(
+        {
+          checkInId: normalizedCheckIn.id,
+          updates: {
+            completed: true,
+            notes: checkInData.notes,
+            mood: checkInData.mood as CheckInMood | undefined,
+            photo_url: checkInData.photo_url,
+          },
+        },
+        {
+          onSuccess: () => {
+            showToast({
+              title: t("common.success"),
+              message: t("checkin.saved") || "Check-in saved!",
+              variant: "success",
+            });
+            onComplete?.();
+            onClose();
+          },
+          onError: (error) => {
+            console.error("Error updating check-in:", error);
+            showAlert({
+              title: t("common.error"),
+              message: t("checkin.update_error") || "Failed to save check-in",
+              variant: "error",
+              confirmLabel: t("common.ok"),
+            });
+          },
+        },
+      );
+    }
   };
 
-  const canSave = !isSaving && !isUploading && uploadingPhotos.length === 0;
+  const canSave = !isSaving && !isUploading && !uploadingPhoto;
 
-  // Don't render anything if not visible (after close animation completes)
+  // Don't render anything if not visible
   if (!internalVisible && !visible) {
     return null;
   }
@@ -319,7 +443,6 @@ export function CheckInModal({
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.keyboardView}
       >
-        {/* Full Screen Modal Content */}
         <Animated.View
           style={[
             styles.modalContainer,
@@ -360,9 +483,8 @@ export function CheckInModal({
               keyboardShouldPersistTaps="handled"
             >
               {/* Loading Skeleton */}
-              {isLoading || !checkIn ? (
+              {isLoading ? (
                 <View style={styles.loadingContainer}>
-                  {/* Icon skeleton */}
                   <SkeletonBox
                     width={60}
                     height={60}
@@ -372,7 +494,6 @@ export function CheckInModal({
                       marginBottom: toRN(tokens.spacing[4]),
                     }}
                   />
-                  {/* Title skeleton */}
                   <SkeletonBox
                     width="60%"
                     height={28}
@@ -388,8 +509,6 @@ export function CheckInModal({
                     borderRadius={toRN(tokens.borderRadius.md)}
                     style={{ alignSelf: "center" }}
                   />
-
-                  {/* Loading indicator */}
                   <View
                     style={{
                       alignItems: "center",
@@ -421,31 +540,38 @@ export function CheckInModal({
                         color={brandColors.primary}
                       />
                     </View>
-                    <Text style={styles.title}>{goalTitle}</Text>
+                    <Text style={styles.title}>{title}</Text>
+                    <Text style={styles.subtitle}>
+                      {normalizedCheckIn?.check_in_date ||
+                        new Date().toLocaleDateString()}
+                    </Text>
                   </View>
 
                   {/* Mood Section */}
                   <View style={styles.moodSection}>
                     <Text style={styles.sectionLabel}>
-                      {t("checkin.mood_label") || "How are you feeling?"}
+                      {t("checkin.how_feeling") || "How are you feeling?"}
                     </Text>
                     <View style={styles.moodContainer}>
-                      {MOOD_EMOJIS.map((emoji, index) => {
-                        const moodValue = index + 1;
-                        const isSelected = selectedMood === moodValue;
+                      {MOODS.map((mood) => {
+                        const isSelected = selectedMood === mood.value;
                         return (
                           <TouchableOpacity
-                            key={moodValue}
+                            key={mood.value}
                             style={[
                               styles.moodButton,
                               isSelected && styles.moodButtonActive,
                             ]}
                             onPress={() =>
-                              setSelectedMood(isSelected ? null : moodValue)
+                              setSelectedMood(isSelected ? null : mood.value)
                             }
                             activeOpacity={0.7}
                           >
-                            <Text style={styles.moodEmoji}>{emoji}</Text>
+                            <MoodIcon
+                              mood={mood.value as MoodType}
+                              size={toRN(tokens.typography.fontSize["2xl"])}
+                              selected={isSelected}
+                            />
                             {isSelected && (
                               <View style={styles.moodCheck}>
                                 <Ionicons
@@ -461,7 +587,8 @@ export function CheckInModal({
                     </View>
                     {selectedMood && (
                       <Text style={styles.moodLabel}>
-                        {MOOD_LABELS[selectedMood - 1]}
+                        {MOODS.find((m) => m.value === selectedMood)?.label ||
+                          selectedMood}
                       </Text>
                     )}
                   </View>
@@ -469,7 +596,7 @@ export function CheckInModal({
                   {/* Notes Section */}
                   <Card shadow="sm" style={styles.notesCard}>
                     <Text style={styles.sectionLabel}>
-                      {t("checkin.reflection_label") || "Notes"}
+                      {t("checkin.notes") || "Notes"}
                       <Text style={styles.optionalText}>
                         {" "}
                         ({t("common.optional")})
@@ -478,11 +605,11 @@ export function CheckInModal({
                     <TextInput
                       style={styles.notesInput}
                       placeholder={
-                        t("checkin.reflection_placeholder") || "How did it go?"
+                        t("checkin.notes_placeholder") || "How did it go?"
                       }
                       placeholderTextColor={colors.text.tertiary}
-                      value={reflection}
-                      onChangeText={setReflection}
+                      value={notes}
+                      onChangeText={setNotes}
                       multiline
                       numberOfLines={4}
                       textAlignVertical="top"
@@ -492,40 +619,36 @@ export function CheckInModal({
                   {/* Photo Section */}
                   <View style={styles.photoSection}>
                     <Text style={styles.sectionLabel}>
-                      {t("checkin.photo_label") || "Progress Photo"}
+                      {t("checkin.photo") || "Progress Photo"}
                       <Text style={styles.optionalText}>
                         {" "}
                         ({t("common.optional")})
                       </Text>
                     </Text>
 
-                    {/* Selected Photos Grid */}
-                    {selectedPhotos.length > 0 && (
-                      <View style={styles.photosGrid}>
-                        {selectedPhotos.map((photoUrl, index) => (
-                          <View key={index} style={styles.photoContainer}>
-                            <Image
-                              source={{ uri: photoUrl }}
-                              style={styles.photoPreview}
-                              resizeMode="cover"
-                            />
-                            <TouchableOpacity
-                              style={styles.removePhotoButton}
-                              onPress={() => handleRemovePhoto(photoUrl)}
-                            >
-                              <Ionicons
-                                name="close-circle"
-                                size={24}
-                                color={colors.feedback.error}
-                              />
-                            </TouchableOpacity>
-                          </View>
-                        ))}
+                    {/* Selected Photo */}
+                    {selectedPhoto && (
+                      <View style={styles.photoContainer}>
+                        <Image
+                          source={{ uri: selectedPhoto }}
+                          style={styles.photoPreview}
+                          resizeMode="cover"
+                        />
+                        <TouchableOpacity
+                          style={styles.removePhotoButton}
+                          onPress={handleRemovePhoto}
+                        >
+                          <Ionicons
+                            name="close-circle"
+                            size={24}
+                            color={colors.feedback.error}
+                          />
+                        </TouchableOpacity>
                       </View>
                     )}
 
-                    {/* Uploading Photos */}
-                    {uploadingPhotos.length > 0 && (
+                    {/* Uploading Photo */}
+                    {uploadingPhoto && (
                       <View style={styles.uploadingContainer}>
                         <ActivityIndicator
                           size="small"
@@ -538,20 +661,22 @@ export function CheckInModal({
                     )}
 
                     {/* Add Photo Button */}
-                    <TouchableOpacity
-                      style={styles.addPhotoButton}
-                      onPress={handleAddPhoto}
-                      disabled={isUploading || uploadingPhotos.length > 0}
-                    >
-                      <Ionicons
-                        name="camera-outline"
-                        size={toRN(tokens.typography.fontSize.xl)}
-                        color={brandColors.primary}
-                      />
-                      <Text style={styles.addPhotoText}>
-                        {t("checkin.add_photo") || "Add Photo"}
-                      </Text>
-                    </TouchableOpacity>
+                    {!selectedPhoto && !uploadingPhoto && (
+                      <TouchableOpacity
+                        style={styles.addPhotoButton}
+                        onPress={() => setShowPhotoOptions(true)}
+                        disabled={isUploading || uploadingPhoto}
+                      >
+                        <Ionicons
+                          name="camera-outline"
+                          size={toRN(tokens.typography.fontSize.xl)}
+                          color={brandColors.primary}
+                        />
+                        <Text style={styles.addPhotoText}>
+                          {t("checkin.add_photo") || "Add Photo"}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
 
                   {/* Save Button */}
@@ -571,8 +696,10 @@ export function CheckInModal({
                       ]}
                     >
                       {isSaving
-                        ? t("checkin.saving")
-                        : t("checkin.save_checkin")}
+                        ? t("checkin.saving") || "Saving..."
+                        : isEditing
+                          ? t("common.save") || "Save"
+                          : t("checkin.submit") || "Submit Check-in"}
                     </Text>
                   </TouchableOpacity>
                 </>
@@ -583,7 +710,7 @@ export function CheckInModal({
           {/* Photo Selection Action Sheet */}
           <ActionSheet
             visible={showPhotoOptions}
-            title={t("checkin.add_photo")}
+            title={t("checkin.add_photo") || "Add Photo"}
             options={[
               {
                 id: "camera",
@@ -616,7 +743,7 @@ const makeCheckInModalStyles = (tokens: any, colors: any, brand: any) => ({
     flex: 1,
     width: "100%",
     height: "100%",
-    position: "absolute",
+    position: "absolute" as const,
     top: 0,
     left: 0,
     right: 0,
@@ -638,9 +765,9 @@ const makeCheckInModalStyles = (tokens: any, colors: any, brand: any) => ({
     textAlign: "center" as const,
   },
   header: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    alignItems: "center",
+    flexDirection: "row" as const,
+    justifyContent: "flex-end" as const,
+    alignItems: "center" as const,
     paddingHorizontal: toRN(tokens.spacing[4]),
     marginBottom: toRN(tokens.spacing[2]),
   },
@@ -649,8 +776,8 @@ const makeCheckInModalStyles = (tokens: any, colors: any, brand: any) => ({
     height: toRN(tokens.spacing[10]),
     borderRadius: toRN(tokens.borderRadius.full),
     backgroundColor: colors.bg.muted,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
   },
   scrollView: {
     flex: 1,
@@ -718,9 +845,6 @@ const makeCheckInModalStyles = (tokens: any, colors: any, brand: any) => ({
     borderColor: brand.primary,
     backgroundColor: brand.primary + "10",
   },
-  moodEmoji: {
-    fontSize: toRN(tokens.typography.fontSize["2xl"]),
-  },
   moodCheck: {
     position: "absolute" as const,
     top: toRN(tokens.spacing[1]),
@@ -752,12 +876,70 @@ const makeCheckInModalStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: colors.bg.muted,
     borderRadius: toRN(tokens.borderRadius.lg),
   },
+  photoSection: {
+    marginBottom: toRN(tokens.spacing[6]),
+  },
+  photoContainer: {
+    width: "100%",
+    aspectRatio: 4 / 3,
+    borderRadius: toRN(tokens.borderRadius.xl),
+    overflow: "hidden" as const,
+    position: "relative" as const,
+    marginTop: toRN(tokens.spacing[3]),
+  },
+  photoPreview: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: colors.bg.muted,
+  },
+  removePhotoButton: {
+    position: "absolute" as const,
+    top: toRN(tokens.spacing[2]),
+    right: toRN(tokens.spacing[2]),
+    backgroundColor: colors.bg.canvas,
+    borderRadius: toRN(tokens.borderRadius.full),
+    padding: toRN(tokens.spacing[1]),
+  },
+  uploadingContainer: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    gap: toRN(tokens.spacing[2]),
+    marginTop: toRN(tokens.spacing[3]),
+    padding: toRN(tokens.spacing[4]),
+    backgroundColor: colors.bg.muted,
+    borderRadius: toRN(tokens.borderRadius.xl),
+  },
+  uploadingText: {
+    fontSize: toRN(tokens.typography.fontSize.sm),
+    fontFamily: fontFamily.regular,
+    color: colors.text.secondary,
+  },
+  addPhotoButton: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    gap: toRN(tokens.spacing[2]),
+    paddingVertical: toRN(tokens.spacing[4]),
+    paddingHorizontal: toRN(tokens.spacing[4]),
+    borderWidth: 2,
+    borderColor: brand.primary,
+    borderStyle: "dashed" as const,
+    borderRadius: toRN(tokens.borderRadius.xl),
+    backgroundColor: "transparent",
+    marginTop: toRN(tokens.spacing[2]),
+  },
+  addPhotoText: {
+    fontSize: toRN(tokens.typography.fontSize.base),
+    fontFamily: fontFamily.semiBold,
+    color: brand.primary,
+  },
   saveButton: {
     backgroundColor: brand.primary,
     paddingVertical: toRN(tokens.spacing[4]),
     borderRadius: toRN(tokens.borderRadius.xl),
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
     marginTop: toRN(tokens.spacing[4]),
   },
   saveButtonDisabled: {
@@ -767,77 +949,9 @@ const makeCheckInModalStyles = (tokens: any, colors: any, brand: any) => ({
   saveButtonText: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.bold,
-    color: "#FFFFFF",
+    color: brand.onPrimary,
   },
   saveButtonTextDisabled: {
     color: colors.text.tertiary,
-  },
-  photoSection: {
-    marginBottom: toRN(tokens.spacing[6]),
-  },
-  photosGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: toRN(tokens.spacing[3]),
-    marginTop: toRN(tokens.spacing[3]),
-    marginBottom: toRN(tokens.spacing[3]),
-  },
-  photoContainer: {
-    width:
-      (Dimensions.get("window").width -
-        toRN(tokens.spacing[8]) * 2 -
-        toRN(tokens.spacing[3])) /
-      3,
-    aspectRatio: 1,
-    borderRadius: toRN(tokens.borderRadius.lg),
-    overflow: "hidden",
-    position: "relative",
-  },
-  photoPreview: {
-    width: "100%",
-    height: "100%",
-    backgroundColor: colors.bg.muted,
-  },
-  removePhotoButton: {
-    position: "absolute",
-    top: toRN(tokens.spacing[1]),
-    right: toRN(tokens.spacing[1]),
-    backgroundColor: colors.bg.canvas,
-    borderRadius: toRN(tokens.borderRadius.full),
-    padding: toRN(tokens.spacing[1]),
-  },
-  uploadingContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: toRN(tokens.spacing[2]),
-    marginTop: toRN(tokens.spacing[3]),
-    marginBottom: toRN(tokens.spacing[3]),
-    padding: toRN(tokens.spacing[3]),
-    backgroundColor: colors.bg.muted,
-    borderRadius: toRN(tokens.borderRadius.lg),
-  },
-  uploadingText: {
-    fontSize: toRN(tokens.typography.fontSize.sm),
-    fontFamily: fontFamily.regular,
-    color: colors.text.secondary,
-  },
-  addPhotoButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: toRN(tokens.spacing[2]),
-    paddingVertical: toRN(tokens.spacing[4]),
-    paddingHorizontal: toRN(tokens.spacing[4]),
-    borderWidth: 2,
-    borderColor: brand.primary,
-    borderStyle: "dashed",
-    borderRadius: toRN(tokens.borderRadius.xl),
-    backgroundColor: "transparent",
-    marginTop: toRN(tokens.spacing[2]),
-  },
-  addPhotoText: {
-    fontSize: toRN(tokens.typography.fontSize.base),
-    fontFamily: fontFamily.semiBold,
-    color: brand.primary,
   },
 });

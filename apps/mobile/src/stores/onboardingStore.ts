@@ -5,6 +5,7 @@ import { FitnessProfile } from "@/types/user";
 
 interface OnboardingState {
   // Profile data
+  biological_sex: string; // 'male', 'female', 'prefer_not_to_say'
   fitness_level: string;
   primary_goal: string;
   current_frequency: string;
@@ -12,6 +13,7 @@ interface OnboardingState {
   available_time: string;
   motivation_style: string;
   biggest_challenge: string;
+  available_equipment: string[];
 
   // State
   isSubmitting: boolean;
@@ -20,6 +22,7 @@ interface OnboardingState {
   error: string | null;
 
   // Actions
+  setBiologicalSex: (sex: string) => void;
   setFitnessLevel: (level: string) => void;
   setPrimaryGoal: (goal: string) => void;
   setCurrentFrequency: (frequency: string) => void;
@@ -27,6 +30,7 @@ interface OnboardingState {
   setAvailableTime: (time: string) => void;
   setMotivationStyle: (style: string) => void;
   setBiggestChallenge: (challenge: string) => void;
+  setAvailableEquipment: (equipment: string[]) => void;
   loadProfile: () => Promise<boolean>; // Returns true if profile exists, false otherwise
   checkHasFitnessProfile: () => Promise<boolean>; // Quick check without loading full profile
   submitProfile: () => Promise<void>;
@@ -35,6 +39,7 @@ interface OnboardingState {
 
 export const useOnboardingStore = create<OnboardingState>((set, get) => ({
   // Initial state
+  biological_sex: "",
   fitness_level: "",
   primary_goal: "",
   current_frequency: "",
@@ -42,12 +47,17 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
   available_time: "",
   motivation_style: "",
   biggest_challenge: "",
+  available_equipment: [],
   isSubmitting: false,
   isCompleted: false,
   hasFitnessProfile: null, // null = not checked yet
   error: null,
 
   // Actions
+  setBiologicalSex: (sex: string) => {
+    set({ biological_sex: sex });
+  },
+
   setFitnessLevel: (level: string) => {
     set({ fitness_level: level });
   },
@@ -76,6 +86,10 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
     set({ biggest_challenge: challenge });
   },
 
+  setAvailableEquipment: (equipment: string[]) => {
+    set({ available_equipment: equipment });
+  },
+
   loadProfile: async () => {
     try {
       const profile = await onboardingApi.getProfile();
@@ -83,6 +97,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
       if (profile) {
         // Populate store with existing profile data
         set({
+          biological_sex: profile.biological_sex || "",
           fitness_level: profile.fitness_level || "",
           primary_goal: profile.primary_goal || "",
           current_frequency: profile.current_frequency || "",
@@ -90,6 +105,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
           available_time: profile.available_time || "",
           motivation_style: profile.motivation_style || "",
           biggest_challenge: profile.biggest_challenge || "",
+          available_equipment: profile.available_equipment || [],
           isCompleted: true, // Profile exists, so it's been completed
           hasFitnessProfile: true,
         });
@@ -135,6 +151,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
     const state = get();
 
     // Validate required fields
+    // biological_sex is optional (user can choose 'prefer_not_to_say' or skip)
     const requiredFields = [
       "fitness_level",
       "primary_goal",
@@ -146,7 +163,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
     ];
 
     const missingFields = requiredFields.filter(
-      (field) => !state[field as keyof typeof state]
+      (field) => !state[field as keyof typeof state],
     );
 
     if (missingFields.length > 0) {
@@ -160,6 +177,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
 
     try {
       const profileData: FitnessProfile = {
+        biological_sex: state.biological_sex || undefined, // Optional field
         fitness_level: state.fitness_level,
         primary_goal: state.primary_goal,
         current_frequency: state.current_frequency,
@@ -167,6 +185,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
         available_time: state.available_time,
         motivation_style: state.motivation_style,
         biggest_challenge: state.biggest_challenge,
+        available_equipment: state.available_equipment,
       };
 
       // Submitting profile - tracked via PostHog in component
@@ -208,6 +227,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
 
   reset: () => {
     set({
+      biological_sex: "",
       fitness_level: "",
       primary_goal: "",
       current_frequency: "",
@@ -215,6 +235,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
       available_time: "",
       motivation_style: "",
       biggest_challenge: "",
+      available_equipment: [],
       isSubmitting: false,
       isCompleted: false,
       hasFitnessProfile: null,

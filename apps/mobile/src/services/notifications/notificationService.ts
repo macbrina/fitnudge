@@ -14,8 +14,14 @@ import {
 import { storageUtil } from "@/utils/storageUtil";
 import { STORAGE_KEYS } from "@/utils/storageUtil";
 import posthog from "@/lib/posthog";
-import { notificationApi } from "@/services/api/notifications";
+import { notificationsService } from "@/services/api/notifications";
 import { handleDeepLink as routeDeepLink } from "@/utils/deepLinkHandler";
+import { queryClient } from "@/lib/queryClient";
+import {
+  actionablePlansQueryKeys,
+  goalsQueryKeys,
+  challengesQueryKeys,
+} from "@/hooks/api/queryKeys";
 
 // Configure notification behavior
 Notifications.setNotificationHandler({
@@ -46,6 +52,7 @@ class NotificationService {
 
   private initializeChannels(): void {
     this.notificationChannels = [
+      // Core notification channels
       {
         id: NotificationCategory.AI_MOTIVATION,
         name: "AI Motivation",
@@ -90,6 +97,210 @@ class NotificationService {
         sound: false,
         vibration: false,
         lights: false,
+      },
+      {
+        id: NotificationCategory.PLAN_READY,
+        name: "Plan Ready",
+        description: "Notifications when your AI-generated plan is ready",
+        importance: "high",
+        sound: true,
+        vibration: true,
+        lights: true,
+      },
+      {
+        id: NotificationCategory.SUBSCRIPTION,
+        name: "Subscription",
+        description: "Subscription status updates and billing notifications",
+        importance: "default",
+        sound: true,
+        vibration: false,
+        lights: false,
+      },
+      {
+        id: NotificationCategory.GENERAL,
+        name: "General",
+        description: "General app notifications",
+        importance: "default",
+        sound: true,
+        vibration: false,
+        lights: false,
+      },
+
+      // Partner notifications
+      {
+        id: NotificationCategory.PARTNER_REQUEST,
+        name: "Partner Requests",
+        description: "New accountability partner requests",
+        importance: "high",
+        sound: true,
+        vibration: true,
+        lights: true,
+      },
+      {
+        id: NotificationCategory.PARTNER_ACCEPTED,
+        name: "Partner Accepted",
+        description: "When someone accepts your partner request",
+        importance: "default",
+        sound: true,
+        vibration: true,
+        lights: false,
+      },
+      {
+        id: NotificationCategory.PARTNER_NUDGE,
+        name: "Partner Nudges",
+        description: "Nudges from your accountability partners",
+        importance: "default",
+        sound: true,
+        vibration: true,
+        lights: false,
+      },
+      {
+        id: NotificationCategory.PARTNER_CHEER,
+        name: "Partner Cheers",
+        description: "Cheers and encouragement from partners",
+        importance: "low",
+        sound: false,
+        vibration: false,
+        lights: false,
+      },
+      {
+        id: NotificationCategory.PARTNER_MILESTONE,
+        name: "Partner Milestones",
+        description: "When your partner reaches a milestone",
+        importance: "low",
+        sound: false,
+        vibration: false,
+        lights: false,
+      },
+      {
+        id: NotificationCategory.PARTNER_INACTIVE,
+        name: "Partner Inactive",
+        description: "When your partner has been inactive",
+        importance: "low",
+        sound: false,
+        vibration: false,
+        lights: false,
+      },
+
+      // Challenge notifications
+      {
+        id: NotificationCategory.CHALLENGE,
+        name: "Challenges",
+        description: "General challenge notifications",
+        importance: "default",
+        sound: true,
+        vibration: true,
+        lights: false,
+      },
+      {
+        id: NotificationCategory.CHALLENGE_INVITE,
+        name: "Challenge Invites",
+        description: "Invitations to join challenges",
+        importance: "high",
+        sound: true,
+        vibration: true,
+        lights: true,
+      },
+      {
+        id: NotificationCategory.CHALLENGE_JOINED,
+        name: "Challenge Joined",
+        description: "When someone joins your challenge",
+        importance: "default",
+        sound: true,
+        vibration: false,
+        lights: false,
+      },
+      {
+        id: NotificationCategory.CHALLENGE_OVERTAKEN,
+        name: "Challenge Overtaken",
+        description: "When someone passes you on the leaderboard",
+        importance: "default",
+        sound: true,
+        vibration: true,
+        lights: false,
+      },
+      {
+        id: NotificationCategory.CHALLENGE_LEAD,
+        name: "Challenge Lead",
+        description: "When you take the lead in a challenge",
+        importance: "default",
+        sound: true,
+        vibration: true,
+        lights: true,
+      },
+      {
+        id: NotificationCategory.CHALLENGE_NUDGE,
+        name: "Challenge Nudges",
+        description: "Nudges from challenge participants",
+        importance: "default",
+        sound: true,
+        vibration: true,
+        lights: false,
+      },
+      {
+        id: NotificationCategory.CHALLENGE_STARTING,
+        name: "Challenge Starting",
+        description: "Reminders when a challenge is about to start",
+        importance: "high",
+        sound: true,
+        vibration: true,
+        lights: true,
+      },
+      {
+        id: NotificationCategory.CHALLENGE_ENDING,
+        name: "Challenge Ending",
+        description: "Reminders when a challenge is about to end",
+        importance: "default",
+        sound: true,
+        vibration: true,
+        lights: false,
+      },
+      {
+        id: NotificationCategory.CHALLENGE_ENDED,
+        name: "Challenge Ended",
+        description: "Notifications when a challenge has ended",
+        importance: "default",
+        sound: true,
+        vibration: false,
+        lights: false,
+      },
+
+      // Other notifications
+      {
+        id: NotificationCategory.MOTIVATION_MESSAGE,
+        name: "Motivation Messages",
+        description: "Motivational messages and tips",
+        importance: "low",
+        sound: false,
+        vibration: false,
+        lights: false,
+      },
+      {
+        id: NotificationCategory.WEEKLY_RECAP,
+        name: "Weekly Recap",
+        description: "Your weekly progress summary",
+        importance: "default",
+        sound: true,
+        vibration: false,
+        lights: false,
+      },
+      {
+        id: NotificationCategory.STREAK_MILESTONE,
+        name: "Streak Milestones",
+        description: "Celebrations for streak achievements",
+        importance: "default",
+        sound: true,
+        vibration: true,
+        lights: true,
+      },
+      {
+        id: NotificationCategory.GOAL_COMPLETE,
+        name: "Goal Complete",
+        description: "Notifications when you complete a goal",
+        importance: "high",
+        sound: true,
+        vibration: true,
+        lights: true,
       },
     ];
   }
@@ -145,19 +356,26 @@ class NotificationService {
   private setupNotificationListeners(): void {
     // Handle notifications received while app is in foreground
     Notifications.addNotificationReceivedListener(
-      this.handleNotificationReceived
+      this.handleNotificationReceived,
     );
 
     // Handle notification taps
     Notifications.addNotificationResponseReceivedListener(
-      this.handleNotificationResponse
+      this.handleNotificationResponse,
     );
   }
 
   private handleNotificationReceived = (
-    notification: Notifications.Notification
+    notification: Notifications.Notification,
   ) => {
-    console.log("Notification received:", notification);
+    const data = notification.request.content
+      .data as unknown as NotificationData;
+
+    // 🔥 For plan_ready notifications received in foreground, invalidate queries
+    // This updates the UI immediately if user is viewing the goal/challenge
+    if (data?.type === NotificationCategory.PLAN_READY) {
+      this.invalidatePlanQueries(data);
+    }
 
     // Track notification received event
     // TODO: Add PostHog tracking
@@ -168,7 +386,7 @@ class NotificationService {
   };
 
   private handleNotificationResponse = (
-    response: Notifications.NotificationResponse
+    response: Notifications.NotificationResponse,
   ) => {
     console.log("Notification tapped:", response);
 
@@ -186,8 +404,73 @@ class NotificationService {
     this.handleDeepLink(data);
   };
 
+  /**
+   * Update plan status immediately when a plan_ready notification is received.
+   * Uses OPTIMISTIC updates for instant UI feedback, then invalidates for fresh data.
+   */
+  private invalidatePlanQueries(data: NotificationData): void {
+    const goalId = data.goalId as string | undefined;
+    const challengeId = data.challengeId as string | undefined;
+
+    if (goalId) {
+      // 🆕 OPTIMISTICALLY set status to "completed" immediately
+      // The notification tells us plan is ready, so we update the cache instantly
+      // This provides instant UI feedback without waiting for network
+      queryClient.setQueryData(
+        actionablePlansQueryKeys.planStatus(goalId),
+        (old: any) => ({
+          ...(old || {}),
+          status: "completed" as const,
+          goal_id: goalId,
+        }),
+      );
+
+      // Also invalidate to get full fresh data in background (with plan details)
+      queryClient.invalidateQueries({
+        queryKey: actionablePlansQueryKeys.plan(goalId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: goalsQueryKeys.detail(goalId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: goalsQueryKeys.active(),
+      });
+      console.log("📲 Set goal plan status to completed for:", goalId);
+    }
+
+    if (challengeId) {
+      // 🆕 OPTIMISTICALLY set status to "completed" immediately
+      queryClient.setQueryData(
+        actionablePlansQueryKeys.challengePlanStatus(challengeId),
+        (old: any) => ({
+          ...(old || {}),
+          status: "completed" as const,
+          challenge_id: challengeId,
+        }),
+      );
+
+      // Also invalidate to get full fresh data in background
+      queryClient.invalidateQueries({
+        queryKey: actionablePlansQueryKeys.challengePlan(challengeId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: challengesQueryKeys.detail(challengeId),
+      });
+      console.log(
+        "📲 Set challenge plan status to completed for:",
+        challengeId,
+      );
+    }
+  }
+
   private handleDeepLink(data: NotificationData): void {
     console.log("📲 Handling notification deep link:", data);
+
+    // 🔥 For plan_ready notifications, invalidate queries BEFORE navigation
+    // This ensures fresh data is fetched when the screen loads
+    if (data.type === NotificationCategory.PLAN_READY) {
+      this.invalidatePlanQueries(data);
+    }
 
     // Use the deepLink from notification data if available
     if (data.deepLink) {
@@ -201,33 +484,11 @@ class NotificationService {
     if (data.url) {
       const urlPath = typeof data.url === "string" ? data.url : "";
       if (urlPath) {
-        routeDeepLink(`fitnudge://app${urlPath.startsWith("/") ? urlPath : `/${urlPath}`}`);
+        routeDeepLink(
+          `fitnudge://app${urlPath.startsWith("/") ? urlPath : `/${urlPath}`}`,
+        );
         return;
       }
-    }
-
-    // Fallback: route based on notification type
-    switch (data.type) {
-      case "reminder":
-        if (data.goalId) {
-          routeDeepLink(`fitnudge://app/checkin/${data.goalId}`);
-        }
-        break;
-      case "achievement":
-        routeDeepLink("fitnudge://app/profile");
-        break;
-      case "social":
-        routeDeepLink("fitnudge://app/notifications");
-        break;
-      case "plan_ready":
-        // Navigate to goal detail screen
-        if (data.goalId) {
-          routeDeepLink(`fitnudge://app/goal?id=${data.goalId}`);
-        }
-        break;
-      default:
-        // No specific route, just open the app
-        break;
     }
   }
 
@@ -235,14 +496,14 @@ class NotificationService {
     try {
       // Check if we should show soft prompt
       const hasShownSoftPrompt = await storageUtil.getItem(
-        STORAGE_KEYS.NOTIFICATION_SOFT_PROMPT_SHOWN
+        STORAGE_KEYS.NOTIFICATION_SOFT_PROMPT_SHOWN,
       );
 
       if (!hasShownSoftPrompt) {
         // Store that we've shown the soft prompt
         await storageUtil.setItem(
           STORAGE_KEYS.NOTIFICATION_SOFT_PROMPT_SHOWN,
-          "true"
+          "true",
         );
 
         // Return a special status to indicate we should show soft prompt
@@ -310,7 +571,7 @@ class NotificationService {
       ).data;
 
       console.log(
-        `[Notifications] Expo push token: ${token.substring(0, 30)}...`
+        `[Notifications] Expo push token: ${token.substring(0, 30)}...`,
       );
       this.fcmToken = token;
 
@@ -324,7 +585,7 @@ class NotificationService {
     } catch (error) {
       console.error(
         "[Notifications] Failed to register for push notifications:",
-        error
+        error,
       );
       return null;
     }
@@ -343,7 +604,7 @@ class NotificationService {
 
     if (!isAuthenticated) {
       console.log(
-        "[Notifications] Skipping device registration: User not authenticated"
+        "[Notifications] Skipping device registration: User not authenticated",
       );
       return;
     }
@@ -359,7 +620,7 @@ class NotificationService {
       };
 
       // ALWAYS register - backend will upsert and mark as active
-      const response = await notificationApi.registerDevice(deviceInfo);
+      const response = await notificationsService.registerDevice(deviceInfo);
     } catch (error) {
       // Silently handle - not critical if registration fails during logout
       if (__DEV__ && !(error as any)?.message?.includes("Not authenticated")) {
@@ -376,7 +637,7 @@ class NotificationService {
   }
 
   public async scheduleLocalNotification(
-    notification: ScheduledNotification
+    notification: ScheduledNotification,
   ): Promise<string | null> {
     try {
       if (this.permissionStatus !== "granted") {
@@ -386,11 +647,11 @@ class NotificationService {
 
       // Check if this notification type is enabled for the user
       const isEnabled = await this.isNotificationTypeEnabled(
-        notification.data.type
+        notification.data.type,
       );
       if (!isEnabled) {
         console.log(
-          `Notification type ${notification.data.type} is disabled for user`
+          `Notification type ${notification.data.type} is disabled for user`,
         );
         return null;
       }
@@ -434,7 +695,7 @@ class NotificationService {
   }
 
   public async cancelScheduledNotification(
-    notificationId: string
+    notificationId: string,
   ): Promise<void> {
     try {
       await Notifications.cancelScheduledNotificationAsync(notificationId);
@@ -465,17 +726,17 @@ class NotificationService {
   }
 
   public async updateNotificationPreferences(
-    preferences: NotificationPreferences
+    preferences: NotificationPreferences,
   ): Promise<void> {
     try {
       // Store locally first
       await storageUtil.setItem(
         STORAGE_KEYS.NOTIFICATION_PREFERENCES,
-        JSON.stringify(preferences)
+        JSON.stringify(preferences),
       );
 
       // Sync preferences to backend
-      await notificationApi.updateNotificationPreferences(preferences);
+      await notificationsService.updatePreferences(preferences);
 
       console.log("Notification preferences updated:", preferences);
     } catch (error) {
@@ -487,39 +748,52 @@ class NotificationService {
     try {
       // Try to get from backend first
       try {
-        const response = await notificationApi.getNotificationPreferences();
+        const response = await notificationsService.getPreferences();
+        if (response.error || !response.data) {
+          throw new Error(response.message || "Failed to get preferences");
+        }
+        const data = response.data;
 
-        // Transform backend response to NotificationPreferences format
+        // Backend now returns the flat structure matching NotificationPreferences
         const preferences: NotificationPreferences = {
-          enabled: response.enabled,
-          aiMotivation: response.ai_motivation,
-          reminders: response.reminders,
-          social: response.social,
-          achievements: response.achievements,
-          reengagement: response.reengagement,
-          quietHours: {
-            enabled: response.quiet_hours_enabled,
-            start: response.quiet_hours_start,
-            end: response.quiet_hours_end,
-          },
+          enabled: data.enabled,
+          push_notifications: data.push_notifications,
+          email_notifications: data.email_notifications,
+          ai_motivation: data.ai_motivation,
+          reminders: data.reminders,
+          social: data.social,
+          achievements: data.achievements,
+          reengagement: data.reengagement,
+          quiet_hours_enabled: data.quiet_hours_enabled,
+          quiet_hours_start: data.quiet_hours_start,
+          quiet_hours_end: data.quiet_hours_end,
+          social_partner_requests: data.social_partner_requests,
+          social_partner_nudges: data.social_partner_nudges,
+          social_partner_cheers: data.social_partner_cheers,
+          social_partner_milestones: data.social_partner_milestones,
+          social_challenge_invites: data.social_challenge_invites,
+          social_challenge_leaderboard: data.social_challenge_leaderboard,
+          social_challenge_nudges: data.social_challenge_nudges,
+          social_challenge_reminders: data.social_challenge_reminders,
+          social_motivation_messages: data.social_motivation_messages,
         };
 
         // Store locally for offline access
         await storageUtil.setItem(
           STORAGE_KEYS.NOTIFICATION_PREFERENCES,
-          preferences
+          preferences,
         );
 
         return preferences;
       } catch (backendError) {
         console.log(
           "Failed to get preferences from backend, using local storage:",
-          backendError
+          backendError,
         );
 
         // Fallback to local storage (getItem already parses JSON)
         const stored = await storageUtil.getItem<NotificationPreferences>(
-          STORAGE_KEYS.NOTIFICATION_PREFERENCES
+          STORAGE_KEYS.NOTIFICATION_PREFERENCES,
         );
         if (stored && typeof stored === "object") {
           return stored;
@@ -527,35 +801,36 @@ class NotificationService {
       }
 
       // Return default preferences
-      return {
-        enabled: true,
-        aiMotivation: true,
-        reminders: true,
-        social: true,
-        achievements: true,
-        reengagement: true,
-        quietHours: {
-          enabled: false,
-          start: "22:00",
-          end: "08:00",
-        },
-      };
+      return this.getDefaultPreferences();
     } catch (error) {
       console.error("Failed to get notification preferences:", error);
-      return {
-        enabled: true,
-        aiMotivation: true,
-        reminders: true,
-        social: true,
-        achievements: true,
-        reengagement: true,
-        quietHours: {
-          enabled: false,
-          start: "22:00",
-          end: "08:00",
-        },
-      };
+      return this.getDefaultPreferences();
     }
+  }
+
+  private getDefaultPreferences(): NotificationPreferences {
+    return {
+      enabled: true,
+      push_notifications: true,
+      email_notifications: true,
+      ai_motivation: true,
+      reminders: true,
+      social: true,
+      achievements: true,
+      reengagement: true,
+      quiet_hours_enabled: false,
+      quiet_hours_start: "22:00",
+      quiet_hours_end: "08:00",
+      social_partner_requests: true,
+      social_partner_nudges: true,
+      social_partner_cheers: true,
+      social_partner_milestones: true,
+      social_challenge_invites: true,
+      social_challenge_leaderboard: true,
+      social_challenge_nudges: true,
+      social_challenge_reminders: true,
+      social_motivation_messages: true,
+    };
   }
 
   public getPermissionStatus(): PermissionStatus {
@@ -567,7 +842,7 @@ class NotificationService {
   }
 
   public async isNotificationTypeEnabled(
-    notificationType: NotificationCategory
+    notificationType: NotificationCategory,
   ): Promise<boolean> {
     try {
       const preferences = await this.getNotificationPreferences();
@@ -579,18 +854,59 @@ class NotificationService {
 
       // Check specific notification type
       switch (notificationType) {
+        // Core notification types
         case NotificationCategory.AI_MOTIVATION:
-          return preferences.aiMotivation;
+        case NotificationCategory.MOTIVATION_MESSAGE:
+          return (
+            preferences.ai_motivation && preferences.social_motivation_messages
+          );
         case NotificationCategory.REMINDER:
           return preferences.reminders;
         case NotificationCategory.SOCIAL:
           return preferences.social;
         case NotificationCategory.ACHIEVEMENT:
+        case NotificationCategory.STREAK_MILESTONE:
+        case NotificationCategory.GOAL_COMPLETE:
           return preferences.achievements;
         case NotificationCategory.REENGAGEMENT:
           return preferences.reengagement;
+
+        // Always-enabled types
+        case NotificationCategory.PLAN_READY:
+        case NotificationCategory.SUBSCRIPTION:
+        case NotificationCategory.GENERAL:
+        case NotificationCategory.WEEKLY_RECAP:
+          return true;
+
+        // Partner notifications - check social + specific partner prefs
+        case NotificationCategory.PARTNER_REQUEST:
+        case NotificationCategory.PARTNER_ACCEPTED:
+          return preferences.social && preferences.social_partner_requests;
+        case NotificationCategory.PARTNER_NUDGE:
+          return preferences.social && preferences.social_partner_nudges;
+        case NotificationCategory.PARTNER_CHEER:
+          return preferences.social && preferences.social_partner_cheers;
+        case NotificationCategory.PARTNER_MILESTONE:
+        case NotificationCategory.PARTNER_INACTIVE:
+          return preferences.social && preferences.social_partner_milestones;
+
+        // Challenge notifications - check social + specific challenge prefs
+        case NotificationCategory.CHALLENGE:
+        case NotificationCategory.CHALLENGE_STARTING:
+        case NotificationCategory.CHALLENGE_ENDING:
+        case NotificationCategory.CHALLENGE_ENDED:
+          return preferences.social && preferences.social_challenge_reminders;
+        case NotificationCategory.CHALLENGE_INVITE:
+        case NotificationCategory.CHALLENGE_JOINED:
+          return preferences.social && preferences.social_challenge_invites;
+        case NotificationCategory.CHALLENGE_OVERTAKEN:
+        case NotificationCategory.CHALLENGE_LEAD:
+          return preferences.social && preferences.social_challenge_leaderboard;
+        case NotificationCategory.CHALLENGE_NUDGE:
+          return preferences.social && preferences.social_challenge_nudges;
+
         default:
-          return false;
+          return true; // Default to enabled for unknown types
       }
     } catch (error) {
       console.error("Failed to check notification type enabled:", error);
@@ -616,7 +932,7 @@ class NotificationService {
       // Unregister device from backend to prevent push notifications while logged out
       if (this.fcmToken) {
         try {
-          await notificationApi.unregisterDevice(this.fcmToken);
+          await notificationsService.unregisterDevice(this.fcmToken);
         } catch (error) {
           // silently ignore
         }
@@ -650,7 +966,7 @@ class NotificationService {
       // Unregister device from backend
       if (this.fcmToken) {
         try {
-          await notificationApi.unregisterDevice(this.fcmToken);
+          await notificationsService.unregisterDevice(this.fcmToken);
         } catch (error) {
           console.error("Failed to unregister device from backend:", error);
         }

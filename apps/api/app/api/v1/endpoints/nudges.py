@@ -57,7 +57,7 @@ class NudgeMarkReadRequest(BaseModel):
 # =====================================================
 # Endpoints
 # =====================================================
-@router.post("/", response_model=NudgeResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=NudgeResponse, status_code=status.HTTP_201_CREATED)
 async def send_nudge(
     data: NudgeCreate,
     current_user: dict = Depends(get_current_user),
@@ -210,7 +210,7 @@ async def send_nudge(
     )
 
 
-@router.get("/", response_model=List[NudgeResponse])
+@router.get("", response_model=List[NudgeResponse])
 async def get_nudges(
     current_user: dict = Depends(get_current_user),
     unread_only: bool = Query(False, description="Only return unread nudges"),

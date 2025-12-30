@@ -42,6 +42,7 @@ interface MusicVoiceModalProps {
   // Preferences
   preferences: UserAudioPreferences;
   onUpdatePreferences: (updates: Partial<UserAudioPreferences>) => void;
+  onSavePreferences?: () => void; // Called when Done is clicked to save to backend
 
   // Playlist (optional - for displaying and selecting tracks)
   tracks?: WorkoutMusicTrack[];
@@ -61,6 +62,7 @@ export function MusicVoiceModal({
   isShuffleOn,
   preferences,
   onUpdatePreferences,
+  onSavePreferences,
   tracks = [],
   onSelectTrack,
   isLoadingTracks = false,
@@ -89,12 +91,20 @@ export function MusicVoiceModal({
     setShowPlaylist(false);
   };
 
+  // Handle Done button - save preferences to backend and close
+  const handleDone = () => {
+    // Save preferences to backend in background
+    onSavePreferences?.();
+    // Close the modal
+    onClose();
+  };
+
   return (
     <Modal
       visible={visible}
       animationType="slide"
       presentationStyle="pageSheet"
-      onRequestClose={onClose}
+      onRequestClose={handleDone}
     >
       <View style={[styles.container, { paddingTop: insets.top }]}>
         {/* Header */}
@@ -326,7 +336,7 @@ export function MusicVoiceModal({
                 <Text style={styles.sectionSubtitle}>
                   {t(
                     "workout.sound_effects_desc",
-                    "'Ding' sound after exercises, etc."
+                    "'Ding' sound after exercises, etc.",
                   )}
                 </Text>
               </View>
@@ -378,7 +388,7 @@ export function MusicVoiceModal({
         >
           <Button
             title={t("common.done", "Done")}
-            onPress={onClose}
+            onPress={handleDone}
             variant="primary"
             fullWidth
           />
@@ -402,13 +412,13 @@ export function MusicVoiceModal({
             {
               id: "apple_music",
               label: "Apple Music",
-              icon: "musical-notes",
+              image: AppleMusicIcon,
               onPress: handleOpenAppleMusic,
             },
             {
               id: "spotify",
               label: "Spotify",
-              icon: "logo-spotify" as any,
+              image: SpotifyIcon,
               onPress: handleOpenSpotify,
             },
           ]}

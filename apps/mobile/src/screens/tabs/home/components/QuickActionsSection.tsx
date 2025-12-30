@@ -104,7 +104,7 @@ export function QuickActionsSection({
 const makeQuickActionsSectionStyles = (
   tokens: any,
   colors: any,
-  brand: any
+  brand: any,
 ) => ({
   container: {
     marginBottom: toRN(tokens.spacing[6]),

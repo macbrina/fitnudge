@@ -1,26 +1,22 @@
-import React from "react";
-import { View, Text, TouchableOpacity, Image } from "react-native";
-import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
-import Svg, {
-  Defs,
-  LinearGradient as SvgLinearGradient,
-  Stop,
-  Rect,
-} from "react-native-svg";
-import { Card } from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
 import { SkeletonBox } from "@/components/ui/SkeletonBox";
-import { useTranslation } from "@/lib/i18n";
-import { useStyles, useTheme } from "@/themes";
-import { toRN } from "@/lib/units";
-import { fontFamily } from "@/lib/fonts";
-import { MOBILE_ROUTES } from "@/lib/routes";
 import {
   usePartners,
   usePendingPartnerRequests,
 } from "@/hooks/api/usePartners";
+import { fontFamily } from "@/lib/fonts";
+import { useTranslation } from "@/lib/i18n";
+import { MOBILE_ROUTES } from "@/lib/routes";
+import { toRN } from "@/lib/units";
 import { Partner } from "@/services/api/partners";
+import SubscriptionScreen from "@/screens/onboarding/SubscriptionScreen";
+import { useSubscriptionStore } from "@/stores/subscriptionStore";
+import { useStyles, useTheme } from "@/themes";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import React, { useState } from "react";
+import { Image, Text, TouchableOpacity, View } from "react-native";
 
 interface PartnersCardProps {
   isLoading?: boolean;
@@ -31,19 +27,39 @@ export const PartnersCard: React.FC<PartnersCardProps> = ({ isLoading }) => {
   const { colors, brandColors } = useTheme();
   const { t } = useTranslation();
   const router = useRouter();
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
 
   const { data: partnersData, isLoading: loadingPartners } = usePartners();
   const { data: pendingData } = usePendingPartnerRequests();
 
+  // Check if user has social accountability feature
+  const { hasFeature, getFeatureValue } = useSubscriptionStore();
+  const hasSocialAccountability = hasFeature("social_accountability");
+  const partnerLimit = getFeatureValue("accountability_partner_limit");
+
   const partners = partnersData?.data || [];
   const pendingRequests = pendingData?.data || [];
   const pendingCount = pendingRequests.length;
+
+  // Check if user has reached partner limit
+  const hasReachedPartnerLimit =
+    partnerLimit !== null && partners.length >= partnerLimit;
 
   const handlePress = () => {
     router.push(MOBILE_ROUTES.SOCIAL.FEED);
   };
 
   const handleFindPartners = () => {
+    // Check if user has social accountability feature
+    if (!hasSocialAccountability) {
+      setShowSubscriptionModal(true);
+      return;
+    }
+    // Check if user has reached partner limit
+    if (hasReachedPartnerLimit) {
+      setShowSubscriptionModal(true);
+      return;
+    }
     router.push(MOBILE_ROUTES.SOCIAL.FIND_PARTNER);
   };
 
@@ -100,15 +116,28 @@ export const PartnersCard: React.FC<PartnersCardProps> = ({ isLoading }) => {
             </View>
 
             {/* CTA Button */}
-            <Button
-              variant="primary"
-              size="sm"
-              title={t("social.find_partner") || "Find a Partner"}
-              onPress={handleFindPartners}
-              leftIcon="person-add-outline"
-            />
+            <View style={styles.ctaContainer}>
+              <Button
+                variant="primary"
+                size="sm"
+                title={t("social.find_partner") || "Find a Partner"}
+                onPress={handleFindPartners}
+                leftIcon="person-add-outline"
+              />
+              {!hasSocialAccountability && (
+                <View style={styles.proBadge}>
+                  <Text style={styles.proBadgeText}>PRO</Text>
+                </View>
+              )}
+            </View>
           </View>
         </Card>
+
+        {/* Subscription Modal */}
+        <SubscriptionScreen
+          visible={showSubscriptionModal}
+          onClose={() => setShowSubscriptionModal(false)}
+        />
       </View>
     );
   }
@@ -209,9 +238,20 @@ export const PartnersCard: React.FC<PartnersCardProps> = ({ isLoading }) => {
             activeOpacity={0.7}
           >
             <Ionicons name="person-add" size={16} color={brandColors.primary} />
+            {(!hasSocialAccountability || hasReachedPartnerLimit) && (
+              <View style={styles.addButtonBadge}>
+                <Text style={styles.addButtonBadgeText}>PRO</Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
       </Card>
+
+      {/* Subscription Modal */}
+      <SubscriptionScreen
+        visible={showSubscriptionModal}
+        onClose={() => setShowSubscriptionModal(false)}
+      />
     </TouchableOpacity>
   );
 };
@@ -422,6 +462,41 @@ const makeStyles = (tokens: any, colors: any, brandColors: any) => ({
     borderWidth: 1,
     borderColor: `${brandColors.primary}25`,
     borderStyle: "dashed" as const,
+    position: "relative" as const,
+  },
+  addButtonBadge: {
+    position: "absolute" as const,
+    top: -4,
+    right: -4,
+    backgroundColor: brandColors.gradient?.start || "#8B5CF6",
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  addButtonBadgeText: {
+    fontSize: 8,
+    fontFamily: fontFamily.bold,
+    color: "#FFFFFF",
+    textTransform: "uppercase" as const,
+  },
+  ctaContainer: {
+    position: "relative" as const,
+    alignItems: "center" as const,
+  },
+  proBadge: {
+    position: "absolute" as const,
+    top: -6,
+    right: -6,
+    backgroundColor: brandColors.gradient?.start || "#8B5CF6",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  proBadgeText: {
+    fontSize: 9,
+    fontFamily: fontFamily.bold,
+    color: "#FFFFFF",
+    textTransform: "uppercase" as const,
   },
 });
 

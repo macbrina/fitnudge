@@ -33,7 +33,7 @@ export const PostHogExample: React.FC = () => {
 
     Alert.alert(
       "Feature Flag Check",
-      `Flag value: ${JSON.stringify(flagValue)}\nIs enabled: ${isEnabled}`
+      `Flag value: ${JSON.stringify(flagValue)}\nIs enabled: ${isEnabled}`,
     );
   };
 

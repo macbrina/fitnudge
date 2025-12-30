@@ -1,13 +1,8 @@
 import { BaseApiService, ApiResponse } from "./base";
 import { ROUTES } from "@/lib/routes";
 
-export type ChallengeType =
-  | "duration"
-  | "target"
-  | "checkin_count"
-  | "streak"
-  | "community"
-  | "custom";
+// Only streak and checkin_count are supported
+export type ChallengeType = "streak" | "checkin_count";
 export type ChallengeStatus = "upcoming" | "active" | "completed" | "cancelled";
 
 export interface ChallengeCreator {
@@ -17,22 +12,8 @@ export interface ChallengeCreator {
   profile_picture_url?: string;
 }
 
-export interface ChallengeGoalTemplate {
-  goal_type?: string;
-  category?: string;
-  frequency?: string;
-  target_days?: number;
-  days_of_week?: number[];
-  target_checkins?: number;
-  duration_days?: number;
-  reminder_times?: string[];
-  actionable_plan?: {
-    status?: string;
-    plan_type?: string;
-    structured_data?: Record<string, unknown>;
-    error_message?: string | null;
-  } | null;
-}
+// Tracking type - determines how user completes their check-in
+export type TrackingType = "workout" | "meal" | "hydration" | "checkin";
 
 export interface Challenge {
   id: string;
@@ -46,12 +27,21 @@ export interface Challenge {
   join_deadline?: string;
   target_value?: number;
   is_public: boolean;
-  is_active?: boolean;
   max_participants?: number;
   status: ChallengeStatus;
-  goal_template?: ChallengeGoalTemplate;
   created_at: string;
   updated_at: string;
+
+  // Standalone challenge fields (direct on challenge)
+  category?: string;
+  frequency?: string;
+  target_days?: number;
+  days_of_week?: number[];
+  target_checkins?: number;
+  reminder_times?: string[];
+  duration_days?: number;
+  tracking_type?: TrackingType; // How user completes check-in
+
   // Creator info (from GET /challenges/:id)
   creator?: ChallengeCreator;
   // Participation info (from /challenges/my)
@@ -60,6 +50,7 @@ export interface Challenge {
   my_progress?: number;
   is_creator?: boolean;
   is_participant?: boolean;
+  is_partner_view?: boolean; // True if viewing as a partner (read-only)
 }
 
 export interface ChallengeParticipant {
@@ -86,10 +77,16 @@ export interface ChallengeCheckIn {
   completed?: boolean;
   is_checked_in?: boolean;
   notes?: string;
-  mood?: string;
+  mood?: string; // Text: great, good, okay, bad, terrible
   photo_url?: string;
   created_at: string;
   updated_at: string;
+  // Related challenge info
+  challenge?: {
+    id: string;
+    title: string;
+    category?: string;
+  };
 }
 
 export interface ChallengeCheckInRequest {
@@ -139,12 +136,52 @@ export interface ShareAsChallengeResponse {
   message: string;
 }
 
+/**
+ * Request body for creating a standalone challenge.
+ * Challenges can now be created directly without needing a goal first.
+ *
+ * Challenge types:
+ * - streak: Time Challenge (duration-based, focus on maintaining streaks)
+ * - checkin_count: Target Challenge (count-based, complete X check-ins)
+ */
+export interface CreateChallengeRequest {
+  title: string;
+  description?: string;
+  challenge_type: "streak" | "checkin_count";
+  duration_days: number;
+  start_date: string; // Format: YYYY-MM-DD
+  end_date?: string; // Format: YYYY-MM-DD, optional - calculated from start_date + duration_days if not provided
+  is_public?: boolean;
+  max_participants?: number; // null = unlimited
+  join_deadline?: string; // Format: YYYY-MM-DD, must be before start_date
+  // Goal-like fields for plan generation
+  category?: string;
+  frequency?: "daily" | "weekly";
+  days_of_week?: number[];
+  target_days?: number;
+  target_checkins?: number; // Required for checkin_count type
+  reminder_times?: string[];
+  tracking_type?: TrackingType; // How user completes check-in
+  metadata?: Record<string, unknown>;
+}
+
 class ChallengesService extends BaseApiService {
   /**
    * Get list of all challenges (legacy - may return all public challenges)
    */
   async getChallenges(): Promise<ApiResponse<Challenge[]>> {
     return this.get<Challenge[]>(ROUTES.CHALLENGES.LIST);
+  }
+
+  /**
+   * Create a new standalone challenge.
+   * This creates a challenge directly without needing a goal first.
+   * The backend will generate an actionable plan if category is provided.
+   */
+  async createChallenge(
+    data: CreateChallengeRequest,
+  ): Promise<ApiResponse<Challenge>> {
+    return this.post<Challenge>(ROUTES.CHALLENGES.CREATE, data);
   }
 
   /**
@@ -184,15 +221,29 @@ class ChallengesService extends BaseApiService {
   }
 
   /**
+   * Cancel a challenge (creator only)
+   * Sets the challenge status to 'cancelled' but preserves all data
+   */
+  async cancelChallenge(
+    id: string,
+    reason?: string,
+  ): Promise<ApiResponse<{ message: string; challenge_id: string }>> {
+    return this.post<{ message: string; challenge_id: string }>(
+      ROUTES.CHALLENGES.CANCEL(id),
+      reason ? { reason } : {},
+    );
+  }
+
+  /**
    * Check into a challenge
    */
   async checkIn(
     challengeId: string,
-    data: ChallengeCheckInRequest = {}
+    data: ChallengeCheckInRequest = {},
   ): Promise<ApiResponse<ChallengeCheckInResponse>> {
     return this.post<ChallengeCheckInResponse>(
       ROUTES.CHALLENGES.CHECK_IN(challengeId),
-      data
+      data,
     );
   }
 
@@ -200,10 +251,10 @@ class ChallengesService extends BaseApiService {
    * Get all check-ins for a challenge
    */
   async getCheckIns(
-    challengeId: string
+    challengeId: string,
   ): Promise<ApiResponse<ChallengeCheckIn[]>> {
     return this.get<ChallengeCheckIn[]>(
-      ROUTES.CHALLENGES.CHECK_INS(challengeId)
+      ROUTES.CHALLENGES.CHECK_INS(challengeId),
     );
   }
 
@@ -211,10 +262,10 @@ class ChallengesService extends BaseApiService {
    * Get my check-ins for a challenge
    */
   async getMyCheckIns(
-    challengeId: string
+    challengeId: string,
   ): Promise<ApiResponse<ChallengeCheckIn[]>> {
     return this.get<ChallengeCheckIn[]>(
-      ROUTES.CHALLENGES.MY_CHECK_INS(challengeId)
+      ROUTES.CHALLENGES.MY_CHECK_INS(challengeId),
     );
   }
 
@@ -224,11 +275,11 @@ class ChallengesService extends BaseApiService {
   async updateCheckIn(
     challengeId: string,
     checkInId: string,
-    data: { notes?: string; mood?: string; photo_url?: string }
+    data: { notes?: string; mood?: string; photo_url?: string },
   ): Promise<ApiResponse<ChallengeCheckIn>> {
     return this.put<ChallengeCheckIn>(
       ROUTES.CHALLENGES.UPDATE_CHECK_IN(challengeId, checkInId),
-      data
+      data,
     );
   }
 
@@ -237,7 +288,7 @@ class ChallengesService extends BaseApiService {
    */
   async deleteCheckIn(
     challengeId: string,
-    checkInId: string
+    checkInId: string,
   ): Promise<
     ApiResponse<{
       message: string;
@@ -247,7 +298,7 @@ class ChallengesService extends BaseApiService {
     }>
   > {
     return this.delete(
-      ROUTES.CHALLENGES.DELETE_CHECK_IN(challengeId, checkInId)
+      ROUTES.CHALLENGES.DELETE_CHECK_IN(challengeId, checkInId),
     );
   }
 
@@ -255,10 +306,10 @@ class ChallengesService extends BaseApiService {
    * Get challenge leaderboard
    */
   async getLeaderboard(
-    challengeId: string
+    challengeId: string,
   ): Promise<ApiResponse<LeaderboardEntry[]>> {
     return this.get<LeaderboardEntry[]>(
-      ROUTES.CHALLENGES.LEADERBOARD(challengeId)
+      ROUTES.CHALLENGES.LEADERBOARD(challengeId),
     );
   }
 
@@ -266,10 +317,10 @@ class ChallengesService extends BaseApiService {
    * Get challenge participants
    */
   async getParticipants(
-    challengeId: string
+    challengeId: string,
   ): Promise<ApiResponse<ChallengeParticipant[]>> {
     return this.get<ChallengeParticipant[]>(
-      ROUTES.CHALLENGES.PARTICIPANTS(challengeId)
+      ROUTES.CHALLENGES.PARTICIPANTS(challengeId),
     );
   }
 
@@ -278,11 +329,11 @@ class ChallengesService extends BaseApiService {
    */
   async shareGoalAsChallenge(
     goalId: string,
-    data: ShareAsChallengeRequest
+    data: ShareAsChallengeRequest,
   ): Promise<ApiResponse<ShareAsChallengeResponse>> {
     return this.post<ShareAsChallengeResponse>(
       ROUTES.GOALS.SHARE_AS_CHALLENGE(goalId),
-      data
+      data,
     );
   }
 
@@ -290,7 +341,7 @@ class ChallengesService extends BaseApiService {
    * Join a challenge via invite code
    */
   async joinViaInviteCode(
-    inviteCode: string
+    inviteCode: string,
   ): Promise<
     ApiResponse<{ message: string; challenge: { id: string; title: string } }>
   > {
@@ -305,11 +356,11 @@ class ChallengesService extends BaseApiService {
    */
   async sendInvite(
     challengeId: string,
-    userId: string
+    userId: string,
   ): Promise<ApiResponse<{ message: string; invite_id: string }>> {
     return this.post<{ message: string; invite_id: string }>(
       ROUTES.CHALLENGES.INVITE(challengeId),
-      { user_id: userId }
+      { user_id: userId },
     );
   }
 
@@ -348,7 +399,7 @@ class ChallengesService extends BaseApiService {
    * Accept a challenge invite
    */
   async acceptInvite(
-    inviteId: string
+    inviteId: string,
   ): Promise<
     ApiResponse<{ message: string; challenge: { id: string; title: string } }>
   > {
@@ -362,11 +413,11 @@ class ChallengesService extends BaseApiService {
    * Decline a challenge invite
    */
   async declineInvite(
-    inviteId: string
+    inviteId: string,
   ): Promise<ApiResponse<{ message: string }>> {
     return this.post<{ message: string }>(
       ROUTES.CHALLENGES.INVITE_DECLINE(inviteId),
-      {}
+      {},
     );
   }
 
@@ -374,10 +425,10 @@ class ChallengesService extends BaseApiService {
    * Cancel a challenge invite that the current user sent
    */
   async cancelInvite(
-    inviteId: string
+    inviteId: string,
   ): Promise<ApiResponse<{ message: string }>> {
     return this.delete<{ message: string }>(
-      ROUTES.CHALLENGES.INVITE_CANCEL(inviteId)
+      ROUTES.CHALLENGES.INVITE_CANCEL(inviteId),
     );
   }
 }
@@ -400,6 +451,7 @@ export interface ChallengeInvite {
     end_date?: string;
     is_public?: boolean;
     challenge_type?: string;
+    status?: string;
   };
   inviter?: {
     id: string;

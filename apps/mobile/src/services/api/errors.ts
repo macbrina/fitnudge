@@ -33,7 +33,7 @@ export interface ParsedApiError<T = unknown> {
 }
 
 export const parseApiError = <T = unknown>(
-  error: unknown
+  error: unknown,
 ): ParsedApiError<T> => {
   let status: number | undefined;
   let data: unknown;

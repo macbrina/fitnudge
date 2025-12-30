@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, status, Depends, Query
 from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 from datetime import date, datetime
 from app.core.flexible_auth import get_current_user
 from app.services.logger import logger
@@ -9,6 +9,52 @@ import pytz
 router = APIRouter(
     redirect_slashes=False
 )  # Disable redirects to preserve Authorization header
+
+
+def check_goal_access(
+    goal_id: str, current_user_id: str, supabase
+) -> Tuple[bool, Optional[dict], bool]:
+    """
+    Check if user can access a goal (either owns it or is a partner of the owner).
+
+    Returns:
+        Tuple of (has_access, goal_data, is_partner_view)
+        - has_access: True if user can view the goal
+        - goal_data: The goal data if found
+        - is_partner_view: True if accessing as a partner (read-only)
+    """
+    # First, try to find the goal (without user filter)
+    goal_result = (
+        supabase.table("goals").select("*").eq("id", goal_id).maybe_single().execute()
+    )
+
+    if not goal_result or not goal_result.data:
+        return False, None, False
+
+    goal = goal_result.data
+    goal_owner_id = goal.get("user_id")
+
+    # Case 1: User owns the goal
+    if goal_owner_id == current_user_id:
+        return True, goal, False
+
+    # Case 2: Check if current user is a partner of the goal owner
+    partnership_result = (
+        supabase.table("accountability_partners")
+        .select("id")
+        .eq("status", "accepted")
+        .or_(
+            f"and(user_id.eq.{current_user_id},partner_user_id.eq.{goal_owner_id}),"
+            f"and(user_id.eq.{goal_owner_id},partner_user_id.eq.{current_user_id})"
+        )
+        .maybe_single()
+        .execute()
+    )
+
+    if partnership_result and partnership_result.data:
+        return True, goal, True  # Partner view (read-only)
+
+    return False, None, False
 
 
 def get_user_goal_limit(user_plan: str, supabase) -> Optional[int]:
@@ -77,7 +123,7 @@ async def create_initial_checkin(
             supabase.table("check_ins")
             .select("id")
             .eq("goal_id", goal_id)
-            .eq("date", user_today.isoformat())
+            .eq("check_in_date", user_today.isoformat())
             .execute()
         )
 
@@ -89,9 +135,8 @@ async def create_initial_checkin(
         checkin_data = {
             "goal_id": goal_id,
             "user_id": user_id,
-            "date": user_today.isoformat(),
+            "check_in_date": user_today.isoformat(),
             "completed": False,
-            "photo_urls": [],
         }
 
         result = supabase.table("check_ins").insert(checkin_data).execute()
@@ -170,22 +215,19 @@ def get_user_challenge_participation_count(user_id: str, supabase) -> int:
     Only counts challenges that are still ongoing (upcoming or active, not completed/cancelled).
 
     NOTE: Status is computed, not stored:
-    - is_active=false -> cancelled
-    - is_active=true, today < start_date -> upcoming
-    - is_active=true, start_date <= today <= end_date -> active
-    - is_active=true, today > end_date -> completed
+    Status is stored in 'status' column.
     """
     from datetime import date
 
     today = date.today().isoformat()
 
     # Count challenges created by user that are ongoing
-    # Ongoing = is_active AND end_date >= today (or end_date is null)
+    # Ongoing = status IN ('upcoming', 'active') AND end_date >= today (or end_date is null)
     created_result = (
         supabase.table("challenges")
-        .select("id, end_date")
+        .select("id, end_date, status")
         .eq("created_by", user_id)
-        .eq("is_active", True)
+        .in_("status", ["upcoming", "active"])
         .execute()
     )
     # Filter: end_date >= today OR end_date is null (ongoing challenges)
@@ -198,11 +240,9 @@ def get_user_challenge_participation_count(user_id: str, supabase) -> int:
     # Count challenges joined (via challenge_participants, not created by user)
     joined_result = (
         supabase.table("challenge_participants")
-        .select(
-            "id, challenge_id, challenges!inner(id, is_active, end_date, created_by)"
-        )
+        .select("id, challenge_id, challenges!inner(id, status, end_date, created_by)")
         .eq("user_id", user_id)
-        .eq("challenges.is_active", True)
+        .in_("challenges.status", ["upcoming", "active"])
         .neq("challenges.created_by", user_id)
         .execute()
     )
@@ -296,6 +336,9 @@ class GoalCreate(BaseModel):
     )
     reminder_times: Optional[List[str]] = None
     custom_reminder_message: Optional[str] = None  # Custom message for reminders
+    # Tracking type - determines how user completes check-ins
+    # Default to None so backend can derive from category if not specified
+    tracking_type: Optional[str] = None  # workout, meal, hydration, checkin
     # Goal type fields
     goal_type: Optional[str] = "habit"  # habit, time_challenge, target_challenge
     target_checkins: Optional[int] = None  # Required for target_challenge
@@ -313,8 +356,10 @@ class GoalUpdate(BaseModel):
         None  # Array of day numbers (0-6): 0=Sunday, 1=Monday, ..., 6=Saturday
     )
     reminder_times: Optional[List[str]] = None
-    is_active: Optional[bool] = None
+    status: Optional[str] = None  # 'active', 'paused', 'completed', 'archived'
     custom_reminder_message: Optional[str] = None  # Custom message for reminders
+    # Tracking type - determines how user completes check-ins
+    tracking_type: Optional[str] = None  # workout, meal, hydration, checkin
     # Goal type fields (mostly immutable after creation, but allow update)
     goal_type: Optional[str] = None
     target_checkins: Optional[int] = None
@@ -331,9 +376,13 @@ class GoalResponse(BaseModel):
     target_days: Optional[int]
     days_of_week: Optional[List[int]] = None
     reminder_times: Optional[List[str]]
-    is_active: bool
+    status: str  # 'active', 'paused', 'completed', 'archived'
     created_at: str
     updated_at: str
+    # Tracking type - determines how user completes check-ins
+    tracking_type: Optional[str] = (
+        None  # workout, meal, hydration, checkin - derived from category
+    )
     # Goal type fields
     goal_type: Optional[str] = "habit"
     challenge_id: Optional[str] = None
@@ -346,20 +395,27 @@ class GoalResponse(BaseModel):
 
 class CheckInCreate(BaseModel):
     goal_id: str
-    date: date
+    check_in_date: date
     completed: bool
-    reflection: Optional[str] = None
-    mood: Optional[int] = None
+    notes: Optional[str] = None
+    mood: Optional[str] = None
+    is_checked_in: Optional[bool] = True
 
 
 class CheckInResponse(BaseModel):
     id: str
     goal_id: str
-    date: date
+    check_in_date: date
     completed: bool
-    reflection: Optional[str]
-    mood: Optional[int]
+    notes: Optional[str] = None
+    mood: Optional[str] = None
+    is_checked_in: Optional[bool] = None
+    photo_url: Optional[str] = None
+    user_id: Optional[str] = None
     created_at: str
+    updated_at: Optional[str] = None
+
+    model_config = {"from_attributes": True}
 
 
 @router.get("/", response_model=List[GoalResponse])
@@ -374,7 +430,7 @@ async def get_goals(
     query = supabase.table("goals").select("*").eq("user_id", current_user["id"])
 
     if active_only:
-        query = query.eq("is_active", True)
+        query = query.eq("status", "active")
 
     result = query.order("created_at", desc=True).execute()
     return result.data
@@ -400,6 +456,9 @@ class GoalTypeSuggestionItem(BaseModel):
     days_of_week: Optional[List[int]] = None
     reminder_times: Optional[List[str]] = None
     goal_type: str
+    tracking_type: Optional[str] = (
+        None  # workout, meal, hydration, checkin - derived from category
+    )
     duration_days: Optional[int] = None  # For time_challenge
     target_checkins: Optional[int] = None  # For target_challenge
     match_reason: Optional[str] = None
@@ -555,7 +614,7 @@ async def create_goal(
         supabase.table("goals")
         .select("id")
         .eq("user_id", user_id)
-        .eq("is_active", True)
+        .eq("status", "active")
         .execute()
     )
 
@@ -575,56 +634,24 @@ async def create_goal(
     # Validate goal data
     validate_goal_data(goal_dict)
 
-    # Validate goal type
-    goal_type = goal_data.goal_type or "habit"
-    if goal_type not in GOAL_TYPES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid goal_type. Must be one of: {GOAL_TYPES}",
-        )
+    # Goals are now only for habits (ongoing, no end date)
+    # For time-bound challenges, users should create a Challenge instead
 
-    # Check premium access for challenges
-    if goal_type in ["time_challenge", "target_challenge"]:
-        from app.core.subscriptions import check_user_has_feature
-
-        has_challenge_create = check_user_has_feature(
-            user_id, "challenge_create", user_plan, supabase
-        )
-
-        if not has_challenge_create:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Upgrade to paid plan to create challenges. Habits are free for all users.",
-            )
-
-    # Validate goal type specific fields
-    if goal_type == "target_challenge":
-        if not goal_data.target_checkins or goal_data.target_checkins <= 0:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="target_checkins is required and must be positive for target challenges",
-            )
-
-    # Calculate challenge dates for time challenges
-    challenge_start_date = None
-    challenge_end_date = None
-    if goal_type == "time_challenge":
-        if (
-            not goal_data.challenge_duration_days
-            or goal_data.challenge_duration_days <= 0
+    # Determine tracking_type - default based on category if not provided
+    tracking_type = goal_data.tracking_type
+    if not tracking_type:
+        if goal_data.category == "fitness":
+            tracking_type = "workout"
+        elif goal_data.category == "nutrition":
+            tracking_type = "meal"
+        elif (
+            goal_data.category == "wellness"
+            or goal_data.category == "mindfulness"
+            or goal_data.category == "sleep"
         ):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="challenge_duration_days is required for time challenges",
-            )
-        from datetime import timedelta
-
-        challenge_start_date = date.today()
-        # End date is start + (duration - 1) days
-        # e.g., 30-day challenge: Day 1 = start, Day 30 = start + 29 days
-        challenge_end_date = challenge_start_date + timedelta(
-            days=goal_data.challenge_duration_days - 1
-        )
+            tracking_type = "checkin"
+        else:
+            tracking_type = "checkin"
 
     goal = {
         "user_id": user_id,
@@ -636,21 +663,9 @@ async def create_goal(
         "days_of_week": goal_data.days_of_week if goal_data.days_of_week else None,
         "reminder_times": goal_data.reminder_times or [],
         "custom_reminder_message": goal_data.custom_reminder_message,
-        # Goal starts ACTIVE immediately - if plan generation fails, it will be deactivated
-        # with archived_reason = "failed" so user can retry
-        "is_active": can_activate,
-        # Goal type fields
-        "goal_type": goal_type,
-        "challenge_id": goal_data.challenge_id,
-        "target_checkins": (
-            goal_data.target_checkins if goal_type == "target_challenge" else None
-        ),
-        "challenge_start_date": (
-            challenge_start_date.isoformat() if challenge_start_date else None
-        ),
-        "challenge_end_date": (
-            challenge_end_date.isoformat() if challenge_end_date else None
-        ),
+        "tracking_type": tracking_type,  # How user completes check-ins
+        # Goal activation
+        "status": "active" if can_activate else "paused",
     }
 
     result = supabase.table("goals").insert(goal).execute()
@@ -670,8 +685,13 @@ async def create_goal(
             .execute()
         )
         user_profile = (
-            profile_result.data if profile_result and profile_result.data else None
+            profile_result.data if profile_result and profile_result.data else {}
         )
+
+        # Merge timezone and country from users table into user_profile for AI personalization
+        # These are needed for locale-specific meal suggestions and time-aware reminders
+        user_profile["timezone"] = current_user.get("timezone", "UTC")
+        user_profile["country"] = current_user.get("country")
 
         # Prepare goal data for plan generator
         goal_for_plan = {
@@ -682,22 +702,6 @@ async def create_goal(
             "frequency": goal_data.frequency,
             "target_days": goal_data.target_days,
             "days_of_week": goal_data.days_of_week,  # For scheduling
-            # Goal type fields for plan generation
-            "goal_type": goal_type,
-            "target_checkins": (
-                goal_data.target_checkins if goal_type == "target_challenge" else None
-            ),
-            "challenge_duration_days": (
-                goal_data.challenge_duration_days
-                if goal_type == "time_challenge"
-                else None
-            ),
-            "challenge_start_date": (
-                challenge_start_date.isoformat() if challenge_start_date else None
-            ),
-            "challenge_end_date": (
-                challenge_end_date.isoformat() if challenge_end_date else None
-            ),
         }
 
         # Queue the plan generation task (Celery handles it now)
@@ -721,7 +725,7 @@ async def create_goal(
         f"Goal created for user {user_id}",
         {
             "goal_id": goal_id,
-            "is_active": can_activate,  # Active immediately, will be deactivated if plan fails
+            "status": "active" if can_activate else "paused",
             "can_activate": can_activate,
             "total_goals": total_goals + 1,
         },
@@ -734,36 +738,29 @@ async def create_goal(
 async def get_goal_plan_status(
     goal_id: str, current_user: dict = Depends(get_current_user)
 ):
-    """Get the status of plan generation for a goal"""
+    """Get the status of plan generation for a goal. Allows access if user owns the goal or is a partner."""
     from app.core.database import get_supabase_client
     from app.services.task_queue import task_queue
 
     supabase = get_supabase_client()
-    user_id = current_user["id"]
 
-    # Verify goal belongs to user (use maybe_single to handle deleted goals)
-    try:
-        goal_result = (
-            supabase.table("goals")
-            .select("id")
-            .eq("id", goal_id)
-            .eq("user_id", user_id)
-            .maybe_single()
-            .execute()
-        )
+    # Verify goal access (owner or partner)
+    has_access, goal, is_partner_view = check_goal_access(
+        goal_id, current_user["id"], supabase
+    )
 
-        if not goal_result or not goal_result.data:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Goal not found",
-            )
-    except Exception as e:
-        if isinstance(e, HTTPException):
-            raise
+    if not has_access:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Goal not found",
         )
+
+    # Partner view: return restricted immediately without querying plan
+    if is_partner_view:
+        return {
+            "goal_id": goal_id,
+            "status": "restricted",
+        }
 
     plan_status = await task_queue.get_plan_status(goal_id)
 
@@ -785,28 +782,31 @@ async def get_goal_plan_status(
 
 @router.get("/{goal_id}/plan")
 async def get_goal_plan(goal_id: str, current_user: dict = Depends(get_current_user)):
-    """Get the generated actionable plan for a goal"""
+    """Get the generated actionable plan for a goal. Allows access if user owns the goal or is a partner."""
     from app.core.database import get_supabase_client
     from app.services.task_queue import task_queue
 
     supabase = get_supabase_client()
-    user_id = current_user["id"]
 
-    # Verify goal belongs to user
-    goal_result = (
-        supabase.table("goals")
-        .select("id")
-        .eq("id", goal_id)
-        .eq("user_id", user_id)
-        .maybe_single()
-        .execute()
+    # Verify goal access (owner or partner)
+    has_access, goal, is_partner_view = check_goal_access(
+        goal_id, current_user["id"], supabase
     )
 
-    if not goal_result or not goal_result.data:
+    if not has_access:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Goal not found",
         )
+
+    # Privacy: partners cannot view plan details
+    if is_partner_view:
+        return {
+            "goal_id": goal_id,
+            "has_plan": True,  # Just indicate plan exists
+            "status": "restricted",
+            "plan": None,
+        }
 
     plan = await task_queue.get_plan(goal_id)
 
@@ -856,7 +856,7 @@ async def retry_plan_generation(
     # Clear the failed state and re-activate the goal
     supabase.table("goals").update(
         {
-            "is_active": True,
+            "status": "active",
             "archived_reason": None,
         }
     ).eq("id", goal_id).execute()
@@ -869,9 +869,11 @@ async def retry_plan_generation(
         .maybe_single()
         .execute()
     )
-    user_profile = (
-        profile_result.data if profile_result and profile_result.data else None
-    )
+    user_profile = profile_result.data if profile_result and profile_result.data else {}
+
+    # Merge timezone and country from users table into user_profile for AI personalization
+    user_profile["timezone"] = current_user.get("timezone", "UTC")
+    user_profile["country"] = current_user.get("country")
 
     # Prepare goal data for plan generator
     goal_for_plan = {
@@ -882,12 +884,6 @@ async def retry_plan_generation(
         "frequency": goal_data["frequency"],
         "target_days": goal_data.get("target_days"),
         "days_of_week": goal_data.get("days_of_week"),  # For scheduling
-        # Goal type fields for plan generation
-        "goal_type": goal_data.get("goal_type", "habit"),
-        "target_checkins": goal_data.get("target_checkins"),
-        "challenge_duration_days": None,  # Calculate if needed
-        "challenge_start_date": goal_data.get("challenge_start_date"),
-        "challenge_end_date": goal_data.get("challenge_end_date"),
     }
 
     # Queue the plan generation task with activation context
@@ -915,24 +911,25 @@ async def retry_plan_generation(
 
 @router.get("/{goal_id}", response_model=GoalResponse)
 async def get_goal(goal_id: str, current_user: dict = Depends(get_current_user)):
-    """Get specific goal by ID"""
+    """Get specific goal by ID. Allows access if user owns the goal or is a partner."""
     from app.core.database import get_supabase_client
 
     supabase = get_supabase_client()
-    result = (
-        supabase.table("goals")
-        .select("*")
-        .eq("id", goal_id)
-        .eq("user_id", current_user["id"])
-        .execute()
+
+    has_access, goal, is_partner_view = check_goal_access(
+        goal_id, current_user["id"], supabase
     )
 
-    if not result.data:
+    if not has_access or not goal:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Goal not found"
         )
 
-    return result.data[0]
+    # Privacy filter: hide sensitive schedule data for partner view
+    if is_partner_view:
+        goal["reminder_times"] = None  # Hide daily schedule
+
+    return goal
 
 
 @router.put("/{goal_id}", response_model=GoalResponse)
@@ -941,7 +938,7 @@ async def update_goal(
 ):
     """
     Update goal.
-    If activating a goal (is_active=True), all other goals are deactivated.
+    If activating a goal (status='active'), check active goal limit.
     """
     from app.core.database import get_supabase_client
 
@@ -988,13 +985,13 @@ async def update_goal(
     active_goal_limit = get_user_active_goal_limit(user_plan, supabase)
 
     # If activating this goal, check active goal limit
-    if update_data.get("is_active") is True:
+    if update_data.get("status") == "active":
         # Get current active goals (excluding this one)
         active_goals = (
             supabase.table("goals")
             .select("id")
             .eq("user_id", user_id)
-            .eq("is_active", True)
+            .eq("status", "active")
             .neq("id", goal_id)
             .execute()
         )
@@ -1010,6 +1007,13 @@ async def update_goal(
             )
 
     result = supabase.table("goals").update(update_data).eq("id", goal_id).execute()
+
+    # Notify partners of the goal update
+    from app.services.social_accountability_service import social_accountability_service
+
+    await social_accountability_service.notify_partners_of_data_change(
+        user_id, "goal_updated"
+    )
 
     return result.data[0]
 
@@ -1076,6 +1080,13 @@ async def delete_goal(
                 media_id=f"goal-delete-{goal_id}",
             )
 
+    # Notify partners of the goal deletion
+    from app.services.social_accountability_service import social_accountability_service
+
+    await social_accountability_service.notify_partners_of_data_change(
+        current_user["id"], "goal_deleted"
+    )
+
     return {"message": "Goal deleted successfully"}
 
 
@@ -1110,17 +1121,30 @@ async def create_checkin(
     checkin = {
         "goal_id": goal_id,
         "user_id": current_user["id"],
-        "date": checkin_data.date.isoformat(),
+        "check_in_date": checkin_data.check_in_date.isoformat(),
         "completed": checkin_data.completed,
-        "reflection": checkin_data.reflection,
+        "notes": checkin_data.notes,
         "mood": checkin_data.mood,
+        "is_checked_in": (
+            checkin_data.is_checked_in
+            if checkin_data.is_checked_in is not None
+            else True
+        ),
     }
 
     result = (
         supabase.table("check_ins")
-        .upsert(checkin, on_conflict="goal_id,date")
+        .upsert(checkin, on_conflict="goal_id,check_in_date")
         .execute()
     )
+
+    # Notify partners of the check-in
+    from app.services.social_accountability_service import social_accountability_service
+
+    await social_accountability_service.notify_partners_of_data_change(
+        current_user["id"], "goal_checkin"
+    )
+
     return result.data[0]
 
 
@@ -1131,33 +1155,33 @@ async def get_goal_checkins(
     start_date: Optional[date] = Query(None),
     end_date: Optional[date] = Query(None),
 ):
-    """Get check-ins for a specific goal"""
+    """Get check-ins for a specific goal. Allows access if user owns the goal or is a partner."""
     from app.core.database import get_supabase_client
 
     supabase = get_supabase_client()
 
-    # Verify goal belongs to user
-    goal = (
-        supabase.table("goals")
-        .select("*")
-        .eq("id", goal_id)
-        .eq("user_id", current_user["id"])
-        .execute()
+    # Verify goal access (owner or partner)
+    has_access, goal, is_partner_view = check_goal_access(
+        goal_id, current_user["id"], supabase
     )
-    if not goal.data:
+    if not has_access:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Goal not found"
         )
 
+    # Privacy: partners cannot view check-in history
+    if is_partner_view:
+        return []  # Return empty - partners don't see check-in details
+
     query = supabase.table("check_ins").select("*").eq("goal_id", goal_id)
 
     if start_date:
-        query = query.gte("date", start_date.isoformat())
+        query = query.gte("check_in_date", start_date.isoformat())
     if end_date:
-        query = query.lte("date", end_date.isoformat())
+        query = query.lte("check_in_date", end_date.isoformat())
 
-    result = query.order("date", desc=True).execute()
-    return result.data
+    result = query.order("check_in_date", desc=True).execute()
+    return result.data or []
 
 
 @router.get("/templates/")
@@ -1173,8 +1197,7 @@ async def get_goal_templates():
 @router.post("/{goal_id}/archive")
 async def archive_goal(goal_id: str, current_user: dict = Depends(get_current_user)):
     """
-    Archive a goal (sets is_active to False).
-    If this was the active goal and user has other goals, you may want to activate another one.
+    Archive a goal (sets status to 'archived').
     """
     from app.core.database import get_supabase_client
 
@@ -1195,17 +1218,28 @@ async def archive_goal(goal_id: str, current_user: dict = Depends(get_current_us
         )
 
     # Check if this was the active goal
-    was_active = existing_goal.data[0].get("is_active", False)
+    was_active = existing_goal.data[0].get("status") == "active"
 
-    # Archive goal (set is_active to False)
-    supabase.table("goals").update({"is_active": False}).eq("id", goal_id).execute()
+    # Archive goal
+    supabase.table("goals").update(
+        {
+            "status": "archived",
+        }
+    ).eq("id", goal_id).execute()
+
+    # Notify partners of the goal archive
+    from app.services.social_accountability_service import social_accountability_service
+
+    await social_accountability_service.notify_partners_of_data_change(
+        user_id, "goal_archived"
+    )
 
     return {"message": "Goal archived successfully"}
 
 
 @router.post("/{goal_id}/unarchive")
 async def unarchive_goal(goal_id: str, current_user: dict = Depends(get_current_user)):
-    """Unarchive a goal (sets is_active to True if within active goal limit)"""
+    """Unarchive a goal (sets status to 'active' if within active goal limit)"""
     from app.core.database import get_supabase_client
 
     supabase = get_supabase_client()
@@ -1232,7 +1266,7 @@ async def unarchive_goal(goal_id: str, current_user: dict = Depends(get_current_
         supabase.table("goals")
         .select("id")
         .eq("user_id", user_id)
-        .eq("is_active", True)
+        .eq("status", "active")
         .neq("id", goal_id)
         .execute()
     )
@@ -1248,7 +1282,18 @@ async def unarchive_goal(goal_id: str, current_user: dict = Depends(get_current_
         )
 
     # Activate this goal
-    supabase.table("goals").update({"is_active": True}).eq("id", goal_id).execute()
+    supabase.table("goals").update(
+        {
+            "status": "active",
+        }
+    ).eq("id", goal_id).execute()
+
+    # Notify partners of the goal reactivation
+    from app.services.social_accountability_service import social_accountability_service
+
+    await social_accountability_service.notify_partners_of_data_change(
+        user_id, "goal_unarchived"
+    )
 
     return {"message": "Goal unarchived and activated successfully"}
 
@@ -1282,19 +1327,10 @@ async def activate_goal(goal_id: str, current_user: dict = Depends(get_current_u
     goal = existing_goal.data[0]
 
     # Check if goal is already active
-    if goal.get("is_active", False):
+    if goal.get("status") == "active":
         return {"message": "Goal is already active", "goal": goal}
 
-    # Check if goal was converted to a challenge (cannot be reactivated)
-    if goal.get("archived_reason") == "converted_to_challenge":
-        challenge_id = goal.get("converted_to_challenge_id")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="This goal was converted to a challenge and cannot be reactivated. "
-            + (f"View the challenge instead." if challenge_id else ""),
-        )
-
-    # Check if goal is archived for other reasons (has archived_reason but not converted)
+    # Check if goal is archived (has archived_reason)
     # Allow activation - it will clear the archived_reason
 
     # Get active goal limit for user's plan (for personal goals only)
@@ -1313,16 +1349,23 @@ async def activate_goal(goal_id: str, current_user: dict = Depends(get_current_u
         )
 
     # Activate this goal and clear archived_reason if needed
-    update_data = {"is_active": True}
-    if (
-        goal.get("archived_reason")
-        and goal.get("archived_reason") != "converted_to_challenge"
-    ):
+    update_data = {
+        "status": "active",
+    }
+    if goal.get("archived_reason"):
         update_data["archived_reason"] = None
 
     result = supabase.table("goals").update(update_data).eq("id", goal_id).execute()
 
     if result.data:
+        # Notify partners of goal activation
+        from app.services.social_accountability_service import (
+            social_accountability_service,
+        )
+
+        await social_accountability_service.notify_partners_of_data_change(
+            user_id, "goal_activated"
+        )
         return {"message": "Goal activated successfully", "goal": result.data[0]}
     else:
         raise HTTPException(
@@ -1334,8 +1377,7 @@ async def activate_goal(goal_id: str, current_user: dict = Depends(get_current_u
 @router.post("/{goal_id}/deactivate")
 async def deactivate_goal(goal_id: str, current_user: dict = Depends(get_current_user)):
     """
-    Deactivate a goal (sets is_active to False).
-    This is the counterpart to activate_goal with clearer naming.
+    Deactivate a goal (sets status to 'paused').
     """
     from app.core.database import get_supabase_client
 
@@ -1356,15 +1398,30 @@ async def deactivate_goal(goal_id: str, current_user: dict = Depends(get_current
         )
 
     # Check if goal is already inactive
-    if not existing_goal.data[0].get("is_active", False):
+    if existing_goal.data[0].get("status") != "active":
         return {"message": "Goal is already inactive", "goal": existing_goal.data[0]}
 
-    # Deactivate goal (set is_active to False)
+    # Deactivate goal
     result = (
-        supabase.table("goals").update({"is_active": False}).eq("id", goal_id).execute()
+        supabase.table("goals")
+        .update(
+            {
+                "status": "archived",
+            }
+        )
+        .eq("id", goal_id)
+        .execute()
     )
 
     if result.data:
+        # Notify partners of goal deactivation
+        from app.services.social_accountability_service import (
+            social_accountability_service,
+        )
+
+        await social_accountability_service.notify_partners_of_data_change(
+            user_id, "goal_deactivated"
+        )
         return {"message": "Goal deactivated successfully", "goal": result.data[0]}
     else:
         raise HTTPException(
@@ -1404,7 +1461,7 @@ async def duplicate_goal(goal_id: str, current_user: dict = Depends(get_current_
         "frequency": goal_data["frequency"],
         "target_days": goal_data["target_days"],
         "reminder_times": goal_data["reminder_times"],
-        "is_active": True,
+        "status": "active",
     }
 
     result = supabase.table("goals").insert(duplicate_goal).execute()
@@ -1413,17 +1470,18 @@ async def duplicate_goal(goal_id: str, current_user: dict = Depends(get_current_
 
 @router.get("/{goal_id}/stats")
 async def get_goal_stats(goal_id: str, current_user: dict = Depends(get_current_user)):
-    """Get statistics for a specific goal"""
+    """Get statistics for a specific goal from goal_statistics table"""
     from app.core.database import get_supabase_client
 
     supabase = get_supabase_client()
 
-    # Verify goal belongs to user
+    # Verify goal belongs to user and get created_at
     goal = (
         supabase.table("goals")
-        .select("*")
+        .select("id, created_at")
         .eq("id", goal_id)
         .eq("user_id", current_user["id"])
+        .maybe_single()
         .execute()
     )
     if not goal.data:
@@ -1431,46 +1489,51 @@ async def get_goal_stats(goal_id: str, current_user: dict = Depends(get_current_
             status_code=status.HTTP_404_NOT_FOUND, detail="Goal not found"
         )
 
-    # Get check-ins for this goal
-    checkins_result = (
-        supabase.table("check_ins").select("*").eq("goal_id", goal_id).execute()
+    # Get cached stats from goal_statistics table
+    stats_result = (
+        supabase.table("goal_statistics")
+        .select(
+            "total_checkins, completed_checkins, completion_rate, "
+            "current_streak, longest_streak, last_checkin_date, "
+            "checkins_last_7d, checkins_last_30d, completion_rate_7d, completion_rate_30d"
+        )
+        .eq("goal_id", goal_id)
+        .maybe_single()
+        .execute()
     )
 
-    checkins = checkins_result.data
-    total_check_ins = len(checkins)
-    completed_check_ins = len([c for c in checkins if c["completed"]])
-    completion_rate = (
-        (completed_check_ins / total_check_ins * 100) if total_check_ins > 0 else 0
-    )
-
-    # Calculate current streak
-    sorted_checkins = sorted(checkins, key=lambda x: x["date"], reverse=True)
-    current_streak = 0
-    for checkin in sorted_checkins:
-        if checkin["completed"]:
-            current_streak += 1
-        else:
-            break
-
-    # Calculate longest streak
-    longest_streak = 0
-    temp_streak = 0
-    for checkin in sorted_checkins:
-        if checkin["completed"]:
-            temp_streak += 1
-            longest_streak = max(longest_streak, temp_streak)
-        else:
-            temp_streak = 0
-
-    return {
-        "goal_id": goal_id,
-        "total_check_ins": total_check_ins,
-        "completed_check_ins": completed_check_ins,
-        "completion_rate": completion_rate,
-        "current_streak": current_streak,
-        "longest_streak": longest_streak,
-        "goal_created": goal.data[0]["created_at"],
-    }
+    if stats_result.data:
+        stats = stats_result.data
+        return {
+            "goal_id": goal_id,
+            "total_check_ins": stats.get("total_checkins", 0),
+            "completed_check_ins": stats.get("completed_checkins", 0),
+            "completion_rate": float(stats.get("completion_rate", 0)),
+            "current_streak": stats.get("current_streak", 0),
+            "longest_streak": stats.get("longest_streak", 0),
+            "last_check_in": stats.get("last_checkin_date"),
+            "checkins_last_7d": stats.get("checkins_last_7d", 0),
+            "checkins_last_30d": stats.get("checkins_last_30d", 0),
+            "completion_rate_7d": float(stats.get("completion_rate_7d", 0)),
+            "completion_rate_30d": float(stats.get("completion_rate_30d", 0)),
+            "goal_created": goal.data["created_at"],
+        }
+    else:
+        # No stats yet (new goal with no check-ins)
+        return {
+            "goal_id": goal_id,
+            "total_check_ins": 0,
+            "completed_check_ins": 0,
+            "completion_rate": 0.0,
+            "current_streak": 0,
+            "longest_streak": 0,
+            "last_check_in": None,
+            "checkins_last_7d": 0,
+            "checkins_last_30d": 0,
+            "completion_rate_7d": 0.0,
+            "completion_rate_30d": 0.0,
+            "goal_created": goal.data["created_at"],
+        }
 
 
 @router.get("/{goal_id}/habit-chains")
@@ -1530,7 +1593,7 @@ async def get_all_goals_stats(current_user: dict = Depends(get_current_user)):
 
     goals = goals_result.data
     total_goals = len(goals)
-    active_goals = len([g for g in goals if g["is_active"]])
+    active_goals = len([g for g in goals if g.get("status") == "active"])
     completed_goals = total_goals - active_goals
 
     # Get all check-ins
@@ -1577,294 +1640,11 @@ def get_active_personal_goals_count(user_id: str, supabase) -> int:
         supabase.table("goals")
         .select("id", count="exact")
         .eq("user_id", user_id)
-        .eq("is_active", True)
+        .eq("status", "active")
         .execute()
     )
     return (
         active_goals.count
         if hasattr(active_goals, "count")
         else len(active_goals.data or [])
-    )
-
-
-class ShareAsChallengeRequest(BaseModel):
-    """Request to share a goal as a challenge"""
-
-    title: Optional[str] = None  # Override goal title for challenge
-    description: Optional[str] = None  # Override description
-    start_date: date  # When the challenge starts
-    join_deadline: Optional[date] = (
-        None  # Optional deadline to join (defaults to start_date)
-    )
-    max_participants: Optional[int] = None  # Optional participant limit
-    is_public: bool = False  # Whether anyone can join or invite-only
-    archive_original_goal: bool = True  # Whether to archive the original goal
-
-
-class ShareAsChallengeResponse(BaseModel):
-    """Response after sharing a goal as a challenge"""
-
-    challenge_id: str
-    goal_id: str
-    title: str
-    start_date: str
-    end_date: Optional[str]
-    join_deadline: Optional[str]
-    is_public: bool
-    goal_archived: bool
-    message: str
-
-
-@router.post("/{goal_id}/share-as-challenge", response_model=ShareAsChallengeResponse)
-async def share_goal_as_challenge(
-    goal_id: str,
-    data: ShareAsChallengeRequest,
-    current_user: dict = Depends(get_current_user),
-):
-    """
-    Share a goal as a challenge that others can join.
-
-    Only works for time_challenge and target_challenge goal types.
-    Creates a SELF-CONTAINED challenge with embedded goal data and actionable plan.
-    The challenge does not depend on the original goal - it can be deleted.
-
-    If archive_original_goal is True (default):
-    - Goal is archived and cannot be reactivated
-    - Only challenge tracking remains
-
-    If archive_original_goal is False:
-    - Goal remains active for personal tracking
-    - Both goal and challenge count toward active limit
-    """
-    from app.core.database import get_supabase_client
-    from app.core.subscriptions import check_user_has_feature
-    from datetime import timedelta
-
-    supabase = get_supabase_client()
-    user_id = current_user["id"]
-    user_plan = current_user.get("plan", "free")
-
-    # Check if user has challenge_create feature
-    if not check_user_has_feature(user_id, "challenge_create", user_plan, supabase):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Upgrade your plan to share challenges with friends",
-        )
-
-    # Get the goal
-    goal_result = (
-        supabase.table("goals")
-        .select("*")
-        .eq("id", goal_id)
-        .eq("user_id", user_id)
-        .maybe_single()
-        .execute()
-    )
-
-    if not goal_result.data:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Goal not found",
-        )
-
-    goal = goal_result.data
-
-    # Verify goal is active (not archived/deactivated)
-    if not goal.get("is_active"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Inactive goals cannot be shared as challenges. Activate the goal first.",
-        )
-
-    # Verify goal type is challenge-compatible
-    goal_type = goal.get("goal_type", "habit")
-    if goal_type not in ["time_challenge", "target_challenge"]:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only time challenges and target challenges can be shared. Habits cannot be shared as challenges.",
-        )
-
-    # Check if already converted
-    if goal.get("converted_to_challenge_id"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="This goal has already been shared as a challenge",
-        )
-
-    # Check CHALLENGE limit (separate from goals limit)
-    challenge_limit = get_user_challenge_limit(user_plan, supabase)
-    current_challenge_count = get_user_challenge_participation_count(user_id, supabase)
-
-    # Check if user can create another challenge (None = unlimited)
-    if challenge_limit is not None and current_challenge_count >= challenge_limit:
-        plan_name = user_plan.capitalize()
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"{plan_name} plan allows only {challenge_limit} challenge(s). "
-            f"Complete or leave a challenge first to create a new one.",
-        )
-
-    # If keeping goal active, also check goal limit
-    if not data.archive_original_goal and goal.get("is_active"):
-        active_goal_limit = get_user_active_goal_limit(user_plan, supabase)
-        current_active_goals = get_active_personal_goals_count(user_id, supabase)
-        # The goal is already counted, so no additional check needed
-        # Just verify we're not going over if they were to keep the goal active
-
-    # Fetch the actionable plan for this goal (to make challenge self-contained)
-    # Table structure: id, goal_id, plan_type, structured_data (JSONB), status, error_message, generated_at
-    # structured_data contains: guidance, structure (with routine, schedule, progression, etc.)
-    actionable_plan_result = (
-        supabase.table("actionable_plans")
-        .select("plan_type, structured_data, status, error_message")
-        .eq("goal_id", goal_id)
-        .maybe_single()
-        .execute()
-    )
-    actionable_plan_data = None
-    if actionable_plan_result.data:
-        ap = actionable_plan_result.data
-        # Just pass plan_type and structured_data as-is - frontend handles the rest
-        actionable_plan_data = {
-            "status": ap.get("status"),
-            "plan_type": ap.get("plan_type"),
-            "structured_data": ap.get("structured_data"),
-            "error_message": ap.get("error_message"),
-        }
-
-    # Build challenge data
-    challenge_title = data.title or goal.get("title", "Challenge")
-    challenge_description = data.description or goal.get("description", "")
-
-    # Calculate duration and end date
-    duration_days = (
-        goal.get("challenge_duration_days") or goal.get("duration_days") or 30
-    )
-    end_date = data.start_date + timedelta(days=duration_days - 1)
-
-    # Validate target_checkins is achievable within duration
-    target_checkins = goal.get("target_checkins")
-    days_of_week = goal.get("days_of_week") or []
-    frequency = goal.get("frequency", "weekly")
-    reminder_times = goal.get("reminder_times") or ["07:00"]
-
-    if target_checkins and goal_type == "target_challenge":
-        # Calculate max possible check-ins in this duration
-        if frequency == "weekly" and days_of_week:
-            workout_days_per_week = len(days_of_week)
-            weeks = duration_days / 7
-            max_checkins = int(workout_days_per_week * weeks * len(reminder_times))
-        else:
-            # Daily frequency
-            max_checkins = duration_days * len(reminder_times)
-
-        if target_checkins > max_checkins:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Target of {target_checkins} check-ins is not achievable in {duration_days} days. "
-                f"Maximum possible: {max_checkins} check-ins with {len(days_of_week) or 7} workout days per week. "
-                f"Either reduce target or increase duration.",
-            )
-
-    # Determine challenge type
-    if goal_type == "time_challenge":
-        challenge_type = "streak"  # Time challenges focus on streaks
-    else:
-        challenge_type = "checkin_count"  # Target challenges count check-ins
-
-    # Build goal template (SELF-CONTAINED - no FK dependency on original goal)
-    goal_template = {
-        # Goal structure (copied, not referenced)
-        "goal_type": goal_type,
-        "category": goal.get("category"),
-        "frequency": goal.get("frequency"),
-        "target_days": goal.get("target_days"),
-        "days_of_week": goal.get("days_of_week"),
-        "target_checkins": goal.get("target_checkins"),
-        "duration_days": duration_days,
-        "reminder_times": goal.get("reminder_times"),
-        # The full actionable plan (self-contained)
-        "actionable_plan": actionable_plan_data,
-    }
-
-    # Create the challenge
-    challenge_data = {
-        "title": challenge_title,
-        "description": challenge_description,
-        "challenge_type": challenge_type,
-        "duration_days": duration_days,
-        "start_date": data.start_date.isoformat(),
-        "end_date": end_date.isoformat(),
-        "join_deadline": (data.join_deadline or data.start_date).isoformat(),
-        "is_public": data.is_public,
-        "is_active": True,
-        "max_participants": data.max_participants,
-        "created_by": user_id,
-        "goal_template": goal_template,
-        "metadata": {
-            "source": "shared_goal",
-            "created_at": date.today().isoformat(),
-        },
-    }
-
-    challenge_result = supabase.table("challenges").insert(challenge_data).execute()
-
-    if not challenge_result.data:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create challenge",
-        )
-
-    challenge = challenge_result.data[0]
-    challenge_id = challenge["id"]
-
-    # Handle the original goal based on user's choice
-    if data.archive_original_goal:
-        # Archive the goal - it cannot be reactivated
-        supabase.table("goals").update(
-            {
-                "is_active": False,
-                "archived_reason": "converted_to_challenge",
-                "converted_to_challenge_id": challenge_id,
-            }
-        ).eq("id", goal_id).execute()
-    else:
-        # Keep goal active, just mark it as having a linked challenge
-        supabase.table("goals").update(
-            {
-                "converted_to_challenge_id": challenge_id,
-            }
-        ).eq("id", goal_id).execute()
-
-    # Add creator as first participant (no goal_id - challenge is self-contained)
-    participant_data = {
-        "challenge_id": challenge_id,
-        "user_id": user_id,
-        "progress_data": {},
-        "points": 0,
-    }
-    supabase.table("challenge_participants").insert(participant_data).execute()
-
-    logger.info(
-        f"Goal {goal_id} shared as challenge {challenge_id} by user {user_id}",
-        {
-            "goal_id": goal_id,
-            "challenge_id": challenge_id,
-            "user_id": user_id,
-            "goal_type": goal_type,
-            "goal_archived": data.archive_original_goal,
-        },
-    )
-
-    return ShareAsChallengeResponse(
-        challenge_id=challenge_id,
-        goal_id=goal_id,
-        title=challenge_title,
-        start_date=data.start_date.isoformat(),
-        end_date=end_date.isoformat(),
-        join_deadline=(data.join_deadline or data.start_date).isoformat(),
-        is_public=data.is_public,
-        goal_archived=data.archive_original_goal,
-        message="Goal successfully shared as a challenge!"
-        + (" Your goal has been archived." if data.archive_original_goal else ""),
     )

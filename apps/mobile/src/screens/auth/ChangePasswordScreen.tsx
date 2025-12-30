@@ -41,7 +41,7 @@ export default function ChangePasswordScreen() {
 
     if (!currentPassword) {
       newErrors.currentPassword = t(
-        "auth.change_password.current_password_required"
+        "auth.change_password.current_password_required",
       );
     }
 
@@ -57,11 +57,11 @@ export default function ChangePasswordScreen() {
 
     if (!confirmPassword) {
       newErrors.confirmPassword = t(
-        "auth.change_password.confirm_password_required"
+        "auth.change_password.confirm_password_required",
       );
     } else if (newPassword !== confirmPassword) {
       newErrors.confirmPassword = t(
-        "auth.change_password.passwords_dont_match"
+        "auth.change_password.passwords_dont_match",
       );
     }
 
@@ -103,7 +103,7 @@ export default function ChangePasswordScreen() {
             setErrors((prev) => ({
               ...prev,
               currentPassword: t(
-                "auth.change_password.error_incorrect_password"
+                "auth.change_password.error_incorrect_password",
               ),
             }));
           } else {
@@ -115,7 +115,7 @@ export default function ChangePasswordScreen() {
             });
           }
         },
-      }
+      },
     );
   };
 
@@ -155,7 +155,7 @@ export default function ChangePasswordScreen() {
             <TextInput
               label={t("auth.change_password.current_password_label")}
               placeholder={t(
-                "auth.change_password.current_password_placeholder"
+                "auth.change_password.current_password_placeholder",
               )}
               value={currentPassword}
               onChangeText={(text) => {
@@ -192,7 +192,7 @@ export default function ChangePasswordScreen() {
             <TextInput
               label={t("auth.change_password.confirm_password_label")}
               placeholder={t(
-                "auth.change_password.confirm_password_placeholder"
+                "auth.change_password.confirm_password_placeholder",
               )}
               value={confirmPassword}
               onChangeText={(text) => {
@@ -231,7 +231,7 @@ export default function ChangePasswordScreen() {
 const makeChangePasswordScreenStyles = (
   tokens: any,
   colors: any,
-  brand: any
+  brand: any,
 ) => {
   return {
     container: {
@@ -265,7 +265,7 @@ const makeChangePasswordScreenStyles = (
       textAlign: "center" as const,
       lineHeight: lineHeight(
         tokens.typography.fontSize.base,
-        tokens.typography.lineHeight.relaxed
+        tokens.typography.lineHeight.relaxed,
       ),
       fontFamily: fontFamily.groteskRegular,
     },

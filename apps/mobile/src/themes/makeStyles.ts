@@ -1,18 +1,18 @@
-import { useMemo } from 'react';
-import { StyleSheet } from 'react-native';
-import { useTheme } from './provider';
-import { tokens, type Tokens } from './tokens';
+import { useMemo } from "react";
+import { StyleSheet } from "react-native";
+import { useTheme } from "./provider";
+import { tokens, type Tokens } from "./tokens";
 import {
   semanticLight,
   semanticDark,
   type SemanticColors,
-} from './semanticColors';
-import { type BrandColors } from './brandVariants';
+} from "./semanticColors";
+import { type BrandColors } from "./brandVariants";
 
 type MakeStylesFunction = (
   tokens: Tokens,
   colors: SemanticColors | typeof semanticLight | typeof semanticDark,
-  brand: BrandColors
+  brand: BrandColors,
 ) => any;
 
 const styleCache = new Map<string, any>();
@@ -26,21 +26,21 @@ const styleCache = new Map<string, any>();
  */
 export function makeStyles(
   stylesFn: MakeStylesFunction,
-  mode: 'light' | 'dark',
-  brand: 'buyer' | 'vendor',
-  brandColors: BrandColors
+  mode: "light" | "dark",
+  brand: "buyer" | "vendor",
+  brandColors: BrandColors,
 ) {
   const cacheKey = `${mode}-${brand}`;
 
   if (!styleCache.has(cacheKey)) {
-    const semanticColors = mode === 'light' ? semanticLight : semanticDark;
+    const semanticColors = mode === "light" ? semanticLight : semanticDark;
     const styles = stylesFn(tokens, semanticColors, brandColors);
     styleCache.set(cacheKey, StyleSheet.create(styles));
   }
 
   const styles = styleCache.get(cacheKey);
   if (!styles) {
-    throw new Error('Style cache error: styles should exist after being set');
+    throw new Error("Style cache error: styles should exist after being set");
   }
   return styles;
 }

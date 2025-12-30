@@ -15,16 +15,25 @@ from app.services.logger import logger
 
 class ProgressionAgent(BaseAgent[Dict[str, Any]]):
     """
-    Creates a 4-week progressive workout plan.
+    Creates a progressive workout plan based on goal type.
+
+    For HABITS (ongoing):
+    - No fixed duration, focus on streak-based milestones
+    - Provide general progression guidance
+
+    For TIME CHALLENGES:
+    - Dynamic weeks based on duration_days
+    - Progressive intensity across the full challenge
+
+    For TARGET CHALLENGES:
+    - Milestone-based (25%, 50%, 75%, 100%)
+    - No weekly structure - progress by check-in count
 
     Progression principles:
-    - Week 1: Foundation - Learn form, establish baseline
-    - Week 2: Building - Slight increase in volume/intensity
-    - Week 3: Challenge - Push harder, test limits
-    - Week 4: Peak/Deload - Either peak performance or recovery
-
-    For beginners: More gradual progression
-    For advanced: More aggressive progression
+    - First 25% of duration: Foundation phase
+    - Next 25%: Building phase
+    - Next 25%: Intensifying phase
+    - Final 25%: Peak/finish phase
     """
 
     MODEL = "gpt-4o-mini"
@@ -35,75 +44,76 @@ class ProgressionAgent(BaseAgent[Dict[str, Any]]):
     def system_prompt(self) -> str:
         return """You are an expert fitness coach that designs progressive workout programs.
 
-Your role is to create a 4-week progression plan that gradually increases difficulty while preventing injury and burnout.
+Your role is to create a progression plan based on the GOAL TYPE provided:
 
-PROGRESSION PRINCIPLES:
-
-By Fitness Level:
-- Beginner: Focus on form first, very gradual progression (+1-2 reps/week)
-- Intermediate: Moderate progression (+2-3 reps or +1 set/week)
-- Advanced: Aggressive progression, may include deload week
-- Athlete: Periodized approach with planned peaks
-
-Weekly Structure:
-- Week 1: Foundation - Establish baseline, focus on form
-- Week 2: Building - Small increase in reps or intensity
-- Week 3: Challenging - Push harder, increased volume
-- Week 4: Options:
-  - Beginner: Continue building
-  - Intermediate: Slight deload or maintain
-  - Advanced: Deload week (reduce volume 40-50%)
-
-REQUIRED OUTPUT FORMAT:
+=== HABIT GOALS (ongoing, no end date) ===
+For habits, focus on STREAK MILESTONES not weekly phases:
 {
   "progression": {
+    "goal_type": "habit",
+    "weekly_focus": "Build consistency through small daily wins",
+    "streak_milestones": [
+      {"days": 7, "title": "First Week!", "description": "You're building momentum!"},
+      {"days": 30, "title": "30-Day Streak!", "description": "Habit is forming!"},
+      {"days": 60, "title": "60-Day Streak!", "description": "This is part of you now!"},
+      {"days": 100, "title": "100 Days!", "description": "You've mastered this habit!"}
+    ]
+  }
+}
+DO NOT include weekly_adjustments for habits - they are ongoing!
+
+=== TIME CHALLENGES (specific duration) ===
+Generate DYNAMIC weeks based on challenge_duration_days:
+- Calculate num_weeks = ceil(duration_days / 7)
+- Generate exactly num_weeks entries in weekly_adjustments
+- Intensity progression: first 25% "light", next 25% "moderate", next 25% "moderate-high", final 25% "high"
+
+Example for 30-day challenge (5 weeks):
+{
+  "progression": {
+    "goal_type": "time_challenge",
     "current_week": 1,
-    "total_weeks": 4,
+    "total_weeks": 5,
+    "weekly_focus": "Week 1 focus here",
     "weekly_adjustments": [
-      {
-        "week": 1,
-        "intensity": "foundation",
-        "reps_modifier": 0,
-        "sets_modifier": 0,
-        "rest_modifier": 0,
-        "focus": "Learn proper form, establish baseline",
-        "tips": ["Focus on form over speed", "Don't push to failure"]
-      },
-      {
-        "week": 2,
-        "intensity": "building",
-        "reps_modifier": 2,
-        "sets_modifier": 0,
-        "rest_modifier": 0,
-        "focus": "Increase reps while maintaining form",
-        "tips": ["Add 2 reps to each set", "Maintain quality"]
-      },
-      {
-        "week": 3,
-        "intensity": "challenging",
-        "reps_modifier": 2,
-        "sets_modifier": 1,
-        "rest_modifier": -5,
-        "focus": "Push your limits, add a set",
-        "tips": ["This week is meant to challenge you", "Rest if needed"]
-      },
-      {
-        "week": 4,
-        "intensity": "peak",
-        "reps_modifier": 4,
-        "sets_modifier": 1,
-        "rest_modifier": -10,
-        "focus": "Peak performance week",
-        "tips": ["Give it your all", "Celebrate your progress"]
-      }
-    ],
-    "weekly_focus": "Focus on building consistency and proper form"
+      {"week": 1, "intensity": "light", "focus": "...", "reps_modifier": 0, "sets_modifier": 0, "rest_modifier": 0},
+      {"week": 2, "intensity": "moderate", "focus": "...", "reps_modifier": 1, "sets_modifier": 0, "rest_modifier": 0},
+      {"week": 3, "intensity": "moderate-high", "focus": "...", "reps_modifier": 2, "sets_modifier": 0, "rest_modifier": -5},
+      {"week": 4, "intensity": "high", "focus": "...", "reps_modifier": 2, "sets_modifier": 1, "rest_modifier": -5},
+      {"week": 5, "intensity": "high", "focus": "Final push!", "reps_modifier": 3, "sets_modifier": 1, "rest_modifier": -10}
+    ]
   }
 }
 
+=== TARGET CHALLENGES (check-in based) ===
+For target challenges, progress is by COUNT not TIME:
+{
+  "progression": {
+    "goal_type": "target_challenge",
+    "target_checkins": 50,
+    "milestones": [
+      {"count": 13, "percent": 25, "title": "25% Complete", "description": "Great start!"},
+      {"count": 25, "percent": 50, "title": "Halfway!", "description": "Keep pushing!"},
+      {"count": 38, "percent": 75, "title": "75% Done!", "description": "Almost there!"},
+      {"count": 50, "percent": 100, "title": "Challenge Complete!", "description": "You did it!"}
+    ]
+  }
+}
+DO NOT include weekly_adjustments for target challenges!
+
+PROGRESSION BY FITNESS LEVEL:
+- Beginner: Very gradual (+1-2 reps/week), focus on form
+- Intermediate: Moderate (+2-3 reps or +1 set every 2 weeks)
+- Advanced: Aggressive, may include deload weeks
+- Athlete: Periodized with planned peaks
+
+BIOLOGICAL SEX CONSIDERATIONS (when provided):
+- Adjust intensity expectations appropriately
+- Consider recovery time differences
+
 Modifiers explanation:
-- reps_modifier: Add this many reps to each set (can be negative for deload)
-- sets_modifier: Add this many sets to each exercise (can be negative for deload)
+- reps_modifier: Add this many reps to each set
+- sets_modifier: Add this many sets to each exercise
 - rest_modifier: Adjust rest time in seconds (negative = less rest = harder)"""
 
     def build_user_prompt(self, context: Dict[str, Any]) -> str:
@@ -114,41 +124,70 @@ Modifiers explanation:
         settings = context.get("settings", {})
         selected_exercises = context.get("selected_exercises", [])
 
-        # Check if this is a challenge with specific duration
+        # Determine goal type and duration
         goal_type = goal.get("goal_type", "habit")
         challenge_duration = goal.get("challenge_duration_days")
+        target_checkins = goal.get("target_checkins")
 
-        prompt = f"""Create a 4-week progression plan for this workout:
+        # Calculate number of weeks for time challenges
+        num_weeks = None
+        if goal_type == "time_challenge" and challenge_duration:
+            num_weeks = (challenge_duration + 6) // 7  # Round up
+
+        # Build goal type specific instructions
+        if goal_type == "habit":
+            type_instruction = """
+⚠️ This is a HABIT (ongoing, no end date).
+Generate STREAK MILESTONES, not weekly_adjustments.
+Focus on celebrating consistency: 7 days, 30 days, 60 days, 100 days."""
+        elif goal_type == "time_challenge":
+            type_instruction = f"""
+⚠️ This is a TIME CHALLENGE with {challenge_duration} days ({num_weeks} weeks).
+Generate exactly {num_weeks} weeks of weekly_adjustments.
+Intensity should progress: light → moderate → moderate-high → high across {num_weeks} weeks."""
+        elif goal_type == "target_challenge":
+            type_instruction = f"""
+⚠️ This is a TARGET CHALLENGE with {target_checkins} check-ins to complete.
+Generate milestones at 25%, 50%, 75%, 100% of {target_checkins}.
+DO NOT include weekly_adjustments - progress is by check-in count."""
+        else:
+            type_instruction = "Generate a standard 4-week progression plan."
+
+        prompt = f"""Create a progression plan for this workout:
 
 GOAL:
 - Title: {goal.get("title", "Workout")}
 - Type: {goal_type}
 - Primary Goal: {user_profile.get("primary_goal", "general_fitness")}
-{f"- Challenge Duration: {challenge_duration} days" if challenge_duration else ""}
+{f"- Challenge Duration: {challenge_duration} days ({num_weeks} weeks)" if challenge_duration else ""}
+{f"- Target Check-ins: {target_checkins}" if target_checkins else ""}
+
+{type_instruction}
 
 USER PROFILE:
 - Fitness Level: {user_profile.get("fitness_level", "beginner")}
 - Current Exercise Frequency: {user_profile.get("current_frequency", "never")}
 - Biggest Challenge: {user_profile.get("biggest_challenge", "staying_consistent")}
+- Biological Sex: {user_profile.get("biological_sex", "not specified")}
 
 CURRENT WORKOUT BASELINE:
 - Default sets per exercise: {settings.get("default_sets", 3)}
 - Exercises in workout: {len(selected_exercises)}
 
-Design a 4-week progression that:
-1. Starts at an appropriate level for a {user_profile.get("fitness_level", "beginner")}
-2. Gradually increases difficulty without causing burnout
-3. Addresses their challenge of: {user_profile.get("biggest_challenge", "staying_consistent")}
-4. Includes weekly focus areas and tips
+Design a progression that:
+1. Matches the GOAL TYPE above (habit/time_challenge/target_challenge)
+2. Starts at an appropriate level for a {user_profile.get("fitness_level", "beginner")}
+3. Gradually increases difficulty without causing burnout
+4. Addresses their challenge of: {user_profile.get("biggest_challenge", "staying_consistent")}
 
 {"For a beginner, be very conservative with progression. Focus on consistency over intensity." if user_profile.get("fitness_level") == "beginner" else ""}
 
-Return the progression plan in the JSON format specified."""
+Return the progression plan in the JSON format specified for this goal type."""
 
         return prompt
 
     def validate_output(self, output: Dict[str, Any]) -> bool:
-        """Validate the progression plan output."""
+        """Validate the progression plan output based on goal type."""
 
         if not output:
             return False
@@ -159,28 +198,49 @@ Return the progression plan in the JSON format specified."""
             logger.warning("ProgressionAgent: No progression in output")
             return False
 
-        # Check for weekly_adjustments
-        weekly_adjustments = progression.get("weekly_adjustments", [])
-        if not weekly_adjustments or not isinstance(weekly_adjustments, list):
-            logger.warning("ProgressionAgent: No weekly_adjustments")
+        goal_type = progression.get("goal_type", "habit")
+
+        # Validate based on goal type
+        if goal_type == "habit":
+            # Habits should have streak_milestones
+            streak_milestones = progression.get("streak_milestones", [])
+            if streak_milestones and isinstance(streak_milestones, list):
+                return True
+            # Fallback: also accept weekly_focus for simpler habit plans
+            if progression.get("weekly_focus"):
+                return True
+            logger.warning("ProgressionAgent: Habit missing streak_milestones")
             return False
 
-        # Should have at least 4 weeks
-        if len(weekly_adjustments) < 4:
-            logger.warning(
-                f"ProgressionAgent: Only {len(weekly_adjustments)} weeks, need 4"
-            )
-            return False
+        elif goal_type == "target_challenge":
+            # Target challenges should have milestones
+            milestones = progression.get("milestones", [])
+            if not milestones or not isinstance(milestones, list):
+                logger.warning("ProgressionAgent: Target challenge missing milestones")
+                return False
+            return True
 
-        # Validate each week has required fields
-        required_fields = ["week", "intensity", "focus"]
-        for week in weekly_adjustments:
-            for field in required_fields:
-                if field not in week:
-                    logger.warning(f"ProgressionAgent: Week missing field: {field}")
-                    return False
+        else:
+            # Time challenge or default: validate weekly_adjustments
+            weekly_adjustments = progression.get("weekly_adjustments", [])
+            if not weekly_adjustments or not isinstance(weekly_adjustments, list):
+                logger.warning("ProgressionAgent: No weekly_adjustments")
+                return False
 
-        return True
+            # Should have at least 1 week
+            if len(weekly_adjustments) < 1:
+                logger.warning("ProgressionAgent: No weeks in weekly_adjustments")
+                return False
+
+            # Validate each week has required fields
+            required_fields = ["week", "intensity", "focus"]
+            for week in weekly_adjustments:
+                for field in required_fields:
+                    if field not in week:
+                        logger.warning(f"ProgressionAgent: Week missing field: {field}")
+                        return False
+
+            return True
 
     def get_fallback_output(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """Return fallback progression when planning fails."""
@@ -201,7 +261,7 @@ Return the progression plan in the JSON format specified."""
                         "tips": [
                             "Don't worry about speed - quality matters more",
                             "Stop if you feel pain (discomfort is okay)",
-                            "Watch the demo GIFs before each exercise",
+                            "Watch the demo videos before each exercise",
                         ],
                     },
                     {

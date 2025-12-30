@@ -1,5 +1,6 @@
 import AILoadingAnimation from "@/components/onboarding/AILoadingAnimation";
 import Button from "@/components/ui/Button";
+import { ActionSheet } from "@/components/ui/ActionSheet";
 import { useAlertModal } from "@/contexts/AlertModalContext";
 import {
   useRegenerateSuggestedGoals,
@@ -39,12 +40,14 @@ const requiresPremium = (type: GoalTypeOption): boolean => {
 
 interface AISuggestionsViewProps {
   onUseSuggestion: (goal: SuggestedGoal) => void;
+  onUseAsChallenge?: (goal: SuggestedGoal) => void;
   onSwitchToCustom?: () => void;
   goalType?: "habit" | "time_challenge" | "target_challenge" | "mixed";
 }
 
 export function AISuggestionsView({
   onUseSuggestion,
+  onUseAsChallenge,
   onSwitchToCustom,
   goalType = "habit",
 }: AISuggestionsViewProps) {
@@ -54,6 +57,10 @@ export function AISuggestionsView({
   const { showAlert, showConfirm } = useAlertModal();
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
   const [showGoalTypeSelector, setShowGoalTypeSelector] = useState(false);
+  const [showCreateTypeActionSheet, setShowCreateTypeActionSheet] =
+    useState(false);
+  const [pendingSuggestion, setPendingSuggestion] =
+    useState<SuggestedGoal | null>(null);
 
   // Get subscription store for feature checks
   const subscriptionStoreInstance = useSubscriptionStore();
@@ -65,7 +72,7 @@ export function AISuggestionsView({
 
   // Default to "mixed" for all users during testing
   const [selectedGoalType, setSelectedGoalType] = useState<GoalTypeOption>(
-    hasPremiumAccess ? "mixed" : "habit"
+    hasPremiumAccess ? "mixed" : "habit",
   );
 
   const statusQuery = useSuggestedGoalsStatus(true);
@@ -78,7 +85,7 @@ export function AISuggestionsView({
   // Free users: feature_value = 2 (2 total generations)
   // Starter+: feature_value = null (unlimited)
   const generationLimit = subscriptionStoreInstance.getFeatureValue(
-    "ai_goal_generations"
+    "ai_goal_generations",
   );
 
   const statusData = statusQuery.data;
@@ -232,7 +239,6 @@ export function AISuggestionsView({
                   style={[
                     styles.typeOption,
                     isSelected && styles.typeOptionSelected,
-                    isLocked && styles.typeOptionLocked,
                   ]}
                   onPress={() => handleGoalTypeSelect(option.id)}
                   activeOpacity={0.7}
@@ -241,31 +247,23 @@ export function AISuggestionsView({
                     name={option.icon}
                     size={24}
                     color={
-                      isSelected
-                        ? brandColors.primary
-                        : isLocked
-                          ? colors.text.tertiary
-                          : colors.text.secondary
+                      isSelected ? brandColors.primary : colors.text.secondary
                     }
                   />
                   <Text
                     style={[
                       styles.typeOptionLabel,
                       isSelected && styles.typeOptionLabelSelected,
-                      isLocked && styles.typeOptionLabelLocked,
                     ]}
                   >
                     {t(`goals.types.${option.id}.title`) || option.id}
                   </Text>
                   {isLocked && (
-                    <Ionicons
-                      name="lock-closed"
-                      size={14}
-                      color={colors.text.tertiary}
-                      style={styles.lockIcon}
-                    />
+                    <View style={styles.proBadge}>
+                      <Text style={styles.proBadgeText}>PRO</Text>
+                    </View>
                   )}
-                  {isSelected && !isLocked && (
+                  {isSelected && (
                     <Ionicons
                       name="checkmark-circle"
                       size={20}
@@ -416,13 +414,65 @@ export function AISuggestionsView({
             <SuggestionGoalCard
               key={goal.id}
               goal={goal}
-              onUseThis={onUseSuggestion}
+              onUseThis={(selectedGoal) => {
+                // If challenge callback exists, show ActionSheet to choose
+                if (onUseAsChallenge) {
+                  setPendingSuggestion(selectedGoal);
+                  setShowCreateTypeActionSheet(true);
+                } else {
+                  // No challenge option, go straight to goal
+                  onUseSuggestion(selectedGoal);
+                }
+              }}
             />
           ))}
         </ScrollView>
 
         {/* Goal Type Selector Modal */}
         {renderGoalTypeSelector()}
+
+        {/* Create Type ActionSheet - Goal or Challenge */}
+        <ActionSheet
+          visible={showCreateTypeActionSheet}
+          title={t("goals.create.choose_type") || "Create as..."}
+          options={[
+            {
+              id: "goal",
+              label: t("goals.create.as_goal") || "Personal Goal",
+              icon: "flag-outline",
+              onPress: () => {
+                if (pendingSuggestion) {
+                  onUseSuggestion(pendingSuggestion);
+                }
+                setShowCreateTypeActionSheet(false);
+                setPendingSuggestion(null);
+              },
+            },
+            {
+              id: "challenge",
+              label: t("goals.create.as_challenge") || "Social Challenge",
+              icon: "trophy-outline",
+              badge: !hasPremiumAccess ? "PRO" : undefined,
+              onPress: () => {
+                if (!hasPremiumAccess) {
+                  setShowCreateTypeActionSheet(false);
+                  setPendingSuggestion(null);
+                  setShowSubscriptionModal(true);
+                  return;
+                }
+                if (pendingSuggestion && onUseAsChallenge) {
+                  onUseAsChallenge(pendingSuggestion);
+                }
+                setShowCreateTypeActionSheet(false);
+                setPendingSuggestion(null);
+              },
+            },
+          ]}
+          onClose={() => {
+            setShowCreateTypeActionSheet(false);
+            setPendingSuggestion(null);
+          }}
+        />
 
         {/* Subscription Modal */}
         <SubscriptionScreen
@@ -664,6 +714,18 @@ const makeAISuggestionsViewStyles = (tokens: any, colors: any, brand: any) => ({
   },
   lockIcon: {
     marginLeft: "auto" as const,
+  },
+  proBadge: {
+    backgroundColor: brand.gradient?.start || "#8B5CF6",
+    paddingHorizontal: toRN(tokens.spacing[2]),
+    paddingVertical: toRN(2),
+    borderRadius: toRN(tokens.borderRadius.sm),
+    marginLeft: "auto" as const,
+  },
+  proBadgeText: {
+    fontSize: toRN(tokens.typography.fontSize.xs),
+    fontFamily: fontFamily.bold,
+    color: "#FFFFFF",
   },
   checkIcon: {
     marginLeft: "auto" as const,

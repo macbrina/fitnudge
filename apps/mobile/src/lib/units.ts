@@ -35,7 +35,7 @@ export const toRN = (v: number | string): number => {
  */
 export const getLineHeight = (
   fontSize: number | string,
-  lineHeightMultiplier: number | string
+  lineHeightMultiplier: number | string,
 ): number => {
   const fontSizePx = toRN(fontSize);
   const multiplier = parseFloat(String(lineHeightMultiplier));

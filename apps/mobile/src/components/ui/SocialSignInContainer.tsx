@@ -21,7 +21,7 @@ interface SocialSignInContainerProps {
 const makeSocialSignInContainerStyles = (
   tokens: any,
   colors: any,
-  brandColors: any
+  brandColors: any,
 ) => {
   return {
     container: {

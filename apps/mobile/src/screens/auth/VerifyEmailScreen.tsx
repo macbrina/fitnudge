@@ -46,7 +46,7 @@ const makeVerifyEmailScreenStyles = (tokens: any, colors: any, brand: any) => ({
     textAlign: "center" as const,
     lineHeight: lineHeight(
       tokens.typography.fontSize.base,
-      tokens.typography.lineHeight.relaxed
+      tokens.typography.lineHeight.relaxed,
     ),
     fontFamily: fontFamily.groteskRegular,
   },
@@ -241,7 +241,7 @@ export default function VerifyEmailScreen() {
 
     try {
       const response = await resendVerificationMutation.mutateAsync(
-        user?.email
+        user?.email,
       );
 
       if (response.data) {

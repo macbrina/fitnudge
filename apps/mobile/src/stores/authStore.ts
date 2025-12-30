@@ -4,6 +4,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { TokenManager } from "@/services/api/base";
 import { authService } from "@/services/api/auth";
 import { notificationService } from "@/services/notifications/notificationService";
+import { clearQueryCache } from "@/lib/queryClient";
 
 interface User {
   id: string;
@@ -16,6 +17,9 @@ interface User {
   auth_provider: string;
   created_at: string;
   linked_providers?: string[];
+  profile_picture_url?: string;
+  country?: string;
+  language?: string;
 }
 
 export type LogoutReason = "not_found" | "disabled" | "suspended" | null;
@@ -35,7 +39,7 @@ interface AuthActions {
   login: (
     user: User,
     accessToken: string,
-    refreshToken: string
+    refreshToken: string,
   ) => Promise<void>;
   logout: (reason?: LogoutReason) => Promise<boolean>;
   updateUser: (user: Partial<User>) => void;
@@ -90,6 +94,9 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         // Clear tokens from cache immediately
         await TokenManager.clearTokens();
 
+        // Clear React Query cache to prevent data leakage between users
+        clearQueryCache();
+
         let success = false;
 
         try {
@@ -101,7 +108,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
             } catch (notificationError) {
               console.warn(
                 "[AuthStore] Failed to unregister device during logout:",
-                notificationError
+                notificationError,
               );
             }
 
@@ -113,7 +120,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
               success = true;
             } else {
               console.warn(
-                `[AuthStore] Logout request returned status ${response.status}: ${response.error}`
+                `[AuthStore] Logout request returned status ${response.status}: ${response.error}`,
               );
             }
           }
@@ -126,7 +133,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           } catch (tokenError) {
             console.warn(
               "[AuthStore] Failed to clear remember me during logout:",
-              tokenError
+              tokenError,
             );
           }
 
@@ -170,6 +177,6 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         isAuthenticated: state.isAuthenticated,
         logoutReason: state.logoutReason,
       }),
-    }
-  )
+    },
+  ),
 );

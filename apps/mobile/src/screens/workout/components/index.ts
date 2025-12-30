@@ -1,6 +1,5 @@
 export { TimerRing } from "./TimerRing";
 export { ExerciseDisplay } from "./ExerciseDisplay";
-export { WorkoutComplete } from "./WorkoutComplete";
 export { ReadyCountdown } from "./ReadyCountdown";
 export { ExerciseCountdown } from "./ExerciseCountdown";
 export { RestScreen } from "./RestScreen";
@@ -9,3 +8,11 @@ export { QuitFeedback } from "./QuitFeedback";
 export { LandscapeWorkoutView } from "./LandscapeWorkoutView";
 export { MusicVoiceModal } from "./MusicVoiceModal";
 export { PlaylistModal } from "./PlaylistModal";
+export { AchievementUnlockedScreen } from "./AchievementUnlockedScreen";
+export { StreakScreen } from "./StreakScreen";
+export { WorkoutSummaryScreen } from "./WorkoutSummaryScreen";
+export { WorkoutReflectionScreen } from "./WorkoutReflectionScreen";
+export type { WorkoutReflectionData } from "./WorkoutReflectionScreen";
+export { CompletionFlow } from "./CompletionFlow";
+export type { CompletionData } from "./CompletionFlow";
+export { WorkoutCompletingScreen } from "./WorkoutCompletingScreen";

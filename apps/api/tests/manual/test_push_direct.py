@@ -74,7 +74,7 @@ async def test_push_notifications():
                 body="If you see this, the backend task will work!",
                 data={
                     "type": "test",
-                    "deepLink": "/home",
+                    "deepLink": "/(user)/(tabs)",
                 },
                 notification_type="achievement",
             )

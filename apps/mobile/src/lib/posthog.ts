@@ -12,7 +12,7 @@ const POSTHOG_HOST =
 
 if (!POSTHOG_API_KEY) {
   console.warn(
-    "PostHog API key not found. PostHog analytics will be disabled."
+    "PostHog API key not found. PostHog analytics will be disabled.",
   );
 }
 
@@ -26,7 +26,7 @@ export const posthog = new PostHog(POSTHOG_API_KEY || "phc_disabled", {
 // Helper function to identify users
 export const identifyUser = (
   userId: string,
-  userProperties?: Record<string, any>
+  userProperties?: Record<string, any>,
 ) => {
   if (posthog) {
     posthog.identify(userId, userProperties);
@@ -43,7 +43,7 @@ export const resetUser = () => {
 // Helper function to capture events
 export const captureEvent = (
   eventName: string,
-  properties?: Record<string, any>
+  properties?: Record<string, any>,
 ) => {
   if (posthog) {
     posthog.capture(eventName, properties);

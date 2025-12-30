@@ -4,66 +4,53 @@ import { useTranslation } from "@/lib/i18n";
 import { fontFamily } from "@/lib/fonts";
 import { toRN } from "@/lib/units";
 import { useStyles } from "@/themes/makeStyles";
-import { tokens, lineHeight } from "@/themes/tokens";
+import { lineHeight } from "@/themes/tokens";
 import { useTheme } from "@/themes";
 import PersonalizationLayout from "./PersonalizationLayout";
 import { useOnboardingStore } from "@/stores/onboardingStore";
-import { Card } from "@/components/ui/Card";
 
 interface PrimaryGoalScreenProps {
   onContinue: (primaryGoal: string) => void;
   onBack?: () => void;
+  currentStep: number;
+  totalSteps: number;
 }
 
 const PRIMARY_GOALS = [
   {
     id: "lose_weight",
-    title: "onboarding.personalization.primary_goal.lose_weight.title",
-    description:
-      "onboarding.personalization.primary_goal.lose_weight.description",
-    icon: "⚖️",
+    label: "onboarding.personalization.primary_goal.lose_weight.title",
   },
   {
     id: "build_muscle",
-    title: "onboarding.personalization.primary_goal.build_muscle.title",
-    description:
-      "onboarding.personalization.primary_goal.build_muscle.description",
-    icon: "💪",
+    label: "onboarding.personalization.primary_goal.build_muscle.title",
   },
   {
     id: "stay_active",
-    title: "onboarding.personalization.primary_goal.stay_active.title",
-    description:
-      "onboarding.personalization.primary_goal.stay_active.description",
-    icon: "🏃",
+    label: "onboarding.personalization.primary_goal.stay_active.title",
   },
   {
     id: "general_fitness",
-    title: "onboarding.personalization.primary_goal.general_fitness.title",
-    description:
-      "onboarding.personalization.primary_goal.general_fitness.description",
-    icon: "🌟",
+    label: "onboarding.personalization.primary_goal.general_fitness.title",
   },
   {
     id: "sport_specific",
-    title: "onboarding.personalization.primary_goal.sport_specific.title",
-    description:
-      "onboarding.personalization.primary_goal.sport_specific.description",
-    icon: "🏅",
+    label: "onboarding.personalization.primary_goal.sport_specific.title",
   },
 ];
 
 export default function PrimaryGoalScreen({
   onContinue,
   onBack,
+  currentStep,
+  totalSteps,
 }: PrimaryGoalScreenProps) {
   const { primary_goal } = useOnboardingStore();
   const [selectedGoal, setSelectedGoal] = useState<string>(primary_goal || "");
   const { t } = useTranslation();
-  const styles = useStyles(makePrimaryGoalScreenStyles);
-  const { colors, brand } = useTheme();
+  const styles = useStyles(makeStyles);
+  const { brandColors } = useTheme();
 
-  // Sync with store when component mounts or store value changes
   useEffect(() => {
     setSelectedGoal(primary_goal || "");
   }, [primary_goal]);
@@ -76,8 +63,8 @@ export default function PrimaryGoalScreen({
 
   return (
     <PersonalizationLayout
-      currentStep={3}
-      totalSteps={8}
+      currentStep={currentStep}
+      totalSteps={totalSteps}
       onContinue={handleContinue}
       onBack={onBack}
       canContinue={!!selectedGoal}
@@ -98,46 +85,26 @@ export default function PrimaryGoalScreen({
               <TouchableOpacity
                 key={goal.id}
                 onPress={() => setSelectedGoal(goal.id)}
-                style={styles.optionCardTouchable}
                 activeOpacity={0.7}
+                style={[
+                  styles.optionCard,
+                  isSelected && [
+                    styles.optionCardSelected,
+                    { borderColor: brandColors.primary },
+                  ],
+                ]}
               >
-                <Card
-                  padded={false}
-                  shadow={isSelected ? "xl" : "md"}
+                <Text
                   style={[
-                    styles.optionCard,
-                    isSelected && styles.optionCardSelected,
+                    styles.optionLabel,
+                    isSelected && [
+                      styles.optionLabelSelected,
+                      { color: brandColors.primary },
+                    ],
                   ]}
                 >
-                  <View style={styles.optionRow}>
-                    <View
-                      style={[
-                        styles.iconContainer,
-                        isSelected && styles.iconContainerSelected,
-                      ]}
-                    >
-                      <Text style={styles.optionIcon}>{goal.icon}</Text>
-                    </View>
-                    <View style={styles.textContainer}>
-                      <Text
-                        style={[
-                          styles.optionTitle,
-                          isSelected && styles.optionTitleSelected,
-                        ]}
-                      >
-                        {t(goal.title)}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.optionDescription,
-                          isSelected && styles.optionDescriptionSelected,
-                        ]}
-                      >
-                        {t(goal.description)}
-                      </Text>
-                    </View>
-                  </View>
-                </Card>
+                  {t(goal.label)}
+                </Text>
               </TouchableOpacity>
             );
           })}
@@ -147,101 +114,53 @@ export default function PrimaryGoalScreen({
   );
 }
 
-const makePrimaryGoalScreenStyles = (tokens: any, colors: any, brand: any) => {
+const makeStyles = (tokens: any, colors: any, brand: any) => {
   return {
     content: {
       flex: 1,
-      paddingTop: toRN(tokens.spacing[4]),
+      paddingTop: toRN(tokens.spacing[2]),
     },
     title: {
-      fontSize: toRN(tokens.typography.fontSize["3xl"]),
+      fontSize: toRN(tokens.typography.fontSize["2xl"]),
       fontWeight: tokens.typography.fontWeight.bold,
       color: colors.text.primary,
-      textAlign: "center" as const,
-      marginBottom: toRN(tokens.spacing[3]),
+      marginBottom: toRN(tokens.spacing[2]),
       fontFamily: fontFamily.groteskBold,
       lineHeight: lineHeight(
-        tokens.typography.fontSize["3xl"],
-        tokens.typography.lineHeight.tight
+        tokens.typography.fontSize["2xl"],
+        tokens.typography.lineHeight.tight,
       ),
     },
     subtitle: {
       fontSize: toRN(tokens.typography.fontSize.base),
       color: colors.text.secondary,
-      textAlign: "center" as const,
-      marginBottom: toRN(tokens.spacing[10]),
+      marginBottom: toRN(tokens.spacing[6]),
       fontFamily: fontFamily.groteskRegular,
       lineHeight: lineHeight(
         tokens.typography.fontSize.base,
-        tokens.typography.lineHeight.relaxed
+        tokens.typography.lineHeight.relaxed,
       ),
-      paddingHorizontal: toRN(tokens.spacing[4]),
     },
     optionsContainer: {
-      gap: toRN(tokens.spacing[4]),
-      marginBottom: toRN(tokens.spacing[6]),
-    },
-    optionCardTouchable: {
-      borderRadius: toRN(tokens.borderRadius.xl),
+      gap: toRN(tokens.spacing[3]),
     },
     optionCard: {
-      padding: toRN(tokens.spacing[5]),
-    },
-    optionRow: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
+      backgroundColor: colors.bg.muted,
+      borderRadius: toRN(tokens.borderRadius.xl),
+      paddingVertical: toRN(tokens.spacing[5]),
+      paddingHorizontal: toRN(tokens.spacing[5]),
+      borderWidth: 2,
+      borderColor: colors.border.subtle,
     },
     optionCardSelected: {
-      borderColor: brand.primary,
       backgroundColor: brand.primary + "08",
-      borderWidth: 2,
-      borderRadius: toRN(tokens.borderRadius.xl),
     },
-    iconContainer: {
-      width: 64,
-      height: 64,
-      borderRadius: 32,
-      backgroundColor: colors.bg.muted,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-      marginRight: toRN(tokens.spacing[4]),
-      flexShrink: 0,
-    },
-    iconContainerSelected: {
-      backgroundColor: brand.primary + "15",
-    },
-    optionIcon: {
-      fontSize: 32,
-    },
-    textContainer: {
-      flex: 1,
-      justifyContent: "center" as const,
-    },
-    optionTitle: {
+    optionLabel: {
       fontSize: toRN(tokens.typography.fontSize.lg),
       fontWeight: tokens.typography.fontWeight.semibold,
       color: colors.text.primary,
-      marginBottom: toRN(tokens.spacing[1]),
       fontFamily: fontFamily.groteskSemiBold,
-      lineHeight: lineHeight(
-        tokens.typography.fontSize.lg,
-        tokens.typography.lineHeight.normal
-      ),
     },
-    optionTitleSelected: {
-      color: brand.primary,
-    },
-    optionDescription: {
-      fontSize: toRN(tokens.typography.fontSize.sm),
-      color: colors.text.secondary,
-      fontFamily: fontFamily.groteskRegular,
-      lineHeight: lineHeight(
-        tokens.typography.fontSize.sm,
-        tokens.typography.lineHeight.relaxed
-      ),
-    },
-    optionDescriptionSelected: {
-      color: brand.primary + "DD",
-    },
+    optionLabelSelected: {},
   };
 };

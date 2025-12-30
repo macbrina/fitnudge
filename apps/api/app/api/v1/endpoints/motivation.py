@@ -66,7 +66,7 @@ async def generate_motivation(
                 supabase.table("check_ins")
                 .select("*")
                 .eq("goal_id", motivation_data.goal_id)
-                .order("date", desc=True)
+                .order("check_in_date", desc=True)
                 .limit(7)
                 .execute()
             )

@@ -1,7 +1,7 @@
 import { useAlertModal } from "@/contexts/AlertModalContext";
 import { fontFamily } from "@/lib/fonts";
 import { toRN } from "@/lib/units";
-import { notificationApi } from "@/services/api/notifications";
+import { notificationsService } from "@/services/api/notifications";
 import { notificationService } from "@/services/notifications/notificationService";
 import { NotificationPreferences } from "@/services/notifications/notificationTypes";
 import { useStyles } from "@/themes/makeStyles";
@@ -16,16 +16,25 @@ export const NotificationSettingsScreen: React.FC = () => {
 
   const [preferences, setPreferences] = useState<NotificationPreferences>({
     enabled: true,
-    aiMotivation: true,
+    ai_motivation: true,
     reminders: true,
     social: true,
     achievements: true,
     reengagement: true,
-    quietHours: {
-      enabled: false,
-      start: "22:00",
-      end: "08:00",
-    },
+    quiet_hours_enabled: false,
+    quiet_hours_start: "22:00",
+    quiet_hours_end: "08:00",
+    social_partner_requests: true,
+    social_partner_nudges: true,
+    social_partner_cheers: true,
+    social_partner_milestones: true,
+    social_challenge_invites: true,
+    social_challenge_leaderboard: true,
+    social_challenge_nudges: true,
+    social_challenge_reminders: true,
+    social_motivation_messages: true,
+    push_notifications: true,
+    email_notifications: true,
   });
 
   const [isLoading, setIsLoading] = useState(false);
@@ -45,7 +54,7 @@ export const NotificationSettingsScreen: React.FC = () => {
 
   const updatePreference = async (
     key: keyof NotificationPreferences,
-    value: any
+    value: any,
   ) => {
     try {
       const newPreferences = { ...preferences, [key]: value };
@@ -60,11 +69,21 @@ export const NotificationSettingsScreen: React.FC = () => {
 
   const updateQuietHours = async (
     key: "enabled" | "start" | "end",
-    value: any
+    value: any,
   ) => {
     try {
-      const newQuietHours = { ...preferences.quietHours, [key]: value };
-      const newPreferences = { ...preferences, quietHours: newQuietHours };
+      // Map key to the correct flat field name
+      const fieldMap = {
+        enabled: "quiet_hours_enabled",
+        start: "quiet_hours_start",
+        end: "quiet_hours_end",
+      } as const;
+
+      const fieldName = fieldMap[key];
+      const newPreferences = {
+        ...preferences,
+        [fieldName]: value,
+      };
       setPreferences(newPreferences);
       await notificationService.updateNotificationPreferences(newPreferences);
     } catch (error) {
@@ -73,37 +92,11 @@ export const NotificationSettingsScreen: React.FC = () => {
     }
   };
 
-  const sendTestNotification = async () => {
-    try {
-      setIsLoading(true);
-      await notificationApi.sendTestNotification("ai_motivation", {
-        goalId: "test",
-        message: "This is a test notification from FitNudge!",
-      });
-      showToast({
-        title: t("notifications.settings.test_sent"),
-        message: "Check your notification panel to see the test notification.",
-        variant: "success",
-        duration: 2000,
-      });
-    } catch (error) {
-      console.error("Failed to send test notification:", error);
-      await showAlert({
-        title: t("common.error"),
-        message: t("notifications.settings.test_failed"),
-        variant: "error",
-        confirmLabel: t("common.ok"),
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const renderToggle = (
     label: string,
     value: boolean,
     onValueChange: (value: boolean) => void,
-    disabled?: boolean
+    disabled?: boolean,
   ) => (
     <View style={styles.toggleRow}>
       <Text style={[styles.toggleLabel, disabled && styles.disabledText]}>
@@ -137,7 +130,7 @@ export const NotificationSettingsScreen: React.FC = () => {
         {renderToggle(
           t("notifications.settings.master_toggle"),
           preferences.enabled,
-          (value) => updatePreference("enabled", value)
+          (value) => updatePreference("enabled", value),
         )}
       </View>
 
@@ -149,37 +142,37 @@ export const NotificationSettingsScreen: React.FC = () => {
 
             {renderToggle(
               t("notifications.settings.categories.ai_motivation"),
-              preferences.aiMotivation,
-              (value) => updatePreference("aiMotivation", value),
-              !preferences.enabled
+              preferences.ai_motivation,
+              (value) => updatePreference("ai_motivation", value),
+              !preferences.enabled,
             )}
 
             {renderToggle(
               t("notifications.settings.categories.reminders"),
               preferences.reminders,
               (value) => updatePreference("reminders", value),
-              !preferences.enabled
+              !preferences.enabled,
             )}
 
             {renderToggle(
               t("notifications.settings.categories.social"),
               preferences.social,
               (value) => updatePreference("social", value),
-              !preferences.enabled
+              !preferences.enabled,
             )}
 
             {renderToggle(
               t("notifications.settings.categories.achievements"),
               preferences.achievements,
               (value) => updatePreference("achievements", value),
-              !preferences.enabled
+              !preferences.enabled,
             )}
 
             {renderToggle(
               t("notifications.settings.categories.reengagement"),
               preferences.reengagement,
               (value) => updatePreference("reengagement", value),
-              !preferences.enabled
+              !preferences.enabled,
             )}
           </View>
 
@@ -194,33 +187,10 @@ export const NotificationSettingsScreen: React.FC = () => {
 
             {renderToggle(
               t("notifications.settings.quiet_hours.enabled"),
-              preferences.quietHours.enabled,
+              preferences.quiet_hours_enabled,
               (value) => updateQuietHours("enabled", value),
-              !preferences.enabled
+              !preferences.enabled,
             )}
-          </View>
-
-          {/* Test Notification */}
-          <View style={styles.section}>
-            <TouchableOpacity
-              style={[
-                styles.testButton,
-                isLoading && styles.testButtonDisabled,
-              ]}
-              onPress={sendTestNotification}
-              disabled={isLoading || !preferences.enabled}
-            >
-              <Text
-                style={[
-                  styles.testButtonText,
-                  isLoading && styles.testButtonTextDisabled,
-                ]}
-              >
-                {isLoading
-                  ? "Sending..."
-                  : t("notifications.settings.test_notification")}
-              </Text>
-            </TouchableOpacity>
           </View>
         </>
       )}
@@ -231,7 +201,7 @@ export const NotificationSettingsScreen: React.FC = () => {
 const makeNotificationSettingsStyles = (
   tokens: any,
   colors: any,
-  brand: any
+  brand: any,
 ) => {
   return {
     container: {

@@ -43,7 +43,7 @@ class NotificationScheduler {
         const data = notif.content.data as NotificationData;
         if (data?.goalId === goalId) {
           await notificationService.cancelScheduledNotification(
-            notif.identifier
+            notif.identifier,
           );
         }
       }

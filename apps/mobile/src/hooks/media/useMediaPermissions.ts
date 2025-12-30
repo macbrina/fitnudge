@@ -21,7 +21,7 @@ export const useMediaPermissions = () => {
           ? "granted"
           : cameraPermission.canAskAgain
             ? "undetermined"
-            : "denied"
+            : "denied",
       );
 
       setLibraryStatus(
@@ -29,7 +29,7 @@ export const useMediaPermissions = () => {
           ? "granted"
           : libraryPermission.canAskAgain
             ? "undetermined"
-            : "denied"
+            : "denied",
       );
     } catch (error) {
       console.error("Error checking media permissions:", error);

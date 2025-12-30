@@ -115,7 +115,7 @@ async def get_goals_analytics(
 
     goals = goals_result.data
     total_goals = len(goals)
-    active_goals = len([g for g in goals if g["is_active"]])
+    active_goals = len([g for g in goals if g.get("status") == "active"])
     completed_goals = total_goals - active_goals
     completion_rate = (completed_goals / total_goals * 100) if total_goals > 0 else 0
 
@@ -140,18 +140,38 @@ async def get_goals_analytics(
             {"date": current_date.isoformat(), "goals_created": goals_created}
         )
 
-    # Streak analytics
-    checkins_result = (
-        supabase.table("check_ins")
-        .select("date, completed")
-        .eq("user_id", current_user["id"])
-        .gte("date", start_date.isoformat())
+    # Streak analytics - use cached user_stats_cache for O(1) lookup
+    user_id = current_user["id"]
+
+    # Get cached stats
+    stats_result = (
+        supabase.table("user_stats_cache")
+        .select("current_streak, longest_streak, total_checkins, completed_checkins")
+        .eq("user_id", user_id)
+        .maybe_single()
         .execute()
     )
 
-    checkins = checkins_result.data
-    current_streak = calculate_current_streak(checkins)
-    longest_streak = calculate_longest_streak(checkins)
+    if stats_result.data:
+        # Use cached values
+        current_streak = stats_result.data.get("current_streak", 0)
+        longest_streak = stats_result.data.get("longest_streak", 0)
+        total_checkins = stats_result.data.get("total_checkins", 0)
+        completed_checkins = stats_result.data.get("completed_checkins", 0)
+    else:
+        # Fallback: calculate from raw data (only if cache doesn't exist)
+        checkins_result = (
+            supabase.table("check_ins")
+            .select("check_in_date, completed")
+            .eq("user_id", user_id)
+            .gte("check_in_date", start_date.isoformat())
+            .execute()
+        )
+        checkins = checkins_result.data or []
+        current_streak = calculate_current_streak(checkins)
+        longest_streak = calculate_longest_streak(checkins)
+        total_checkins = len(checkins)
+        completed_checkins = len([c for c in checkins if c["completed"]])
 
     return GoalsAnalytics(
         total_goals=total_goals,
@@ -163,8 +183,8 @@ async def get_goals_analytics(
         streak_analytics={
             "current_streak": current_streak,
             "longest_streak": longest_streak,
-            "total_check_ins": len(checkins),
-            "completed_check_ins": len([c for c in checkins if c["completed"]]),
+            "total_check_ins": total_checkins,
+            "completed_check_ins": completed_checkins,
         },
     )
 
@@ -331,8 +351,8 @@ async def get_user_stats(
         supabase.table("check_ins")
         .select("id")
         .eq("user_id", user_id)
-        .gte("date", start_date.isoformat())
-        .lte("date", end_date.isoformat())
+        .gte("check_in_date", start_date.isoformat())
+        .lte("check_in_date", end_date.isoformat())
         .execute()
     )
     checkins_count = len(checkins_result.data)
@@ -362,7 +382,7 @@ async def get_goals_overview(
     )
 
     goals = goals_result.data
-    active_goals = len([g for g in goals if g["is_active"]])
+    active_goals = len([g for g in goals if g.get("status") == "active"])
 
     return {
         "total_goals": len(goals),
@@ -378,7 +398,7 @@ async def get_recent_activity(
     # Get recent check-ins
     checkins_result = (
         supabase.table("check_ins")
-        .select("date, completed, goal:goals(title)")
+        .select("check_in_date, completed, goal:goals(title)")
         .eq("user_id", user_id)
         .order("created_at", desc=True)
         .limit(limit)
@@ -390,7 +410,7 @@ async def get_recent_activity(
         activities.append(
             {
                 "type": "check_in",
-                "date": checkin["date"],
+                "date": checkin["check_in_date"],
                 "description": f"Checked in for goal: {checkin['goal']['title']}",
                 "completed": checkin["completed"],
             }
@@ -456,7 +476,7 @@ def calculate_current_streak(checkins: List[Dict]) -> int:
     if not checkins:
         return 0
 
-    sorted_checkins = sorted(checkins, key=lambda x: x["date"], reverse=True)
+    sorted_checkins = sorted(checkins, key=lambda x: x["check_in_date"], reverse=True)
     streak = 0
 
     for checkin in sorted_checkins:
@@ -473,7 +493,7 @@ def calculate_longest_streak(checkins: List[Dict]) -> int:
     if not checkins:
         return 0
 
-    sorted_checkins = sorted(checkins, key=lambda x: x["date"], reverse=True)
+    sorted_checkins = sorted(checkins, key=lambda x: x["check_in_date"], reverse=True)
     longest_streak = 0
     current_streak = 0
 

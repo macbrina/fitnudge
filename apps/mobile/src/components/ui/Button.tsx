@@ -321,7 +321,7 @@ export default function Button({
 
   // Determine if variant should have shadow (only solid background variants)
   const hasShadow = ["primary", "secondary", "danger", "success"].includes(
-    variant
+    variant,
   );
 
   // Determine if variant should explicitly have no shadow (transparent variants)
@@ -467,7 +467,7 @@ function getIconColor(
   variant: ButtonVariant,
   isDisabled: boolean,
   colors: any,
-  brandColors: any
+  brandColors: any,
 ): string {
   if (
     isDisabled &&

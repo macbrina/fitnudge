@@ -20,7 +20,7 @@ export const exercisesQueryKeys = {
  */
 export const useExerciseDetails = (
   exerciseId: string | undefined,
-  enabled = true
+  enabled = true,
 ) => {
   return useQuery({
     queryKey: exercisesQueryKeys.detail(exerciseId || ""),
@@ -36,7 +36,7 @@ export const useExerciseDetails = (
  */
 export const useSearchExercises = (
   params: SearchExercisesParams,
-  enabled = true
+  enabled = true,
 ) => {
   return useQuery({
     queryKey: exercisesQueryKeys.search(params),
@@ -74,7 +74,7 @@ export const useInvalidateExercises = () => {
         queryKey: exercisesQueryKeys.detail(exerciseId),
       });
     },
-    [queryClient]
+    [queryClient],
   );
 
   return { invalidateAll, invalidateDetail };

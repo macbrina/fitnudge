@@ -4,48 +4,38 @@ import { useTranslation } from "@/lib/i18n";
 import { fontFamily } from "@/lib/fonts";
 import { toRN } from "@/lib/units";
 import { useStyles } from "@/themes/makeStyles";
-import { tokens, lineHeight } from "@/themes/tokens";
+import { lineHeight } from "@/themes/tokens";
 import { useTheme } from "@/themes";
 import PersonalizationLayout from "./PersonalizationLayout";
 import { useOnboardingStore } from "@/stores/onboardingStore";
-import { Card } from "@/components/ui/Card";
 
 interface MotivationStyleScreenProps {
   onContinue: (motivationStyle: string) => void;
   onBack?: () => void;
   isSubmitting: boolean;
+  hasExistingProfile?: boolean;
+  currentStep: number;
+  totalSteps: number;
 }
 
 const MOTIVATION_STYLES = [
   {
     id: "tough_love",
-    title: "onboarding.personalization.motivation_style.tough_love.title",
-    description:
-      "onboarding.personalization.motivation_style.tough_love.description",
-    icon: "🔥",
+    label: "onboarding.personalization.motivation_style.tough_love.title",
   },
   {
     id: "gentle_encouragement",
-    title:
+    label:
       "onboarding.personalization.motivation_style.gentle_encouragement.title",
-    description:
-      "onboarding.personalization.motivation_style.gentle_encouragement.description",
-    icon: "🤗",
   },
   {
     id: "data_driven",
-    title: "onboarding.personalization.motivation_style.data_driven.title",
-    description:
-      "onboarding.personalization.motivation_style.data_driven.description",
-    icon: "📊",
+    label: "onboarding.personalization.motivation_style.data_driven.title",
   },
   {
     id: "accountability_buddy",
-    title:
+    label:
       "onboarding.personalization.motivation_style.accountability_buddy.title",
-    description:
-      "onboarding.personalization.motivation_style.accountability_buddy.description",
-    icon: "👥",
   },
 ];
 
@@ -53,15 +43,18 @@ export default function MotivationStyleScreen({
   onContinue,
   onBack,
   isSubmitting,
+  hasExistingProfile = false,
+  currentStep,
+  totalSteps,
 }: MotivationStyleScreenProps) {
   const { motivation_style } = useOnboardingStore();
   const [selectedStyle, setSelectedStyle] = useState<string>(
-    motivation_style || ""
+    motivation_style || "",
   );
   const { t } = useTranslation();
-  const styles = useStyles(makeMotivationStyleScreenStyles);
+  const styles = useStyles(makeStyles);
+  const { brandColors } = useTheme();
 
-  // Sync with store when component mounts or store value changes
   useEffect(() => {
     setSelectedStyle(motivation_style || "");
   }, [motivation_style]);
@@ -74,16 +67,20 @@ export default function MotivationStyleScreen({
 
   return (
     <PersonalizationLayout
-      currentStep={8}
-      totalSteps={8}
+      currentStep={currentStep}
+      totalSteps={totalSteps}
       onContinue={handleContinue}
       onBack={onBack}
       canContinue={!!selectedStyle}
       isLoading={isSubmitting}
       buttonText={
         isSubmitting
-          ? t("onboarding.personalization.submitting")
-          : t("onboarding.personalization.generate_goals")
+          ? hasExistingProfile
+            ? t("onboarding.personalization.updating")
+            : t("onboarding.personalization.submitting")
+          : hasExistingProfile
+            ? t("onboarding.personalization.update_profile")
+            : t("onboarding.personalization.generate_goals")
       }
     >
       <View style={styles.content}>
@@ -102,48 +99,26 @@ export default function MotivationStyleScreen({
               <TouchableOpacity
                 key={motivationStyle.id}
                 onPress={() => setSelectedStyle(motivationStyle.id)}
-                style={styles.optionCardTouchable}
                 activeOpacity={0.7}
+                style={[
+                  styles.optionCard,
+                  isSelected && [
+                    styles.optionCardSelected,
+                    { borderColor: brandColors.primary },
+                  ],
+                ]}
               >
-                <Card
-                  padded={false}
-                  shadow={isSelected ? "xl" : "md"}
+                <Text
                   style={[
-                    styles.optionCard,
-                    isSelected && styles.optionCardSelected,
+                    styles.optionLabel,
+                    isSelected && [
+                      styles.optionLabelSelected,
+                      { color: brandColors.primary },
+                    ],
                   ]}
                 >
-                  <View style={styles.optionRow}>
-                    <View
-                      style={[
-                        styles.iconContainer,
-                        isSelected && styles.iconContainerSelected,
-                      ]}
-                    >
-                      <Text style={styles.optionIcon}>
-                        {motivationStyle.icon}
-                      </Text>
-                    </View>
-                    <View style={styles.textContainer}>
-                      <Text
-                        style={[
-                          styles.optionTitle,
-                          isSelected && styles.optionTitleSelected,
-                        ]}
-                      >
-                        {t(motivationStyle.title)}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.optionDescription,
-                          isSelected && styles.optionDescriptionSelected,
-                        ]}
-                      >
-                        {t(motivationStyle.description)}
-                      </Text>
-                    </View>
-                  </View>
-                </Card>
+                  {t(motivationStyle.label)}
+                </Text>
               </TouchableOpacity>
             );
           })}
@@ -153,105 +128,53 @@ export default function MotivationStyleScreen({
   );
 }
 
-const makeMotivationStyleScreenStyles = (
-  tokens: any,
-  colors: any,
-  brand: any
-) => {
+const makeStyles = (tokens: any, colors: any, brand: any) => {
   return {
     content: {
       flex: 1,
-      paddingTop: toRN(tokens.spacing[4]),
+      paddingTop: toRN(tokens.spacing[2]),
     },
     title: {
-      fontSize: toRN(tokens.typography.fontSize["3xl"]),
+      fontSize: toRN(tokens.typography.fontSize["2xl"]),
       fontWeight: tokens.typography.fontWeight.bold,
       color: colors.text.primary,
-      textAlign: "center" as const,
-      marginBottom: toRN(tokens.spacing[3]),
+      marginBottom: toRN(tokens.spacing[2]),
       fontFamily: fontFamily.groteskBold,
       lineHeight: lineHeight(
-        tokens.typography.fontSize["3xl"],
-        tokens.typography.lineHeight.tight
+        tokens.typography.fontSize["2xl"],
+        tokens.typography.lineHeight.tight,
       ),
     },
     subtitle: {
       fontSize: toRN(tokens.typography.fontSize.base),
       color: colors.text.secondary,
-      textAlign: "center" as const,
-      marginBottom: toRN(tokens.spacing[10]),
+      marginBottom: toRN(tokens.spacing[6]),
       fontFamily: fontFamily.groteskRegular,
       lineHeight: lineHeight(
         tokens.typography.fontSize.base,
-        tokens.typography.lineHeight.relaxed
+        tokens.typography.lineHeight.relaxed,
       ),
-      paddingHorizontal: toRN(tokens.spacing[4]),
     },
     optionsContainer: {
-      gap: toRN(tokens.spacing[4]),
-      marginBottom: toRN(tokens.spacing[6]),
-    },
-    optionCardTouchable: {
-      borderRadius: toRN(tokens.borderRadius.xl),
+      gap: toRN(tokens.spacing[3]),
     },
     optionCard: {
-      padding: toRN(tokens.spacing[5]),
-    },
-    optionRow: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
+      backgroundColor: colors.bg.muted,
+      borderRadius: toRN(tokens.borderRadius.xl),
+      paddingVertical: toRN(tokens.spacing[5]),
+      paddingHorizontal: toRN(tokens.spacing[5]),
+      borderWidth: 2,
+      borderColor: colors.border.subtle,
     },
     optionCardSelected: {
-      borderColor: brand.primary,
       backgroundColor: brand.primary + "08",
-      borderWidth: 2,
-      borderRadius: toRN(tokens.borderRadius.xl),
     },
-    iconContainer: {
-      width: 64,
-      height: 64,
-      borderRadius: 32,
-      backgroundColor: colors.bg.muted,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-      marginRight: toRN(tokens.spacing[4]),
-      flexShrink: 0,
-    },
-    iconContainerSelected: {
-      backgroundColor: brand.primary + "15",
-    },
-    optionIcon: {
-      fontSize: 32,
-    },
-    textContainer: {
-      flex: 1,
-      justifyContent: "center" as const,
-    },
-    optionTitle: {
+    optionLabel: {
       fontSize: toRN(tokens.typography.fontSize.lg),
       fontWeight: tokens.typography.fontWeight.semibold,
       color: colors.text.primary,
-      marginBottom: toRN(tokens.spacing[1]),
       fontFamily: fontFamily.groteskSemiBold,
-      lineHeight: lineHeight(
-        tokens.typography.fontSize.lg,
-        tokens.typography.lineHeight.normal
-      ),
     },
-    optionTitleSelected: {
-      color: brand.primary,
-    },
-    optionDescription: {
-      fontSize: toRN(tokens.typography.fontSize.sm),
-      color: colors.text.secondary,
-      fontFamily: fontFamily.groteskRegular,
-      lineHeight: lineHeight(
-        tokens.typography.fontSize.sm,
-        tokens.typography.lineHeight.relaxed
-      ),
-    },
-    optionDescriptionSelected: {
-      color: brand.primary + "DD",
-    },
+    optionLabelSelected: {},
   };
 };

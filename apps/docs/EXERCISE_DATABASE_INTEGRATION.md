@@ -44,7 +44,7 @@ MP4 videos are hosted on Cloudflare R2 for global CDN distribution:
 **URL Format**:
 
 ```
-https://media.fitnudge.app/exercises/360/0001.mp4
+https://media.fitnudge.app/exercises/0001.mp4
 ```
 
 **Benefits**:
@@ -62,7 +62,7 @@ https://media.fitnudge.app/exercises/360/0001.mp4
 **File**: `apps/api/scripts/import_exercises.py`
 
 - Imports all exercises from JSON
-- Sets CDN URLs: `https://media.fitnudge.app/exercises/360/{id}.mp4`
+- Sets CDN URLs: `https://media.fitnudge.app/exercises/{id}.mp4`
 - Batch processing (100 per batch)
 - Progress tracking
 - Error handling
@@ -120,7 +120,7 @@ poetry run python scripts/import_exercises.py
       "sets": 3,
       "reps": "10-12",
       "demo": {
-        "mp4_url": "https://media.fitnudge.app/exercises/360/0003.mp4",
+        "mp4_url": "https://media.fitnudge.app/exercises/0003.mp4",
         "target_muscle": "pectorals",
         "instructions": ["Step 1...", "Step 2..."],
         "difficulty": "beginner"

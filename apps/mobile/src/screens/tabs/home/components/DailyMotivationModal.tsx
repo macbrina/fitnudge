@@ -88,7 +88,7 @@ export function DailyMotivationModal({
 
   // Check if user has unlimited_text_motivation feature
   const hasUnlimitedMotivation = useSubscriptionStore((state) =>
-    state.hasFeature("unlimited_text_motivation")
+    state.hasFeature("unlimited_text_motivation"),
   );
 
   // Animation values - starts off-screen at the bottom
@@ -314,7 +314,7 @@ export function DailyMotivationModal({
 const makeDailyMotivationModalStyles = (
   tokens: any,
   colors: any,
-  brand: any
+  brand: any,
 ) => ({
   modalContainer: {
     flex: 1,

@@ -17,7 +17,7 @@ interface SocialSignInButtonProps {
 const makeSocialSignInButtonStyles = (
   tokens: any,
   colors: any,
-  brandColors: any
+  brandColors: any,
 ) => {
   return {
     button: {
@@ -72,7 +72,7 @@ export const SocialSignInButton: React.FC<SocialSignInButtonProps> = ({
   const styles = useStyles(makeSocialSignInButtonStyles);
 
   const getButtonStyle = () => {
-    let buttonStyle = [styles.button];
+    const buttonStyle = [styles.button];
 
     if (provider === "google") {
       buttonStyle.push(styles.googleButton);
@@ -92,7 +92,7 @@ export const SocialSignInButton: React.FC<SocialSignInButtonProps> = ({
   };
 
   const getButtonTextStyle = () => {
-    let textStyle = [styles.buttonText];
+    const textStyle = [styles.buttonText];
 
     if (provider === "google") {
       textStyle.push(styles.googleButtonText);

@@ -38,10 +38,10 @@ export const usePlanStatus = (goalId: string | undefined, enabled = true) => {
     refetchOnMount: "always", // Force refetch on mount to get latest status
     refetchOnWindowFocus: true,
     refetchInterval: (q) => {
-      // Poll every 3 seconds when pending or generating
+      // Poll every 2 seconds when pending or generating (faster feedback for users)
       const status = q.state.data?.status;
       if (status === "pending" || status === "generating") {
-        return 3000;
+        return 2000;
       }
       // Stop polling when completed, failed, or not_started
       return false;
@@ -115,7 +115,7 @@ export const useBatchPlanStatuses = (goalIds: string[]) => {
       refetchInterval: (q: any) => {
         const status = q.state.data?.status;
         if (status === "pending" || status === "generating") {
-          return 3000; // Poll every 3 seconds
+          return 2000; // Poll every 2 seconds (faster feedback)
         }
         return false; // Stop polling
       },
@@ -187,6 +187,99 @@ export const useBatchPlanStatuses = (goalIds: string[]) => {
 };
 
 /**
+ * Hook to batch fetch plan statuses for multiple challenges at once
+ * Returns a map of challengeId -> planStatus for easy lookup
+ *
+ * IMPORTANT: Polls every 3 seconds when ANY plan is pending/generating
+ */
+export const useBatchChallengePlanStatuses = (challengeIds: string[]) => {
+  const queryClient = useQueryClient();
+  const prevStatusesRef = useRef<Record<string, string>>({});
+
+  const queries = useQueries({
+    queries: challengeIds.map((challengeId) => ({
+      queryKey: actionablePlansQueryKeys.challengePlanStatus(challengeId),
+      queryFn: () => actionablePlansService.getChallengePlanStatus(challengeId),
+      staleTime: 0, // Always fetch fresh data
+      refetchOnMount: "always" as const,
+      refetchOnWindowFocus: true,
+      // Each query polls independently based on its own status
+      refetchInterval: (q: any) => {
+        const status = q.state.data?.status;
+        if (status === "pending" || status === "generating") {
+          return 2000; // Poll every 2 seconds (faster feedback)
+        }
+        return false; // Stop polling
+      },
+      refetchIntervalInBackground: false,
+    })),
+  });
+
+  const isLoading = queries.some((q) => q.isLoading);
+  const isError = queries.some((q) => q.isError);
+
+  // Create a map of challengeId -> planStatus for easy lookup
+  const planStatusMap = useMemo(() => {
+    const map: Record<
+      string,
+      { status: PlanStatus; [key: string]: any } | undefined
+    > = {};
+    challengeIds.forEach((challengeId, index) => {
+      map[challengeId] = queries[index]?.data;
+    });
+    return map;
+  }, [challengeIds, queries]);
+
+  // Check if any plan is currently generating
+  const hasGeneratingPlan = useMemo(() => {
+    return queries.some((q) => {
+      const status = q.data?.status;
+      return status === "pending" || status === "generating";
+    });
+  }, [queries]);
+
+  // When a plan status changes to "completed", invalidate related queries
+  useEffect(() => {
+    queries.forEach((q, index) => {
+      const challengeId = challengeIds[index];
+      const currentStatus = q.data?.status;
+      const prevStatus = prevStatusesRef.current[challengeId];
+
+      // Only invalidate when status CHANGES to completed (not on every render)
+      if (
+        currentStatus === "completed" &&
+        prevStatus !== "completed" &&
+        prevStatus !== undefined
+      ) {
+        logger.info(
+          `Plan completed for challenge ${challengeId}, invalidating queries`,
+        );
+
+        // Invalidate challenges
+        queryClient.invalidateQueries({ queryKey: ["challenges"] });
+
+        // Invalidate check-ins
+        queryClient.invalidateQueries({ queryKey: checkInsQueryKeys.today() });
+        queryClient.invalidateQueries({ queryKey: checkInsQueryKeys.all });
+      }
+
+      // Update previous status
+      if (currentStatus) {
+        prevStatusesRef.current[challengeId] = currentStatus;
+      }
+    });
+  }, [queries, challengeIds, queryClient]);
+
+  return {
+    planStatusMap,
+    isLoading,
+    isError,
+    queries,
+    hasGeneratingPlan, // Expose this so UI can show a loading indicator
+  };
+};
+
+/**
  * Hook to get the complete actionable plan for a goal
  */
 export const useGoalPlan = (goalId: string | undefined, enabled = true) => {
@@ -202,6 +295,68 @@ export const useGoalPlan = (goalId: string | undefined, enabled = true) => {
 };
 
 /**
+ * Hook to get the complete actionable plan for a challenge
+ */
+export const useChallengePlan = (
+  challengeId: string | undefined,
+  enabled = true,
+) => {
+  return useQuery({
+    queryKey: actionablePlansQueryKeys.challengePlan(challengeId || ""),
+    queryFn: () => actionablePlansService.getChallengePlan(challengeId!),
+    enabled: enabled && !!challengeId,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+  });
+};
+
+/**
+ * Hook to get plan status for a challenge
+ * Similar to usePlanStatus but for challenges
+ */
+export const useChallengePlanStatus = (
+  challengeId: string | undefined,
+  enabled = true,
+) => {
+  const queryClient = useQueryClient();
+  const prevStatusRef = useRef<string | null>(null);
+
+  const query = useQuery({
+    queryKey: actionablePlansQueryKeys.challengePlanStatus(challengeId || ""),
+    queryFn: () => actionablePlansService.getChallengePlanStatus(challengeId!),
+    enabled: enabled && !!challengeId,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    refetchInterval: (q) => {
+      const status = q.state.data?.status;
+      if (status === "pending" || status === "generating") {
+        return 2000; // Poll every 2 seconds (faster feedback)
+      }
+      return false;
+    },
+    refetchIntervalInBackground: false,
+  });
+
+  // When status changes to "completed", invalidate challenge queries
+  useEffect(() => {
+    const currentStatus = query.data?.status;
+    const justBecameCompleted =
+      currentStatus === "completed" && prevStatusRef.current !== "completed";
+
+    if (justBecameCompleted) {
+      // Plan just became ready - invalidate challenge-related queries
+      queryClient.invalidateQueries({ queryKey: ["challenges"] });
+    }
+    prevStatusRef.current = currentStatus || null;
+  }, [query.data?.status, queryClient, challengeId]);
+
+  return query;
+};
+
+/**
  * Hook to prefetch a goal's plan data
  * Use this in PlanSection to warm up the cache before user clicks "Start Workout"
  */
@@ -212,6 +367,21 @@ export const usePrefetchGoalPlan = () => {
     queryClient.prefetchQuery({
       queryKey: actionablePlansQueryKeys.plan(goalId),
       queryFn: () => actionablePlansService.getGoalPlan(goalId),
+      staleTime: 5 * 60 * 1000,
+    });
+  };
+};
+
+/**
+ * Hook to prefetch a challenge's plan data
+ */
+export const usePrefetchChallengePlan = () => {
+  const queryClient = useQueryClient();
+
+  return (challengeId: string) => {
+    queryClient.prefetchQuery({
+      queryKey: actionablePlansQueryKeys.challengePlan(challengeId),
+      queryFn: () => actionablePlansService.getChallengePlan(challengeId),
       staleTime: 5 * 60 * 1000,
     });
   };
@@ -233,7 +403,7 @@ export const useRetryPlanGeneration = () => {
       });
 
       const previousStatus = queryClient.getQueryData(
-        actionablePlansQueryKeys.planStatus(goalId)
+        actionablePlansQueryKeys.planStatus(goalId),
       );
 
       // Optimistically set status to generating
@@ -242,7 +412,7 @@ export const useRetryPlanGeneration = () => {
         (old: any) => {
           if (!old) return { status: "generating" };
           return { ...old, status: "generating" };
-        }
+        },
       );
 
       return { previousStatus, goalId };
@@ -252,7 +422,7 @@ export const useRetryPlanGeneration = () => {
       if (context?.previousStatus) {
         queryClient.setQueryData(
           actionablePlansQueryKeys.planStatus(goalId),
-          context.previousStatus
+          context.previousStatus,
         );
       }
       logger.error("Failed to retry plan generation", {
@@ -266,9 +436,63 @@ export const useRetryPlanGeneration = () => {
       });
 
       // Invalidate goals to reflect the re-activated state
-      // (retry endpoint clears archived_reason and sets is_active: true)
+      // (retry endpoint clears archived_reason and sets status: "active")
       queryClient.invalidateQueries({ queryKey: goalsQueryKeys.active() });
       queryClient.invalidateQueries({ queryKey: goalsQueryKeys.list() });
+    },
+  });
+};
+
+/**
+ * Hook to retry plan generation for a failed challenge plan
+ */
+export const useRetryChallengePlanGeneration = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (challengeId: string) =>
+      actionablePlansService.retryChallengePlanGeneration(challengeId),
+    // Optimistic update - show generating status instantly
+    onMutate: async (challengeId) => {
+      await queryClient.cancelQueries({
+        queryKey: actionablePlansQueryKeys.challengePlanStatus(challengeId),
+      });
+
+      const previousStatus = queryClient.getQueryData(
+        actionablePlansQueryKeys.challengePlanStatus(challengeId),
+      );
+
+      // Optimistically set status to generating
+      queryClient.setQueryData(
+        actionablePlansQueryKeys.challengePlanStatus(challengeId),
+        (old: any) => {
+          if (!old) return { status: "generating" };
+          return { ...old, status: "generating" };
+        },
+      );
+
+      return { previousStatus, challengeId };
+    },
+    onError: (error, challengeId, context) => {
+      // Rollback on error
+      if (context?.previousStatus) {
+        queryClient.setQueryData(
+          actionablePlansQueryKeys.challengePlanStatus(challengeId),
+          context.previousStatus,
+        );
+      }
+      logger.error("Failed to retry challenge plan generation", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    },
+    onSuccess: (data, challengeId) => {
+      // Invalidate plan status to start polling
+      queryClient.invalidateQueries({
+        queryKey: actionablePlansQueryKeys.challengePlanStatus(challengeId),
+      });
+
+      // Invalidate challenges to reflect the re-activated state
+      queryClient.invalidateQueries({ queryKey: ["challenges"] });
     },
   });
 };

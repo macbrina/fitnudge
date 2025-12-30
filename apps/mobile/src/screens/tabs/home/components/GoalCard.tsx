@@ -17,11 +17,7 @@ import {
   usePlanStatus,
   useRetryPlanGeneration,
 } from "@/hooks/api/useActionablePlans";
-import {
-  useDeleteGoal,
-  useActivateGoal,
-  useDeactivateGoal,
-} from "@/hooks/api/useGoals";
+import { useActivateGoal, useDeactivateGoal } from "@/hooks/api/useGoals";
 import { useAlertModal } from "@/contexts/AlertModalContext";
 import { useSubscriptionStore } from "@/stores/subscriptionStore";
 import { PlanStatusBadge } from "@/screens/tabs/goals/components/PlanStatusBadge";
@@ -40,29 +36,14 @@ interface GoalCardProps {
     title: string;
     category: string;
     current_streak?: number;
-    is_active?: boolean;
-    converted_to_challenge_id?: string;
+    status?: string;
     archived_reason?: string | null;
-    // Goal type fields
-    goal_type?: "habit" | "time_challenge" | "target_challenge";
-    target_checkins?: number;
-    challenge_start_date?: string;
-    challenge_end_date?: string;
     completed_at?: string;
     // Progress data (populated externally)
     completed_checkins?: number;
   };
   planStatus?: PlanStatusData; // Optional: pass from parent to avoid individual fetching
   onPress?: () => void;
-  onDeleted?: () => void;
-  onActivated?: () => void;
-  onDeactivated?: () => void;
-  onShareGoal?: () => void; // For sharing goal with friends
-  onShareAsChallenge?: () => void; // For creating challenge from goal
-  onViewChallenge?: () => void; // For viewing converted challenge
-  onInviteMembers?: () => void; // For group goals
-  onViewMembers?: () => void; // For group goals
-  onLeaveGroup?: () => void; // For group goals (non-owner)
   showMenu?: boolean; // Only show menu in GoalsScreen, not HomeScreen
   activeGoalsCount?: number; // Current number of active goals (for limit checking)
   style?: any;
@@ -72,15 +53,6 @@ export function GoalCard({
   goal,
   planStatus: planStatusProp,
   onPress,
-  onDeleted,
-  onActivated,
-  onDeactivated,
-  onShareGoal,
-  onShareAsChallenge,
-  onViewChallenge,
-  onInviteMembers,
-  onViewMembers,
-  onLeaveGroup,
   showMenu = false,
   activeGoalsCount = 0,
   style,
@@ -96,166 +68,57 @@ export function GoalCard({
   // Use passed planStatus if available, otherwise fetch (for backward compatibility with HomeScreen)
   const { data: fetchedPlanStatus } = usePlanStatus(
     goal.id,
-    !planStatusProp // Only fetch if not passed from parent
+    !planStatusProp, // Only fetch if not passed from parent
   );
   const planStatus = planStatusProp || fetchedPlanStatus;
 
-  const deleteGoal = useDeleteGoal();
   const activateGoal = useActivateGoal();
   const deactivateGoal = useDeactivateGoal();
   const retryPlan = useRetryPlanGeneration();
 
   // Check if goal failed (plan generation failed)
   const isGoalFailed = goal.archived_reason === "failed";
-  const isConvertedToChallenge =
-    goal.archived_reason === "converted_to_challenge";
+
+  // Card should be disabled if plan not ready
+  // Active status check happens inside detail screen for actions
+  const isCardDisabled = planStatus?.status !== "completed";
 
   // Get active goal limit and feature access from subscription
   const activeGoalLimit = useSubscriptionStore(
-    (state) => state.getActiveGoalLimit?.() ?? 1
+    (state) => state.getActiveGoalLimit?.() ?? 1,
   );
   const hasFeature = useSubscriptionStore((state) => state.hasFeature);
 
-  // Feature checks
-  const canCreateChallenge = hasFeature?.("challenge_create") ?? false;
-
-  // Category info with emoji, label, and color
+  // Category info with icon, label, and color
   const CATEGORY_INFO: Record<
     string,
-    { emoji: string; label: string; color: string }
+    { icon: keyof typeof Ionicons.glyphMap; label: string; color: string }
   > = {
-    fitness: { emoji: "💪", label: "Fitness", color: "#EF4444" },
-    nutrition: { emoji: "🥗", label: "Nutrition", color: "#22C55E" },
-    wellness: { emoji: "🧘", label: "Wellness", color: "#8B5CF6" },
-    mindfulness: { emoji: "🧠", label: "Mindfulness", color: "#3B82F6" },
-    sleep: { emoji: "😴", label: "Sleep", color: "#6366F1" },
-    custom: { emoji: "🎯", label: "Custom", color: "#F59E0B" },
+    fitness: { icon: "fitness-outline", label: "Fitness", color: "#EF4444" },
+    nutrition: {
+      icon: "nutrition-outline",
+      label: "Nutrition",
+      color: "#22C55E",
+    },
+    wellness: { icon: "leaf-outline", label: "Wellness", color: "#8B5CF6" },
+    mindfulness: {
+      icon: "flower-outline",
+      label: "Mindfulness",
+      color: "#3B82F6",
+    },
+    sleep: { icon: "moon-outline", label: "Sleep", color: "#6366F1" },
   };
 
   // Goal type info
-  const GOAL_TYPE_INFO: Record<
-    string,
-    { icon: keyof typeof Ionicons.glyphMap; label: string }
-  > = {
-    habit: { icon: "refresh-outline", label: "Habit" },
-    time_challenge: { icon: "calendar-outline", label: "Time Challenge" },
-    target_challenge: { icon: "flag-outline", label: "Target Challenge" },
+  const categoryInfo = CATEGORY_INFO[goal.category] || CATEGORY_INFO.wellness;
+
+  // Goals are now habits only - show streak
+  const progressDisplay = {
+    type: "habit" as const,
+    streak: goal.current_streak || 0,
   };
 
-  const categoryInfo = CATEGORY_INFO[goal.category] || CATEGORY_INFO.custom;
-  const emoji = categoryInfo.emoji;
-
-  // Determine goal type (default to habit)
-  const goalType = goal.goal_type || "habit";
-
-  // Calculate progress for different goal types
-  const getProgressDisplay = () => {
-    if (
-      goalType === "time_challenge" &&
-      goal.challenge_start_date &&
-      goal.challenge_end_date
-    ) {
-      // Normalize dates to midnight to avoid partial day issues
-      const start = new Date(goal.challenge_start_date);
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(goal.challenge_end_date);
-      end.setHours(0, 0, 0, 0);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      // Calculate total days (end date is inclusive, so add 1)
-      const totalDays =
-        Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) +
-        1;
-
-      // Days elapsed since start (0 on first day)
-      const daysElapsed = Math.max(
-        0,
-        Math.round((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
-      );
-
-      // Current day number (1-indexed)
-      const currentDay = Math.min(daysElapsed + 1, totalDays);
-      const daysRemaining = Math.max(0, totalDays - currentDay);
-      const progress = Math.min(
-        100,
-        Math.max(0, (currentDay / totalDays) * 100)
-      );
-
-      return {
-        type: "time_challenge" as const,
-        currentDay,
-        totalDays,
-        daysRemaining,
-        progress,
-      };
-    }
-
-    if (goalType === "target_challenge" && goal.target_checkins) {
-      const completed = goal.completed_checkins || 0;
-      const target = goal.target_checkins;
-      const progress = Math.min(100, (completed / target) * 100);
-
-      return {
-        type: "target_challenge" as const,
-        completed,
-        target,
-        progress,
-      };
-    }
-
-    // Default: Habit
-    return {
-      type: "habit" as const,
-      streak: goal.current_streak || 0,
-    };
-  };
-
-  const progressDisplay = getProgressDisplay();
-
-  // Goal type badge - always show
-  const goalTypeInfo = GOAL_TYPE_INFO[goalType] || GOAL_TYPE_INFO.habit;
-
-  const handleDelete = async () => {
-    const confirmed = await showConfirm({
-      title: t("goals.delete_goal"),
-      message: t("goals.delete_goal_confirm", { title: goal.title }),
-      variant: "error",
-      confirmLabel: t("common.delete"),
-      cancelLabel: t("common.cancel"),
-    });
-
-    if (confirmed) {
-      try {
-        await deleteGoal.mutateAsync(goal.id);
-        console.log(`[GoalCard] ✅ Goal deleted successfully!`);
-        onDeleted?.();
-      } catch (error) {
-        console.error(`[GoalCard] ❌ Delete failed:`, error);
-        await showAlert({
-          title: t("common.error"),
-          message: t("goals.delete_goal_error"),
-          variant: "error",
-          confirmLabel: t("common.ok"),
-        });
-      }
-    }
-  };
-
-  const handleActivate = async () => {
-    // Goals converted to challenges cannot be reactivated
-    if (isConvertedToChallenge) {
-      await showAlert({
-        title: t("goals.cannot_reactivate_title") || "Cannot Reactivate",
-        message:
-          t("goals.cannot_reactivate_converted") ||
-          "This goal was converted to a challenge and cannot be reactivated.",
-        variant: "warning",
-        confirmLabel: t("common.ok"),
-      });
-      return;
-    }
-
+  const handleResume = async () => {
     // Check active goal limit
     if (activeGoalsCount >= activeGoalLimit) {
       await showAlert({
@@ -269,12 +132,26 @@ export function GoalCard({
       return;
     }
 
+    // Check if plan is ready
+    if (planStatus?.status !== "completed") {
+      await showAlert({
+        title: t("goals.plan_not_ready_title") || "Plan Not Ready",
+        message:
+          t("goals.plan_not_ready_message") ||
+          "Your goal plan is still being generated. Please wait until it's ready.",
+        variant: "warning",
+        confirmLabel: t("common.ok"),
+      });
+      return;
+    }
+
     try {
       await activateGoal.mutateAsync(goal.id);
-      onActivated?.();
     } catch (error: any) {
       const errorMessage =
-        error?.response?.data?.detail || t("goals.activate_goal_error");
+        error?.response?.data?.detail ||
+        t("goals.resume_goal_error") ||
+        "Failed to resume goal";
       await showAlert({
         title: t("common.error"),
         message: errorMessage,
@@ -284,13 +161,14 @@ export function GoalCard({
     }
   };
 
-  const handleDeactivate = async () => {
+  const handlePause = async () => {
     try {
       await deactivateGoal.mutateAsync(goal.id);
-      onDeactivated?.();
     } catch (error: any) {
       const errorMessage =
-        error?.response?.data?.detail || t("goals.deactivate_goal_error");
+        error?.response?.data?.detail ||
+        t("goals.pause_goal_error") ||
+        "Failed to pause goal";
       await showAlert({
         title: t("common.error"),
         message: errorMessage,
@@ -321,28 +199,30 @@ export function GoalCard({
   const buildMenuSections = (): BottomMenuSection[] => {
     const sections: BottomMenuSection[] = [];
 
-    // === Section 1: Primary Actions (Activate/Deactivate) ===
+    // === Section 1: Primary Actions (Pause/Resume) ===
     const primaryOptions: BottomMenuOption[] = [];
 
-    if (goal.is_active) {
+    // Active goals can be paused
+    if (goal.status === "active") {
       primaryOptions.push({
-        id: "deactivate",
-        label: t("goals.deactivate_goal") || "Deactivate Goal",
+        id: "pause",
+        label: t("goals.pause_goal") || "Pause Goal",
         description:
-          t("goals.deactivate_goal_desc") || "Pause tracking this goal",
+          t("goals.pause_goal_desc") || "Temporarily stop tracking this goal",
         icon: "pause-circle-outline",
-        onPress: handleDeactivate,
+        onPress: handlePause,
       });
-    } else {
+    }
+
+    // Archived goals can be resumed (not completed goals)
+    if (goal.status === "archived") {
       primaryOptions.push({
-        id: "activate",
-        label: t("goals.activate_goal") || "Activate Goal",
+        id: "resume",
+        label: t("goals.resume_goal") || "Resume Goal",
         description:
-          t("goals.activate_goal_desc") || "Start tracking this goal",
+          t("goals.resume_goal_desc") || "Continue tracking this goal",
         icon: "play-circle-outline",
-        onPress: handleActivate,
-        // Disable if converted to challenge
-        disabled: isConvertedToChallenge,
+        onPress: handleResume,
       });
     }
 
@@ -350,138 +230,19 @@ export function GoalCard({
       sections.push({ id: "primary", options: primaryOptions });
     }
 
-    // === Section 2: Sharing Actions ===
-    const sharingOptions: BottomMenuOption[] = [];
-
-    // Share as Challenge (for time/target challenges, requires challenge_create)
-    if (
-      (goalType === "time_challenge" || goalType === "target_challenge") &&
-      !goal.converted_to_challenge_id
-    ) {
-      sharingOptions.push({
-        id: "share_challenge",
-        label: t("goals.share_as_challenge") || "Share as Challenge",
-        description:
-          t("goals.share_as_challenge_desc") ||
-          "Create a challenge for friends to join",
-        icon: "trophy-outline",
-        onPress: () => onShareAsChallenge?.(),
-        disabled: !canCreateChallenge,
-      });
-    }
-
-    // View Challenge (if converted)
-    if (goal.converted_to_challenge_id) {
-      sharingOptions.push({
-        id: "view_challenge",
-        label: t("goals.view_challenge") || "View Challenge",
-        description:
-          t("goals.view_challenge_desc") ||
-          "See the challenge created from this goal",
-        icon: "trophy-outline",
-        onPress: () => {
-          if (onViewChallenge) {
-            onViewChallenge();
-          } else if (goal.converted_to_challenge_id) {
-            router.push(
-              MOBILE_ROUTES.CHALLENGES.DETAILS(goal.converted_to_challenge_id)
-            );
-          }
-        },
-      });
-    }
-
-    if (sharingOptions.length > 0) {
-      sections.push({ id: "sharing", options: sharingOptions });
-    }
-
-    // === Section 3: Danger Zone (Delete) ===
-    const dangerOptions: BottomMenuOption[] = [];
-
-    dangerOptions.push({
-      id: "delete",
-      label: t("goals.delete_goal") || "Delete Goal",
-      description:
-        t("goals.delete_goal_desc") || "Permanently remove this goal",
-      icon: "trash-outline",
-      destructive: true,
-      onPress: handleDelete,
-    });
-
-    sections.push({ id: "danger", options: dangerOptions });
+    // No delete option - we preserve data for limits/history
 
     return sections;
   };
 
   const menuSections = buildMenuSections();
 
-  // Render progress section based on goal type
+  // Render progress section - habits show streak
   const renderProgress = () => {
     if (!progressDisplay) return null;
 
-    if (
-      progressDisplay.type === "time_challenge" &&
-      planStatus?.status === "completed"
-    ) {
-      const { currentDay, totalDays, daysRemaining, progress } =
-        progressDisplay;
-      return (
-        <View style={styles.progressSection}>
-          <View style={styles.progressRow}>
-            <Text style={styles.progressValue}>
-              Day {currentDay}
-              <Text style={styles.progressTotal}>/{totalDays}</Text>
-            </Text>
-            <Text style={styles.progressSubtext}>
-              {daysRemaining > 0
-                ? `${daysRemaining} day${daysRemaining === 1 ? "" : "s"} left`
-                : "🎉 Complete!"}
-            </Text>
-          </View>
-          <View style={styles.progressBarContainer}>
-            <View
-              style={[
-                styles.progressBar,
-                { width: `${progress}%`, backgroundColor: categoryInfo.color },
-              ]}
-            />
-          </View>
-        </View>
-      );
-    }
-
-    if (
-      progressDisplay.type === "target_challenge" &&
-      planStatus?.status === "completed"
-    ) {
-      const { completed, target, progress } = progressDisplay;
-      return (
-        <View style={styles.progressSection}>
-          <View style={styles.progressRow}>
-            <Text style={styles.progressValue}>
-              {completed}
-              <Text style={styles.progressTotal}>/{target}</Text>
-            </Text>
-            <Text style={styles.progressSubtext}>check-ins</Text>
-          </View>
-          <View style={styles.progressBarContainer}>
-            <View
-              style={[
-                styles.progressBar,
-                { width: `${progress}%`, backgroundColor: categoryInfo.color },
-              ]}
-            />
-          </View>
-        </View>
-      );
-    }
-
-    // Habit - show streak
-    if (
-      progressDisplay.type === "habit" &&
-      progressDisplay.streak > 0 &&
-      planStatus?.status === "completed"
-    ) {
+    // Show streak for habits
+    if (progressDisplay.streak > 0 && planStatus?.status === "completed") {
       return (
         <View style={styles.streakContainer}>
           <Ionicons
@@ -508,14 +269,10 @@ export function GoalCard({
 
   return (
     <TouchableOpacity
-      onPress={planStatus?.status === "completed" ? onPress : undefined}
+      onPress={!isCardDisabled ? onPress : undefined}
       activeOpacity={0.7}
     >
-      <Card
-        shadow="sm"
-        style={[styles.card, style]}
-        disabled={planStatus?.status !== "completed"}
-      >
+      <Card shadow="sm" style={[styles.card, style]} disabled={isCardDisabled}>
         {/* Header Row */}
         <View style={styles.header}>
           {/* Icon */}
@@ -525,7 +282,11 @@ export function GoalCard({
               { backgroundColor: `${categoryInfo.color}12` },
             ]}
           >
-            <Text style={styles.emoji}>{emoji}</Text>
+            <Ionicons
+              name={categoryInfo.icon}
+              size={toRN(tokens.typography.fontSize.xl)}
+              color={categoryInfo.color}
+            />
           </View>
 
           {/* Title & Meta */}
@@ -548,11 +309,13 @@ export function GoalCard({
               </View>
               <View style={styles.typePill}>
                 <Ionicons
-                  name={goalTypeInfo.icon}
+                  name="refresh-outline"
                   size={10}
                   color={colors.text.tertiary}
                 />
-                <Text style={styles.typeText}>{goalTypeInfo.label}</Text>
+                <Text style={styles.typeText}>
+                  {t("goals.habit") || "Habit"}
+                </Text>
               </View>
             </View>
           </View>
@@ -583,11 +346,23 @@ export function GoalCard({
             planStatus.status === "completed" ||
             planStatus.status === "failed" ||
             isGoalFailed) && (
-            <View style={styles.planStatusRow}>
-              <PlanStatusBadge
-                status={isGoalFailed ? "failed" : planStatus.status}
-                size="sm"
-              />
+            <View
+              style={[
+                styles.planStatusRow,
+                {
+                  justifyContent:
+                    planStatus.status === "completed"
+                      ? "flex-end"
+                      : "space-between",
+                },
+              ]}
+            >
+              {planStatus.status !== "completed" && (
+                <PlanStatusBadge
+                  status={isGoalFailed ? "failed" : planStatus.status}
+                  size="sm"
+                />
+              )}
               {planStatus.status === "completed" && !isGoalFailed && (
                 <TouchableOpacity
                   onPress={onPress}
@@ -630,19 +405,6 @@ export function GoalCard({
         visible={showActionSheet}
         title={goal.title}
         sections={menuSections}
-        infoLink={
-          isConvertedToChallenge
-            ? {
-                id: "converted_info",
-                label:
-                  t("goals.converted_to_challenge_info") ||
-                  "Why can't I reactivate this?",
-                description:
-                  t("goals.converted_to_challenge_info_desc") ||
-                  "This goal was converted to a challenge. View the challenge instead.",
-              }
-            : undefined
-        }
         onClose={() => setShowActionSheet(false)}
       />
     </TouchableOpacity>
@@ -669,9 +431,6 @@ const makeGoalCardStyles = (tokens: any, colors: any, brand: any) => ({
     alignItems: "center" as const,
     justifyContent: "center" as const,
     marginRight: toRN(tokens.spacing[3]),
-  },
-  emoji: {
-    fontSize: toRN(tokens.typography.fontSize.xl),
   },
   titleContainer: {
     flex: 1,

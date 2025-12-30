@@ -1,9 +1,13 @@
+import { useMemo } from "react";
 import { useRouter } from "expo-router";
 import { useTranslation } from "@/lib/i18n";
 import { useAlertModal } from "@/contexts/AlertModalContext";
 import { MOBILE_ROUTES } from "@/lib/routes";
 import { Challenge } from "@/services/api/challenges";
-import { useLeaveChallenge } from "@/hooks/api/useChallenges";
+import {
+  useLeaveChallenge,
+  useCancelChallenge,
+} from "@/hooks/api/useChallenges";
 import { BottomMenuSection } from "@/components/ui/BottomMenuSheet";
 
 interface UseChallengeMenuOptions {
@@ -31,15 +35,30 @@ export function useChallengeMenu({
   const { showAlert, showConfirm, showToast } = useAlertModal();
 
   const leaveChallenge = useLeaveChallenge();
+  const cancelChallenge = useCancelChallenge();
 
   // Determine challenge status
   const isCreator = challenge.is_creator === true;
   const isParticipant = challenge.is_participant === true;
   const isCompleted = challenge.status === "completed";
   const isCancelled = challenge.status === "cancelled";
-  const isActive =
-    challenge.status === "active" || challenge.is_active === true;
+  const isActive = challenge.status === "active";
   const isUpcoming = challenge.status === "upcoming";
+
+  // Check if join deadline is still valid (for invites)
+  const isJoinDeadlineValid = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Use join_deadline if set, otherwise use start_date
+    const deadlineStr = challenge.join_deadline || challenge.start_date;
+    if (!deadlineStr) return false;
+
+    const deadline = new Date(deadlineStr);
+    deadline.setHours(23, 59, 59, 999); // End of day
+
+    return deadline >= today;
+  }, [challenge.join_deadline, challenge.start_date]);
 
   const handleLeave = async () => {
     const confirmed = await showConfirm({
@@ -69,23 +88,47 @@ export function useChallengeMenu({
   };
 
   const handleCancel = async () => {
-    // TODO: Implement cancel challenge API
-    showAlert({
-      title: t("common.coming_soon") || "Coming Soon",
-      message:
-        t("challenges.cancel_coming_soon") ||
-        "Cancel functionality coming soon",
-    });
-  };
+    const participantCount = challenge.participants_count || 0;
+    const confirmMessage =
+      participantCount > 0
+        ? t("challenges.cancel_confirm_with_participants", {
+            count: participantCount,
+          }) ||
+          `This will end the challenge for all ${participantCount} participant(s). This action cannot be undone.`
+        : t("challenges.cancel_confirm") ||
+          "Are you sure you want to cancel this challenge? This action cannot be undone.";
 
-  const handleDelete = async () => {
-    // TODO: Implement delete challenge API
-    showAlert({
-      title: t("common.coming_soon") || "Coming Soon",
-      message:
-        t("challenges.delete_coming_soon") ||
-        "Delete functionality coming soon",
+    const confirmed = await showConfirm({
+      title: t("challenges.cancel_title") || "Cancel Challenge?",
+      message: confirmMessage,
+      variant: "error",
+      confirmLabel: t("challenges.cancel_confirm_button") || "Cancel Challenge",
+      cancelLabel: t("common.nevermind") || "Nevermind",
+      showCancel: true,
     });
+
+    if (!confirmed) return;
+
+    try {
+      await cancelChallenge.mutateAsync({ challengeId: challenge.id });
+      showToast({
+        title: t("common.success"),
+        message:
+          t("challenges.cancel_success") || "Challenge has been cancelled",
+        variant: "success",
+      });
+      onCancelled?.();
+    } catch (error: any) {
+      const errorMessage =
+        error?.response?.data?.detail ||
+        t("challenges.cancel_error") ||
+        "Failed to cancel challenge";
+      showAlert({
+        title: t("common.error"),
+        message: errorMessage,
+        variant: "error",
+      });
+    }
   };
 
   const handleInvite = () => {
@@ -127,8 +170,14 @@ export function useChallengeMenu({
       },
     ];
 
-    // Add invite option for participants/creators
-    if (isParticipant || isCreator) {
+    // Add invite option for participants/creators only if join deadline hasn't passed
+    // and challenge is still active or upcoming
+    const canInvite =
+      (isParticipant || isCreator) &&
+      isJoinDeadlineValid &&
+      (isActive || isUpcoming);
+
+    if (canInvite) {
       secondaryOptions.push({
         id: "invite",
         label: t("challenges.invite_users") || "Invite Users",
@@ -190,8 +239,9 @@ export function useChallengeMenu({
     menuSections: buildMenuSections(),
     handleLeave,
     handleCancel,
-    handleDelete,
     handleInvite,
     isLeaving: leaveChallenge.isPending,
+    isCancelling: cancelChallenge.isPending,
+    isJoinDeadlineValid,
   };
 }

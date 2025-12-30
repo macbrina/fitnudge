@@ -53,7 +53,7 @@ export const SkeletonBox: React.FC<SkeletonBoxProps> = ({
             duration: duration,
             useNativeDriver: false,
           }),
-        ])
+        ]),
       );
       animation.start();
 

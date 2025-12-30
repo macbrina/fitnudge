@@ -36,7 +36,7 @@ def generate_weekly_recaps_task(self) -> Dict[str, Any]:
         active_goals = (
             supabase.table("goals")
             .select("user_id, id")
-            .eq("is_active", True)
+            .eq("status", "active")
             .execute()
         )
 

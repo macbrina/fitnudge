@@ -79,7 +79,7 @@ export default function ForgotPasswordScreen() {
             variant: "error",
           });
         },
-      }
+      },
     );
   };
 
@@ -163,7 +163,7 @@ export default function ForgotPasswordScreen() {
 const makeForgotPasswordScreenStyles = (
   tokens: any,
   colors: any,
-  brand: any
+  brand: any,
 ) => {
   return {
     container: {
@@ -197,7 +197,7 @@ const makeForgotPasswordScreenStyles = (
       textAlign: "center" as const,
       lineHeight: lineHeight(
         tokens.typography.fontSize.base,
-        tokens.typography.lineHeight.relaxed
+        tokens.typography.lineHeight.relaxed,
       ),
       fontFamily: fontFamily.groteskRegular,
     },

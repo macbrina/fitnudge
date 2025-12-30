@@ -1,38 +1,35 @@
 import { BaseApiService, ApiResponse } from "./base";
 import { ROUTES } from "@/lib/routes";
 
-// Goal type literals
-export type GoalType = "habit" | "time_challenge" | "target_challenge";
+// Goal status type
+export type GoalStatus = "active" | "paused" | "completed" | "archived";
 export type CompletionReason = "duration" | "target" | "manual";
 
-// Goals Types
+// Goal type - goals are now habits only (challenges handle time/target based goals)
+export type GoalType = "habit";
+
+// Tracking type - determines how user completes their check-in
+export type TrackingType = "workout" | "meal" | "hydration" | "checkin";
+
+// Goals Types - Goals are habits only (ongoing activities without fixed end dates)
 export interface Goal {
   id: string;
   user_id: string;
   title: string;
   description?: string;
-  category:
-    | "fitness"
-    | "nutrition"
-    | "wellness"
-    | "mindfulness"
-    | "sleep"
-    | "custom";
+  category: "fitness" | "nutrition" | "wellness" | "mindfulness" | "sleep";
   frequency: "daily" | "weekly";
   target_days: number;
   days_of_week?: number[]; // Array of day numbers (0-6): 0=Sunday, 1=Monday, ..., 6=Saturday
   reminder_times: string[];
-  is_active: boolean;
+  status: GoalStatus;
+  tracking_type: TrackingType; // How user completes check-in
   created_at: string;
   updated_at: string;
-  // Goal type fields
-  goal_type?: GoalType;
-  challenge_id?: string; // Links to shared challenge
-  target_checkins?: number; // For target_challenge
-  challenge_start_date?: string; // For time_challenge
-  challenge_end_date?: string; // For time_challenge
-  completed_at?: string; // When challenge was completed
+  // Completion fields
+  completed_at?: string;
   completion_reason?: CompletionReason;
+  archived_reason?: string;
 }
 
 export interface CreateGoalRequest {
@@ -43,12 +40,8 @@ export interface CreateGoalRequest {
   target_days: number;
   days_of_week?: number[];
   reminder_times: string[];
-  is_active?: boolean;
-  // Goal type fields
-  goal_type?: GoalType;
-  target_checkins?: number; // For target_challenge
-  challenge_duration_days?: number; // For time_challenge (30, 60, 90)
-  challenge_id?: string; // Link to shared challenge
+  tracking_type?: TrackingType; // Defaults to 'checkin' or 'workout' for fitness
+  status?: GoalStatus;
 }
 
 export interface UpdateGoalRequest {
@@ -59,12 +52,7 @@ export interface UpdateGoalRequest {
   target_days?: number;
   days_of_week?: number[];
   reminder_times?: string[];
-  is_active?: boolean;
-  // Goal type fields (mostly immutable)
-  goal_type?: GoalType;
-  target_checkins?: number;
-  completed_at?: string;
-  completion_reason?: CompletionReason;
+  status?: GoalStatus;
 }
 
 // Goal Type Suggestion Types
@@ -118,7 +106,8 @@ export interface GoalStats {
 // Goals Service
 export class GoalsService extends BaseApiService {
   async getGoals(): Promise<ApiResponse<Goal[]>> {
-    return this.get<Goal[]>(ROUTES.GOALS.LIST);
+    // Pass active_only=false to get all goals (active, archived, paused, completed)
+    return this.get<Goal[]>(`${ROUTES.GOALS.LIST}?active_only=false`);
   }
 
   async getGoal(goalId: string): Promise<ApiResponse<Goal>> {
@@ -131,7 +120,7 @@ export class GoalsService extends BaseApiService {
 
   async updateGoal(
     goalId: string,
-    updates: UpdateGoalRequest
+    updates: UpdateGoalRequest,
   ): Promise<ApiResponse<Goal>> {
     return this.put<Goal>(ROUTES.GOALS.UPDATE(goalId), updates);
   }
@@ -147,7 +136,7 @@ export class GoalsService extends BaseApiService {
   async createGoalFromTemplate(templateId: string): Promise<ApiResponse<Goal>> {
     return this.post<Goal>(
       `${ROUTES.GOALS.TEMPLATES}/${templateId}/create`,
-      {}
+      {},
     );
   }
 
@@ -179,7 +168,7 @@ export class GoalsService extends BaseApiService {
   }
 
   async getGoalsByCategory(
-    category: Goal["category"]
+    category: Goal["category"],
   ): Promise<ApiResponse<Goal[]>> {
     return this.get<Goal[]>(ROUTES.GOALS.GET_GOALS_BY_CATEGORY(category));
   }
@@ -196,11 +185,11 @@ export class GoalsService extends BaseApiService {
    * Get AI-powered goal suggestions based on goal type
    */
   async getSuggestionsByType(
-    request: GoalTypeSuggestionRequest
+    request: GoalTypeSuggestionRequest,
   ): Promise<ApiResponse<GoalTypeSuggestionResponse>> {
     return this.post<GoalTypeSuggestionResponse>(
       `${ROUTES.GOALS.LIST}/suggestions-by-type`,
-      request
+      request,
     );
   }
 }

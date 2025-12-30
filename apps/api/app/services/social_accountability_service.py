@@ -5,13 +5,130 @@ Handles accountability partners and social nudges.
 """
 
 from typing import Dict, Any, List, Optional
-from datetime import date
+from datetime import date, datetime
 from app.core.database import get_supabase_client
 from app.services.logger import logger
 
 
 class SocialAccountabilityService:
     """Service for managing social accountability features"""
+
+    async def notify_partners_of_data_change(
+        self, user_id: str, change_type: str = "data"
+    ) -> int:
+        """
+        Touch accountability_partners table to trigger realtime events for partners.
+
+        When a user updates their goals/challenges/check-ins, their partners need
+        to be notified so their PartnerDetailScreen can refresh and show updated data.
+
+        This updates the updated_at field on all partnerships involving this user,
+        which triggers Supabase Realtime events to all partners.
+
+        Args:
+            user_id: The user whose data changed
+            change_type: Description of what changed (for logging)
+
+        Returns:
+            Number of partners notified
+        """
+        supabase = get_supabase_client()
+
+        try:
+            # Update all accepted partnerships where this user is involved
+            # This triggers realtime events to their partners
+            result = (
+                supabase.table("accountability_partners")
+                .update({"updated_at": datetime.utcnow().isoformat()})
+                .or_(f"user_id.eq.{user_id},partner_user_id.eq.{user_id}")
+                .eq("status", "accepted")
+                .execute()
+            )
+
+            partner_count = len(result.data) if result.data else 0
+            if partner_count > 0:
+                logger.info(
+                    f"Notified {partner_count} partnership records of {change_type} change for user {user_id}"
+                )
+            return partner_count
+        except Exception as e:
+            # Don't fail the main operation if partner notification fails
+            logger.warning(f"Failed to notify partners of {change_type} change: {e}")
+            return 0
+
+    def notify_partners_of_data_change_sync(
+        self, user_id: str, change_type: str = "data"
+    ) -> int:
+        """
+        Sync version of notify_partners_of_data_change for use in Celery tasks.
+
+        Touch accountability_partners table to trigger realtime events for partners.
+        """
+        supabase = get_supabase_client()
+
+        try:
+            result = (
+                supabase.table("accountability_partners")
+                .update({"updated_at": datetime.utcnow().isoformat()})
+                .or_(f"user_id.eq.{user_id},partner_user_id.eq.{user_id}")
+                .eq("status", "accepted")
+                .execute()
+            )
+
+            partner_count = len(result.data) if result.data else 0
+            if partner_count > 0:
+                logger.info(
+                    f"Notified {partner_count} partnership records of {change_type} change for user {user_id}"
+                )
+            return partner_count
+        except Exception as e:
+            logger.warning(f"Failed to notify partners of {change_type} change: {e}")
+            return 0
+
+    def notify_partners_for_multiple_users_sync(
+        self, user_ids: list, change_type: str = "data"
+    ) -> int:
+        """
+        Sync version of partner notification for multiple users (e.g., all challenge participants).
+        Used in Celery tasks that affect multiple users at once.
+
+        Args:
+            user_ids: List of user IDs whose partners should be notified
+            change_type: Description of what changed (for logging)
+
+        Returns:
+            Total number of partnerships notified
+        """
+        if not user_ids:
+            return 0
+
+        supabase = get_supabase_client()
+        total_notified = 0
+
+        try:
+            # Build OR condition for all user IDs
+            # Each user can be either user_id or partner_user_id in the partnership
+            or_conditions = ",".join(
+                [f"user_id.eq.{uid},partner_user_id.eq.{uid}" for uid in user_ids]
+            )
+
+            result = (
+                supabase.table("accountability_partners")
+                .update({"updated_at": datetime.utcnow().isoformat()})
+                .or_(or_conditions)
+                .eq("status", "accepted")
+                .execute()
+            )
+
+            total_notified = len(result.data) if result.data else 0
+            if total_notified > 0:
+                logger.info(
+                    f"Notified {total_notified} partnership records of {change_type} change for {len(user_ids)} users"
+                )
+        except Exception as e:
+            logger.warning(f"Failed to notify partners for multiple users: {e}")
+
+        return total_notified
 
     async def request_accountability_partner(
         self, user_id: str, partner_user_id: str

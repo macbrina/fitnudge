@@ -14,21 +14,21 @@ interface RedirectionOptions {
  * @param options.hasFitnessProfile - If true, skip personalization (user already completed it before)
  */
 export async function getRedirection(
-  options: RedirectionOptions = {}
+  options: RedirectionOptions = {},
 ): Promise<string> {
   const { hasFitnessProfile } = options;
 
   // Check onboarding flags in order
   try {
     const hasSeenNotificationPermission = await storageUtil.getItem<boolean>(
-      STORAGE_KEYS.HAS_SEEN_NOTIFICATION_PERMISSION
+      STORAGE_KEYS.HAS_SEEN_NOTIFICATION_PERMISSION,
     );
     if (!hasSeenNotificationPermission) {
       return MOBILE_ROUTES.ONBOARDING.NOTIFICATION_PERMISSION;
     }
 
     const hasSeenPersonalization = await storageUtil.getItem<boolean>(
-      STORAGE_KEYS.HAS_SEEN_PERSONALIZATION
+      STORAGE_KEYS.HAS_SEEN_PERSONALIZATION,
     );
 
     // Skip personalization if:

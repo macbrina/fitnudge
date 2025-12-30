@@ -25,7 +25,11 @@ export function AccountabilityPlanCard({ plan }: AccountabilityPlanCardProps) {
     <Card shadow="lg" style={styles.card}>
       <View style={styles.header}>
         <View style={styles.iconContainer}>
-          <Ionicons name="checkmark-circle" size={28} color={brandColors.primary} />
+          <Ionicons
+            name="checkmark-circle"
+            size={28}
+            color={brandColors.primary}
+          />
         </View>
         <Text style={styles.cardTitle}>
           {t("goals.plan.accountability_title")}
@@ -34,7 +38,11 @@ export function AccountabilityPlanCard({ plan }: AccountabilityPlanCardProps) {
 
       <View style={styles.trackingCard}>
         <View style={styles.trackingRow}>
-          <Ionicons name="calendar-outline" size={20} color={colors.text.secondary} />
+          <Ionicons
+            name="calendar-outline"
+            size={20}
+            color={colors.text.secondary}
+          />
           <Text style={styles.trackingLabel}>{t("goals.plan.frequency")}:</Text>
           <Text style={styles.trackingValue}>
             {tracking.frequency === "daily"
@@ -45,7 +53,11 @@ export function AccountabilityPlanCard({ plan }: AccountabilityPlanCardProps) {
 
         {tracking.target_days_per_week && (
           <View style={styles.trackingRow}>
-            <Ionicons name="flag-outline" size={20} color={colors.text.secondary} />
+            <Ionicons
+              name="flag-outline"
+              size={20}
+              color={colors.text.secondary}
+            />
             <Text style={styles.trackingLabel}>{t("goals.plan.target")}:</Text>
             <Text style={styles.trackingValue}>
               {tracking.target_days_per_week} {t("goals.plan.days_per_week")}
@@ -54,7 +66,11 @@ export function AccountabilityPlanCard({ plan }: AccountabilityPlanCardProps) {
         )}
 
         <View style={styles.trackingRow}>
-          <Ionicons name="checkbox-outline" size={20} color={colors.text.secondary} />
+          <Ionicons
+            name="checkbox-outline"
+            size={20}
+            color={colors.text.secondary}
+          />
           <Text style={styles.trackingLabel}>{t("goals.plan.method")}:</Text>
           <Text style={styles.trackingValue}>
             {t("goals.plan.daily_checkins")}
@@ -68,7 +84,7 @@ export function AccountabilityPlanCard({ plan }: AccountabilityPlanCardProps) {
 const makeAccountabilityPlanCardStyles = (
   tokens: any,
   colors: any,
-  brand: any
+  brand: any,
 ) => ({
   card: {
     marginBottom: toRN(tokens.spacing[4]),
@@ -118,4 +134,3 @@ const makeAccountabilityPlanCardStyles = (
     color: colors.text.primary,
   },
 });
-

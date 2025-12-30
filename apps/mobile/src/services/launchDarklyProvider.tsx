@@ -19,10 +19,10 @@ const FallbackLDProvider = ({ children }: { children: ReactNode }) => {
 
 const useFallbackBoolVariation = (
   flagKey: string,
-  defaultValue: boolean = false
+  defaultValue: boolean = false,
 ) => {
   console.warn(
-    `LaunchDarkly: Using fallback for flag ${flagKey}, returning default: ${defaultValue}`
+    `LaunchDarkly: Using fallback for flag ${flagKey}, returning default: ${defaultValue}`,
   );
   return defaultValue;
 };
@@ -50,7 +50,7 @@ const createLDClient = () => {
   // Optional: Hint if the key does not look like a mobile (Test) key
   if (!clientId.startsWith("mob-")) {
     console.warn(
-      "LaunchDarkly: SDK key may be incorrect for Test environment (expected to start with 'mob-')."
+      "LaunchDarkly: SDK key may be incorrect for Test environment (expected to start with 'mob-').",
     );
   }
 
@@ -69,7 +69,7 @@ const createLDClient = () => {
           id: "fitnudge-mobile",
           version: "1.0.0",
         },
-      }
+      },
     );
   } catch (error) {
     console.error("LaunchDarkly: Failed to create client:", error);
@@ -111,7 +111,6 @@ function UserIdentifier({ children }: { children: ReactNode }) {
           if (ldClient && ldClient.track) {
             // Fire-and-forget; RN SDK may return void or Promise
             try {
-              // eslint-disable-next-line @typescript-eslint/no-floating-promises
               ldClient.track("68fed7daead2430abe79ae24");
             } catch (e) {
               console.warn("LaunchDarkly: track failed", e);

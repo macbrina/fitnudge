@@ -76,7 +76,7 @@ i18next
     missingKeyHandler: (lng, ns, key, fallbackValue) => {
       console.warn(
         `Missing translation key: ${lng}.${ns}.${key}`,
-        fallbackValue
+        fallbackValue,
       );
     },
   });

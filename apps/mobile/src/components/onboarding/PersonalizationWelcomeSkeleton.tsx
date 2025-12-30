@@ -97,7 +97,7 @@ export default function PersonalizationWelcomeSkeleton() {
 const makePersonalizationWelcomeSkeletonStyles = (
   tokens: any,
   colors: any,
-  brand: any
+  brand: any,
 ) => {
   return {
     container: {

@@ -54,7 +54,7 @@ class AchievementsService extends BaseApiService {
    */
   async getAchievementTypes(): Promise<AchievementType[]> {
     const response = await this.get<AchievementType[]>(
-      ROUTES.ACHIEVEMENTS.TYPES
+      ROUTES.ACHIEVEMENTS.TYPES,
     );
     return response.data || [];
   }
@@ -64,7 +64,7 @@ class AchievementsService extends BaseApiService {
    */
   async getMyAchievements(): Promise<UserAchievement[]> {
     const response = await this.get<UserAchievement[]>(
-      ROUTES.ACHIEVEMENTS.MY_ACHIEVEMENTS
+      ROUTES.ACHIEVEMENTS.MY_ACHIEVEMENTS,
     );
     return response.data || [];
   }
@@ -75,7 +75,7 @@ class AchievementsService extends BaseApiService {
   async checkAchievements(): Promise<UserAchievement[]> {
     const response = await this.post<UserAchievement[]>(
       ROUTES.ACHIEVEMENTS.CHECK,
-      {}
+      {},
     );
     return response.data || [];
   }
@@ -85,7 +85,7 @@ class AchievementsService extends BaseApiService {
    */
   async getAchievementStats(): Promise<AchievementStats> {
     const response = await this.get<AchievementStats>(
-      ROUTES.ACHIEVEMENTS.STATS
+      ROUTES.ACHIEVEMENTS.STATS,
     );
     return (
       response.data || {

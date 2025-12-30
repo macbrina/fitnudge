@@ -104,5 +104,23 @@ export {
   type HomeDashboardResponse,
 } from "./home";
 
+// Tracking Stats
+export {
+  trackingStatsService,
+  type TrackingStatsResponse,
+  type TrackingType,
+  type WorkoutStats,
+  type MealStats,
+  type HydrationStats,
+  type CheckinStats,
+} from "./trackingStats";
+
+// Notifications
+export {
+  notificationsService,
+  type NotificationHistoryItem,
+  type NotificationType,
+} from "./notifications";
+
 // Legacy compatibility - re-export the main services as apiService
 export { authService as apiService } from "./auth";

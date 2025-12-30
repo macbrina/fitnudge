@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -8,7 +8,7 @@ import {
   Dimensions,
   ActivityIndicator,
 } from "react-native";
-import { useVideoPlayer, VideoView } from "expo-video";
+import Video, { ResizeMode } from "react-native-video";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStyles } from "@/themes";
 import { useTheme } from "@/themes";
@@ -67,32 +67,6 @@ export function ExerciseDetailModal({
 
   // MP4 URLs are now full Cloudflare CDN URLs stored in the database
   const mp4Url = exercise?.mp4_url || null;
-
-  // Video player for exercise demonstration
-  const player = useVideoPlayer(mp4Url || "", (player) => {
-    player.loop = true;
-    player.playbackRate = 0.5;
-    player.muted = true;
-  });
-
-  // Listen for player status changes
-  useEffect(() => {
-    if (!player) return;
-
-    const subscription = player.addListener("statusChange", (status) => {
-      if (status.status === "readyToPlay") {
-        setVideoLoaded(true);
-        player.play();
-      } else if (status.status === "error") {
-        setVideoError(true);
-        setVideoLoaded(true);
-      }
-    });
-
-    return () => {
-      subscription.remove();
-    };
-  }, [player]);
 
   const getDifficultyColor = (difficulty?: string) => {
     switch (difficulty?.toLowerCase()) {
@@ -172,11 +146,19 @@ export function ExerciseDetailModal({
                   </Text>
                 </View>
               )}
-              <VideoView
-                player={player}
+              <Video
+                source={{ uri: mp4Url }}
                 style={[styles.video, !videoLoaded && styles.videoHidden]}
-                contentFit="contain"
-                nativeControls={false}
+                resizeMode={ResizeMode.CONTAIN}
+                repeat={true}
+                rate={0.75}
+                muted={true}
+                controls={false}
+                onLoad={() => setVideoLoaded(true)}
+                onError={() => {
+                  setVideoError(true);
+                  setVideoLoaded(true);
+                }}
               />
             </View>
           ) : (
@@ -427,7 +409,7 @@ export function ExerciseDetailModal({
 const makeExerciseDetailModalStyles = (
   tokens: any,
   colors: any,
-  brand: any
+  brand: any,
 ) => ({
   container: {
     flex: 1,

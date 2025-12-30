@@ -12,6 +12,7 @@ import { SkeletonBox } from "@/components/ui/SkeletonBox";
 import { ActiveItem } from "@/services/api/home";
 import { Ionicons } from "@expo/vector-icons";
 import Button from "@/components/ui/Button";
+import { useGoals } from "@/hooks/api/useGoals";
 
 interface ActiveItemsSummaryProps {
   items: ActiveItem[];
@@ -30,6 +31,10 @@ export function ActiveItemsSummary({
   const { colors, brandColors } = useTheme();
   const { t } = useTranslation();
   const router = useRouter();
+
+  // Check if user has any goals at all (including archived)
+  const { data: goalsResponse } = useGoals();
+  const hasAnyGoals = (goalsResponse?.data?.length ?? 0) > 0;
 
   // Count items by type
   const counts = React.useMemo(() => {
@@ -92,24 +97,30 @@ export function ActiveItemsSummary({
     );
   }
 
-  // Empty state
+  // Empty state - for both goals and challenges
   if (!items || items.length === 0) {
     return (
       <View style={styles.container}>
         <Card shadow="sm" style={styles.card}>
           <View style={styles.emptyContent}>
             <View style={styles.emptyIconContainer}>
-              <Text style={styles.emptyIcon}>🎯</Text>
+              <Ionicons
+                name="rocket-outline"
+                size={toRN(tokens.typography.fontSize["3xl"])}
+                color={brandColors.primary}
+              />
             </View>
-            <Text style={styles.emptyTitle}>{t("home.no_goals_title")}</Text>
+            <Text style={styles.emptyTitle}>{t("home.no_items_title")}</Text>
             <Text style={styles.emptyMessage}>
-              {t("home.no_goals_message")}
+              {t("home.no_items_message")}
             </Text>
             <Button
               variant="primary"
               size="sm"
               onPress={handleCreate}
-              title={t("home.create_first_goal")}
+              title={
+                hasAnyGoals ? t("home.create_goal") : t("home.get_started")
+              }
               leftIcon="add"
             />
           </View>
@@ -175,7 +186,7 @@ export function ActiveItemsSummary({
 const makeActiveItemsSummaryStyles = (
   tokens: any,
   colors: any,
-  brand: any
+  brand: any,
 ) => ({
   container: {
     marginBottom: toRN(tokens.spacing[4]),

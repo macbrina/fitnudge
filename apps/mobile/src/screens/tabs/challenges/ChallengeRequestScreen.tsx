@@ -63,6 +63,29 @@ export const ChallengeRequestScreen: React.FC = () => {
   const { data: challengeData } = useChallenge(challengeId || "");
   const challenge = challengeData?.data;
 
+  // Check if challenge allows invites
+  const canSendInvites = useMemo(() => {
+    if (!challenge) return false;
+
+    // Challenge must be active or upcoming
+    const validStatus =
+      challenge.status === "active" || challenge.status === "upcoming";
+    if (!validStatus) return false;
+
+    // Check join deadline
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const deadlineStr = challenge.join_deadline || challenge.start_date;
+    if (deadlineStr) {
+      const deadline = new Date(deadlineStr);
+      deadline.setHours(23, 59, 59, 999);
+      if (today > deadline) return false;
+    }
+
+    return true;
+  }, [challenge]);
+
   // Build tabs with translations
   const tabs: TabItem[] = useMemo(
     () => [
@@ -70,7 +93,7 @@ export const ChallengeRequestScreen: React.FC = () => {
       { id: "received", label: t("challenges.received") },
       { id: "sent", label: t("challenges.pending") },
     ],
-    [t]
+    [t],
   );
 
   // Debounce search query
@@ -118,7 +141,7 @@ export const ChallengeRequestScreen: React.FC = () => {
 
   // Track which users are currently being processed (for showing loading on specific buttons)
   const [processingUsers, setProcessingUsers] = useState<Set<string>>(
-    new Set()
+    new Set(),
   );
 
   // Track manual refresh state (don't show RefreshControl for background refetches)
@@ -155,7 +178,7 @@ export const ChallengeRequestScreen: React.FC = () => {
   const filteredSentInvites = sentInvites.filter(
     (inv) =>
       inv.status === "pending" &&
-      (!challengeId || inv.challenge_id === challengeId)
+      (!challengeId || inv.challenge_id === challengeId),
   );
 
   // Check if user already has pending invite for this challenge
@@ -163,10 +186,10 @@ export const ChallengeRequestScreen: React.FC = () => {
     (userId: string) => {
       if (!challengeId) return false;
       return filteredSentInvites.some(
-        (inv) => inv.invited_user_id === userId && inv.status === "pending"
+        (inv) => inv.invited_user_id === userId && inv.status === "pending",
       );
     },
-    [challengeId, filteredSentInvites]
+    [challengeId, filteredSentInvites],
   );
 
   // Get the invite for a specific user (for cancellation)
@@ -174,10 +197,10 @@ export const ChallengeRequestScreen: React.FC = () => {
     (userId: string): ChallengeInvite | undefined => {
       if (!challengeId) return undefined;
       return filteredSentInvites.find(
-        (inv) => inv.invited_user_id === userId && inv.status === "pending"
+        (inv) => inv.invited_user_id === userId && inv.status === "pending",
       );
     },
-    [challengeId, filteredSentInvites]
+    [challengeId, filteredSentInvites],
   );
 
   const handleLoadMore = useCallback(() => {
@@ -268,7 +291,7 @@ export const ChallengeRequestScreen: React.FC = () => {
       t,
       addProcessingUser,
       removeProcessingUser,
-    ]
+    ],
   );
 
   const handleSendInvite = useCallback(
@@ -277,6 +300,19 @@ export const ChallengeRequestScreen: React.FC = () => {
         showAlert({
           title: t("common.error"),
           message: t("challenges.no_challenge_selected"),
+          variant: "error",
+          confirmLabel: t("common.ok"),
+        });
+        return;
+      }
+
+      // Check if challenge allows invites (status + deadline)
+      if (!canSendInvites) {
+        showAlert({
+          title: t("common.error"),
+          message:
+            t("challenges.invite_not_allowed") ||
+            "Invites are no longer allowed for this challenge",
           variant: "error",
           confirmLabel: t("common.ok"),
         });
@@ -316,17 +352,35 @@ export const ChallengeRequestScreen: React.FC = () => {
     [
       challengeId,
       challenge,
+      canSendInvites,
       hasInvitePending,
       sendInviteMutation,
       showAlert,
       t,
       addProcessingUser,
       removeProcessingUser,
-    ]
+    ],
   );
 
   const handleAcceptInvite = useCallback(
     async (invite: ChallengeInvite) => {
+      // Check if challenge is still joinable
+      const challengeStatus = invite.challenge?.status;
+      if (
+        challengeStatus &&
+        !["active", "upcoming"].includes(challengeStatus)
+      ) {
+        showAlert({
+          title: t("common.error"),
+          message:
+            t("challenges.invite_challenge_ended") ||
+            "This challenge is no longer available",
+          variant: "error",
+          confirmLabel: t("common.ok"),
+        });
+        return;
+      }
+
       addProcessingUser(invite.id);
       try {
         await acceptMutation.mutateAsync(invite.id);
@@ -342,7 +396,7 @@ export const ChallengeRequestScreen: React.FC = () => {
         removeProcessingUser(invite.id);
       }
     },
-    [acceptMutation, showAlert, t, addProcessingUser, removeProcessingUser]
+    [acceptMutation, showAlert, t, addProcessingUser, removeProcessingUser],
   );
 
   const handleDeclineInvite = useCallback(
@@ -362,7 +416,7 @@ export const ChallengeRequestScreen: React.FC = () => {
         removeProcessingUser(invite.id);
       }
     },
-    [declineMutation, showAlert, t, addProcessingUser, removeProcessingUser]
+    [declineMutation, showAlert, t, addProcessingUser, removeProcessingUser],
   );
 
   const handleCancelInvite = useCallback(
@@ -382,14 +436,14 @@ export const ChallengeRequestScreen: React.FC = () => {
         removeProcessingUser(invite.id);
       }
     },
-    [cancelMutation, showAlert, t, addProcessingUser, removeProcessingUser]
+    [cancelMutation, showAlert, t, addProcessingUser, removeProcessingUser],
   );
 
   const handleViewChallenge = useCallback(
     (id: string) => {
       router.push(MOBILE_ROUTES.CHALLENGES.DETAILS(id));
     },
-    [router]
+    [router],
   );
 
   const formatDate = useCallback((dateStr?: string) => {
@@ -445,11 +499,13 @@ export const ChallengeRequestScreen: React.FC = () => {
         }
 
         // No invite - show "Invite" button
+        const isButtonDisabled =
+          isProcessing || !challengeId || !canSendInvites;
         return (
           <TouchableOpacity
-            style={styles.addButton}
+            style={[styles.addButton, isButtonDisabled && { opacity: 0.5 }]}
             onPress={() => handleSendInvite(item)}
-            disabled={isProcessing || !challengeId}
+            disabled={isButtonDisabled}
             activeOpacity={0.7}
           >
             {isProcessing ? (
@@ -460,13 +516,15 @@ export const ChallengeRequestScreen: React.FC = () => {
                   name="person-add"
                   size={16}
                   color={
-                    challengeId ? brandColors.primary : colors.text.tertiary
+                    !isButtonDisabled
+                      ? brandColors.primary
+                      : colors.text.tertiary
                   }
                 />
                 <Text
                   style={[
                     styles.addButtonText,
-                    !challengeId && { color: colors.text.tertiary },
+                    isButtonDisabled && { color: colors.text.tertiary },
                   ]}
                 >
                   {t("challenges.invite")}
@@ -496,14 +554,14 @@ export const ChallengeRequestScreen: React.FC = () => {
 
             {/* User Info */}
             <View style={styles.userInfo}>
-              <Text style={styles.userName} numberOfLines={1}>
-                {displayName}
-              </Text>
               {item.username && (
                 <Text style={styles.userUsername} numberOfLines={1}>
                   @{item.username}
                 </Text>
               )}
+              <Text style={styles.userName} numberOfLines={1}>
+                {item.name || (item.username ? "" : t("common.user"))}
+              </Text>
             </View>
 
             {/* Action Button */}
@@ -516,13 +574,14 @@ export const ChallengeRequestScreen: React.FC = () => {
       brandColors,
       colors,
       challengeId,
+      canSendInvites,
       handleSendInvite,
       handleCancelInviteForUser,
       hasInvitePending,
       processingUsers,
       styles,
       t,
-    ]
+    ],
   );
 
   const renderReceivedInviteCard = useCallback(
@@ -607,7 +666,7 @@ export const ChallengeRequestScreen: React.FC = () => {
       processingUsers,
       styles,
       t,
-    ]
+    ],
   );
 
   const renderSentInviteCard = useCallback(
@@ -685,7 +744,7 @@ export const ChallengeRequestScreen: React.FC = () => {
       processingUsers,
       styles,
       t,
-    ]
+    ],
   );
 
   const renderEmptyState = useCallback(() => {
@@ -833,7 +892,7 @@ export const ChallengeRequestScreen: React.FC = () => {
         ))}
       </View>
     ),
-    [styles]
+    [styles],
   );
 
   // Show skeleton loading for initial load
@@ -873,6 +932,28 @@ export const ChallengeRequestScreen: React.FC = () => {
           fullWidth
         />
       </View>
+
+      {/* Warning Banner when invites not allowed */}
+      {activeTab === "search" &&
+        challengeId &&
+        !canSendInvites &&
+        challenge && (
+          <View style={styles.warningBanner}>
+            <Ionicons
+              name="warning-outline"
+              size={18}
+              color={colors.feedback.warning}
+            />
+            <Text style={styles.warningText}>
+              {challenge.status === "completed" ||
+              challenge.status === "cancelled"
+                ? t("challenges.invite_disabled_ended") ||
+                  "This challenge has ended"
+                : t("challenges.invite_disabled_deadline") ||
+                  "Join deadline has passed"}
+            </Text>
+          </View>
+        )}
 
       {/* Search Bar (only in search tab) */}
       {activeTab === "search" && (
@@ -937,6 +1018,25 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
   tabsContainer: {
     paddingHorizontal: toRN(tokens.spacing[4]),
     marginBottom: toRN(tokens.spacing[4]),
+  },
+  warningBanner: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: toRN(tokens.spacing[2]),
+    marginHorizontal: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[3]),
+    paddingVertical: toRN(tokens.spacing[3]),
+    paddingHorizontal: toRN(tokens.spacing[4]),
+    backgroundColor: `${colors.feedback.warning}15`,
+    borderRadius: toRN(tokens.borderRadius.md),
+    borderWidth: 1,
+    borderColor: `${colors.feedback.warning}30`,
+  },
+  warningText: {
+    flex: 1,
+    fontSize: toRN(tokens.typography.fontSize.sm),
+    fontFamily: fontFamily.medium,
+    color: colors.feedback.warning,
   },
   searchContainer: {
     paddingHorizontal: toRN(tokens.spacing[4]),

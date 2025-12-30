@@ -103,7 +103,7 @@ export const useExitOfferStore = create<ExitOfferState>((set, get) => ({
     const now = Date.now();
     const remaining = Math.max(
       0,
-      Math.floor((expiryTime.getTime() - now) / 1000)
+      Math.floor((expiryTime.getTime() - now) / 1000),
     );
 
     // Auto-clear if expired
@@ -148,7 +148,7 @@ export const useExitOfferStore = create<ExitOfferState>((set, get) => ({
 
     // Check last shown date
     const lastShownStr = await storageUtil.getItem<string>(
-      EXIT_OFFER_LAST_SHOWN
+      EXIT_OFFER_LAST_SHOWN,
     );
     if (lastShownStr) {
       const lastShown = new Date(lastShownStr);
@@ -172,7 +172,7 @@ export const useExitOfferStore = create<ExitOfferState>((set, get) => ({
 
     // Increment show count
     const currentCount = await storageUtil.getItem<number>(
-      EXIT_OFFER_SHOW_COUNT
+      EXIT_OFFER_SHOW_COUNT,
     );
     await storageUtil.setItem(EXIT_OFFER_SHOW_COUNT, (currentCount || 0) + 1);
   },

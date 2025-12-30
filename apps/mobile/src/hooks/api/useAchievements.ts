@@ -15,6 +15,15 @@ export const achievementsQueryKeys = {
   stats: () => [...achievementsQueryKeys.all, "stats"] as const,
 } as const;
 
+// Empty placeholders to prevent loading spinners
+const EMPTY_ACHIEVEMENTS: UserAchievement[] = [];
+const EMPTY_ACHIEVEMENT_TYPES: AchievementType[] = [];
+const EMPTY_STATS: AchievementStats = {
+  total_achievements: 0,
+  total_points: 0,
+  by_rarity: { common: 0, rare: 0, epic: 0, legendary: 0 },
+};
+
 /**
  * Hook to get all available achievement types
  */
@@ -23,6 +32,8 @@ export const useAchievementTypes = () => {
     queryKey: achievementsQueryKeys.types(),
     queryFn: () => achievementsService.getAchievementTypes(),
     staleTime: 30 * 60 * 1000, // 30 minutes - achievement types rarely change
+    refetchOnMount: false,
+    placeholderData: EMPTY_ACHIEVEMENT_TYPES,
   });
 };
 
@@ -37,6 +48,8 @@ export const useMyAchievements = () => {
     queryFn: () => achievementsService.getMyAchievements(),
     enabled: isAuthenticated,
     staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnMount: false,
+    placeholderData: EMPTY_ACHIEVEMENTS,
   });
 };
 
@@ -51,6 +64,8 @@ export const useAchievementStats = () => {
     queryFn: () => achievementsService.getAchievementStats(),
     enabled: isAuthenticated,
     staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnMount: false,
+    placeholderData: EMPTY_STATS,
   });
 };
 

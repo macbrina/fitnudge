@@ -21,13 +21,21 @@ import { UpgradePrompt, UpgradePromptType } from "@/components/subscription";
 import { useActiveGoals } from "@/hooks/api/useGoals";
 import SubscriptionScreen from "@/screens/onboarding/SubscriptionScreen";
 
+// Extended type to include challenge types for this selection screen
+type SelectableType =
+  | GoalType
+  | "mixed"
+  | "time_challenge"
+  | "target_challenge";
+
 interface GoalTypeOption {
-  id: GoalType | "mixed";
+  id: SelectableType;
   title: string;
   description: string;
   icon: keyof typeof Ionicons.glyphMap;
   isPremium: boolean;
   badge?: string;
+  isChallenge?: boolean; // True for challenge types
 }
 
 export default function GoalTypeSelectionScreen() {
@@ -42,9 +50,7 @@ export default function GoalTypeSelectionScreen() {
   } = useSubscriptionStore();
   const params = useLocalSearchParams<{ category?: string }>();
 
-  const [selectedType, setSelectedType] = useState<GoalType | "mixed" | null>(
-    null
-  );
+  const [selectedType, setSelectedType] = useState<SelectableType | null>(null);
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
   const [upgradePromptType, setUpgradePromptType] =
     useState<UpgradePromptType>("generic");
@@ -109,6 +115,7 @@ export default function GoalTypeSelectionScreen() {
         "Commit to 30, 60, or 90 days of focused effort. Shareable with friends.",
       icon: "calendar-outline",
       isPremium: true,
+      isChallenge: true,
     },
     {
       id: "target_challenge",
@@ -118,6 +125,7 @@ export default function GoalTypeSelectionScreen() {
         "Achieve a specific number (50 workouts, 100 meals, etc.). Race with friends.",
       icon: "flag-outline",
       isPremium: true,
+      isChallenge: true,
     },
   ];
 
@@ -125,14 +133,12 @@ export default function GoalTypeSelectionScreen() {
     router.back();
   };
 
-  const handleSelectType = (type: GoalType | "mixed") => {
+  const handleSelectType = (type: SelectableType) => {
     const option = goalTypeOptions.find((o) => o.id === type);
 
-    // Check premium access for challenges
+    // Check premium access for challenges - show subscription modal (hybrid approach)
     if (option?.isPremium && !hasPremiumAccess) {
-      // Show upgrade prompt instead of navigating
-      setUpgradePromptType("feature_locked");
-      setShowUpgradePrompt(true);
+      setShowSubscriptionScreen(true);
       return;
     }
 
@@ -142,14 +148,30 @@ export default function GoalTypeSelectionScreen() {
   const handleContinue = () => {
     if (!selectedType) return;
 
-    // Navigate to create goal screen with selected type
-    router.push({
-      pathname: "/create-goal",
-      params: {
-        goalType: selectedType,
-        category: params.category,
-      },
-    });
+    const option = goalTypeOptions.find((o) => o.id === selectedType);
+
+    // Navigate to create goal/challenge screen based on type
+    if (option?.isChallenge) {
+      // Route to challenge creation
+      router.push({
+        pathname: "/create-goal",
+        params: {
+          createType: "challenge",
+          challengeType:
+            selectedType === "time_challenge" ? "streak" : "checkin_count",
+          category: params.category,
+        },
+      });
+    } else {
+      // Route to goal creation
+      router.push({
+        pathname: "/create-goal",
+        params: {
+          goalType: selectedType,
+          category: params.category,
+        },
+      });
+    }
   };
 
   return (
@@ -186,7 +208,6 @@ export default function GoalTypeSelectionScreen() {
                   style={[
                     styles.optionCard,
                     isSelected && styles.optionCardSelected,
-                    isLocked && styles.optionCardLocked,
                   ]}
                 >
                   <View style={styles.optionHeader}>
@@ -221,15 +242,8 @@ export default function GoalTypeSelectionScreen() {
                       </View>
 
                       {isLocked && (
-                        <View style={styles.premiumBadge}>
-                          <Ionicons
-                            name="lock-closed"
-                            size={12}
-                            color={colors.text.tertiary}
-                          />
-                          <Text style={styles.premiumText}>
-                            {t("common.premium") || "Premium"}
-                          </Text>
+                        <View style={styles.proBadge}>
+                          <Text style={styles.proBadgeText}>PRO</Text>
                         </View>
                       )}
                     </View>
@@ -243,12 +257,7 @@ export default function GoalTypeSelectionScreen() {
                     )}
                   </View>
 
-                  <Text
-                    style={[
-                      styles.optionDescription,
-                      isLocked && styles.optionDescriptionLocked,
-                    ]}
-                  >
+                  <Text style={styles.optionDescription}>
                     {option.description}
                   </Text>
 
@@ -418,6 +427,19 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.medium,
     color: colors.text.tertiary,
+  },
+  proBadge: {
+    backgroundColor: brand.gradient?.start || "#8B5CF6",
+    paddingHorizontal: toRN(tokens.spacing[2]),
+    paddingVertical: toRN(2),
+    borderRadius: toRN(tokens.borderRadius.sm),
+    marginLeft: toRN(tokens.spacing[2]),
+  },
+  proBadgeText: {
+    fontSize: toRN(tokens.typography.fontSize.xs),
+    fontFamily: fontFamily.bold,
+    color: "#FFFFFF",
+    textTransform: "uppercase" as const,
   },
   optionDescription: {
     fontSize: toRN(tokens.typography.fontSize.sm),

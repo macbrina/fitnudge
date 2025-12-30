@@ -7,19 +7,32 @@ import { useTheme } from "@/themes";
 import { useStyles } from "@/themes/makeStyles";
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
-import { Text, TouchableOpacity, View } from "react-native";
+import {
+  NativeSyntheticEvent,
+  Text,
+  TextLayoutEventData,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
-// Category emoji mapping
+// Category info with icons instead of emojis
 const CATEGORY_INFO: Record<
   string,
-  { emoji: string; label: string; color: string }
+  { icon: keyof typeof Ionicons.glyphMap; label: string; color: string }
 > = {
-  fitness: { emoji: "💪", label: "Fitness", color: "#FF6B6B" },
-  nutrition: { emoji: "🥗", label: "Nutrition", color: "#4ECDC4" },
-  wellness: { emoji: "🧘", label: "Wellness", color: "#9B59B6" },
-  mindfulness: { emoji: "🧠", label: "Mindfulness", color: "#3498DB" },
-  sleep: { emoji: "😴", label: "Sleep", color: "#2C3E50" },
-  custom: { emoji: "🎯", label: "Custom", color: "#E67E22" },
+  fitness: { icon: "fitness-outline", label: "Fitness", color: "#FF6B6B" },
+  nutrition: {
+    icon: "nutrition-outline",
+    label: "Nutrition",
+    color: "#4ECDC4",
+  },
+  wellness: { icon: "leaf-outline", label: "Wellness", color: "#9B59B6" },
+  mindfulness: {
+    icon: "flower-outline",
+    label: "Mindfulness",
+    color: "#3498DB",
+  },
+  sleep: { icon: "moon-outline", label: "Sleep", color: "#2C3E50" },
 };
 
 // Goal type info
@@ -37,29 +50,43 @@ interface SuggestionGoalCardProps {
   onUseThis: (goal: SuggestedGoal) => void;
 }
 
-const shouldTruncate = (text: string, maxLength: number = 120) => {
-  return text && text.length > maxLength;
-};
-
 export function SuggestionGoalCard({
   goal,
   onUseThis,
 }: SuggestionGoalCardProps) {
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [isMatchReasonExpanded, setIsMatchReasonExpanded] = useState(false);
+  const [descriptionNeedsTruncation, setDescriptionNeedsTruncation] =
+    useState(false);
+  const [matchReasonNeedsTruncation, setMatchReasonNeedsTruncation] =
+    useState(false);
 
   const { t } = useTranslation();
   const styles = useStyles(makeSuggestionGoalCardStyles);
   const { colors, brandColors } = useTheme();
 
-  const descriptionNeedsTruncation = shouldTruncate(goal.description || "");
-  const matchReasonNeedsTruncation = shouldTruncate(
-    goal.match_reason || "",
-    100
-  );
+  // Detect if description text is actually truncated based on line count
+  const handleDescriptionLayout = (
+    event: NativeSyntheticEvent<TextLayoutEventData>,
+  ) => {
+    // Only check when not expanded - if more than 2 lines, it needs truncation
+    if (!isDescriptionExpanded && event.nativeEvent.lines.length > 2) {
+      setDescriptionNeedsTruncation(true);
+    }
+  };
+
+  // Detect if match reason text is actually truncated based on line count
+  const handleMatchReasonLayout = (
+    event: NativeSyntheticEvent<TextLayoutEventData>,
+  ) => {
+    // Only check when not expanded - if more than 2 lines, it needs truncation
+    if (!isMatchReasonExpanded && event.nativeEvent.lines.length > 2) {
+      setMatchReasonNeedsTruncation(true);
+    }
+  };
 
   // Get category and goal type info
-  const categoryInfo = CATEGORY_INFO[goal.category] || CATEGORY_INFO.custom;
+  const categoryInfo = CATEGORY_INFO[goal.category] || CATEGORY_INFO.wellness;
   const goalType = goal.goal_type || "habit";
   const goalTypeInfo = GOAL_TYPE_INFO[goalType] || GOAL_TYPE_INFO.habit;
 
@@ -74,7 +101,11 @@ export function SuggestionGoalCard({
             { backgroundColor: categoryInfo.color + "20" },
           ]}
         >
-          <Text style={styles.categoryEmoji}>{categoryInfo.emoji}</Text>
+          <Ionicons
+            name={categoryInfo.icon}
+            size={14}
+            color={categoryInfo.color}
+          />
           <Text style={[styles.categoryLabel, { color: categoryInfo.color }]}>
             {categoryInfo.label}
           </Text>
@@ -117,6 +148,15 @@ export function SuggestionGoalCard({
       {/* Goal Description */}
       {goal.description && (
         <View style={styles.descriptionContainer}>
+          {/* Hidden text for measuring actual line count */}
+          {!isDescriptionExpanded && !descriptionNeedsTruncation && (
+            <Text
+              style={[styles.goalDescription, styles.hiddenMeasureText]}
+              onTextLayout={handleDescriptionLayout}
+            >
+              {goal.description}
+            </Text>
+          )}
           <Text
             style={styles.goalDescription}
             numberOfLines={isDescriptionExpanded ? undefined : 2}
@@ -182,6 +222,15 @@ export function SuggestionGoalCard({
             color={brandColors.primary}
             style={styles.matchReasonIcon}
           />
+          {/* Hidden text for measuring actual line count */}
+          {!isMatchReasonExpanded && !matchReasonNeedsTruncation && (
+            <Text
+              style={[styles.matchReason, styles.hiddenMeasureText]}
+              onTextLayout={handleMatchReasonLayout}
+            >
+              {goal.match_reason}
+            </Text>
+          )}
           <Text
             style={styles.matchReason}
             numberOfLines={isMatchReasonExpanded ? undefined : 2}
@@ -222,7 +271,7 @@ export function SuggestionGoalCard({
 const makeSuggestionGoalCardStyles = (
   tokens: any,
   colors: any,
-  brand: any
+  brand: any,
 ) => ({
   goalCard: {
     backgroundColor: colors.bg.surface,
@@ -250,9 +299,6 @@ const makeSuggestionGoalCardStyles = (
     paddingVertical: toRN(tokens.spacing[1]),
     borderRadius: toRN(tokens.borderRadius.md),
     gap: toRN(tokens.spacing[1]),
-  },
-  categoryEmoji: {
-    fontSize: toRN(tokens.typography.fontSize.sm),
   },
   categoryLabel: {
     fontSize: toRN(tokens.typography.fontSize.xs),
@@ -300,6 +346,11 @@ const makeSuggestionGoalCardStyles = (
     color: colors.text.secondary,
     fontFamily: fontFamily.groteskRegular,
     lineHeight: toRN(tokens.typography.fontSize.base * 1.5),
+  },
+  hiddenMeasureText: {
+    position: "absolute" as const,
+    opacity: 0,
+    pointerEvents: "none" as const,
   },
   expandButton: {
     flexDirection: "row" as const,

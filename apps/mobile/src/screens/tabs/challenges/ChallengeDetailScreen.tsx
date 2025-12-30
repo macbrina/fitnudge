@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   View,
   Text,
@@ -23,41 +23,6 @@ import { formatDate } from "@/utils/helper";
 import { MOBILE_ROUTES } from "@/lib/routes";
 import type { Challenge, ChallengeStatus } from "@/services/api/challenges";
 
-/**
- * Compute challenge status from is_active and dates.
- * This is a frontend fallback if the backend doesn't return status.
- */
-function computeChallengeStatus(challenge: Challenge): ChallengeStatus {
-  if (challenge.status) {
-    return challenge.status;
-  }
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const startDate = challenge.start_date
-    ? new Date(challenge.start_date)
-    : null;
-  const endDate = challenge.end_date ? new Date(challenge.end_date) : null;
-
-  if (startDate) startDate.setHours(0, 0, 0, 0);
-  if (endDate) endDate.setHours(0, 0, 0, 0);
-
-  if (challenge.is_active === false) {
-    return "cancelled";
-  }
-
-  if (endDate && today > endDate) {
-    return "completed";
-  }
-
-  if (startDate && today < startDate) {
-    return "upcoming";
-  }
-
-  return "active";
-}
-
 import { useAlertModal } from "@/contexts/AlertModalContext";
 import {
   useChallenge,
@@ -66,13 +31,21 @@ import {
   useJoinChallenge,
   useLeaveChallenge,
 } from "@/hooks/api/useChallenges";
+import { usePartners } from "@/hooks/api/usePartners";
+import {
+  useChallengePlanStatus,
+  useChallengePlan,
+} from "@/hooks/api/useActionablePlans";
 import { ChallengeProgressSection } from "./components/ChallengeProgressSection";
 import { LeaderboardPreview } from "./components/LeaderboardPreview";
-import { ChallengePlanSection } from "./components/ChallengePlanSection";
-import { ChallengeCheckInModal } from "./components/ChallengeCheckInModal";
+import { PlanSection } from "@/screens/tabs/goals/components/PlanSection";
+import { CheckInModal } from "@/screens/tabs/home/components/CheckInModal";
+import { HydrationModal } from "@/components/tracking/HydrationModal";
+import { MealLogModal } from "@/components/tracking/MealLogModal";
 import { ParticipantsModal } from "./components/ParticipantsModal";
 import { BottomMenuSheet } from "@/components/ui/BottomMenuSheet";
 import { useChallengeMenu } from "@/hooks/useChallengeMenu";
+import { NotFoundState } from "@/components/ui/NotFoundState";
 import type { ChallengeCheckIn } from "@/services/api/challenges";
 
 // Tab IDs
@@ -81,16 +54,49 @@ const TAB_PROGRESS = "progress";
 const TAB_PLAN = "plan";
 
 export default function ChallengeDetailScreen() {
-  const params = useLocalSearchParams<{ id?: string }>();
-  const challengeId = params.id;
+  const params = useLocalSearchParams<{
+    id?: string;
+    viewMode?: string;
+    partnerId?: string;
+  }>();
+  const { id: challengeId, viewMode, partnerId } = params;
+  const isPartnerView = viewMode === "partner";
+
   const styles = useStyles(makeChallengeDetailScreenStyles);
   const { colors, brandColors } = useTheme();
   const { t } = useTranslation();
   const router = useRouter();
   const { showAlert, showConfirm, showToast } = useAlertModal();
 
+  // For partner view - verify partnership exists
+  const { data: partnersData } = usePartners();
+  const isValidPartner = useMemo(() => {
+    if (!isPartnerView) return true; // Not partner view, always valid
+    if (!partnersData?.data || !partnerId) return true; // Still loading, assume valid
+    return partnersData.data.some(
+      (p) => p.partner?.id === partnerId || p.partner_user_id === partnerId,
+    );
+  }, [partnersData?.data, partnerId, isPartnerView]);
+
+  // Navigate away if partner view but not valid partner
+  useEffect(() => {
+    if (isPartnerView && partnersData?.data && !isValidPartner) {
+      showAlert({
+        title: t("partners.access_denied") || "Access Denied",
+        message:
+          t("partners.not_partners_anymore") ||
+          "You are no longer accountability partners",
+        variant: "error",
+        confirmLabel: t("common.ok"),
+      });
+      router.back();
+    }
+  }, [isPartnerView, isValidPartner, partnersData?.data]);
+
   const [refreshing, setRefreshing] = useState(false);
   const [showCheckInModal, setShowCheckInModal] = useState(false);
+  const [showHydrationModal, setShowHydrationModal] = useState(false);
+  const [showMealLogModal, setShowMealLogModal] = useState(false);
   const [showParticipantsModal, setShowParticipantsModal] = useState(false);
   const [showMenuSheet, setShowMenuSheet] = useState(false);
   const [selectedCheckIn, setSelectedCheckIn] =
@@ -120,6 +126,37 @@ export default function ChallengeDetailScreen() {
   const leaderboard = leaderboardResponse?.data || [];
   const myCheckIns = myCheckInsResponse?.data || [];
 
+  // Get challenge's category (direct on challenge for standalone challenges)
+  const challengeCategory = challenge?.category;
+
+  // Plan status hook - only fetch if challenge has a category (plan was generated)
+  const { data: planStatusData } = useChallengePlanStatus(
+    challengeId,
+    !!challengeCategory,
+  );
+  const planStatus = planStatusData?.status;
+
+  // Fetch full plan data to get targets (for meal tracking)
+  const { data: challengePlanData } = useChallengePlan(
+    challengeId,
+    planStatus === "completed",
+  );
+
+  // Extract meal targets from plan for MealLogModal
+  const mealPlanTargets = useMemo(() => {
+    const structure = challengePlanData?.plan?.structured_data?.structure;
+    if (!structure)
+      return { calorieTarget: undefined, proteinTarget: undefined };
+
+    const dailyTargets = structure.daily_targets || {};
+    const nutritionalTargets = structure.nutritional_targets || {}; // Legacy fallback
+
+    return {
+      calorieTarget: dailyTargets.calories || nutritionalTargets.calories,
+      proteinTarget: dailyTargets.protein_grams || nutritionalTargets.protein,
+    };
+  }, [challengePlanData]);
+
   // Mutations
   const joinChallenge = useJoinChallenge();
   const leaveChallenge = useLeaveChallenge();
@@ -129,13 +166,19 @@ export default function ChallengeDetailScreen() {
   const isCreator = challenge?.is_creator;
   const isParticipant = challenge?.is_participant || isCreator;
 
-  const challengeStatus = challenge
-    ? computeChallengeStatus(challenge)
-    : undefined;
+  const challengeStatus = challenge?.status;
   const isUpcoming = challengeStatus === "upcoming";
   const isActive = challengeStatus === "active";
   const isCompleted = challengeStatus === "completed";
   const isCancelled = challengeStatus === "cancelled";
+
+  // Tracking type logic
+  const trackingType = challenge?.tracking_type || "manual";
+  const isWorkoutTracking = trackingType === "workout";
+  const isMealTracking = trackingType === "meal";
+  const isHydrationTracking = trackingType === "hydration";
+  const isManualTracking =
+    !isWorkoutTracking && !isMealTracking && !isHydrationTracking;
 
   // Challenge menu hook (shared with ChallengeCard)
   const { menuSections } = useChallengeMenu({
@@ -156,7 +199,7 @@ export default function ChallengeDetailScreen() {
     const endDate = new Date(challenge.end_date);
     const today = new Date();
     const diff = Math.ceil(
-      (endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+      (endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
     );
     return Math.max(0, diff);
   }, [challenge?.end_date]);
@@ -168,13 +211,16 @@ export default function ChallengeDetailScreen() {
       { id: TAB_PROGRESS, label: t("challenges.progress") || "Progress" },
     ];
 
-    // Only show Plan tab if there's a goal_template with actionable_plan
-    if (challenge?.goal_template?.actionable_plan) {
+    // Show Plan tab if challenge has a category (plan was/is being generated)
+    // or plan status exists (pending, generating, completed, failed)
+    const hasPlan = challengeCategory || planStatus;
+
+    if (hasPlan) {
       tabList.push({ id: TAB_PLAN, label: t("challenges.plan") || "Plan" });
     }
 
     return tabList;
-  }, [challenge, t]);
+  }, [challenge, challengeCategory, planStatus, t]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -246,6 +292,12 @@ export default function ChallengeDetailScreen() {
   // Check if already checked in today (is_checked_in=true)
   const hasCheckedInToday = todayCheckIn?.is_checked_in === true;
 
+  // Get challenge fields (direct on challenge for standalone challenges)
+  const challengeDaysOfWeek = challenge?.days_of_week;
+  const challengeFrequency = challenge?.frequency || "daily";
+  const challengeTargetCheckins = challenge?.target_checkins;
+  const challengeReminderTimes = challenge?.reminder_times;
+
   // Check if today is a scheduled check-in day (has a pre-created record)
   // If there's a todayCheckIn record, today is scheduled
   const isScheduledDay = useMemo(() => {
@@ -254,13 +306,12 @@ export default function ChallengeDetailScreen() {
       return true;
     }
     // Fallback: check days_of_week (for before task has run)
-    const daysOfWeek = challenge?.goal_template?.days_of_week;
-    if (!daysOfWeek || daysOfWeek.length === 0) {
+    if (!challengeDaysOfWeek || challengeDaysOfWeek.length === 0) {
       return true;
     }
     const todayIndex = new Date().getDay(); // 0 = Sunday, 1 = Monday, etc.
-    return daysOfWeek.includes(todayIndex);
-  }, [challenge?.goal_template?.days_of_week, todayCheckIn]);
+    return challengeDaysOfWeek.includes(todayIndex);
+  }, [challengeDaysOfWeek, todayCheckIn]);
 
   // Can check in: scheduled day, active challenge, participant, and not already checked in
   const canCheckIn =
@@ -471,62 +522,66 @@ export default function ChallengeDetailScreen() {
         />
       </TouchableOpacity>
 
+      {/* Leaderboard Preview */}
+      <LeaderboardPreview
+        entries={leaderboard.slice(0, 5)}
+        myRank={challenge?.my_rank}
+        isLoading={leaderboardLoading}
+        onViewAll={handleViewLeaderboard}
+      />
+
       {/* Scheduled Days */}
-      {challenge?.goal_template?.days_of_week &&
-        challenge.goal_template.days_of_week.length > 0 && (
-          <View style={styles.scheduledDaysCard}>
-            <Text style={styles.scheduledDaysLabel}>
-              {t("goals.scheduled_days") || "Scheduled Days"}
-            </Text>
-            <View style={styles.daysRow}>
-              {["S", "M", "T", "W", "T", "F", "S"].map((dayLabel, index) => {
-                const isDayActive = (
-                  challenge.goal_template?.days_of_week || []
-                ).includes(index);
-                return (
-                  <View
-                    key={index}
+      {challengeDaysOfWeek && challengeDaysOfWeek.length > 0 && (
+        <View style={styles.scheduledDaysCard}>
+          <Text style={styles.scheduledDaysLabel}>
+            {t("goals.scheduled_days") || "Scheduled Days"}
+          </Text>
+          <View style={styles.daysRow}>
+            {["S", "M", "T", "W", "T", "F", "S"].map((dayLabel, index) => {
+              const isDayActive = challengeDaysOfWeek.includes(index);
+              return (
+                <View
+                  key={index}
+                  style={[
+                    styles.dayBadge,
+                    isDayActive && styles.dayBadgeActive,
+                  ]}
+                >
+                  <Text
                     style={[
-                      styles.dayBadge,
-                      isDayActive && styles.dayBadgeActive,
+                      styles.dayBadgeText,
+                      isDayActive && styles.dayBadgeTextActive,
                     ]}
                   >
-                    <Text
-                      style={[
-                        styles.dayBadgeText,
-                        isDayActive && styles.dayBadgeTextActive,
-                      ]}
-                    >
-                      {dayLabel}
-                    </Text>
-                  </View>
-                );
-              })}
-            </View>
+                    {dayLabel}
+                  </Text>
+                </View>
+              );
+            })}
           </View>
-        )}
+        </View>
+      )}
 
       {/* Workout Times */}
-      {challenge?.goal_template?.reminder_times &&
-        challenge.goal_template.reminder_times.length > 0 && (
-          <View style={styles.scheduledDaysCard}>
-            <Text style={styles.scheduledDaysLabel}>
-              {t("goals.reminder_times") || "Workout Times"}
-            </Text>
-            <View style={styles.reminderTimesRow}>
-              {challenge.goal_template.reminder_times.map((time, index) => (
-                <View key={index} style={styles.reminderTimeBadge}>
-                  <Ionicons
-                    name="time-outline"
-                    size={14}
-                    color={brandColors.primary}
-                  />
-                  <Text style={styles.reminderTimeText}>{time}</Text>
-                </View>
-              ))}
-            </View>
+      {challengeReminderTimes && challengeReminderTimes.length > 0 && (
+        <View style={styles.scheduledDaysCard}>
+          <Text style={styles.scheduledDaysLabel}>
+            {t("goals.reminder_times") || "Workout Times"}
+          </Text>
+          <View style={styles.reminderTimesRow}>
+            {challengeReminderTimes.map((time, index) => (
+              <View key={index} style={styles.reminderTimeBadge}>
+                <Ionicons
+                  name="time-outline"
+                  size={14}
+                  color={brandColors.primary}
+                />
+                <Text style={styles.reminderTimeText}>{time}</Text>
+              </View>
+            ))}
           </View>
-        )}
+        </View>
+      )}
 
       {/* Join Deadline Warning */}
       {isUpcoming && challenge?.join_deadline && (
@@ -559,21 +614,18 @@ export default function ChallengeDetailScreen() {
         <ChallengeProgressSection
           challengeId={challengeId || ""}
           challengeType={challenge.challenge_type}
-          targetValue={
-            challenge.target_value || challenge.goal_template?.target_checkins
-          }
+          targetValue={challenge.target_value || challengeTargetCheckins}
           myProgress={challenge.my_progress || 0}
           myRank={challenge.my_rank}
           totalParticipants={challenge.participants_count || 0}
           startDate={challenge.start_date}
           endDate={challenge.end_date}
           checkIns={myCheckIns}
-          daysOfWeek={challenge.goal_template?.days_of_week}
-          frequency={
-            (challenge.goal_template?.frequency as "daily" | "weekly") ||
-            "daily"
-          }
+          daysOfWeek={challengeDaysOfWeek}
+          frequency={(challengeFrequency as "daily" | "weekly") || "daily"}
+          trackingType={(challenge.tracking_type as any) || "checkin"}
           isLoading={checkInsLoading}
+          isPartnerView={effectivePartnerView}
         />
       )}
 
@@ -591,24 +643,19 @@ export default function ChallengeDetailScreen() {
           </Text>
         </Card>
       )}
-
-      {/* Leaderboard Preview */}
-      <LeaderboardPreview
-        entries={leaderboard.slice(0, 5)}
-        myRank={challenge?.my_rank}
-        isLoading={leaderboardLoading}
-        onViewAll={handleViewLeaderboard}
-      />
     </>
   );
 
   // Render Plan Tab Content
   const renderPlanTab = () => (
     <>
-      {challenge?.goal_template && (
-        <ChallengePlanSection
-          actionablePlan={challenge.goal_template.actionable_plan}
-          category={challenge.goal_template.category}
+      {challengeId && (
+        <PlanSection
+          challengeId={challengeId}
+          planStatus={planStatusData}
+          entityStatus={challenge?.status}
+          isScheduledDay={isScheduledDay}
+          isPartnerView={effectivePartnerView}
         />
       )}
     </>
@@ -654,14 +701,66 @@ export default function ChallengeDetailScreen() {
           title={t("challenges.details") || "Challenge Details"}
           onPress={() => router.back()}
         />
+        <NotFoundState
+          title={t("errors.challenge_not_found_title")}
+          description={t("errors.challenge_not_found_description")}
+          icon="trophy-outline"
+        />
+      </View>
+    );
+  }
+
+  // Access guard: Show cancelled message for cancelled challenges
+  if (isCancelled && !isCreator) {
+    return (
+      <View style={styles.container}>
+        <BackButton
+          title={t("challenges.details") || "Challenge Details"}
+          onPress={() => router.back()}
+        />
         <View style={styles.errorContainer}>
           <Ionicons
-            name="alert-circle-outline"
+            name="close-circle-outline"
             size={48}
             color={colors.text.tertiary}
           />
           <Text style={styles.errorText}>
-            {t("challenges.not_found") || "Challenge not found"}
+            {t("challenges.cancelled_message") ||
+              "This challenge has been cancelled and is no longer available."}
+          </Text>
+          <Button
+            variant="outline"
+            title={t("common.go_back") || "Go Back"}
+            onPress={() => router.back()}
+          />
+        </View>
+      </View>
+    );
+  }
+
+  // Access guard: Private challenges require participation or partner access
+  // Backend handles access control - if we have challenge data, we have access
+  // is_partner_view from backend indicates partner viewing (read-only)
+  const isPartnerViewFromBackend = challenge.is_partner_view === true;
+  const effectivePartnerView = isPartnerView || isPartnerViewFromBackend;
+
+  // Only show access denied if private, not participant, AND not partner view
+  if (!challenge.is_public && !isParticipant && !effectivePartnerView) {
+    return (
+      <View style={styles.container}>
+        <BackButton
+          title={t("challenges.details") || "Challenge Details"}
+          onPress={() => router.back()}
+        />
+        <View style={styles.errorContainer}>
+          <Ionicons
+            name="lock-closed-outline"
+            size={48}
+            color={colors.text.tertiary}
+          />
+          <Text style={styles.errorText}>
+            {t("challenges.private_access_denied") ||
+              "This is a private challenge. You need an invitation to participate."}
           </Text>
           <Button
             variant="outline"
@@ -716,87 +815,198 @@ export default function ChallengeDetailScreen() {
           />
         }
       >
+        {/* Partner View Banner */}
+        {effectivePartnerView && (
+          <View style={styles.partnerBanner}>
+            <Ionicons
+              name="eye-outline"
+              size={18}
+              color={brandColors.primary}
+            />
+            <Text style={styles.partnerBannerText}>
+              {t("partners.viewing_partner_challenge") ||
+                "Viewing partner's challenge (read-only)"}
+            </Text>
+          </View>
+        )}
+
         {/* Tab Content */}
         {renderTabContent()}
 
-        {/* Action Section - Always visible */}
-        <View style={styles.actionSection}>
-          {!isParticipant && isUpcoming && (
-            <Button
-              variant="primary"
-              size="lg"
-              title={t("challenges.join") || "Join Challenge"}
-              onPress={handleJoin}
-              loading={joinChallenge.isPending}
-            />
-          )}
-
-          {/* Can check in - scheduled day, not checked in yet */}
-          {canCheckIn && (
-            <Button
-              variant="primary"
-              title={t("checkin.check_in") || "Check In"}
-              onPress={handleCheckIn}
-              leftIcon="checkmark-circle"
-            />
-          )}
-
-          {/* Already checked in today */}
-          {isParticipant && isActive && hasCheckedInToday && (
-            <View style={styles.checkedInBadge}>
-              <Ionicons
-                name="checkmark-circle"
-                size={20}
-                color={colors.feedback.success}
+        {/* Action Section - Always visible (hidden in partner view) */}
+        {!effectivePartnerView && (
+          <View style={styles.actionSection}>
+            {!isParticipant && isUpcoming && (
+              <Button
+                variant="primary"
+                size="lg"
+                title={t("challenges.join") || "Join Challenge"}
+                onPress={handleJoin}
+                loading={joinChallenge.isPending}
               />
-              <Text style={styles.checkedInText}>
-                {t("checkin.checked_in_today") || "Checked in today"}
-              </Text>
-            </View>
-          )}
+            )}
 
-          {/* Not a scheduled check-in day */}
-          {isParticipant &&
-            isActive &&
-            !isScheduledDay &&
-            !hasCheckedInToday && (
-              <View style={styles.noCheckInScheduled}>
+            {/* Action Buttons - Based on tracking type and scheduled day */}
+            {isParticipant && isActive && isScheduledDay && (
+              <>
+                {/* Manual/Checkin tracking - show Check In button */}
+                {isManualTracking && canCheckIn && (
+                  <Button
+                    variant="primary"
+                    title={t("checkin.check_in") || "Check In"}
+                    onPress={handleCheckIn}
+                    leftIcon="checkmark-circle"
+                  />
+                )}
+
+                {/* Meal tracking - show Log Meal button */}
+                {isMealTracking && !hasCheckedInToday && (
+                  <Button
+                    variant="primary"
+                    title={t("meals.log_meal") || "Log Meal"}
+                    onPress={() => setShowMealLogModal(true)}
+                    leftIcon="restaurant"
+                  />
+                )}
+
+                {/* Hydration tracking - show Log Water button */}
+                {isHydrationTracking && !hasCheckedInToday && (
+                  <Button
+                    variant="primary"
+                    title={t("hydration.log_water") || "Log Water"}
+                    onPress={() => setShowHydrationModal(true)}
+                    leftIcon="water"
+                  />
+                )}
+
+                {/* Workout tracking - hint to go to Plan tab */}
+                {isWorkoutTracking && planStatus === "completed" && (
+                  <View style={styles.workoutHint}>
+                    <Ionicons
+                      name="fitness-outline"
+                      size={20}
+                      color={brandColors.primary}
+                    />
+                    <Text style={styles.workoutHintText}>
+                      {t("goals.start_workout_hint") ||
+                        "Go to the Plan tab to start your workout"}
+                    </Text>
+                  </View>
+                )}
+              </>
+            )}
+
+            {/* Already checked in today */}
+            {isParticipant && isActive && hasCheckedInToday && (
+              <View style={styles.checkedInBadge}>
                 <Ionicons
-                  name="calendar-outline"
+                  name="checkmark-circle"
                   size={20}
-                  color={colors.text.tertiary}
+                  color={colors.feedback.success}
                 />
-                <Text style={styles.noCheckInScheduledText}>
-                  {t("checkin.no_checkin_scheduled") ||
-                    "No check-in scheduled for today"}
+                <Text style={styles.checkedInText}>
+                  {t("checkin.checked_in_today") || "Checked in today"}
                 </Text>
               </View>
             )}
 
-          {isParticipant && !isCreator && (isUpcoming || isActive) && (
-            <Button
-              variant="ghost"
-              size="md"
-              title={t("challenges.leave") || "Leave Challenge"}
-              onPress={handleLeave}
-              loading={leaveChallenge.isPending}
-            />
-          )}
-        </View>
+            {/* Rest day - not a scheduled day for any tracking type */}
+            {isParticipant &&
+              isActive &&
+              !isScheduledDay &&
+              !hasCheckedInToday && (
+                <View style={styles.noCheckInScheduled}>
+                  <Ionicons
+                    name="moon-outline"
+                    size={20}
+                    color={colors.text.tertiary}
+                  />
+                  <Text style={styles.noCheckInScheduledText}>
+                    {t("goals.rest_day") ||
+                      "Rest day - no action scheduled for today"}
+                  </Text>
+                </View>
+              )}
+
+            {/* Challenge is not active - show status message */}
+            {!isActive && !isUpcoming && challenge?.status && (
+              <View style={styles.inactiveChallengeCard}>
+                <Ionicons
+                  name="information-circle-outline"
+                  size={20}
+                  color={colors.text.tertiary}
+                />
+                <Text style={styles.inactiveChallengeText}>
+                  {isCancelled
+                    ? t("challenges.challenge_cancelled") ||
+                      "This challenge has been cancelled"
+                    : isCompleted
+                      ? t("challenges.challenge_completed") ||
+                        "This challenge is completed"
+                      : t("challenges.challenge_not_active") ||
+                        "This challenge is not active"}
+                </Text>
+              </View>
+            )}
+
+            {isParticipant && !isCreator && (isUpcoming || isActive) && (
+              <Button
+                variant="ghost"
+                size="md"
+                title={t("challenges.leave") || "Leave Challenge"}
+                onPress={handleLeave}
+                loading={leaveChallenge.isPending}
+              />
+            )}
+          </View>
+        )}
       </ScrollView>
 
-      {/* Check-In Modal */}
-      {challengeId && (
-        <ChallengeCheckInModal
-          visible={showCheckInModal}
-          challengeId={challengeId}
-          checkIn={selectedCheckIn}
-          onClose={() => {
-            setShowCheckInModal(false);
-            setSelectedCheckIn(null);
-          }}
-          onComplete={handleCheckInComplete}
-        />
+      {/* Action Modals - Only show when not in partner view */}
+      {!effectivePartnerView && (
+        <>
+          {/* Check-In Modal - using unified CheckInModal */}
+          {challengeId && (
+            <CheckInModal
+              visible={showCheckInModal}
+              challengeId={challengeId}
+              challengeCheckIn={selectedCheckIn}
+              onClose={() => {
+                setShowCheckInModal(false);
+                setSelectedCheckIn(null);
+              }}
+              onComplete={handleCheckInComplete}
+            />
+          )}
+
+          {/* Meal Log Modal */}
+          {challengeId && (
+            <MealLogModal
+              visible={showMealLogModal}
+              onClose={() => setShowMealLogModal(false)}
+              challengeId={challengeId}
+              calorieTarget={mealPlanTargets.calorieTarget}
+              proteinTarget={mealPlanTargets.proteinTarget}
+              onSuccess={() => {
+                refetchCheckIns();
+                refetchLeaderboard();
+              }}
+            />
+          )}
+
+          {/* Hydration Modal */}
+          {challengeId && (
+            <HydrationModal
+              visible={showHydrationModal}
+              onClose={() => setShowHydrationModal(false)}
+              challengeId={challengeId}
+              onSuccess={() => {
+                refetchCheckIns();
+                refetchLeaderboard();
+              }}
+            />
+          )}
+        </>
       )}
 
       {/* Participants Modal */}
@@ -824,7 +1034,7 @@ export default function ChallengeDetailScreen() {
 const makeChallengeDetailScreenStyles = (
   tokens: any,
   colors: any,
-  brand: any
+  brand: any,
 ) => ({
   container: {
     flex: 1,
@@ -841,6 +1051,25 @@ const makeChallengeDetailScreenStyles = (
     padding: toRN(tokens.spacing[4]),
     paddingBottom: toRN(tokens.spacing[8]),
     gap: toRN(tokens.spacing[4]),
+  },
+  // Partner view banner
+  partnerBanner: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: toRN(tokens.spacing[2]),
+    paddingHorizontal: toRN(tokens.spacing[4]),
+    paddingVertical: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[2]),
+    backgroundColor: `${brand.primary}15`,
+    borderRadius: toRN(tokens.borderRadius.lg),
+    borderWidth: 1,
+    borderColor: `${brand.primary}30`,
+  },
+  partnerBannerText: {
+    fontSize: toRN(tokens.typography.fontSize.sm),
+    fontFamily: fontFamily.medium,
+    color: brand.primary,
+    flex: 1,
   },
   errorContainer: {
     flex: 1,
@@ -1129,6 +1358,34 @@ const makeChallengeDetailScreenStyles = (
   noCheckInScheduledText: {
     fontFamily: fontFamily.regular,
     fontSize: toRN(tokens.typography.fontSize.sm),
+    color: colors.text.tertiary,
+  },
+  workoutHint: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    backgroundColor: brand.primary + "15",
+    padding: toRN(tokens.spacing[4]),
+    borderRadius: toRN(tokens.borderRadius.xl),
+    gap: toRN(tokens.spacing[2]),
+  },
+  workoutHintText: {
+    fontSize: toRN(tokens.typography.fontSize.sm),
+    fontFamily: fontFamily.medium,
+    color: brand.primary,
+  },
+  inactiveChallengeCard: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    backgroundColor: colors.bg.muted,
+    padding: toRN(tokens.spacing[4]),
+    borderRadius: toRN(tokens.borderRadius.xl),
+    gap: toRN(tokens.spacing[2]),
+  },
+  inactiveChallengeText: {
+    fontSize: toRN(tokens.typography.fontSize.sm),
+    fontFamily: fontFamily.regular,
     color: colors.text.tertiary,
   },
 });

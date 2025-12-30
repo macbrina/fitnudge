@@ -15,7 +15,7 @@ export const suggestedGoalsQueryKeys = {
 };
 
 export const useSuggestedGoalsStatus = (
-  enabled: boolean = true
+  enabled: boolean = true,
 ): QueryObserverResult<SuggestedGoalsStatusResponse, unknown> => {
   return useQuery({
     queryKey: suggestedGoalsQueryKeys.status(),
@@ -55,7 +55,7 @@ export const useRequestSuggestedGoals = () => {
       // This ensures loading state is shown immediately
       queryClient.setQueryData<SuggestedGoalsStatusResponse>(
         suggestedGoalsQueryKeys.status(),
-        { status: "pending" }
+        { status: "pending" },
       );
     },
     onSuccess: (data) => {
@@ -63,7 +63,7 @@ export const useRequestSuggestedGoals = () => {
       // Ensure we don't accidentally restore old goals
       queryClient.setQueryData<SuggestedGoalsStatusResponse>(
         suggestedGoalsQueryKeys.status(),
-        { status: data.status || "pending" }
+        { status: data.status || "pending" },
       );
     },
     onSettled: () => {
@@ -92,7 +92,7 @@ export const useRegenerateSuggestedGoals = () => {
       // This ensures loading state is shown immediately
       queryClient.setQueryData<SuggestedGoalsStatusResponse>(
         suggestedGoalsQueryKeys.status(),
-        { status: "pending" }
+        { status: "pending" },
       );
     },
     onSuccess: (data) => {
@@ -102,7 +102,7 @@ export const useRegenerateSuggestedGoals = () => {
         {
           status: data.status || "pending",
           regeneration_count: data.regeneration_count,
-        }
+        },
       );
     },
     onSettled: () => {

@@ -105,7 +105,7 @@ def import_exercises():
                     "difficulty": exercise.get("difficulty", "beginner"),
                     "category": exercise.get("category", "strength"),
                     # MP4 Video URL (Cloudflare R2 CDN)
-                    "mp4_url": f"https://media.fitnudge.app/exercises/360/{exercise['id']}.mp4",
+                    "mp4_url": f"https://media.fitnudge.app/exercises/{exercise['id']}.mp4",
                     "usage_count": 0,
                     "last_used_at": None,
                 }
@@ -147,7 +147,7 @@ def import_exercises():
     print(f"🎬  MP4 videos available at 360px resolution")
     print()
     print("🔗 MP4 URL format (Cloudflare R2 CDN):")
-    print(f"   https://media.fitnudge.app/exercises/360/0001.mp4")
+    print(f"   https://media.fitnudge.app/exercises/0001.mp4")
     print()
     print("📝 Next steps:")
     print("   1. Test MP4 video access in browser")

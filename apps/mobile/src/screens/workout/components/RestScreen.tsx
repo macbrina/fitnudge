@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -6,7 +6,7 @@ import {
   Animated,
   StatusBar,
 } from "react-native";
-import { useVideoPlayer, VideoView } from "expo-video";
+import Video, { ResizeMode } from "react-native-video";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStyles, useTheme } from "@/themes";
 import { tokens } from "@/themes/tokens";
@@ -14,17 +14,24 @@ import { toRN } from "@/lib/units";
 import { fontFamily } from "@/lib/fonts";
 import { useTranslation } from "@/lib/i18n";
 import { Ionicons } from "@expo/vector-icons";
+import { ExerciseListModal } from "./ExerciseListModal";
 import type { WorkoutExercise, WarmupCooldownExercise } from "@/types/workout";
+
+type AnyExercise = WorkoutExercise | WarmupCooldownExercise;
 
 interface RestScreenProps {
   timeRemaining: number;
-  nextExerciseIndex: number;
+  nextExerciseIndex: number; // 1-based for display "NEXT X/Y"
+  nextExerciseGlobalIndex: number; // 0-based for highlighting in modal
   totalExercises: number;
   nextExercise: WorkoutExercise | WarmupCooldownExercise | null;
+  allExercises: AnyExercise[];
   onExtendRest: () => void;
   onSkipRest: () => void;
   onHelp?: () => void;
-  onMenu?: () => void;
+  onJumpToExercise?: (index: number) => void;
+  onPauseTimer?: () => void;
+  onResumeTimer?: () => void;
 }
 
 /**
@@ -38,17 +45,40 @@ interface RestScreenProps {
 export function RestScreen({
   timeRemaining,
   nextExerciseIndex,
+  nextExerciseGlobalIndex,
   totalExercises,
   nextExercise,
+  allExercises,
   onExtendRest,
   onSkipRest,
   onHelp,
-  onMenu,
+  onJumpToExercise,
+  onPauseTimer,
+  onResumeTimer,
 }: RestScreenProps) {
   const insets = useSafeAreaInsets();
   const styles = useStyles(makeStyles);
   const { t } = useTranslation();
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const [showExerciseList, setShowExerciseList] = useState(false);
+
+  // Handle opening the exercise list modal
+  const handleOpenExerciseList = () => {
+    onPauseTimer?.();
+    setShowExerciseList(true);
+  };
+
+  // Handle closing the exercise list modal
+  const handleCloseExerciseList = () => {
+    setShowExerciseList(false);
+    onResumeTimer?.();
+  };
+
+  // Handle selecting an exercise from the list
+  const handleSelectExercise = (index: number) => {
+    setShowExerciseList(false);
+    onJumpToExercise?.(index);
+  };
 
   // Pulse animation on last 5 seconds
   useEffect(() => {
@@ -109,31 +139,28 @@ export function RestScreen({
 
   const mp4Url = getMp4Url();
 
-  // Create video player for next exercise preview
-  const player = useVideoPlayer(mp4Url || "", (player) => {
-    player.loop = true;
-    player.playbackRate = 0.5;
-    player.muted = true;
-    player.play();
-  });
-
   return (
-    <View
-      style={[
-        styles.container,
-        { paddingTop: insets.top, paddingBottom: insets.bottom },
-      ]}
-    >
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <StatusBar barStyle="light-content" />
       {/* Header with menu icon */}
       <View style={styles.header}>
         <View style={styles.headerSpacer} />
-        {onMenu && (
-          <TouchableOpacity onPress={onMenu} style={styles.menuButton}>
-            <Ionicons name="menu" size={28} color="white" />
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity
+          onPress={handleOpenExerciseList}
+          style={styles.menuButton}
+        >
+          <Ionicons name="menu" size={28} color="white" />
+        </TouchableOpacity>
       </View>
+
+      {/* Exercise List Modal */}
+      <ExerciseListModal
+        visible={showExerciseList}
+        onClose={handleCloseExerciseList}
+        exercises={allExercises}
+        currentExerciseIndex={nextExerciseGlobalIndex}
+        onSelectExercise={handleSelectExercise}
+      />
 
       {/* Main content */}
       <View style={styles.content}>
@@ -167,81 +194,83 @@ export function RestScreen({
         <View style={styles.nextExerciseContainer}>
           {/* Next label */}
           <Text style={styles.nextLabel}>
-            {t("workout.next_exercise", {
-              current: nextExerciseIndex + 1,
-              total: totalExercises,
-            })}
+            NEXT {nextExerciseIndex}/{totalExercises}
           </Text>
 
-          {/* Exercise name row */}
+          {/* Exercise name row with duration on right */}
           <View style={styles.exerciseNameRow}>
             <Text style={styles.nextExerciseName}>{nextExercise.name}</Text>
             {onHelp && (
               <TouchableOpacity onPress={onHelp} style={styles.helpButton}>
                 <Ionicons
-                  name="help-circle-outline"
-                  size={18}
-                  color="rgba(255,255,255,0.7)"
+                  name="help-circle"
+                  size={20}
+                  color="rgba(255,255,255,0.5)"
                 />
               </TouchableOpacity>
             )}
             <Text style={styles.durationLabel}>{getNextDuration()}</Text>
           </View>
 
-          {/* Video preview */}
-          {mp4Url && (
-            <View style={styles.videoContainer}>
-              <VideoView
-                player={player}
+          {/* Video preview with rounded top corners */}
+          <View style={styles.videoContainer}>
+            {mp4Url ? (
+              <Video
+                source={{ uri: mp4Url }}
                 style={styles.videoPreview}
-                contentFit="contain"
-                nativeControls={false}
+                resizeMode={ResizeMode.COVER}
+                repeat={true}
+                rate={0.75}
+                muted={true}
+                paused={false}
+                controls={false}
               />
-            </View>
-          )}
+            ) : (
+              <View style={styles.videoPreview} />
+            )}
+          </View>
         </View>
       )}
     </View>
   );
 }
 
-const BLUE_COLOR = "#007AFF";
-
 const makeStyles = (tokens: any, colors: any, brand: any) => ({
   container: {
     flex: 1,
-    backgroundColor: colors.bg.primary,
+    backgroundColor: brand.primary,
   },
   header: {
     flexDirection: "row" as const,
     justifyContent: "flex-end" as const,
     paddingHorizontal: toRN(tokens.spacing[4]),
-    paddingTop: toRN(tokens.spacing[4]),
+    paddingTop: toRN(tokens.spacing[2]),
   },
   headerSpacer: {
     flex: 1,
   },
   menuButton: {
-    padding: toRN(tokens.spacing[1]),
+    padding: toRN(tokens.spacing[2]),
   },
   content: {
-    flex: 1,
     alignItems: "center" as const,
     justifyContent: "center" as const,
     paddingHorizontal: toRN(tokens.spacing[4]),
+    paddingVertical: toRN(tokens.spacing[10]),
   },
   restLabel: {
-    fontSize: toRN(tokens.typography.fontSize.lg),
-    fontFamily: fontFamily.semiBold,
-    color: "rgba(255,255,255,0.9)",
-    letterSpacing: 4,
-    marginBottom: toRN(tokens.spacing[3]),
+    fontSize: toRN(tokens.typography.fontSize.base),
+    fontFamily: fontFamily.bold,
+    color: "white",
+    letterSpacing: 3,
+    marginBottom: toRN(tokens.spacing[2]),
+    textTransform: "uppercase" as const,
   },
   timer: {
-    fontSize: toRN(80),
+    fontSize: toRN(72),
     fontFamily: fontFamily.groteskBold,
     color: "white",
-    marginBottom: toRN(tokens.spacing[8]),
+    marginBottom: toRN(tokens.spacing[6]),
   },
   timerWarning: {
     color: "#FFCC00",
@@ -251,74 +280,74 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     gap: toRN(tokens.spacing[3]),
   },
   extendButton: {
-    backgroundColor: "rgba(255,255,255,0.2)",
-    paddingVertical: toRN(tokens.spacing[3]),
-    paddingHorizontal: toRN(tokens.spacing[6]),
+    backgroundColor: "rgba(255,255,255,0.25)",
+    paddingVertical: toRN(tokens.spacing[4]),
+    paddingHorizontal: toRN(tokens.spacing[8]),
     borderRadius: toRN(tokens.borderRadius.full),
-    minWidth: toRN(100),
+    minWidth: toRN(110),
     alignItems: "center" as const,
   },
   extendButtonText: {
     color: "white",
     fontSize: toRN(tokens.typography.fontSize.base),
-    fontFamily: fontFamily.semiBold,
+    fontFamily: fontFamily.bold,
   },
   skipButton: {
     backgroundColor: "white",
-    paddingVertical: toRN(tokens.spacing[3]),
-    paddingHorizontal: toRN(tokens.spacing[6]),
+    paddingVertical: toRN(tokens.spacing[4]),
+    paddingHorizontal: toRN(tokens.spacing[8]),
     borderRadius: toRN(tokens.borderRadius.full),
-    minWidth: toRN(100),
+    minWidth: toRN(110),
     alignItems: "center" as const,
   },
   skipButtonText: {
-    color: BLUE_COLOR,
+    color: brand.primary,
     fontSize: toRN(tokens.typography.fontSize.base),
-    fontFamily: fontFamily.semiBold,
+    fontFamily: fontFamily.bold,
   },
+  // Next exercise section - fills remaining space to bottom
   nextExerciseContainer: {
-    backgroundColor: "rgba(255,255,255,0.1)",
-    borderTopLeftRadius: toRN(tokens.borderRadius.xl),
-    borderTopRightRadius: toRN(tokens.borderRadius.xl),
+    flex: 1,
     paddingTop: toRN(tokens.spacing[4]),
-    paddingHorizontal: toRN(tokens.spacing[4]),
-    paddingBottom: toRN(tokens.spacing[8]),
   },
   nextLabel: {
     fontSize: toRN(tokens.typography.fontSize.sm),
-    fontFamily: fontFamily.medium,
-    color: "rgba(255,255,255,0.7)",
-    letterSpacing: 1,
-    marginBottom: toRN(tokens.spacing[2]),
+    fontFamily: fontFamily.bold,
+    color: "white",
+    letterSpacing: 0.5,
+    marginBottom: toRN(tokens.spacing[1]),
+    textTransform: "uppercase" as const,
+    paddingHorizontal: toRN(tokens.spacing[4]),
   },
   exerciseNameRow: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    gap: toRN(tokens.spacing[1]),
     marginBottom: toRN(tokens.spacing[3]),
+    paddingHorizontal: toRN(tokens.spacing[4]),
   },
   nextExerciseName: {
-    fontSize: toRN(tokens.typography.fontSize.base),
+    fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.semiBold,
     color: "white",
-    flex: 1,
     textTransform: "capitalize" as const,
   },
   helpButton: {
-    padding: toRN(tokens.spacing[1]),
+    marginLeft: toRN(tokens.spacing[1]),
+    padding: toRN(tokens.spacing[0.5]),
   },
   durationLabel: {
-    fontSize: toRN(tokens.typography.fontSize.sm),
-    fontFamily: fontFamily.medium,
-    color: "rgba(255,255,255,0.8)",
+    fontSize: toRN(tokens.typography.fontSize.xl),
+    fontFamily: fontFamily.bold,
+    color: "white",
+    marginLeft: "auto" as const,
   },
+  // Video container with rounded top corners - fills remaining space to bottom
   videoContainer: {
-    backgroundColor: "white",
-    borderRadius: toRN(tokens.borderRadius.lg),
+    flex: 1,
+    backgroundColor: colors.bg.card,
+    borderTopLeftRadius: toRN(tokens.borderRadius["3xl"]),
+    borderTopRightRadius: toRN(tokens.borderRadius["3xl"]),
     overflow: "hidden" as const,
-    alignItems: "center" as const,
-    justifyContent: "center" as const,
-    height: toRN(150),
   },
   videoPreview: {
     width: "100%",

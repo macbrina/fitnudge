@@ -2,14 +2,11 @@ import { ArrowBackIcon } from "@/components/icons/arrow-back-icon";
 import Button from "@/components/ui/Button";
 import { fontFamily } from "@/lib/fonts";
 import { useTranslation } from "@/lib/i18n";
-import { MOBILE_ROUTES } from "@/lib/routes";
 import { toRN } from "@/lib/units";
 import { useTheme } from "@/themes";
 import { useStyles } from "@/themes/makeStyles";
-import { router } from "expo-router";
 import React from "react";
 import { ScrollView, Text, TouchableOpacity, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface PersonalizationLayoutProps {
   children: React.ReactNode;
@@ -20,6 +17,7 @@ interface PersonalizationLayoutProps {
   canContinue: boolean;
   isLoading?: boolean;
   buttonText?: string;
+  title?: string;
 }
 
 export default function PersonalizationLayout({
@@ -31,36 +29,34 @@ export default function PersonalizationLayout({
   canContinue,
   isLoading = false,
   buttonText,
+  title,
 }: PersonalizationLayoutProps) {
   const { t } = useTranslation();
   const styles = useStyles(makePersonalizationLayoutStyles);
-  const insets = useSafeAreaInsets();
-  const { colors } = useTheme();
+  const { colors, brandColors } = useTheme();
 
-  const progressPercentage = (currentStep / totalSteps) * 100;
+  // Generate segments for progress bar
+  const segments = Array.from({ length: totalSteps }, (_, i) => i + 1);
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+      {/* Header with title and segmented progress */}
       <View style={styles.header}>
-        {currentStep > 1 && onBack && (
-          <TouchableOpacity onPress={onBack} style={styles.backButton}>
-            <ArrowBackIcon size={24} color={colors.text.primary} />
-          </TouchableOpacity>
-        )}
+        {title && <Text style={styles.headerTitle}>{title}</Text>}
 
+        {/* Segmented Progress Bar */}
         <View style={styles.progressContainer}>
-          <Text style={styles.progressText}>
-            {t("onboarding.personalization.step", {
-              current: currentStep,
-              total: totalSteps,
-            })}
-          </Text>
-          <View style={styles.progressBar}>
+          {segments.map((step, index) => (
             <View
-              style={[styles.progressFill, { width: `${progressPercentage}%` }]}
+              key={step}
+              style={[
+                styles.progressSegment,
+                step <= currentStep && styles.progressSegmentActive,
+                index === 0 && styles.progressSegmentFirst,
+                index === segments.length - 1 && styles.progressSegmentLast,
+              ]}
             />
-          </View>
+          ))}
         </View>
       </View>
 
@@ -74,18 +70,24 @@ export default function PersonalizationLayout({
         {children}
       </ScrollView>
 
-      {/* Footer */}
+      {/* Footer with back button and continue button */}
       <View style={styles.footer}>
-        <Button
-          title={
-            isLoading
-              ? t("onboarding.personalization.submitting")
-              : buttonText || t("onboarding.personalization.continue")
-          }
-          onPress={onContinue}
-          disabled={!canContinue || isLoading}
-          loading={isLoading}
-        />
+        {currentStep > 1 && onBack ? (
+          <TouchableOpacity onPress={onBack} style={styles.backButton}>
+            <ArrowBackIcon size={20} color={brandColors.primary} />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.backButtonPlaceholder} />
+        )}
+
+        <View style={styles.continueButtonContainer}>
+          <Button
+            title={buttonText || t("onboarding.personalization.continue")}
+            onPress={onContinue}
+            disabled={!canContinue || isLoading}
+            loading={isLoading}
+          />
+        </View>
       </View>
     </View>
   );
@@ -94,7 +96,7 @@ export default function PersonalizationLayout({
 const makePersonalizationLayoutStyles = (
   tokens: any,
   colors: any,
-  brand: any
+  brand: any,
 ) => {
   return {
     container: {
@@ -103,55 +105,36 @@ const makePersonalizationLayoutStyles = (
     },
     header: {
       paddingHorizontal: toRN(tokens.spacing[6]),
-      paddingBottom: toRN(tokens.spacing[5]),
+      paddingTop: toRN(tokens.spacing[2]),
+      paddingBottom: toRN(tokens.spacing[4]),
     },
-    backButton: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: colors.bg.muted,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-      marginBottom: toRN(tokens.spacing[4]),
+    headerTitle: {
+      fontSize: toRN(tokens.typography.fontSize.base),
+      color: colors.text.secondary,
+      fontFamily: fontFamily.groteskMedium,
+      textAlign: "center" as const,
+      marginBottom: toRN(tokens.spacing[3]),
     },
     progressContainer: {
-      alignItems: "center" as const,
+      flexDirection: "row" as const,
+      gap: toRN(tokens.spacing[1]),
       width: "100%",
     },
-    progressText: {
-      fontSize: toRN(tokens.typography.fontSize.sm),
-      color: colors.text.secondary,
-      marginBottom: toRN(tokens.spacing[3]),
-      fontFamily: fontFamily.groteskMedium,
-      letterSpacing: 0.3,
-    },
-    progressBar: {
-      width: "100%",
-      height: 6,
+    progressSegment: {
+      flex: 1,
+      height: 4,
       backgroundColor: colors.bg.secondary,
-      borderRadius: 3,
-      overflow: "hidden" as const,
-      shadowColor: colors.shadow.default,
-      shadowOffset: {
-        width: 0,
-        height: 1,
-      },
-      shadowOpacity: 0.05,
-      shadowRadius: 2,
-      elevation: 1,
     },
-    progressFill: {
-      height: "100%",
+    progressSegmentActive: {
       backgroundColor: brand.primary,
-      borderRadius: 3,
-      shadowColor: brand.primary,
-      shadowOffset: {
-        width: 0,
-        height: 0,
-      },
-      shadowOpacity: 0.3,
-      shadowRadius: 4,
-      elevation: 2,
+    },
+    progressSegmentFirst: {
+      borderTopLeftRadius: 2,
+      borderBottomLeftRadius: 2,
+    },
+    progressSegmentLast: {
+      borderTopRightRadius: 2,
+      borderBottomRightRadius: 2,
     },
     content: {
       flex: 1,
@@ -161,25 +144,25 @@ const makePersonalizationLayoutStyles = (
       paddingHorizontal: toRN(tokens.spacing[6]),
     },
     footer: {
-      paddingHorizontal: toRN(tokens.spacing[6]),
-    },
-    continueButton: {
-      backgroundColor: brand.primary,
-      borderRadius: toRN(tokens.borderRadius.lg),
-      paddingVertical: toRN(tokens.spacing[4]),
+      flexDirection: "row" as const,
       alignItems: "center" as const,
+      paddingHorizontal: toRN(tokens.spacing[6]),
+      paddingBottom: toRN(tokens.spacing[4]),
+      gap: toRN(tokens.spacing[3]),
     },
-    continueButtonDisabled: {
+    backButton: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
       backgroundColor: colors.bg.muted,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
     },
-    continueButtonText: {
-      fontSize: toRN(tokens.typography.fontSize.lg),
-      fontWeight: tokens.typography.fontWeight.semibold,
-      color: colors.text.inverse,
-      fontFamily: fontFamily.groteskSemiBold,
+    backButtonPlaceholder: {
+      width: 0,
     },
-    continueButtonTextDisabled: {
-      color: colors.text.tertiary,
+    continueButtonContainer: {
+      flex: 1,
     },
   };
 };

@@ -15,7 +15,7 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 const makeLoadingContainerStyles = (
   tokens: any,
   colors: any,
-  brandColors: any
+  brandColors: any,
 ) => {
   return {
     container: {
@@ -120,7 +120,7 @@ export const LoadingContainer: React.FC<LoadingContainerProps> = ({
             duration: 1000,
             useNativeDriver: true,
           }),
-        ])
+        ]),
       );
       textPulseAnimation.start();
 
@@ -130,7 +130,7 @@ export const LoadingContainer: React.FC<LoadingContainerProps> = ({
           toValue: 1,
           duration: 2000,
           useNativeDriver: true,
-        })
+        }),
       );
       rotateAnimation.start();
 

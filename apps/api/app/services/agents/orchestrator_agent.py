@@ -219,6 +219,13 @@ class OrchestratorAgent:
                 "biggest_challenge": profile.get(
                     "biggest_challenge", "staying_consistent"
                 ),
+                "available_equipment": profile.get("available_equipment", []),
+                # Additional personalization fields
+                "biological_sex": profile.get(
+                    "biological_sex"
+                ),  # male, female, prefer_not_to_say
+                "country": profile.get("country"),  # For cultural context
+                "timezone": profile.get("timezone"),  # For scheduling recommendations
             },
             # Available exercises (will be used by exercise selector)
             "available_exercises": available_exercises or [],
@@ -339,22 +346,56 @@ class OrchestratorAgent:
         }
         default_sets = sets_by_level.get(fitness_level, 3)
 
-        # Determine equipment availability based on location
-        equipment_options = {
-            "home": ["body weight", "dumbbell", "resistance band"],
-            "gym": [
-                "body weight",
-                "barbell",
-                "dumbbell",
-                "cable",
-                "machine",
-                "kettlebell",
-            ],
-            "outdoor": ["body weight"],
-            "mix": ["body weight", "dumbbell", "barbell"],
-            "dont_know": ["body weight", "dumbbell"],
-        }
-        available_equipment = equipment_options.get(preferred_location, ["body weight"])
+        # Determine equipment availability
+        # Priority: user's specified equipment > location-based defaults
+        user_equipment = profile.get("available_equipment", [])
+
+        if user_equipment and len(user_equipment) > 0:
+            # User has specified their equipment - use it
+            # Map our equipment IDs to database equipment values
+            equipment_mapping = {
+                "none": [],
+                "resistance_band": ["resistance band"],
+                "dumbbell": ["dumbbell"],
+                "kettlebell": ["kettlebell"],
+                "pull_up_bar": [],  # Uses body weight exercises
+                "yoga_mat": [],  # Uses body weight exercises
+                "barbell": ["barbell"],
+                "bench": ["dumbbell", "barbell"],
+                "cable_machine": ["cable"],
+            }
+
+            # Always include body weight
+            available_equipment = ["body weight"]
+
+            for equip in user_equipment:
+                mapped = equipment_mapping.get(equip, [])
+                for item in mapped:
+                    if item not in available_equipment:
+                        available_equipment.append(item)
+        else:
+            # Fallback to location-based equipment defaults
+            equipment_options = {
+                "home": [
+                    "body weight"
+                ],  # Home without specified equipment = body weight only
+                "gym": [
+                    "body weight",
+                    "barbell",
+                    "dumbbell",
+                    "cable",
+                    "machine",
+                    "kettlebell",
+                ],
+                "outdoor": ["body weight"],
+                "mix": [
+                    "body weight"
+                ],  # Mix without specified equipment = body weight only
+                "dont_know": ["body weight", "resistance band"],
+            }
+            available_equipment = equipment_options.get(
+                preferred_location, ["body weight"]
+            )
 
         # Duration settings
         duration_minutes = {
@@ -424,6 +465,7 @@ class OrchestratorAgent:
         # Build the final plan structure
         plan = {
             "plan_type": "workout_plan",
+            "tracking_type": "workout",  # Fitness plans always use workout tracking
             "structure": {
                 "total_duration_minutes": total_duration_minutes,
                 "warm_up": warmup_cooldown.get(
@@ -576,6 +618,7 @@ class OrchestratorAgent:
 
         return {
             "plan_type": "workout_plan",
+            "tracking_type": "workout",  # Fitness plans always use workout tracking
             "structure": {
                 "total_duration_minutes": 30,
                 "warm_up": {

@@ -47,14 +47,19 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     "expo-sqlite", // Required for Supabase localStorage polyfill
     "expo-audio", // For workout music and sound effects
     "expo-screen-orientation", // For landscape mode in workout player
-    [
-      "expo-video",
-      {
-        supportsBackgroundPlayback: true,
-        supportsPictureInPicture: true,
-      },
-    ], // For exercise demonstration videos
     "expo-asset", // For loading assets
+    [
+      "react-native-video",
+      {
+        enableNotificationControls: true,
+        androidExtensions: {
+          useExoplayerRtsp: false,
+          useExoplayerSmoothStreaming: false,
+          useExoplayerHls: false,
+          useExoplayerDash: false,
+        },
+      },
+    ],
   ];
 
   return {

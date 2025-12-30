@@ -1,41 +1,52 @@
 import { BaseApiService, ApiResponse } from "./base";
 import { ROUTES } from "@/lib/routes";
 
-// Check-ins Types
+// Mood values (matches challenge_check_ins)
+export type CheckInMood = "great" | "good" | "okay" | "bad" | "terrible";
+
+// Check-ins Types - Unified structure for both goals and challenges
 export interface CheckIn {
   id: string;
-  goal_id: string;
+  goal_id?: string; // For goal check-ins
+  challenge_id?: string; // For challenge check-ins
   user_id: string;
-  date: string;
+  check_in_date: string; // Unified date field
   completed: boolean;
   is_checked_in?: boolean; // True when user has responded (yes or no)
-  reflection?: string;
-  mood?: number;
-  photo_urls?: string[];
+  notes?: string; // Unified from 'reflection'
+  mood?: CheckInMood; // Text-based mood (great, good, okay, bad, terrible)
+  photo_url?: string; // Single photo (unified from photo_urls)
   created_at: string;
   updated_at: string;
+  // Related entity info
   goal?: {
     id: string;
     title: string;
     category?: string;
     frequency?: string;
   };
+  challenge?: {
+    id: string;
+    title: string;
+    category?: string;
+  };
 }
 
 export interface CreateCheckInRequest {
-  goal_id: string;
-  date: string;
+  goal_id?: string;
+  challenge_id?: string;
+  check_in_date: string;
   completed: boolean;
-  reflection?: string;
-  mood?: number;
-  photo_urls?: string[];
+  notes?: string;
+  mood?: CheckInMood;
+  photo_url?: string;
 }
 
 export interface UpdateCheckInRequest {
   completed?: boolean;
-  reflection?: string;
-  mood?: number;
-  photo_urls?: string[];
+  notes?: string;
+  mood?: CheckInMood;
+  photo_url?: string;
   is_checked_in?: boolean;
 }
 
@@ -45,17 +56,18 @@ export interface CheckInStats {
   current_streak: number;
   longest_streak: number;
   completion_rate: number;
-  average_mood: number;
+  average_mood?: CheckInMood; // Most common mood
   most_productive_day: string;
   most_productive_time: string;
 }
 
 export interface CheckInCalendar {
-  date: string;
+  check_in_date: string;
   completed: boolean;
-  mood?: number;
-  goal_id: string;
-  goal_title: string;
+  mood?: CheckInMood;
+  goal_id?: string;
+  challenge_id?: string;
+  title: string; // Goal or challenge title
 }
 
 // Check-ins Service
@@ -72,14 +84,14 @@ export class CheckInsService extends BaseApiService {
   }
 
   async createCheckIn(
-    checkIn: CreateCheckInRequest
+    checkIn: CreateCheckInRequest,
   ): Promise<ApiResponse<CheckIn>> {
     return this.post<CheckIn>(ROUTES.CHECKINS.CREATE, checkIn);
   }
 
   async updateCheckIn(
     checkInId: string,
-    updates: UpdateCheckInRequest
+    updates: UpdateCheckInRequest,
   ): Promise<ApiResponse<CheckIn>> {
     return this.put<CheckIn>(ROUTES.CHECKINS.UPDATE(checkInId), updates);
   }
@@ -98,7 +110,7 @@ export class CheckInsService extends BaseApiService {
   async getCheckInCalendar(
     year: number,
     month: number,
-    goalId?: string
+    goalId?: string,
   ): Promise<ApiResponse<CheckInCalendar[]>> {
     const params = new URLSearchParams({
       year: year.toString(),
@@ -110,14 +122,14 @@ export class CheckInsService extends BaseApiService {
     }
 
     return this.get<CheckInCalendar[]>(
-      `${ROUTES.CHECKINS.CALENDAR}?${params.toString()}`
+      `${ROUTES.CHECKINS.CALENDAR}?${params.toString()}`,
     );
   }
 
   async getCheckInsByDateRange(
     startDate: string,
     endDate: string,
-    goalId?: string
+    goalId?: string,
   ): Promise<ApiResponse<CheckIn[]>> {
     const params = new URLSearchParams({
       start_date: startDate,
@@ -129,7 +141,7 @@ export class CheckInsService extends BaseApiService {
     }
 
     return this.get<CheckIn[]>(
-      `${ROUTES.CHECKINS.BY_DATE_RANGE}?${params.toString()}`
+      `${ROUTES.CHECKINS.BY_DATE_RANGE}?${params.toString()}`,
     );
   }
 
@@ -166,7 +178,7 @@ export class CheckInsService extends BaseApiService {
   }
 
   async bulkCreateCheckIns(
-    checkIns: CreateCheckInRequest[]
+    checkIns: CreateCheckInRequest[],
   ): Promise<ApiResponse<CheckIn[]>> {
     return this.post<CheckIn[]>(ROUTES.CHECKINS.BULK_CREATE, {
       check_ins: checkIns,
@@ -175,7 +187,7 @@ export class CheckInsService extends BaseApiService {
 
   async getMoodTrends(
     goalId?: string,
-    days: number = 30
+    days: number = 30,
   ): Promise<
     ApiResponse<
       {

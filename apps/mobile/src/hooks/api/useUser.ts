@@ -10,12 +10,15 @@ export const userQueryKeys = {
   notificationSettings: ["user", "notification-settings"] as const,
 } as const;
 
+// Empty placeholder to prevent loading spinners - no longer needed since types conflict
+
 // User Hooks
 export const useCurrentUser = () => {
   return useQuery({
     queryKey: userQueryKeys.currentUser,
     queryFn: () => userService.getCurrentUser(),
     staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnMount: false,
   });
 };
 
@@ -52,7 +55,7 @@ export const useUpdateProfile = () => {
       if (context?.previousUser) {
         queryClient.setQueryData(
           userQueryKeys.currentUser,
-          context.previousUser
+          context.previousUser,
         );
       }
     },
@@ -93,8 +96,9 @@ export const useUserStats = (userId?: string) => {
   return useQuery({
     queryKey: userQueryKeys.userStats(userId),
     queryFn: () => userService.getUserStats(userId),
-    enabled: isAuthenticated, // Only fetch when authenticated
+    enabled: isAuthenticated,
     staleTime: 0, // Refetch immediately when invalidated (realtime updates)
+    refetchOnMount: false,
   });
 };
 
@@ -159,7 +163,7 @@ export const useUpdateNotificationSettings = () => {
       });
 
       const previousSettings = queryClient.getQueryData(
-        userQueryKeys.notificationSettings
+        userQueryKeys.notificationSettings,
       );
 
       // Optimistically update settings
@@ -168,7 +172,7 @@ export const useUpdateNotificationSettings = () => {
         (old: any) => {
           if (!old?.data) return old;
           return { ...old, data: { ...old.data, ...newSettings } };
-        }
+        },
       );
 
       return { previousSettings };
@@ -177,7 +181,7 @@ export const useUpdateNotificationSettings = () => {
       if (context?.previousSettings) {
         queryClient.setQueryData(
           userQueryKeys.notificationSettings,
-          context.previousSettings
+          context.previousSettings,
         );
       }
     },

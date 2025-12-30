@@ -65,7 +65,7 @@ export function AchievementsSection({ onViewAll }: AchievementsSectionProps) {
       <Card shadow="md" style={styles.card}>
         <Text style={styles.title}>{t("home.achievements")}</Text>
         <EmptyState
-          icon="🏆"
+          icon="ribbon-outline"
           title={t("home.no_achievements")}
           message={t("home.no_achievements_message")}
         />
@@ -128,7 +128,7 @@ function AchievementBadge({ achievement }: { achievement: UserAchievement }) {
 const makeAchievementsSectionStyles = (
   tokens: any,
   colors: any,
-  brand: any
+  brand: any,
 ) => ({
   card: {
     marginBottom: toRN(tokens.spacing[4]),

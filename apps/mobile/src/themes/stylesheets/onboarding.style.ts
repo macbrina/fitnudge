@@ -7,7 +7,7 @@ const { width: screenWidth } = Dimensions.get("window");
 export const makeOnboardingStyles = (
   tokens: any,
   colors: any,
-  brandColors: any
+  brandColors: any,
 ) => {
   return {
     container: {
@@ -37,7 +37,7 @@ export const makeOnboardingCarouselStyles = (
   tokens: any,
   colors: any,
   brandColors: any,
-  { currentIndex = 0 }: { currentIndex: number }
+  { currentIndex = 0 }: { currentIndex: number },
 ) => {
   return {
     container: {

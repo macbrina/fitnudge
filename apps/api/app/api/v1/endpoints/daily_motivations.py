@@ -65,9 +65,9 @@ def get_user_context_for_motivation(supabase, user_id: str) -> dict:
     # =========================================
     goals_result = (
         supabase.table("goals")
-        .select("id, title, category, description, is_active")
+        .select("id, title, category, description, status")
         .eq("user_id", user_id)
-        .eq("is_active", True)
+        .eq("status", "active")
         .execute()
     )
     personal_goals = goals_result.data or []
@@ -80,30 +80,18 @@ def get_user_context_for_motivation(supabase, user_id: str) -> dict:
         participant_result = (
             supabase.table("challenge_participants")
             .select(
-                "challenge_id, challenges(id, title, description, start_date, end_date, is_active)"
+                "challenge_id, challenges(id, title, description, start_date, end_date, status)"
             )
             .eq("user_id", user_id)
             .execute()
         )
         for participation in participant_result.data or []:
             challenge = participation.get("challenges")
-            if not challenge or not challenge.get("is_active"):
+            if not challenge:
                 continue
-            # Check if challenge is currently active (between start and end date)
-            start_date = (
-                date.fromisoformat(challenge["start_date"])
-                if challenge.get("start_date")
-                else None
-            )
-            end_date = (
-                date.fromisoformat(challenge["end_date"])
-                if challenge.get("end_date")
-                else None
-            )
-            if start_date and today < start_date:
-                continue  # Not started yet
-            if end_date and today > end_date:
-                continue  # Already ended
+            # Only include challenges with status = 'active'
+            if challenge.get("status") != "active":
+                continue
             active_challenges.append(challenge)
     except Exception:
         pass
@@ -117,13 +105,13 @@ def get_user_context_for_motivation(supabase, user_id: str) -> dict:
     try:
         goal_checkins_result = (
             supabase.table("check_ins")
-            .select("date, completed")
+            .select("check_in_date, completed")
             .eq("user_id", user_id)
             .eq("completed", True)
             .execute()
         )
         for checkin in goal_checkins_result.data or []:
-            all_checkin_dates.add(checkin["date"])
+            all_checkin_dates.add(checkin["check_in_date"])
     except Exception:
         pass
 

@@ -39,7 +39,7 @@ export default function ResetPasswordScreen() {
     "checking" | "valid" | "invalid"
   >(initialToken ? "checking" : "invalid");
   const [validationMessage, setValidationMessage] = useState<string | null>(
-    initialToken ? null : null
+    initialToken ? null : null,
   );
 
   const { t } = useTranslation();
@@ -56,7 +56,7 @@ export default function ResetPasswordScreen() {
         params: { alertMessage: message },
       });
     },
-    [router]
+    [router],
   );
 
   useEffect(() => {
@@ -71,7 +71,7 @@ export default function ResetPasswordScreen() {
       } catch (error) {
         console.warn(
           "[ResetPassword] Failed to compute authenticated redirect",
-          error
+          error,
         );
         if (isMounted) {
           router.replace(MOBILE_ROUTES.MAIN.HOME);
@@ -165,7 +165,7 @@ export default function ResetPasswordScreen() {
 
     if (!confirmPassword) {
       newErrors.confirmPassword = t(
-        "auth.reset_password.confirm_password_required"
+        "auth.reset_password.confirm_password_required",
       );
     } else if (password !== confirmPassword) {
       newErrors.confirmPassword = t("auth.reset_password.passwords_dont_match");
@@ -246,7 +246,7 @@ export default function ResetPasswordScreen() {
             });
           }
         },
-      }
+      },
     );
   };
 
@@ -318,7 +318,7 @@ export default function ResetPasswordScreen() {
             <TextInput
               label={t("auth.reset_password.confirm_password_label")}
               placeholder={t(
-                "auth.reset_password.confirm_password_placeholder"
+                "auth.reset_password.confirm_password_placeholder",
               )}
               value={confirmPassword}
               onChangeText={(text) => {
@@ -383,7 +383,7 @@ export default function ResetPasswordScreen() {
 const makeResetPasswordScreenStyles = (
   tokens: any,
   colors: any,
-  brand: any
+  brand: any,
 ) => {
   return {
     container: {
@@ -417,7 +417,7 @@ const makeResetPasswordScreenStyles = (
       textAlign: "center" as const,
       lineHeight: lineHeight(
         tokens.typography.fontSize.base,
-        tokens.typography.lineHeight.relaxed
+        tokens.typography.lineHeight.relaxed,
       ),
       fontFamily: fontFamily.groteskRegular,
     },

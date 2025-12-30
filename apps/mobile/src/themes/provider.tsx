@@ -158,7 +158,7 @@ export function ThemeProvider({ children, initialBrand }: ThemeProviderProps) {
       setIsSystem,
       setBrand,
     }),
-    [mode, preference, brand, isDark, isSystem, colors, brandColors]
+    [mode, preference, brand, isDark, isSystem, colors, brandColors],
   );
 
   // Don't render until preferences are loaded to prevent flash
@@ -184,7 +184,7 @@ export function useTheme(): ThemeContextValue {
 
 // Hook to create themed styles
 export function useThemedStyles<T extends Record<string, any>>(
-  stylesFn: (tokens: Tokens, colors: SemanticColors, brand: BrandColors) => T
+  stylesFn: (tokens: Tokens, colors: SemanticColors, brand: BrandColors) => T,
 ): T {
   const { tokens: themeTokens, colors, brandColors } = useTheme();
 

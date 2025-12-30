@@ -15,14 +15,18 @@ class AchievementService:
     """Service for managing achievement badges"""
 
     async def check_and_unlock_achievements(
-        self, user_id: str, goal_id: Optional[str] = None
+        self,
+        user_id: str,
+        source_type: Optional[str] = None,  # "goal" or "challenge"
+        source_id: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
         Check user progress and unlock any eligible achievements.
 
         Args:
             user_id: User ID to check
-            goal_id: Optional goal ID to check achievements for specific goal
+            source_type: Optional source type ("goal" or "challenge") for metadata
+            source_id: Optional source ID (goal_id or challenge_id) for metadata
 
         Returns:
             List of newly unlocked achievements
@@ -43,45 +47,49 @@ class AchievementService:
             if not achievements.data:
                 return newly_unlocked
 
+            # SCALABILITY: Batch fetch all user's unlocked achievements (1 query vs N)
+            achievement_type_ids = [a["id"] for a in achievements.data]
+            unlocked_achievements = (
+                supabase.table("user_achievements")
+                .select("achievement_type_id")
+                .eq("user_id", user_id)
+                .in_("achievement_type_id", achievement_type_ids)
+                .execute()
+            )
+            unlocked_ids = set(
+                a["achievement_type_id"] for a in unlocked_achievements.data or []
+            )
+
             # Check each achievement type
             for achievement in achievements.data:
-                # Check if already unlocked
-                query = (
-                    supabase.table("user_achievements")
-                    .select("id")
-                    .eq("user_id", user_id)
-                    .eq("achievement_type_id", achievement["id"])
-                )
-
-                if goal_id:
-                    query = query.eq("goal_id", goal_id)
-                else:
-                    query = query.is_("goal_id", "null")
-
-                existing = query.execute()
-
-                if existing.data:
+                # Check if already unlocked (from batch data)
+                if achievement["id"] in unlocked_ids:
                     continue  # Already unlocked
 
                 # Check if condition is met
                 condition_met = await self._check_condition(
-                    user_id, goal_id, achievement["unlock_condition"]
+                    user_id, achievement["unlock_condition"]
                 )
 
                 if condition_met:
                     # Unlock the achievement
                     unlocked = await self._unlock_achievement(
-                        user_id, achievement["id"], goal_id, achievement
+                        user_id,
+                        achievement["id"],
+                        achievement,
+                        source_type,
+                        source_id,
                     )
                     if unlocked:
                         newly_unlocked.append(unlocked)
 
             if newly_unlocked:
-                print(
+                logger.info(
                     f"Unlocked {len(newly_unlocked)} achievements for user {user_id}",
                     {
                         "user_id": user_id,
-                        "goal_id": goal_id,
+                        "source_type": source_type,
+                        "source_id": source_id,
                         "achievements": [a["badge_key"] for a in newly_unlocked],
                     },
                 )
@@ -91,19 +99,16 @@ class AchievementService:
         except Exception as e:
             logger.error(
                 f"Failed to check achievements for user {user_id}",
-                {"error": str(e), "user_id": user_id, "goal_id": goal_id},
+                {"error": str(e), "user_id": user_id},
             )
             return newly_unlocked
 
-    async def _check_condition(
-        self, user_id: str, goal_id: Optional[str], condition: str
-    ) -> bool:
+    async def _check_condition(self, user_id: str, condition: str) -> bool:
         """
         Check if an achievement condition is met.
 
         Args:
             user_id: User ID
-            goal_id: Optional goal ID
             condition: JSON string describing the condition
 
         Returns:
@@ -122,18 +127,14 @@ class AchievementService:
             supabase = get_supabase_client()
 
             if condition_type == "checkin_count":
-                # Count total check-ins (completed = true)
-                query = (
+                # Count total check-ins across all goals (completed = true)
+                result = (
                     supabase.table("check_ins")
                     .select("id", count="exact")
                     .eq("user_id", user_id)
                     .eq("completed", True)
+                    .execute()
                 )
-
-                if goal_id:
-                    query = query.eq("goal_id", goal_id)
-
-                result = query.execute()
                 count = (
                     result.count if hasattr(result, "count") else len(result.data or [])
                 )
@@ -141,8 +142,8 @@ class AchievementService:
                 return count >= target_value
 
             elif condition_type == "streak":
-                # Get current streak
-                streak = await self._get_current_streak(user_id, goal_id)
+                # Get current streak across all goals
+                streak = await self._get_current_streak(user_id)
                 return streak >= target_value
 
             elif condition_type == "goal_count":
@@ -159,42 +160,23 @@ class AchievementService:
                 return count >= target_value
 
             elif condition_type == "perfect_week":
-                # Check if user completed all check-ins in a week
+                # Check if user completed all check-ins in a week (across all goals)
                 today = date.today()
                 week_start = today - timedelta(days=today.weekday())
 
-                query = (
+                result = (
                     supabase.table("check_ins")
-                    .select("date")
+                    .select("check_in_date")
                     .eq("user_id", user_id)
                     .eq("completed", True)
-                    .gte("date", week_start.isoformat())
-                    .lte("date", today.isoformat())
+                    .gte("check_in_date", week_start.isoformat())
+                    .lte("check_in_date", today.isoformat())
+                    .execute()
                 )
+                completed_dates = {row["check_in_date"] for row in (result.data or [])}
 
-                if goal_id:
-                    query = query.eq("goal_id", goal_id)
-
-                result = query.execute()
-                completed_dates = {row["date"] for row in (result.data or [])}
-
-                # Check if all 7 days have check-ins (or goal's target_days)
-                if goal_id:
-                    goal = (
-                        supabase.table("goals")
-                        .select("target_days")
-                        .eq("id", goal_id)
-                        .maybe_single()
-                        .execute()
-                    )
-                    if goal.data:
-                        target_days = goal.data.get("target_days", 7)
-                    else:
-                        target_days = 7
-                else:
-                    target_days = 7
-
-                return len(completed_dates) >= min(target_days, 7)
+                # Check if all 7 days have check-ins
+                return len(completed_dates) >= 7
 
             # ==========================================
             # WORKOUT-SPECIFIC CONDITION TYPES
@@ -244,7 +226,9 @@ class AchievementService:
 
             elif condition_type == "workout_time":
                 # Check if user completed a workout at a specific time
-                time_condition = condition_data.get("condition")  # "before", "after", "between"
+                time_condition = condition_data.get(
+                    "condition"
+                )  # "before", "after", "between"
                 hour = condition_data.get("hour")
                 start_hour = condition_data.get("start_hour")
                 end_hour = condition_data.get("end_hour")
@@ -353,32 +337,27 @@ class AchievementService:
             )
             return False
 
-    async def _get_current_streak(self, user_id: str, goal_id: Optional[str]) -> int:
+    async def _get_current_streak(self, user_id: str) -> int:
         """
-        Get current streak for user/goal.
+        Get current streak for user across all goals/challenges.
 
         Args:
             user_id: User ID
-            goal_id: Optional goal ID
 
         Returns:
             Current streak count (days)
         """
         supabase = get_supabase_client()
 
-        # Get all completed check-ins, ordered by date descending
-        query = (
+        # Get all completed check-ins across all goals, ordered by date descending
+        result = (
             supabase.table("check_ins")
-            .select("date")
+            .select("check_in_date")
             .eq("user_id", user_id)
             .eq("completed", True)
-            .order("date", desc=True)
+            .order("check_in_date", desc=True)
+            .execute()
         )
-
-        if goal_id:
-            query = query.eq("goal_id", goal_id)
-
-        result = query.execute()
         check_ins = result.data or []
 
         if not check_ins:
@@ -390,17 +369,17 @@ class AchievementService:
         current_date = today
 
         for check_in in check_ins:
-            check_in_date = (
-                check_in["date"]
-                if isinstance(check_in["date"], date)
-                else date.fromisoformat(str(check_in["date"]))
+            check_in_date_val = (
+                check_in["check_in_date"]
+                if isinstance(check_in["check_in_date"], date)
+                else date.fromisoformat(str(check_in["check_in_date"]))
             )
 
             # Check if this date matches our expected date
-            if check_in_date == current_date:
+            if check_in_date_val == current_date:
                 streak += 1
                 current_date -= timedelta(days=1)
-            elif check_in_date < current_date:
+            elif check_in_date_val < current_date:
                 # Gap in streak, break
                 break
 
@@ -469,8 +448,9 @@ class AchievementService:
         self,
         user_id: str,
         achievement_type_id: str,
-        goal_id: Optional[str],
         achievement_data: Dict[str, Any],
+        source_type: Optional[str] = None,
+        source_id: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         """
         Unlock an achievement for a user.
@@ -478,8 +458,9 @@ class AchievementService:
         Args:
             user_id: User ID
             achievement_type_id: Achievement type ID
-            goal_id: Optional goal ID
             achievement_data: Achievement type data
+            source_type: Optional source type ("goal" or "challenge") for metadata
+            source_id: Optional source ID for metadata
 
         Returns:
             Unlocked achievement data or None if failed
@@ -487,33 +468,36 @@ class AchievementService:
         supabase = get_supabase_client()
 
         try:
-            # Create user achievement record
+            # Build metadata with source info if provided
+            metadata: Dict[str, Any] = {}
+            if source_type and source_id:
+                metadata["source_type"] = source_type
+                metadata["source_id"] = source_id
+
+            # Create user achievement record (no goal_id column anymore)
             achievement_record = {
                 "user_id": user_id,
                 "achievement_type_id": achievement_type_id,
-                "goal_id": goal_id,
-                "metadata": {},
+                "metadata": metadata,
             }
 
-            # Add metadata based on achievement type
+            # Add additional metadata based on achievement type
             if "streak" in achievement_data.get("badge_key", ""):
-                streak = await self._get_current_streak(user_id, goal_id)
-                achievement_record["metadata"] = {"streak": streak}
+                streak = await self._get_current_streak(user_id)
+                achievement_record["metadata"]["streak"] = streak
             elif "checkin" in achievement_data.get("badge_key", ""):
-                # Get check-in count
-                query = (
+                # Get total check-in count across all goals
+                result = (
                     supabase.table("check_ins")
                     .select("id", count="exact")
                     .eq("user_id", user_id)
                     .eq("completed", True)
+                    .execute()
                 )
-                if goal_id:
-                    query = query.eq("goal_id", goal_id)
-                result = query.execute()
                 count = (
                     result.count if hasattr(result, "count") else len(result.data or [])
                 )
-                achievement_record["metadata"] = {"checkin_count": count}
+                achievement_record["metadata"]["checkin_count"] = count
 
             result = (
                 supabase.table("user_achievements").insert(achievement_record).execute()
@@ -553,15 +537,12 @@ class AchievementService:
             )
             return None
 
-    async def get_user_achievements(
-        self, user_id: str, goal_id: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+    async def get_user_achievements(self, user_id: str) -> List[Dict[str, Any]]:
         """
         Get all achievements unlocked by a user.
 
         Args:
             user_id: User ID
-            goal_id: Optional goal ID to filter by
 
         Returns:
             List of user achievements
@@ -569,19 +550,13 @@ class AchievementService:
         supabase = get_supabase_client()
 
         try:
-            query = (
+            result = (
                 supabase.table("user_achievements")
                 .select("*, achievement_types(*)")
                 .eq("user_id", user_id)
                 .order("unlocked_at", desc=True)
+                .execute()
             )
-
-            if goal_id:
-                query = query.eq("goal_id", goal_id)
-            else:
-                query = query.is_("goal_id", "null")
-
-            result = query.execute()
             return result.data or []
 
         except Exception as e:

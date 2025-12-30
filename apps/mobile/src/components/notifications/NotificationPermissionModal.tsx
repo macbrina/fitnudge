@@ -127,7 +127,7 @@ export const NotificationPermissionModal: React.FC<
 const makeNotificationPermissionModalStyles = (
   tokens: any,
   colors: any,
-  brand: any
+  brand: any,
 ) => {
   return {
     overlay: {
@@ -175,7 +175,7 @@ const makeNotificationPermissionModalStyles = (
       textAlign: "center" as const,
       lineHeight: lineHeight(
         tokens.typography.fontSize.base,
-        tokens.typography.lineHeight.relaxed
+        tokens.typography.lineHeight.relaxed,
       ),
       fontFamily: fontFamily.groteskRegular,
     },
@@ -207,7 +207,7 @@ const makeNotificationPermissionModalStyles = (
       color: colors.text.secondary,
       lineHeight: lineHeight(
         tokens.typography.fontSize.sm,
-        tokens.typography.lineHeight.relaxed
+        tokens.typography.lineHeight.relaxed,
       ),
       fontFamily: fontFamily.groteskRegular,
     },
@@ -257,7 +257,7 @@ const makeNotificationPermissionModalStyles = (
       marginTop: toRN(tokens.spacing[4]),
       lineHeight: lineHeight(
         tokens.typography.fontSize.xs,
-        tokens.typography.lineHeight.tight
+        tokens.typography.lineHeight.tight,
       ),
       fontFamily: fontFamily.groteskRegular,
     },
