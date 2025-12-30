@@ -1,47 +1,42 @@
-import React, { useState, useMemo, useCallback } from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  RefreshControl,
-} from "react-native";
-import { useTranslation } from "@/lib/i18n";
-import { useRouter } from "expo-router";
-import { useStyles } from "@/themes";
-import { useTheme } from "@/themes";
-import { tokens } from "@/themes/tokens";
-import { toRN } from "@/lib/units";
-import { fontFamily } from "@/lib/fonts";
-import { Ionicons } from "@expo/vector-icons";
-import { useGoals } from "@/hooks/api/useGoals";
-import {
-  useMyChallenges,
-  useShareGoalAsChallenge,
-} from "@/hooks/api/useChallenges";
-import { GoalCard } from "@/screens/tabs/home/components/GoalCard";
-import { ChallengeCard } from "@/screens/tabs/home/components/ChallengeCard";
-import { Tabs, TabItem } from "@/components/ui/Tabs";
-import { SearchBar } from "@/components/ui/SearchBar";
+import { ActionSheetOption } from "@/components/ui/ActionSheet";
+import Button from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { ModalActionSheet } from "@/components/ui/ModalActionSheet";
-import { ActionSheetOption } from "@/components/ui/ActionSheet";
-import { EmptyState } from "@/screens/tabs/home/components/EmptyState";
+import { SearchBar } from "@/components/ui/SearchBar";
 import { SkeletonCard } from "@/components/ui/SkeletonBox";
-import { MOBILE_ROUTES } from "@/lib/routes";
-import { Goal } from "@/services/api/goals";
-import { Challenge } from "@/services/api/challenges";
+import { TabItem, Tabs } from "@/components/ui/Tabs";
 import { useAlertModal } from "@/contexts/AlertModalContext";
-import { ShareGoalModal } from "@/components/goals/ShareGoalModal";
-import { ShareAsChallengeModal } from "@/components/goals/ShareAsChallengeModal";
-import { socialService } from "@/services/api/social";
-import Button from "@/components/ui/Button";
-import { useBatchPlanStatuses } from "@/hooks/api/useActionablePlans";
+import {
+  useBatchChallengePlanStatuses,
+  useBatchPlanStatuses,
+} from "@/hooks/api/useActionablePlans";
+import { useMyChallenges } from "@/hooks/api/useChallenges";
+import { useGoals } from "@/hooks/api/useGoals";
+import { fontFamily } from "@/lib/fonts";
+import { useTranslation } from "@/lib/i18n";
+import { MOBILE_ROUTES } from "@/lib/routes";
+import { toRN } from "@/lib/units";
+import { ChallengeCard } from "@/screens/tabs/home/components/ChallengeCard";
+import { EmptyState } from "@/screens/tabs/home/components/EmptyState";
+import { GoalCard } from "@/screens/tabs/home/components/GoalCard";
+import { Challenge } from "@/services/api/challenges";
+import { Goal } from "@/services/api/goals";
+import { useStyles, useTheme } from "@/themes";
+import { tokens } from "@/themes/tokens";
+import { Ionicons } from "@expo/vector-icons";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  RefreshControl,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 // Extend Goal type to include optional fields used in GoalCard
 type GoalWithStreak = Goal & {
   current_streak?: number;
-  converted_to_challenge_id?: string;
   archived_reason?: string | null;
   completed_checkins?: number;
   // Challenge-specific fields (when viewing challenges)
@@ -70,13 +65,12 @@ type SortOption =
   | "streak-low";
 
 const CATEGORIES = [
-  { id: "all", label: "All", emoji: "" },
-  { id: "fitness", label: "Fitness", emoji: "💪" },
-  { id: "nutrition", label: "Nutrition", emoji: "🥗" },
-  { id: "wellness", label: "Wellness", emoji: "🧘" },
-  { id: "mindfulness", label: "Mindfulness", emoji: "🧠" },
-  { id: "sleep", label: "Sleep", emoji: "😴" },
-  { id: "custom", label: "Custom", emoji: "🎯" },
+  { id: "all", label: "All", icon: "apps-outline" as const },
+  { id: "fitness", label: "Fitness", icon: "fitness-outline" as const },
+  { id: "nutrition", label: "Nutrition", icon: "nutrition-outline" as const },
+  { id: "wellness", label: "Wellness", icon: "leaf-outline" as const },
+  { id: "mindfulness", label: "Mindfulness", icon: "flower-outline" as const },
+  { id: "sleep", label: "Sleep", icon: "moon-outline" as const },
 ] as const;
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
@@ -93,7 +87,7 @@ export default function GoalsScreen() {
   const { colors, brandColors } = useTheme();
   const { t } = useTranslation();
   const router = useRouter();
-  const { showAlert, showToast } = useAlertModal();
+  const params = useLocalSearchParams<{ tab?: string }>();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
@@ -104,12 +98,19 @@ export default function GoalsScreen() {
   const [sortBy, setSortBy] = useState<SortOption>("recent");
   const [refreshing, setRefreshing] = useState(false);
 
-  // Modal states
-  const [shareGoalModalVisible, setShareGoalModalVisible] = useState(false);
-  const [shareAsChallengeModalVisible, setShareAsChallengeModalVisible] =
-    useState(false);
-  const [selectedGoalForAction, setSelectedGoalForAction] =
-    useState<GoalWithStreak | null>(null);
+  // Handle tab query param (e.g., from Social screen)
+  useEffect(() => {
+    if (params.tab === "challenges") {
+      setStatusFilter("active");
+      setTypeFilter("challenges");
+    } else if (params.tab === "my_goals") {
+      setStatusFilter("active");
+      setTypeFilter("my_goals");
+    } else if (params.tab === "archived") {
+      setStatusFilter("archived");
+      setTypeFilter("all");
+    }
+  }, [params.tab]);
 
   const {
     data: goalsResponse,
@@ -123,27 +124,71 @@ export default function GoalsScreen() {
     refetch: refetchChallenges,
     error: challengesError,
   } = useMyChallenges(); // Fetch challenges user has created or joined
-  const goals = (goalsResponse?.data || []) as GoalWithStreak[];
-  const challenges = (challengesResponse?.data || []) as Challenge[];
-  const shareGoalAsChallenge = useShareGoalAsChallenge();
+  // Dedupe goals and challenges to prevent duplicate key errors
+  // This can happen if realtime INSERT races with mutation optimistic update
+  const goals = useMemo(() => {
+    const data = (goalsResponse?.data || []) as GoalWithStreak[];
+    const seen = new Set<string>();
+    return data.filter((g) => {
+      if (seen.has(g.id)) return false;
+      seen.add(g.id);
+      return true;
+    });
+  }, [goalsResponse?.data]);
+
+  const challenges = useMemo(() => {
+    const data = (challengesResponse?.data || []) as Challenge[];
+    const seen = new Set<string>();
+    return data.filter((c) => {
+      if (seen.has(c.id)) return false;
+      seen.add(c.id);
+      return true;
+    });
+  }, [challengesResponse?.data]);
 
   // Get all goal IDs for batch plan status fetch
-  const goalIds = useMemo(() => goals.map((g) => g.id), [goals]);
+  // Filter out temp IDs from optimistic updates - they don't have plan status yet
+  const goalIds = useMemo(
+    () => goals.filter((g) => !g.id.startsWith("temp-")).map((g) => g.id),
+    [goals],
+  );
+
+  // Get all challenge IDs for batch plan status fetch (only for participated challenges)
+  // Filter out temp IDs from optimistic updates - they don't have plan status yet
+  const participatedChallengeIds = useMemo(
+    () =>
+      challenges
+        .filter(
+          (c) =>
+            (c.is_creator || c.is_participant) && !c.id.startsWith("temp-"),
+        )
+        .map((c) => c.id),
+    [challenges],
+  );
 
   // Batch fetch all plan statuses at once (instead of each GoalCard fetching individually)
   const { planStatusMap, isLoading: isLoadingPlanStatuses } =
     useBatchPlanStatuses(goalIds);
 
+  // Batch fetch challenge plan statuses
+  const {
+    planStatusMap: challengePlanStatusMap,
+    isLoading: isLoadingChallengePlanStatuses,
+  } = useBatchChallengePlanStatuses(participatedChallengeIds);
+
   // Combined loading state
-  // When viewing "all" (Active tab) or "challenges", we need to wait for challenges too
-  // Also wait for plan statuses when viewing goals
+  // Only show loading skeleton on initial fetch (when we have no data yet)
+  // Don't show loading for subsequent refetches to avoid flicker after optimistic updates
+  // Plan status loading should not block the main list display - goals/challenges
+  // can show immediately with a "generating" badge on their cards
+  const hasNoGoalsData = !goalsResponse?.data;
+  const hasNoChallengesData = !challengesResponse?.data;
+
   const isLoading =
-    isLoadingGoals ||
+    (isLoadingGoals && hasNoGoalsData) ||
     ((typeFilter === "all" || typeFilter === "challenges") &&
-      isLoadingChallenges) ||
-    ((typeFilter === "all" || typeFilter === "my_goals") &&
-      goals.length > 0 &&
-      isLoadingPlanStatuses);
+      isLoadingChallenges &&
+      hasNoChallengesData);
 
   // Refetch both data sources
   const refetch = useCallback(async () => {
@@ -152,8 +197,8 @@ export default function GoalsScreen() {
 
   // Count active goals for limit checking
   const activeGoalsCount = useMemo(
-    () => goals.filter((g) => g.is_active).length,
-    [goals]
+    () => goals.filter((g) => g.status === "active").length,
+    [goals],
   );
 
   // Filter and sort challenges (separate from goals)
@@ -163,17 +208,11 @@ export default function GoalsScreen() {
     // Status filter for challenges
     if (statusFilter === "active") {
       filteredChallenges = filteredChallenges.filter(
-        (c) =>
-          c.status === "active" ||
-          c.status === "upcoming" ||
-          c.is_active === true
+        (c) => c.status === "active" || c.status === "upcoming",
       );
     } else if (statusFilter === "archived") {
       filteredChallenges = filteredChallenges.filter(
-        (c) =>
-          c.status === "completed" ||
-          c.status === "cancelled" ||
-          c.is_active === false
+        (c) => c.status === "completed" || c.status === "cancelled",
       );
     }
 
@@ -183,7 +222,7 @@ export default function GoalsScreen() {
       filteredChallenges = filteredChallenges.filter(
         (c) =>
           c.title.toLowerCase().includes(query) ||
-          c.description?.toLowerCase().includes(query)
+          c.description?.toLowerCase().includes(query),
       );
     }
 
@@ -192,13 +231,13 @@ export default function GoalsScreen() {
       case "recent":
         filteredChallenges.sort(
           (a, b) =>
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
         );
         break;
       case "oldest":
         filteredChallenges.sort(
           (a, b) =>
-            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
         );
         break;
       case "alphabetical-asc":
@@ -210,7 +249,7 @@ export default function GoalsScreen() {
       default:
         filteredChallenges.sort(
           (a, b) =>
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
         );
     }
 
@@ -224,15 +263,20 @@ export default function GoalsScreen() {
 
     // Status filter
     if (statusFilter === "active") {
-      filtered = filtered.filter((g) => g.is_active === true);
+      filtered = filtered.filter((g) => g.status === "active");
     } else if (statusFilter === "archived") {
-      filtered = filtered.filter((g) => g.is_active === false);
+      filtered = filtered.filter(
+        (g) =>
+          g.status === "archived" ||
+          g.status === "paused" ||
+          g.status === "completed",
+      );
     }
 
     // Category filter
     if (selectedCategories.length > 0 && !selectedCategories.includes("all")) {
       filtered = filtered.filter((g) =>
-        selectedCategories.includes(g.category)
+        selectedCategories.includes(g.category),
       );
     }
 
@@ -242,7 +286,7 @@ export default function GoalsScreen() {
       filtered = filtered.filter(
         (g) =>
           g.title.toLowerCase().includes(query) ||
-          g.description?.toLowerCase().includes(query)
+          g.description?.toLowerCase().includes(query),
       );
     }
 
@@ -251,13 +295,13 @@ export default function GoalsScreen() {
       case "recent":
         filtered.sort(
           (a, b) =>
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
         );
         break;
       case "oldest":
         filtered.sort(
           (a, b) =>
-            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
         );
         break;
       case "alphabetical-asc":
@@ -268,12 +312,12 @@ export default function GoalsScreen() {
         break;
       case "streak-high":
         filtered.sort(
-          (a, b) => (b.current_streak || 0) - (a.current_streak || 0)
+          (a, b) => (b.current_streak || 0) - (a.current_streak || 0),
         );
         break;
       case "streak-low":
         filtered.sort(
-          (a, b) => (a.current_streak || 0) - (b.current_streak || 0)
+          (a, b) => (a.current_streak || 0) - (b.current_streak || 0),
         );
         break;
     }
@@ -296,10 +340,10 @@ export default function GoalsScreen() {
     // Create combined list
     const items: CombinedListItem[] = [
       ...filteredAndSortedGoals.map(
-        (g): CombinedListItem => ({ type: "goal", data: g })
+        (g): CombinedListItem => ({ type: "goal", data: g }),
       ),
       ...filteredAndSortedChallenges.map(
-        (c): CombinedListItem => ({ type: "challenge", data: c })
+        (c): CombinedListItem => ({ type: "challenge", data: c }),
       ),
     ];
 
@@ -316,20 +360,16 @@ export default function GoalsScreen() {
   // Calculate stats
   const stats = useMemo(() => {
     // Goals breakdown
-    const activeGoals = goals.filter((g) => g.is_active).length;
-    const archivedGoals = goals.filter((g) => !g.is_active).length;
-    const myGoals = goals.filter((g) => g.is_active).length;
+    const activeGoals = goals.filter((g) => g.status === "active").length;
+    const archivedGoals = goals.filter((g) => g.status !== "active").length;
+    const myGoals = goals.filter((g) => g.status === "active").length;
 
     // Challenges breakdown
     const activeChallenges = challenges.filter(
-      (c) =>
-        c.status === "active" || c.status === "upcoming" || c.is_active === true
+      (c) => c.status === "active" || c.status === "upcoming",
     ).length;
     const archivedChallenges = challenges.filter(
-      (c) =>
-        c.status === "completed" ||
-        c.status === "cancelled" ||
-        c.is_active === false
+      (c) => c.status === "completed" || c.status === "cancelled",
     ).length;
 
     // Combined counts (goals + challenges)
@@ -377,108 +417,6 @@ export default function GoalsScreen() {
     router.push(MOBILE_ROUTES.GOALS.CREATE);
   };
 
-  // === Menu Action Handlers ===
-
-  // Share Goal (for habits)
-  const handleShareGoal = useCallback((goal: GoalWithStreak) => {
-    setSelectedGoalForAction(goal);
-    setShareGoalModalVisible(true);
-  }, []);
-
-  // Share as Challenge (for time/target challenges)
-  const handleShareAsChallenge = useCallback((goal: GoalWithStreak) => {
-    setSelectedGoalForAction(goal);
-    setShareAsChallengeModalVisible(true);
-  }, []);
-
-  // View Challenge (navigate to converted challenge)
-  const handleViewChallenge = useCallback(
-    (goal: GoalWithStreak) => {
-      if (goal.converted_to_challenge_id) {
-        router.push(
-          MOBILE_ROUTES.CHALLENGES.DETAILS(goal.converted_to_challenge_id)
-        );
-      }
-    },
-    [router]
-  );
-
-  // Invite Members (group goals - TODO: Create dedicated screen)
-  const handleInviteMembers = useCallback(
-    async (goal: GoalWithStreak) => {
-      // TODO: Navigate to invite members screen when implemented
-      await showAlert({
-        title: t("common.coming_soon") || "Coming Soon",
-        message:
-          t("goals.invite_members_coming_soon") ||
-          "Invite members feature will be available soon.",
-        variant: "info",
-        confirmLabel: t("common.ok"),
-      });
-    },
-    [showAlert, t]
-  );
-
-  // View Members (group goals - TODO: Create dedicated screen)
-  const handleViewMembers = useCallback(
-    async (goal: GoalWithStreak) => {
-      // TODO: Navigate to view members screen when implemented
-      await showAlert({
-        title: t("common.coming_soon") || "Coming Soon",
-        message:
-          t("goals.view_members_coming_soon") ||
-          "View members feature will be available soon.",
-        variant: "info",
-        confirmLabel: t("common.ok"),
-      });
-    },
-    [showAlert, t]
-  );
-
-  // Leave Group (group goals - TODO: Implement API call)
-  const handleLeaveGroup = useCallback(
-    async (goal: GoalWithStreak) => {
-      // TODO: Implement leave group functionality
-      await showAlert({
-        title: t("common.coming_soon") || "Coming Soon",
-        message:
-          t("goals.leave_group_coming_soon") ||
-          "Leave group feature will be available soon.",
-        variant: "info",
-        confirmLabel: t("common.ok"),
-      });
-    },
-    [showAlert, t]
-  );
-
-  // Search users for sharing
-  const handleSearchUsers = useCallback(async (query: string) => {
-    try {
-      const response = await socialService.searchUsers(query);
-      return response.data || [];
-    } catch (error) {
-      console.error("Error searching users:", error);
-      return [];
-    }
-  }, []);
-
-  // Share goal with user
-  const handleShareGoalWithUser = useCallback(
-    async (
-      userId: string,
-      permissionLevel: "view" | "comment" | "motivate"
-    ) => {
-      if (!selectedGoalForAction) return;
-      // TODO: Implement goal sharing API
-      console.log("Sharing goal with user:", {
-        goalId: selectedGoalForAction.id,
-        userId,
-        permissionLevel,
-      });
-    },
-    [selectedGoalForAction]
-  );
-
   // Combined filter tabs (merges status + type into one clean row)
   // Memoized to ensure proper re-render when stats change
   const filterTabs: TabItem[] = useMemo(
@@ -496,7 +434,7 @@ export default function GoalsScreen() {
         badge: stats.archived > 0 ? stats.archived : undefined,
       },
     ],
-    [stats.active, stats.archived, t]
+    [stats.active, stats.archived, t],
   );
 
   // Active filter state (combined status + type)
@@ -532,11 +470,11 @@ export default function GoalsScreen() {
   // Category options for ActionSheet
   const categoryOptions: ActionSheetOption[] = CATEGORIES.map((cat) => ({
     id: cat.id,
-    label: cat.emoji ? `${cat.emoji} ${cat.label}` : cat.label,
+    label: cat.label,
     icon:
       selectedCategories[0] === cat.id
         ? ("checkmark-circle" as const)
-        : undefined,
+        : cat.icon,
     onPress: () => handleCategoryToggle(cat.id),
   }));
 
@@ -684,7 +622,7 @@ export default function GoalsScreen() {
           combinedList.length === 0 ? (
             <Card shadow="md" style={styles.emptyCard}>
               <EmptyState
-                icon="🎯"
+                icon="flag-outline"
                 title={
                   searchQuery
                     ? t("goals.no_results_title")
@@ -698,7 +636,11 @@ export default function GoalsScreen() {
               />
               {!searchQuery && (
                 <Button
-                  title={t("goals.create_first_goal")}
+                  title={
+                    goals.length === 0
+                      ? t("goals.create_first_goal")
+                      : t("goals.create_goal")
+                  }
                   onPress={handleCreateGoal}
                   variant="primary"
                   borderRadius="full"
@@ -716,28 +658,23 @@ export default function GoalsScreen() {
                     onPress={() => handleGoalPress(item.data)}
                     showMenu={true}
                     activeGoalsCount={activeGoalsCount}
-                    onShareGoal={() => handleShareGoal(item.data)}
-                    onShareAsChallenge={() => handleShareAsChallenge(item.data)}
-                    onViewChallenge={() => handleViewChallenge(item.data)}
-                    onInviteMembers={() => handleInviteMembers(item.data)}
-                    onViewMembers={() => handleViewMembers(item.data)}
-                    onLeaveGroup={() => handleLeaveGroup(item.data)}
                     style={styles.goalCard}
                   />
                 ) : (
                   <ChallengeCard
                     key={`challenge-${item.data.id}`}
                     challenge={item.data}
+                    planStatus={challengePlanStatusMap[item.data.id]}
                     onPress={() => handleChallengePress(item.data)}
                     showMenu={true}
                     activeChallengesCount={
                       challenges.filter(
-                        (c) => c.status === "active" || c.status === "upcoming"
+                        (c) => c.status === "active" || c.status === "upcoming",
                       ).length
                     }
                     style={styles.goalCard}
                   />
-                )
+                ),
               )}
             </View>
           )
@@ -746,7 +683,7 @@ export default function GoalsScreen() {
           filteredAndSortedChallenges.length === 0 ? (
             <Card shadow="md" style={styles.emptyCard}>
               <EmptyState
-                icon="🏆"
+                icon="trophy-outline"
                 title={
                   searchQuery
                     ? t("goals.no_results_title")
@@ -773,11 +710,12 @@ export default function GoalsScreen() {
                 <ChallengeCard
                   key={challenge.id}
                   challenge={challenge}
+                  planStatus={challengePlanStatusMap[challenge.id]}
                   onPress={() => handleChallengePress(challenge)}
                   showMenu={true}
                   activeChallengesCount={
                     challenges.filter(
-                      (c) => c.status === "active" || c.status === "upcoming"
+                      (c) => c.status === "active" || c.status === "upcoming",
                     ).length
                   }
                   style={styles.goalCard}
@@ -789,7 +727,7 @@ export default function GoalsScreen() {
           // Render Goals empty state
           <Card shadow="md" style={styles.emptyCard}>
             <EmptyState
-              icon="🎯"
+              icon="flag-outline"
               title={
                 searchQuery || selectedCategories.length > 0
                   ? t("goals.no_results_title")
@@ -805,7 +743,11 @@ export default function GoalsScreen() {
               selectedCategories.includes("all") &&
               statusFilter !== "archived" && (
                 <Button
-                  title={t("goals.create_first_goal")}
+                  title={
+                    goals.length === 0
+                      ? t("goals.create_first_goal")
+                      : t("goals.create_goal")
+                  }
                   onPress={handleCreateGoal}
                   variant="primary"
                   borderRadius="full"
@@ -823,45 +765,12 @@ export default function GoalsScreen() {
                 onPress={() => handleGoalPress(goal)}
                 showMenu={true}
                 activeGoalsCount={activeGoalsCount}
-                onShareGoal={() => handleShareGoal(goal)}
-                onShareAsChallenge={() => handleShareAsChallenge(goal)}
-                onViewChallenge={() => handleViewChallenge(goal)}
-                onInviteMembers={() => handleInviteMembers(goal)}
-                onViewMembers={() => handleViewMembers(goal)}
-                onLeaveGroup={() => handleLeaveGroup(goal)}
                 style={styles.goalCard}
               />
             ))}
           </View>
         )}
       </ScrollView>
-
-      {/* Share Goal Modal */}
-      {selectedGoalForAction && (
-        <ShareGoalModal
-          visible={shareGoalModalVisible}
-          goalId={selectedGoalForAction.id}
-          goalTitle={selectedGoalForAction.title}
-          onClose={() => {
-            setShareGoalModalVisible(false);
-            setSelectedGoalForAction(null);
-          }}
-          onShare={handleShareGoalWithUser}
-          searchUsers={handleSearchUsers}
-        />
-      )}
-
-      {/* Share as Challenge Modal */}
-      {selectedGoalForAction && (
-        <ShareAsChallengeModal
-          visible={shareAsChallengeModalVisible}
-          goal={selectedGoalForAction}
-          onClose={() => {
-            setShareAsChallengeModalVisible(false);
-            setSelectedGoalForAction(null);
-          }}
-        />
-      )}
 
       {/* Category ActionSheet */}
       <ModalActionSheet

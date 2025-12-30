@@ -17,13 +17,13 @@ All tasks are organized into domain-specific modules:
 # Plan generation tasks
 from app.services.tasks.plan_tasks import (
     generate_plan_task,
+    generate_challenge_plan_task,
     generate_suggested_goals_task,
 )
 
 # Goal-related tasks
 from app.services.tasks.goal_tasks import (
     auto_create_daily_checkins_task,
-    check_goal_completions_task,
 )
 
 # Achievement tasks
@@ -36,6 +36,7 @@ from app.services.tasks.achievement_tasks import (
 from app.services.tasks.challenge_tasks import (
     check_ended_challenges_task,
     send_challenge_reminder_task,
+    send_challenge_reminder_chunk_task,
     check_challenges_ending_soon_task,
 )
 
@@ -64,6 +65,9 @@ from app.services.tasks.subscription_tasks import (
     update_challenge_statuses_task,
     cleanup_abandoned_challenges_task,
     process_failed_webhook_events_task,
+    cleanup_expired_creator_challenges_task,
+    cleanup_expired_partner_requests_task,
+    notify_challenge_cancelled_chunk_task,
 )
 
 # Auth tasks
@@ -71,19 +75,28 @@ from app.services.tasks.auth_tasks import (
     cleanup_expired_refresh_tokens_task,
 )
 
+# Task utilities (for scalable chunking)
+from app.services.tasks.task_utils import (
+    chunk_list,
+    dispatch_chunked_tasks,
+    process_in_batches,
+    aggregate_chunk_results_task,
+)
+
 __all__ = [
     # Plan tasks
     "generate_plan_task",
+    "generate_challenge_plan_task",
     "generate_suggested_goals_task",
     # Goal tasks
     "auto_create_daily_checkins_task",
-    "check_goal_completions_task",
     # Achievement tasks
     "check_achievements_task",
     "update_challenge_progress_task",
     # Challenge lifecycle tasks
     "check_ended_challenges_task",
     "send_challenge_reminder_task",
+    "send_challenge_reminder_chunk_task",
     "check_challenges_ending_soon_task",
     # Notification tasks
     "send_scheduled_ai_motivations_task",
@@ -100,6 +113,14 @@ __all__ = [
     "update_challenge_statuses_task",
     "cleanup_abandoned_challenges_task",
     "process_failed_webhook_events_task",
+    "cleanup_expired_creator_challenges_task",
+    "cleanup_expired_partner_requests_task",
+    "notify_challenge_cancelled_chunk_task",
     # Auth tasks
     "cleanup_expired_refresh_tokens_task",
+    # Task utilities
+    "chunk_list",
+    "dispatch_chunked_tasks",
+    "process_in_batches",
+    "aggregate_chunk_results_task",
 ]

@@ -61,7 +61,7 @@ export function ParticipantsModal({
       result = participants.filter(
         (p) =>
           p.user?.name?.toLowerCase().includes(query) ||
-          p.user?.username?.toLowerCase().includes(query)
+          p.user?.username?.toLowerCase().includes(query),
       );
     }
 

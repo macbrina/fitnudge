@@ -7,6 +7,8 @@ import { LoadingContainer } from "@/components/common/LoadingContainer";
 import { TokenManager } from "@/services/api/base";
 import { getRedirection } from "@/utils/getRedirection";
 import { storageUtil, STORAGE_KEYS } from "@/utils/storageUtil";
+import { prefetchCriticalData } from "@/services/prefetch";
+import { queryClient } from "@/lib/queryClient";
 
 export default function Index() {
   const { isAuthenticated, user, setVerifyingUser } = useAuthStore();
@@ -89,12 +91,14 @@ export default function Index() {
               import("@/stores/onboardingStore"),
             ]);
 
-            // Fetch subscription data, features, pricing plans, and fitness profile in parallel
+            // Fetch subscription data, features, pricing plans, fitness profile,
+            // AND prefetch critical React Query data in parallel
             const [, , , profileExists] = await Promise.all([
               useSubscriptionStore.getState().fetchSubscription(),
               useSubscriptionStore.getState().fetchFeatures(),
               usePricingStore.getState().fetchPlans(), // Prefetch pricing plans
               useOnboardingStore.getState().checkHasFitnessProfile(), // Check fitness profile
+              prefetchCriticalData(queryClient), // Prefetch home, user, goals, exercises etc.
             ]);
 
             hasFitnessProfile = profileExists;
@@ -106,7 +110,6 @@ export default function Index() {
 
         // Get redirect URL based on onboarding status
         const url = await getRedirection({ hasFitnessProfile });
-        console.log("url", url);
         setRedirectUrl(url);
       } else {
         // Non-authenticated user
@@ -114,7 +117,7 @@ export default function Index() {
 
         // Get redirect URL based on onboarding status for non-authenticated users
         const hasSeenOnboarding = await storageUtil.getItem<boolean>(
-          STORAGE_KEYS.HAS_SEEN_ONBOARDING
+          STORAGE_KEYS.HAS_SEEN_ONBOARDING,
         );
         if (!hasSeenOnboarding) {
           setRedirectUrl(MOBILE_ROUTES.ONBOARDING.MAIN);

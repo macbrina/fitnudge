@@ -30,7 +30,7 @@ export class MediaService extends BaseApiService {
    */
   async uploadMedia(
     fileUri: string,
-    options: UploadOptions = {}
+    options: UploadOptions = {},
   ): Promise<ApiResponse<MediaUploadResponse>> {
     const { filename, mediaType = "other", postId } = options;
 
@@ -110,7 +110,7 @@ export class MediaService extends BaseApiService {
    * Upload multiple media files at once
    */
   async uploadMultipleMedia(
-    fileUris: string[]
+    fileUris: string[],
   ): Promise<
     ApiResponse<{ uploaded_files: MediaUploadResponse[]; errors: any[] }>
   > {
@@ -144,7 +144,7 @@ export class MediaService extends BaseApiService {
    * Delete a media file by ID (for post media stored in database)
    */
   async deleteMedia(
-    mediaId: string
+    mediaId: string,
   ): Promise<ApiResponse<{ message: string }>> {
     return this.delete<{ message: string }>(ROUTES.MEDIA.DELETE(mediaId));
   }
@@ -153,7 +153,7 @@ export class MediaService extends BaseApiService {
    * Delete a media file by URL (for checkin/profile media not in database)
    */
   async deleteMediaByUrl(
-    url: string
+    url: string,
   ): Promise<ApiResponse<{ message: string }>> {
     return this.post<{ message: string }>(ROUTES.MEDIA.DELETE_BY_URL, { url });
   }

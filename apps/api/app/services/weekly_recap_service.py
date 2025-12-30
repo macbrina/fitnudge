@@ -46,8 +46,8 @@ class WeeklyRecapService:
                 .select("*")
                 .eq("user_id", user_id)
                 .eq("completed", True)
-                .gte("date", week_start.isoformat())
-                .lte("date", week_end.isoformat())
+                .gte("check_in_date", week_start.isoformat())
+                .lte("check_in_date", week_end.isoformat())
             )
 
             if goal_id:
@@ -93,7 +93,7 @@ class WeeklyRecapService:
                     supabase.table("goals")
                     .select("*")
                     .eq("user_id", user_id)
-                    .eq("is_active", True)
+                    .eq("status", "active")
                     .execute()
                 )
                 personal_goals = goal_result.data or []
@@ -107,14 +107,17 @@ class WeeklyRecapService:
                 participant_result = (
                     supabase.table("challenge_participants")
                     .select(
-                        "challenges(id, title, description, start_date, end_date, is_active)"
+                        "challenges(id, title, description, start_date, end_date, status)"
                     )
                     .eq("user_id", user_id)
                     .execute()
                 )
                 for p in participant_result.data or []:
                     challenge = p.get("challenges")
-                    if not challenge or not challenge.get("is_active"):
+                    if not challenge or challenge.get("status") not in (
+                        "upcoming",
+                        "active",
+                    ):
                         continue
                     start_date_c = (
                         date.fromisoformat(challenge["start_date"])
@@ -146,16 +149,29 @@ class WeeklyRecapService:
             # Combine check-in dates for streak calculation
             all_checkin_dates: set[str] = set()
             for c in goal_check_ins:
-                all_checkin_dates.add(c["date"])
+                all_checkin_dates.add(c["check_in_date"])
             for c in challenge_check_ins:
                 all_checkin_dates.add(c["check_in_date"])
 
-            stats = self._calculate_stats(goal_check_ins, week_start, week_end)
+            # Get goal_id for cache optimization
+            current_goal_id = goal.get("id") if goal else None
+            stats = self._calculate_stats(
+                goal_check_ins, week_start, week_end, current_goal_id, None, user_id
+            )
             # Add challenge stats
             stats["challenge_check_ins"] = len(challenge_check_ins)
             stats["total_check_ins"] = stats["completed_check_ins"] + len(
                 challenge_check_ins
             )
+
+            # Get aggregated challenge stats from cache
+            challenge_stats = self._get_aggregated_challenge_stats(
+                user_id, [c["id"] for c in active_challenges]
+            )
+            stats["challenge_current_streak"] = challenge_stats.get("current_streak", 0)
+            stats["challenge_longest_streak"] = challenge_stats.get("longest_streak", 0)
+            stats["challenge_total_points"] = challenge_stats.get("total_points", 0)
+
             # Recalculate streak from combined dates
             stats["current_streak"] = self._calculate_combined_streak(
                 all_checkin_dates, week_end
@@ -241,15 +257,83 @@ class WeeklyRecapService:
 
         return streak
 
-    def _calculate_stats(
-        self, check_ins: List[Dict[str, Any]], week_start: date, week_end: date
+    def _get_aggregated_challenge_stats(
+        self, user_id: str, challenge_ids: List[str]
     ) -> Dict[str, Any]:
-        """Calculate weekly statistics"""
+        """Get aggregated challenge statistics from challenge_statistics cache
+
+        Args:
+            user_id: User ID
+            challenge_ids: List of challenge IDs to aggregate stats for
+
+        Returns:
+            Aggregated stats including best streak, total points
+        """
+        from app.core.database import get_supabase_client
+
+        result = {
+            "current_streak": 0,
+            "longest_streak": 0,
+            "total_points": 0,
+            "total_checkins": 0,
+        }
+
+        if not challenge_ids:
+            return result
+
+        try:
+            supabase = get_supabase_client()
+            stats_result = (
+                supabase.table("challenge_statistics")
+                .select("current_streak, longest_streak, points, total_checkins")
+                .eq("user_id", user_id)
+                .in_("challenge_id", challenge_ids)
+                .execute()
+            )
+
+            if stats_result.data:
+                # Aggregate: best current streak, best longest streak, sum of points/checkins
+                for stat in stats_result.data:
+                    result["current_streak"] = max(
+                        result["current_streak"], stat.get("current_streak", 0)
+                    )
+                    result["longest_streak"] = max(
+                        result["longest_streak"], stat.get("longest_streak", 0)
+                    )
+                    result["total_points"] += stat.get("points", 0)
+                    result["total_checkins"] += stat.get("total_checkins", 0)
+
+        except Exception as e:
+            logger.warning(f"Failed to get aggregated challenge stats: {e}")
+
+        return result
+
+    def _calculate_stats(
+        self,
+        check_ins: List[Dict[str, Any]],
+        week_start: date,
+        week_end: date,
+        goal_id: str = None,
+        challenge_id: str = None,
+        user_id: str = None,
+    ) -> Dict[str, Any]:
+        """Calculate weekly statistics
+
+        Args:
+            check_ins: List of check-in records
+            week_start: Start date of the week
+            week_end: End date of the week
+            goal_id: Optional goal ID for using cached goal_statistics
+            challenge_id: Optional challenge ID for using cached challenge_statistics
+            user_id: Optional user ID for challenge_statistics lookup
+        """
         # Count completed check-ins
         completed_count = len(check_ins)
 
-        # Calculate current streak
-        current_streak = self._calculate_streak(check_ins, week_end)
+        # Calculate current streak (uses cache if goal_id or challenge_id provided and end_date is today)
+        current_streak = self._calculate_streak(
+            check_ins, week_end, goal_id, challenge_id, user_id
+        )
 
         # Calculate average mood
         moods = [c.get("mood") for c in check_ins if c.get("mood") is not None]
@@ -259,16 +343,18 @@ class WeeklyRecapService:
         days_with_checkins = len(
             set(
                 (
-                    c["date"]
-                    if isinstance(c["date"], date)
-                    else date.fromisoformat(str(c["date"]))
+                    c["check_in_date"]
+                    if isinstance(c["check_in_date"], date)
+                    else date.fromisoformat(str(c["check_in_date"]))
                 )
                 for c in check_ins
             )
         )
 
-        # Get longest streak in the week
-        longest_streak = self._calculate_longest_streak(check_ins)
+        # Get longest streak in the week (uses cache if goal_id or challenge_id provided)
+        longest_streak = self._calculate_longest_streak(
+            check_ins, goal_id, challenge_id, user_id
+        )
 
         return {
             "completed_check_ins": completed_count,
@@ -281,17 +367,63 @@ class WeeklyRecapService:
             ),  # Assuming 7-day week
         }
 
-    def _calculate_streak(self, check_ins: List[Dict[str, Any]], end_date: date) -> int:
-        """Calculate current streak ending on end_date"""
+    def _calculate_streak(
+        self,
+        check_ins: List[Dict[str, Any]],
+        end_date: date,
+        goal_id: str = None,
+        challenge_id: str = None,
+        user_id: str = None,
+    ) -> int:
+        """Calculate current streak ending on end_date
+
+        If goal_id is provided and end_date is today, use cached goal_statistics
+        If challenge_id and user_id are provided and end_date is today, use cached challenge_statistics
+        """
+        from app.core.database import get_supabase_client
+
+        # Optimization: Use cached goal_statistics if available and end_date is today
+        if goal_id and end_date == date.today():
+            try:
+                supabase = get_supabase_client()
+                stats_result = (
+                    supabase.table("goal_statistics")
+                    .select("current_streak")
+                    .eq("goal_id", goal_id)
+                    .maybe_single()
+                    .execute()
+                )
+                if stats_result.data:
+                    return stats_result.data.get("current_streak", 0)
+            except Exception:
+                pass  # Fall back to calculation
+
+        # Optimization: Use cached challenge_statistics if available and end_date is today
+        if challenge_id and user_id and end_date == date.today():
+            try:
+                supabase = get_supabase_client()
+                stats_result = (
+                    supabase.table("challenge_statistics")
+                    .select("current_streak")
+                    .eq("challenge_id", challenge_id)
+                    .eq("user_id", user_id)
+                    .maybe_single()
+                    .execute()
+                )
+                if stats_result.data:
+                    return stats_result.data.get("current_streak", 0)
+            except Exception:
+                pass  # Fall back to calculation
+
         if not check_ins:
             return 0
 
         sorted_check_ins = sorted(
             check_ins,
             key=lambda x: (
-                x["date"]
-                if isinstance(x["date"], date)
-                else date.fromisoformat(str(x["date"]))
+                x["check_in_date"]
+                if isinstance(x["check_in_date"], date)
+                else date.fromisoformat(str(x["check_in_date"]))
             ),
             reverse=True,
         )
@@ -301,9 +433,9 @@ class WeeklyRecapService:
 
         for check_in in sorted_check_ins:
             check_in_date = (
-                check_in["date"]
-                if isinstance(check_in["date"], date)
-                else date.fromisoformat(str(check_in["date"]))
+                check_in["check_in_date"]
+                if isinstance(check_in["check_in_date"], date)
+                else date.fromisoformat(str(check_in["check_in_date"]))
             )
 
             if check_in_date == current_date:
@@ -314,17 +446,62 @@ class WeeklyRecapService:
 
         return streak
 
-    def _calculate_longest_streak(self, check_ins: List[Dict[str, Any]]) -> int:
-        """Calculate longest consecutive streak in check-ins"""
+    def _calculate_longest_streak(
+        self,
+        check_ins: List[Dict[str, Any]],
+        goal_id: str = None,
+        challenge_id: str = None,
+        user_id: str = None,
+    ) -> int:
+        """Calculate longest consecutive streak in check-ins
+
+        If goal_id is provided, try to use cached goal_statistics first
+        If challenge_id and user_id are provided, try to use cached challenge_statistics first
+        """
+        from app.core.database import get_supabase_client
+
+        # Optimization: Use cached goal_statistics if available
+        if goal_id:
+            try:
+                supabase = get_supabase_client()
+                stats_result = (
+                    supabase.table("goal_statistics")
+                    .select("longest_streak")
+                    .eq("goal_id", goal_id)
+                    .maybe_single()
+                    .execute()
+                )
+                if stats_result.data:
+                    return stats_result.data.get("longest_streak", 0)
+            except Exception:
+                pass  # Fall back to calculation
+
+        # Optimization: Use cached challenge_statistics if available
+        if challenge_id and user_id:
+            try:
+                supabase = get_supabase_client()
+                stats_result = (
+                    supabase.table("challenge_statistics")
+                    .select("longest_streak")
+                    .eq("challenge_id", challenge_id)
+                    .eq("user_id", user_id)
+                    .maybe_single()
+                    .execute()
+                )
+                if stats_result.data:
+                    return stats_result.data.get("longest_streak", 0)
+            except Exception:
+                pass  # Fall back to calculation
+
         if not check_ins:
             return 0
 
         sorted_dates = sorted(
             [
                 (
-                    c["date"]
-                    if isinstance(c["date"], date)
-                    else date.fromisoformat(str(c["date"]))
+                    c["check_in_date"]
+                    if isinstance(c["check_in_date"], date)
+                    else date.fromisoformat(str(c["check_in_date"]))
                 )
                 for c in check_ins
             ]
@@ -428,6 +605,8 @@ WEEKLY STATS (Week of {week_start.strftime('%B %d')} - {week_end.strftime('%B %d
 - Current Streak: {stats['current_streak']} days (combined goals + challenges)
 - Longest Streak This Week: {stats['longest_streak']} days
 - Completion Rate: {stats['completion_rate']}%
+- Challenge Points Earned: {stats.get('challenge_total_points', 0)} points
+- Best Challenge Streak: {stats.get('challenge_current_streak', 0)} days
 """
 
         if stats.get("average_mood"):

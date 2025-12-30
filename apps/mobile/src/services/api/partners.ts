@@ -3,6 +3,15 @@ import { ROUTES } from "@/lib/routes";
 
 export type PartnershipStatus = "pending" | "accepted" | "rejected";
 
+export interface PartnerUserInfo {
+  id: string;
+  name?: string;
+  username?: string;
+  profile_picture_url?: string;
+  has_social_accountability?: boolean;
+  is_active?: boolean; // Whether partner's account is active
+}
+
 export interface Partner {
   id: string;
   user_id: string;
@@ -11,12 +20,54 @@ export interface Partner {
   initiated_by_user_id: string;
   created_at: string;
   accepted_at?: string;
-  partner?: {
-    id: string;
-    name: string;
-    username?: string;
-    profile_picture_url?: string;
-  };
+  partner?: PartnerUserInfo;
+}
+
+// Partner Dashboard types (for viewing partner's goals and challenges)
+export interface PartnerGoalSummary {
+  id: string;
+  title: string;
+  category: string;
+  tracking_type?: string;
+  status: string;
+  progress_percentage: number;
+  current_streak: number;
+  logged_today: boolean;
+  frequency?: string;
+}
+
+export interface PartnerChallengeSummary {
+  id: string;
+  title: string;
+  category?: string;
+  tracking_type?: string;
+  status: string;
+  progress: number;
+  target_value?: number;
+  participants_count: number;
+  logged_today: boolean;
+}
+
+export interface PartnerDashboard {
+  partner: PartnerUserInfo;
+  partnership_id: string;
+  partnership_created_at: string;
+  goals: PartnerGoalSummary[];
+  challenges: PartnerChallengeSummary[];
+  total_active_goals: number;
+  total_active_challenges: number;
+  overall_streak: number;
+  logged_today: boolean;
+  has_scheduled_today: boolean; // Whether partner has any goals/challenges scheduled for today
+}
+
+export interface PartnerLimits {
+  has_feature: boolean;
+  limit: number | null; // null = unlimited
+  accepted_count: number;
+  pending_sent_count: number;
+  total_toward_limit: number;
+  can_send_request: boolean;
 }
 
 export interface PartnerRequest {
@@ -85,11 +136,11 @@ class PartnersService extends BaseApiService {
    * Reject a partner request (when someone sent you a request)
    */
   async rejectRequest(
-    partnershipId: string
+    partnershipId: string,
   ): Promise<ApiResponse<{ message: string }>> {
     return this.post<{ message: string }>(
       ROUTES.PARTNERS.REJECT(partnershipId),
-      {}
+      {},
     );
   }
 
@@ -97,11 +148,11 @@ class PartnersService extends BaseApiService {
    * Cancel a partner request that you initiated
    */
   async cancelRequest(
-    partnershipId: string
+    partnershipId: string,
   ): Promise<ApiResponse<{ message: string }>> {
     return this.post<{ message: string }>(
       ROUTES.PARTNERS.CANCEL(partnershipId),
-      {}
+      {},
     );
   }
 
@@ -109,10 +160,10 @@ class PartnersService extends BaseApiService {
    * Remove an existing partner
    */
   async removePartner(
-    partnershipId: string
+    partnershipId: string,
   ): Promise<ApiResponse<{ message: string }>> {
     return this.delete<{ message: string }>(
-      ROUTES.PARTNERS.REMOVE(partnershipId)
+      ROUTES.PARTNERS.REMOVE(partnershipId),
     );
   }
 
@@ -122,7 +173,7 @@ class PartnersService extends BaseApiService {
   async searchUsers(
     query: string,
     page: number = 1,
-    limit: number = 20
+    limit: number = 20,
   ): Promise<ApiResponse<PaginatedSearchResponse>> {
     const params = new URLSearchParams();
     params.append("query", query);
@@ -130,7 +181,7 @@ class PartnersService extends BaseApiService {
     params.append("limit", limit.toString());
 
     return this.get<PaginatedSearchResponse>(
-      `${ROUTES.PARTNERS.SEARCH_USERS}?${params.toString()}`
+      `${ROUTES.PARTNERS.SEARCH_USERS}?${params.toString()}`,
     );
   }
 
@@ -139,15 +190,31 @@ class PartnersService extends BaseApiService {
    */
   async getSuggestedUsers(
     page: number = 1,
-    limit: number = 20
+    limit: number = 20,
   ): Promise<ApiResponse<PaginatedSearchResponse>> {
     const params = new URLSearchParams();
     params.append("page", page.toString());
     params.append("limit", limit.toString());
 
     return this.get<PaginatedSearchResponse>(
-      `${ROUTES.PARTNERS.SUGGESTED_USERS}?${params.toString()}`
+      `${ROUTES.PARTNERS.SUGGESTED_USERS}?${params.toString()}`,
     );
+  }
+
+  /**
+   * Get partner's accountability dashboard (goals, challenges, progress)
+   */
+  async getPartnerDashboard(
+    partnerUserId: string,
+  ): Promise<ApiResponse<PartnerDashboard>> {
+    return this.get<PartnerDashboard>(ROUTES.PARTNERS.DASHBOARD(partnerUserId));
+  }
+
+  /**
+   * Get current user's partner limits and counts
+   */
+  async getPartnerLimits(): Promise<ApiResponse<PartnerLimits>> {
+    return this.get<PartnerLimits>(ROUTES.PARTNERS.LIMITS);
   }
 }
 

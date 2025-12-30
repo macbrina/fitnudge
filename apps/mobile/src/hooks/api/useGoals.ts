@@ -5,6 +5,7 @@ import {
   userQueryKeys,
 } from "@/hooks/api/queryKeys";
 import { homeDashboardQueryKeys } from "@/hooks/api/useHomeDashboard";
+import { trackingStatsQueryKeys } from "@/hooks/api/useTrackingStats";
 import { useGoalNotifications } from "@/hooks/notifications/useGoalNotifications";
 import {
   CreateGoalRequest,
@@ -17,6 +18,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 // Re-export for backward compatibility
 export { goalsQueryKeys } from "@/hooks/api/queryKeys";
 
+// Empty response for placeholder (prevents loading spinners)
+const EMPTY_GOALS_RESPONSE = { data: [], status: 200 };
+
 // Goals Hooks
 export const useGoals = () => {
   const { isAuthenticated } = useAuthStore();
@@ -24,8 +28,10 @@ export const useGoals = () => {
   return useQuery({
     queryKey: goalsQueryKeys.list(),
     queryFn: () => goalsService.getGoals(),
-    enabled: isAuthenticated, // Only fetch when authenticated
+    enabled: isAuthenticated,
     staleTime: 2 * 60 * 1000, // 2 minutes
+    refetchOnMount: false, // Use cached data, don't force refetch
+    placeholderData: EMPTY_GOALS_RESPONSE, // Show empty instead of loading
   });
 };
 
@@ -53,10 +59,10 @@ export const useCreateGoal = () => {
       // Snapshot previous data for rollback
       const previousGoals = queryClient.getQueryData(goalsQueryKeys.list());
       const previousActiveGoals = queryClient.getQueryData(
-        goalsQueryKeys.active()
+        goalsQueryKeys.active(),
       );
       const previousUserStats = queryClient.getQueryData(
-        userQueryKeys.userStats()
+        userQueryKeys.userStats(),
       );
 
       // Create optimistic goal with temp ID
@@ -66,7 +72,7 @@ export const useCreateGoal = () => {
         user_id: "", // Will be set by backend
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-        is_active: newGoal.is_active ?? true,
+        status: newGoal.status ?? "active",
       };
 
       // Optimistically add to goals list
@@ -76,7 +82,7 @@ export const useCreateGoal = () => {
       });
 
       // Add to active goals if active
-      if (optimisticGoal.is_active) {
+      if (optimisticGoal.status === "active") {
         queryClient.setQueryData(goalsQueryKeys.active(), (old: any) => {
           if (!old?.data) return old;
           return { ...old, data: [...old.data, optimisticGoal] };
@@ -91,7 +97,7 @@ export const useCreateGoal = () => {
           data: {
             ...old.data,
             total_goals: (old.data.total_goals || 0) + 1,
-            ...(optimisticGoal.is_active && {
+            ...(optimisticGoal.status === "active" && {
               active_goals: (old.data.active_goals || 0) + 1,
             }),
           },
@@ -108,13 +114,13 @@ export const useCreateGoal = () => {
       if (context?.previousActiveGoals) {
         queryClient.setQueryData(
           goalsQueryKeys.active(),
-          context.previousActiveGoals
+          context.previousActiveGoals,
         );
       }
       if (context?.previousUserStats) {
         queryClient.setQueryData(
           userQueryKeys.userStats(),
-          context.previousUserStats
+          context.previousUserStats,
         );
       }
     },
@@ -126,29 +132,42 @@ export const useCreateGoal = () => {
           if (!old?.data) return old;
           // Remove temp and add real
           const filtered = old.data.filter(
-            (g: any) => !g.id.startsWith("temp-")
+            (g: any) => !g.id.startsWith("temp-"),
           );
           return { ...old, data: [...filtered, realGoal] };
         });
 
-        // IMPORTANT: Keep goal in active list even if is_active is false
-        // Goal starts inactive until plan is ready, but we show it with "generating" badge
+        // IMPORTANT: Keep goal in active list even if status is not "active"
+        // Goal starts as paused until plan is ready, but we show it with "generating" badge
         // When plan is completed, backend activates the goal and we'll refetch
         queryClient.setQueryData(goalsQueryKeys.active(), (old: any) => {
           if (!old?.data) return old;
           const filtered = old.data.filter(
-            (g: any) => !g.id.startsWith("temp-")
+            (g: any) => !g.id.startsWith("temp-"),
           );
-          // Add goal with is_active forced to true for display purposes
+          // Add goal with status forced to "active" for display purposes
           // Real state will be synced when plan is ready
           return {
             ...old,
-            data: [...filtered, { ...realGoal, is_active: true }],
+            data: [...filtered, { ...realGoal, status: "active" }],
           };
         });
+
+        // 🆕 OPTIMISTICALLY set plan status to "pending" immediately
+        // This shows "Generating" badge right away instead of waiting for API fetch
+        // The backend creates the pending plan entry, but this ensures instant UI feedback
+        queryClient.setQueryData(
+          actionablePlansQueryKeys.planStatus(realGoal.id),
+          {
+            status: "pending" as const,
+            goal_id: realGoal.id,
+            plan_type: null,
+            structured_data: null,
+          },
+        );
       }
 
-      // Invalidate plan status queries to ensure they refetch
+      // Invalidate plan status queries to ensure they refetch (will merge with optimistic data)
       queryClient.invalidateQueries({ queryKey: actionablePlansQueryKeys.all });
       // Invalidate user stats for accurate server-side calculation
       queryClient.invalidateQueries({ queryKey: userQueryKeys.userStats() });
@@ -180,10 +199,10 @@ export const useUpdateGoal = () => {
       // Snapshot previous data
       const previousGoals = queryClient.getQueryData(goalsQueryKeys.list());
       const previousActiveGoals = queryClient.getQueryData(
-        goalsQueryKeys.active()
+        goalsQueryKeys.active(),
       );
       const previousDetail = queryClient.getQueryData(
-        goalsQueryKeys.detail(goalId)
+        goalsQueryKeys.detail(goalId),
       );
 
       // Optimistically update goals list
@@ -194,31 +213,31 @@ export const useUpdateGoal = () => {
           data: old.data.map((g: any) =>
             g.id === goalId
               ? { ...g, ...updates, updated_at: new Date().toISOString() }
-              : g
+              : g,
           ),
         };
       });
 
-      // Handle active goals based on is_active status
+      // Handle active goals based on status
       queryClient.setQueryData(goalsQueryKeys.active(), (old: any) => {
         if (!old?.data) return old;
-        if (updates.is_active === false) {
+        if (updates.status && updates.status !== "active") {
           // Remove from active goals
           return { ...old, data: old.data.filter((g: any) => g.id !== goalId) };
-        } else if (updates.is_active === true) {
+        } else if (updates.status === "active") {
           // Add to active goals if not already there
           const existing = old.data.find((g: any) => g.id === goalId);
           if (existing) {
             return {
               ...old,
               data: old.data.map((g: any) =>
-                g.id === goalId ? { ...g, ...updates } : g
+                g.id === goalId ? { ...g, ...updates } : g,
               ),
             };
           }
           // Get full goal from list
           const allGoals = queryClient.getQueryData(
-            goalsQueryKeys.list()
+            goalsQueryKeys.list(),
           ) as any;
           const fullGoal = allGoals?.data?.find((g: any) => g.id === goalId);
           if (fullGoal) {
@@ -229,7 +248,7 @@ export const useUpdateGoal = () => {
           return {
             ...old,
             data: old.data.map((g: any) =>
-              g.id === goalId ? { ...g, ...updates } : g
+              g.id === goalId ? { ...g, ...updates } : g,
             ),
           };
         }
@@ -259,13 +278,13 @@ export const useUpdateGoal = () => {
       if (context?.previousActiveGoals) {
         queryClient.setQueryData(
           goalsQueryKeys.active(),
-          context.previousActiveGoals
+          context.previousActiveGoals,
         );
       }
       if (context?.previousDetail) {
         queryClient.setQueryData(
           goalsQueryKeys.detail(goalId),
-          context.previousDetail
+          context.previousDetail,
         );
       }
     },
@@ -273,8 +292,8 @@ export const useUpdateGoal = () => {
       const updatedGoal = response?.data;
 
       // Handle local notification cleanup when goal is deactivated
-      if (updatedGoal && updates.is_active !== undefined) {
-        if (!updates.is_active && !updatedGoal.is_active) {
+      if (updatedGoal && updates.status !== undefined) {
+        if (updates.status !== "active" && updatedGoal.status !== "active") {
           await cancelGoalNotifications(goalId);
         }
       }
@@ -315,19 +334,19 @@ export const useDeleteGoal = () => {
       // Snapshot previous data
       const previousGoals = queryClient.getQueryData(goalsQueryKeys.list());
       const previousActiveGoals = queryClient.getQueryData(
-        goalsQueryKeys.active()
+        goalsQueryKeys.active(),
       );
       const previousUserStats = queryClient.getQueryData(
-        userQueryKeys.userStats()
+        userQueryKeys.userStats(),
       );
       const previousTodayCheckIns = queryClient.getQueryData(
-        checkInsQueryKeys.today()
+        checkInsQueryKeys.today(),
       );
       const previousCheckInStats = queryClient.getQueryData(
-        checkInsQueryKeys.stats()
+        checkInsQueryKeys.stats(),
       );
       const previousDashboard = queryClient.getQueryData(
-        homeDashboardQueryKeys.dashboard()
+        homeDashboardQueryKeys.dashboard(),
       );
 
       // Check if the goal being deleted is active (for stats update)
@@ -371,7 +390,7 @@ export const useDeleteGoal = () => {
             total_goals: Math.max(0, (old.data.total_goals || 0) - 1),
             total_check_ins: Math.max(
               0,
-              (old.data.total_check_ins || 0) - removedCheckInsCount
+              (old.data.total_check_ins || 0) - removedCheckInsCount,
             ),
             // Only decrement active_goals if it was an active goal
             ...(isActiveGoal && {
@@ -387,7 +406,7 @@ export const useDeleteGoal = () => {
         // Recalculate stats after removing this goal's check-ins
         const totalCheckIns = Math.max(
           0,
-          (old.data.total_check_ins || 0) - removedCheckInsCount
+          (old.data.total_check_ins || 0) - removedCheckInsCount,
         );
         return {
           ...old,
@@ -408,12 +427,13 @@ export const useDeleteGoal = () => {
             ...old,
             // Remove goal from items
             items: (old.items || []).filter(
-              (item: any) => !(item.type === "goal" && item.data?.id === goalId)
+              (item: any) =>
+                !(item.type === "goal" && item.data?.id === goalId),
             ),
             // Remove pending check-ins for this goal
             today_pending_checkins: (old.today_pending_checkins || []).filter(
               (item: any) =>
-                !(item.type === "goal" && item.data?.goal_id === goalId)
+                !(item.type === "goal" && item.data?.goal_id === goalId),
             ),
             // Update stats
             stats: old.stats
@@ -423,7 +443,7 @@ export const useDeleteGoal = () => {
                 }
               : old.stats,
           };
-        }
+        },
       );
 
       return {
@@ -443,35 +463,35 @@ export const useDeleteGoal = () => {
       if (context?.previousActiveGoals) {
         queryClient.setQueryData(
           goalsQueryKeys.active(),
-          context.previousActiveGoals
+          context.previousActiveGoals,
         );
       }
       if (context?.previousUserStats) {
         queryClient.setQueryData(
           userQueryKeys.userStats(),
-          context.previousUserStats
+          context.previousUserStats,
         );
       }
       if (context?.previousTodayCheckIns) {
         queryClient.setQueryData(
           checkInsQueryKeys.today(),
-          context.previousTodayCheckIns
+          context.previousTodayCheckIns,
         );
       }
       if (context?.previousCheckInStats) {
         queryClient.setQueryData(
           checkInsQueryKeys.stats(),
-          context.previousCheckInStats
+          context.previousCheckInStats,
         );
       }
       if (context?.previousDashboard) {
         queryClient.setQueryData(
           homeDashboardQueryKeys.dashboard(),
-          context.previousDashboard
+          context.previousDashboard,
         );
       }
     },
-    onSuccess: () => {
+    onSuccess: (_, goalId) => {
       // Invalidate all related queries to ensure UI is in sync
       // Goals list (GoalsScreen counts and tabs)
       queryClient.invalidateQueries({ queryKey: goalsQueryKeys.list() });
@@ -482,6 +502,10 @@ export const useDeleteGoal = () => {
       // Home dashboard (HomeScreen uses this)
       queryClient.invalidateQueries({
         queryKey: homeDashboardQueryKeys.dashboard(),
+      });
+      // Clear tracking stats for this goal (goal is deleted)
+      queryClient.invalidateQueries({
+        queryKey: trackingStatsQueryKeys.entity("goal", goalId),
       });
     },
   });
@@ -512,7 +536,7 @@ export const useCreateGoalFromTemplate = () => {
           return { ...old, data: [...old.data, newGoal] };
         });
 
-        if (newGoal.is_active) {
+        if (newGoal.status === "active") {
           queryClient.setQueryData(goalsQueryKeys.active(), (old: any) => {
             if (!old?.data) return old;
             return { ...old, data: [...old.data, newGoal] };
@@ -527,7 +551,7 @@ export const useCreateGoalFromTemplate = () => {
             data: {
               ...old.data,
               total_goals: (old.data.total_goals || 0) + 1,
-              ...(newGoal.is_active && {
+              ...(newGoal.status === "active" && {
                 active_goals: (old.data.active_goals || 0) + 1,
               }),
             },
@@ -560,19 +584,19 @@ export const useArchiveGoal = () => {
 
       const previousGoals = queryClient.getQueryData(goalsQueryKeys.list());
       const previousActiveGoals = queryClient.getQueryData(
-        goalsQueryKeys.active()
+        goalsQueryKeys.active(),
       );
       const previousUserStats = queryClient.getQueryData(
-        userQueryKeys.userStats()
+        userQueryKeys.userStats(),
       );
 
-      // Optimistically update is_active to false
+      // Optimistically update status
       queryClient.setQueryData(goalsQueryKeys.list(), (old: any) => {
         if (!old?.data) return old;
         return {
           ...old,
           data: old.data.map((g: any) =>
-            g.id === goalId ? { ...g, is_active: false } : g
+            g.id === goalId ? { ...g, status: "archived" } : g,
           ),
         };
       });
@@ -604,13 +628,13 @@ export const useArchiveGoal = () => {
       if (context?.previousActiveGoals) {
         queryClient.setQueryData(
           goalsQueryKeys.active(),
-          context.previousActiveGoals
+          context.previousActiveGoals,
         );
       }
       if (context?.previousUserStats) {
         queryClient.setQueryData(
           userQueryKeys.userStats(),
-          context.previousUserStats
+          context.previousUserStats,
         );
       }
     },
@@ -620,6 +644,10 @@ export const useArchiveGoal = () => {
         queryKey: actionablePlansQueryKeys.planStatus(goalId),
       });
       queryClient.invalidateQueries({ queryKey: userQueryKeys.userStats() });
+      // Invalidate tracking stats for this goal
+      queryClient.invalidateQueries({
+        queryKey: trackingStatsQueryKeys.entity("goal", goalId),
+      });
     },
   });
 };
@@ -636,23 +664,23 @@ export const useUnarchiveGoal = () => {
 
       const previousGoals = queryClient.getQueryData(goalsQueryKeys.list());
       const previousActiveGoals = queryClient.getQueryData(
-        goalsQueryKeys.active()
+        goalsQueryKeys.active(),
       );
       const previousUserStats = queryClient.getQueryData(
-        userQueryKeys.userStats()
+        userQueryKeys.userStats(),
       );
 
       // Get the goal to add to active
       const allGoals = previousGoals as any;
       const goal = allGoals?.data?.find((g: any) => g.id === goalId);
 
-      // Optimistically update is_active to true
+      // Optimistically update status
       queryClient.setQueryData(goalsQueryKeys.list(), (old: any) => {
         if (!old?.data) return old;
         return {
           ...old,
           data: old.data.map((g: any) =>
-            g.id === goalId ? { ...g, is_active: true } : g
+            g.id === goalId ? { ...g, status: "active" } : g,
           ),
         };
       });
@@ -663,7 +691,7 @@ export const useUnarchiveGoal = () => {
           if (!old?.data) return old;
           const exists = old.data.some((g: any) => g.id === goalId);
           if (exists) return old;
-          return { ...old, data: [...old.data, { ...goal, is_active: true }] };
+          return { ...old, data: [...old.data, { ...goal, status: "active" }] };
         });
       }
 
@@ -688,13 +716,13 @@ export const useUnarchiveGoal = () => {
       if (context?.previousActiveGoals) {
         queryClient.setQueryData(
           goalsQueryKeys.active(),
-          context.previousActiveGoals
+          context.previousActiveGoals,
         );
       }
       if (context?.previousUserStats) {
         queryClient.setQueryData(
           userQueryKeys.userStats(),
-          context.previousUserStats
+          context.previousUserStats,
         );
       }
     },
@@ -703,6 +731,10 @@ export const useUnarchiveGoal = () => {
         queryKey: actionablePlansQueryKeys.planStatus(goalId),
       });
       queryClient.invalidateQueries({ queryKey: userQueryKeys.userStats() });
+      // Invalidate tracking stats for this goal (unarchived/reactivated)
+      queryClient.invalidateQueries({
+        queryKey: trackingStatsQueryKeys.entity("goal", goalId),
+      });
     },
   });
 };
@@ -717,31 +749,49 @@ export const useActivateGoal = () => {
       await queryClient.cancelQueries({ queryKey: goalsQueryKeys.list() });
       await queryClient.cancelQueries({ queryKey: goalsQueryKeys.active() });
       await queryClient.cancelQueries({
+        queryKey: goalsQueryKeys.detail(goalId),
+      });
+      await queryClient.cancelQueries({
         queryKey: homeDashboardQueryKeys.dashboard(),
       });
 
       const previousGoals = queryClient.getQueryData(goalsQueryKeys.list());
       const previousActiveGoals = queryClient.getQueryData(
-        goalsQueryKeys.active()
+        goalsQueryKeys.active(),
+      );
+      const previousDetail = queryClient.getQueryData(
+        goalsQueryKeys.detail(goalId),
       );
       const previousUserStats = queryClient.getQueryData(
-        userQueryKeys.userStats()
+        userQueryKeys.userStats(),
       );
       const previousDashboard = queryClient.getQueryData(
-        homeDashboardQueryKeys.dashboard()
+        homeDashboardQueryKeys.dashboard(),
       );
+
+      // Optimistically update goal detail query
+      queryClient.setQueryData(goalsQueryKeys.detail(goalId), (old: any) => {
+        if (!old?.data) return old;
+        return {
+          ...old,
+          data: {
+            ...old.data,
+            status: "active",
+          },
+        };
+      });
 
       // Get the goal to add to active
       const allGoals = previousGoals as any;
       const goal = allGoals?.data?.find((g: any) => g.id === goalId);
 
-      // Optimistically update is_active to true
+      // Optimistically update status
       queryClient.setQueryData(goalsQueryKeys.list(), (old: any) => {
         if (!old?.data) return old;
         return {
           ...old,
           data: old.data.map((g: any) =>
-            g.id === goalId ? { ...g, is_active: true } : g
+            g.id === goalId ? { ...g, status: "active" } : g,
           ),
         };
       });
@@ -752,7 +802,7 @@ export const useActivateGoal = () => {
           if (!old?.data) return old;
           const exists = old.data.some((g: any) => g.id === goalId);
           if (exists) return old;
-          return { ...old, data: [...old.data, { ...goal, is_active: true }] };
+          return { ...old, data: [...old.data, { ...goal, status: "active" }] };
         });
       }
 
@@ -768,13 +818,32 @@ export const useActivateGoal = () => {
         };
       });
 
-      // Optimistically update home dashboard
+      // Optimistically update home dashboard - add goal to items AND increment count
       queryClient.setQueryData(
         homeDashboardQueryKeys.dashboard(),
         (old: any) => {
           if (!old) return old;
+
+          // Create the item to add back
+          const itemToAdd = goal
+            ? {
+                type: "goal" as const,
+                data: { ...goal, status: "active" },
+              }
+            : null;
+
+          // Check if already exists in items
+          const alreadyExists = (old.items || []).some(
+            (item: any) => item.type === "goal" && item.data?.id === goalId,
+          );
+
           return {
             ...old,
+            // Add goal back to items if it exists and isn't already there
+            items:
+              itemToAdd && !alreadyExists
+                ? [...(old.items || []), itemToAdd]
+                : old.items,
             stats: old.stats
               ? {
                   ...old.stats,
@@ -782,12 +851,13 @@ export const useActivateGoal = () => {
                 }
               : old.stats,
           };
-        }
+        },
       );
 
       return {
         previousGoals,
         previousActiveGoals,
+        previousDetail,
         previousUserStats,
         previousDashboard,
       };
@@ -799,19 +869,25 @@ export const useActivateGoal = () => {
       if (context?.previousActiveGoals) {
         queryClient.setQueryData(
           goalsQueryKeys.active(),
-          context.previousActiveGoals
+          context.previousActiveGoals,
+        );
+      }
+      if (context?.previousDetail) {
+        queryClient.setQueryData(
+          goalsQueryKeys.detail(goalId),
+          context.previousDetail,
         );
       }
       if (context?.previousUserStats) {
         queryClient.setQueryData(
           userQueryKeys.userStats(),
-          context.previousUserStats
+          context.previousUserStats,
         );
       }
       if (context?.previousDashboard) {
         queryClient.setQueryData(
           homeDashboardQueryKeys.dashboard(),
-          context.previousDashboard
+          context.previousDashboard,
         );
       }
     },
@@ -821,9 +897,16 @@ export const useActivateGoal = () => {
       });
       queryClient.invalidateQueries({ queryKey: goalsQueryKeys.list() });
       queryClient.invalidateQueries({ queryKey: goalsQueryKeys.active() });
+      queryClient.invalidateQueries({
+        queryKey: goalsQueryKeys.detail(goalId),
+      });
       queryClient.invalidateQueries({ queryKey: userQueryKeys.userStats() });
       queryClient.invalidateQueries({
         queryKey: homeDashboardQueryKeys.dashboard(),
+      });
+      // Invalidate tracking stats for this goal (now active)
+      queryClient.invalidateQueries({
+        queryKey: trackingStatsQueryKeys.entity("goal", goalId),
       });
     },
   });
@@ -839,27 +922,45 @@ export const useDeactivateGoal = () => {
       await queryClient.cancelQueries({ queryKey: goalsQueryKeys.list() });
       await queryClient.cancelQueries({ queryKey: goalsQueryKeys.active() });
       await queryClient.cancelQueries({
+        queryKey: goalsQueryKeys.detail(goalId),
+      });
+      await queryClient.cancelQueries({
         queryKey: homeDashboardQueryKeys.dashboard(),
       });
 
       const previousGoals = queryClient.getQueryData(goalsQueryKeys.list());
       const previousActiveGoals = queryClient.getQueryData(
-        goalsQueryKeys.active()
+        goalsQueryKeys.active(),
+      );
+      const previousDetail = queryClient.getQueryData(
+        goalsQueryKeys.detail(goalId),
       );
       const previousUserStats = queryClient.getQueryData(
-        userQueryKeys.userStats()
+        userQueryKeys.userStats(),
       );
       const previousDashboard = queryClient.getQueryData(
-        homeDashboardQueryKeys.dashboard()
+        homeDashboardQueryKeys.dashboard(),
       );
 
-      // Optimistically update is_active to false
+      // Optimistically update goal detail query
+      queryClient.setQueryData(goalsQueryKeys.detail(goalId), (old: any) => {
+        if (!old?.data) return old;
+        return {
+          ...old,
+          data: {
+            ...old.data,
+            status: "archived",
+          },
+        };
+      });
+
+      // Optimistically update status
       queryClient.setQueryData(goalsQueryKeys.list(), (old: any) => {
         if (!old?.data) return old;
         return {
           ...old,
           data: old.data.map((g: any) =>
-            g.id === goalId ? { ...g, is_active: false } : g
+            g.id === goalId ? { ...g, status: "archived" } : g,
           ),
         };
       });
@@ -894,7 +995,8 @@ export const useDeactivateGoal = () => {
             ...old,
             // Remove goal from items
             items: (old.items || []).filter(
-              (item: any) => !(item.type === "goal" && item.data?.id === goalId)
+              (item: any) =>
+                !(item.type === "goal" && item.data?.id === goalId),
             ),
             stats: old.stats
               ? {
@@ -903,12 +1005,13 @@ export const useDeactivateGoal = () => {
                 }
               : old.stats,
           };
-        }
+        },
       );
 
       return {
         previousGoals,
         previousActiveGoals,
+        previousDetail,
         previousUserStats,
         previousDashboard,
       };
@@ -920,19 +1023,25 @@ export const useDeactivateGoal = () => {
       if (context?.previousActiveGoals) {
         queryClient.setQueryData(
           goalsQueryKeys.active(),
-          context.previousActiveGoals
+          context.previousActiveGoals,
+        );
+      }
+      if (context?.previousDetail) {
+        queryClient.setQueryData(
+          goalsQueryKeys.detail(goalId),
+          context.previousDetail,
         );
       }
       if (context?.previousUserStats) {
         queryClient.setQueryData(
           userQueryKeys.userStats(),
-          context.previousUserStats
+          context.previousUserStats,
         );
       }
       if (context?.previousDashboard) {
         queryClient.setQueryData(
           homeDashboardQueryKeys.dashboard(),
-          context.previousDashboard
+          context.previousDashboard,
         );
       }
     },
@@ -942,9 +1051,16 @@ export const useDeactivateGoal = () => {
       });
       queryClient.invalidateQueries({ queryKey: goalsQueryKeys.list() });
       queryClient.invalidateQueries({ queryKey: goalsQueryKeys.active() });
+      queryClient.invalidateQueries({
+        queryKey: goalsQueryKeys.detail(goalId),
+      });
       queryClient.invalidateQueries({ queryKey: userQueryKeys.userStats() });
       queryClient.invalidateQueries({
         queryKey: homeDashboardQueryKeys.dashboard(),
+      });
+      // Invalidate tracking stats for this goal (deactivated)
+      queryClient.invalidateQueries({
+        queryKey: trackingStatsQueryKeys.entity("goal", goalId),
       });
     },
   });
@@ -965,7 +1081,7 @@ export const useDuplicateGoal = () => {
           return { ...old, data: [...old.data, newGoal] };
         });
 
-        if (newGoal.is_active) {
+        if (newGoal.status === "active") {
           queryClient.setQueryData(goalsQueryKeys.active(), (old: any) => {
             if (!old?.data) return old;
             return { ...old, data: [...old.data, newGoal] };
@@ -980,7 +1096,7 @@ export const useDuplicateGoal = () => {
             data: {
               ...old.data,
               total_goals: (old.data.total_goals || 0) + 1,
-              ...(newGoal.is_active && {
+              ...(newGoal.status === "active" && {
                 active_goals: (old.data.active_goals || 0) + 1,
               }),
             },
@@ -1006,6 +1122,8 @@ export const useActiveGoals = () => {
     queryKey: goalsQueryKeys.active(),
     queryFn: () => goalsService.getActiveGoals(),
     staleTime: 1 * 60 * 1000, // 1 minute
+    refetchOnMount: false,
+    placeholderData: EMPTY_GOALS_RESPONSE,
   });
 };
 

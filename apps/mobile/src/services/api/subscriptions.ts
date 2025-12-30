@@ -90,11 +90,11 @@ export class SubscriptionsService extends BaseApiService {
    * Backend will validate with Apple/Google and update subscription
    */
   async verifyPurchase(
-    request: VerifyPurchaseRequest
+    request: VerifyPurchaseRequest,
   ): Promise<ApiResponse<VerifyPurchaseResponse>> {
     return this.post<VerifyPurchaseResponse>(
       `${ROUTES.SUBSCRIPTIONS.ME}/verify`,
-      request
+      request,
     );
   }
 
@@ -104,7 +104,7 @@ export class SubscriptionsService extends BaseApiService {
   async restorePurchases(): Promise<ApiResponse<SubscriptionResponse>> {
     return this.post<SubscriptionResponse>(
       `${ROUTES.SUBSCRIPTIONS.ME}/restore`,
-      {}
+      {},
     );
   }
 
@@ -113,11 +113,11 @@ export class SubscriptionsService extends BaseApiService {
    * Called when app detects potential mismatch between RevenueCat and backend
    */
   async syncSubscription(
-    request: SyncSubscriptionRequest
+    request: SyncSubscriptionRequest,
   ): Promise<ApiResponse<SyncSubscriptionResponse>> {
     return this.post<SyncSubscriptionResponse>(
       ROUTES.SUBSCRIPTIONS.SYNC,
-      request
+      request,
     );
   }
 }

@@ -38,7 +38,8 @@ REQUIRED JSON FORMAT:
     {
       "title": "Specific, engaging goal title (e.g., 'Complete 30-Day Push-Up Challenge' NOT 'Workout 3x week')",
       "description": "Compelling description that highlights benefits, mentions accountability features, and explains what makes this exciting. Write like a personal coach speaking directly to them.",
-      "category": "fitness|nutrition|wellness|mindfulness|sleep|custom",
+      "category": "fitness|nutrition|wellness|mindfulness|sleep",
+      "tracking_type": "workout|meal|hydration|checkin",  // How user completes their check-in
       "frequency": "daily|weekly",
       "target_days": 7,
       "days_of_week": [1, 3, 5],  // Required for weekly goals: array of day numbers (0-6, 0=Sunday, 6=Saturday). Omit or null for daily goals.
@@ -47,6 +48,24 @@ REQUIRED JSON FORMAT:
     }
   ]
 }
+
+⚠️ CATEGORY vs TRACKING_TYPE - CRITICAL DISTINCTION:
+VALID CATEGORIES (only these 5): fitness, nutrition, wellness, mindfulness, sleep
+VALID TRACKING_TYPES (only these 4): workout, meal, hydration, checkin
+
+❌ "hydration" is NOT a valid category! It is a tracking_type.
+✅ Water/hydration goals MUST use: category="nutrition", tracking_type="hydration"
+
+TRACKING_TYPE RULES:
+- category="fitness" → tracking_type MUST be "workout"
+- category="nutrition" + water/hydration/drink goal → tracking_type MUST be "hydration"
+- category="nutrition" + food/meal/eating goal → tracking_type MUST be "meal"
+- category="wellness/mindfulness/sleep" → tracking_type MUST be "checkin"
+
+EXAMPLES:
+✅ CORRECT: {"category": "nutrition", "tracking_type": "hydration", "title": "Drink 8 glasses of water"}
+❌ WRONG: {"category": "hydration", ...} - "hydration" is NOT a valid category!
+❌ WRONG: {"category": "wellness", "tracking_type": "hydration", ...} - hydration goals must be category="nutrition"
 
 CRITICAL GUIDELINES FOR COMPELLING GOALS:
 
@@ -98,12 +117,21 @@ EXAMPLE OF A COMPELLING GOAL:
   "title": "Complete 25-Minute Morning Strength Routine 4x Weekly",
   "description": "Start each day with a powerful 25-minute strength circuit you can do at home with minimal equipment. This routine includes 6 compound exercises targeting your full body, designed to build muscle and boost metabolism. Our AI coach will send you morning reminders, track your weekly consistency, and celebrate your progress - perfect for someone who needs accountability to stay consistent!",
   "category": "fitness",
+  "tracking_type": "workout",
   "frequency": "weekly",
   "target_days": 4,
   "days_of_week": [1, 3, 5, 6],  // Monday, Wednesday, Friday, Saturday
   "reminder_times": ["06:30", "19:00"],
   "match_reason": "Since you're a beginner wanting to lose weight and struggle with staying consistent, this goal gives you a structured routine that fits your under-30-minute time window. The 4x weekly frequency builds accountability without overwhelming you, and our AI will check in daily to help you maintain consistency - directly addressing your biggest challenge."
 }
+
+EXAMPLES OF TRACKING_TYPE USAGE:
+- "Complete 30-Day Push-Up Challenge" → tracking_type: "workout"
+- "Hit 10,000 Steps Daily" → tracking_type: "checkin" (simple yes/no)
+- "Track Meals and Hit 100g Protein" → tracking_type: "meal"
+- "Drink 8 Glasses of Water Daily" → tracking_type: "hydration"
+- "Meditate for 10 Minutes Daily" → tracking_type: "checkin"
+- "Sleep 7+ Hours 5 Nights a Week" → tracking_type: "checkin"
 
 Focus on creating goals that would make someone excited to start, not just generic workout frequency suggestions."""
 
@@ -187,6 +215,67 @@ class OpenAIService:
                 f"OpenAI generated {len(goals)} goals before validation",
                 {"user_plan": "unknown", "goal_count": len(goals)},
             )
+
+            # === CATEGORY SANITIZATION (before validation) ===
+            # Fix common AI mistakes with category/tracking_type confusion
+            hydration_keywords = [
+                "water",
+                "hydration",
+                "hydrate",
+                "drink",
+                "glasses",
+                "ml",
+                "fluid",
+                "h2o",
+            ]
+            valid_categories = [
+                "fitness",
+                "nutrition",
+                "wellness",
+                "mindfulness",
+                "sleep",
+            ]
+
+            for goal in goals:
+                category = goal.get("category", "").lower()
+                tracking_type = goal.get("tracking_type", "").lower()
+                combined_text = (
+                    f"{goal.get('title', '')} {goal.get('description', '')}".lower()
+                )
+                is_hydration_goal = any(
+                    kw in combined_text for kw in hydration_keywords
+                )
+
+                # Fix 1: If AI incorrectly set category as "hydration", change to "nutrition"
+                if category == "hydration":
+                    goal["category"] = "nutrition"
+                    goal["tracking_type"] = "hydration"
+                    logger.info(
+                        f"Fixed category 'hydration' -> 'nutrition' for: {goal.get('title')}"
+                    )
+
+                # Fix 2: If tracking_type is "hydration" but category is not "nutrition", fix it
+                elif tracking_type == "hydration" and category != "nutrition":
+                    goal["category"] = "nutrition"
+                    logger.info(
+                        f"Fixed category '{category}' -> 'nutrition' for hydration goal: {goal.get('title')}"
+                    )
+
+                # Fix 3: If it's clearly a hydration goal but category is wrong
+                elif is_hydration_goal and category not in ["nutrition"]:
+                    goal["category"] = "nutrition"
+                    goal["tracking_type"] = "hydration"
+                    logger.info(
+                        f"Fixed category '{category}' -> 'nutrition' for detected hydration goal: {goal.get('title')}"
+                    )
+
+                # Fix 4: If category is invalid, default to wellness
+                if goal.get("category", "").lower() not in valid_categories:
+                    logger.warning(
+                        f"Invalid category '{goal.get('category')}' for goal '{goal.get('title')}', defaulting to 'wellness'"
+                    )
+                    goal["category"] = "wellness"
+                    goal["tracking_type"] = "checkin"
 
             # Validate each goal has required fields
             validated_goals = []
@@ -446,14 +535,34 @@ REMEMBER: Return a JSON object with a "goals" array containing AT LEAST 5 goal o
             "wellness",
             "mindfulness",
             "sleep",
-            "custom",
         ]
         valid_frequencies = ["daily", "weekly"]
+        valid_tracking_types = ["workout", "meal", "hydration", "checkin"]
 
         if goal["category"] not in valid_categories:
             return False
         if goal["frequency"] not in valid_frequencies:
             return False
+
+        # Validate tracking_type if present (default to 'checkin' if missing)
+        tracking_type = goal.get("tracking_type", "checkin")
+        if tracking_type not in valid_tracking_types:
+            return False
+
+        # Set default tracking_type based on category if not provided by AI
+        if "tracking_type" not in goal:
+            if goal["category"] == "fitness":
+                goal["tracking_type"] = "workout"
+            elif goal["category"] == "nutrition":
+                goal["tracking_type"] = "meal"
+            elif (
+                goal["category"] == "wellness"
+                or goal["category"] == "mindfulness"
+                or goal["category"] == "sleep"
+            ):
+                goal["tracking_type"] = "checkin"
+            else:
+                goal["tracking_type"] = "checkin"
 
         # Validate target_days is reasonable
         if goal["target_days"] < 1 or goal["target_days"] > 7:

@@ -64,7 +64,7 @@ export default function ModularApiExample() {
       if (response.data) {
         Alert.alert(
           "User Info",
-          `Name: ${response.data.name}\nPlan: ${response.data.plan}`
+          `Name: ${response.data.name}\nPlan: ${response.data.plan}`,
         );
       }
     } catch (error) {
@@ -124,7 +124,6 @@ export default function ModularApiExample() {
         frequency: "daily",
         target_days: 7,
         reminder_times: ["07:00"],
-        is_active: true,
       });
       Alert.alert("Success", "Goal created with React Query!");
     } catch (error) {
@@ -141,10 +140,9 @@ export default function ModularApiExample() {
     try {
       await createCheckInMutation.mutateAsync({
         goal_id: goals.data[0].id,
-        date: new Date().toISOString().split("T")[0],
+        check_in_date: new Date().toISOString().split("T")[0],
         completed: true,
-        reflection: "Great workout today!",
-        mood: 5,
+        notes: "Great workout today!",
       });
       Alert.alert("Success", "Check-in created with React Query!");
     } catch (error) {

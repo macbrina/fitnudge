@@ -57,26 +57,32 @@ export function RealtimeProvider({ children }: RealtimeProviderProps) {
   }, [queryClient]);
 
   // Handle app state changes to refresh data when returning from background
+  // NOTE: Realtime reconnection is now handled by the service itself (realtimeService.ts)
+  // This effect only handles query invalidation for fresh data
   useEffect(() => {
-    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+    const handleAppStateChange = async (nextAppState: AppStateStatus) => {
       // App coming back to foreground from background
       if (
         appStateRef.current.match(/inactive|background/) &&
         nextAppState === "active" &&
-        isAuthenticated
+        isAuthenticated &&
+        user?.id
       ) {
         console.log(
-          "[RealtimeContext] 📱 App returned to foreground, refreshing data..."
+          "[RealtimeContext] 📱 App returned to foreground, refreshing data...",
         );
 
         // Invalidate key queries to ensure fresh data
-        // These will refetch immediately since we set staleTime: 0
+        // Realtime reconnection is handled by the service's AppState listener
         queryClient.invalidateQueries({ queryKey: ["checkIns"] });
         queryClient.invalidateQueries({ queryKey: ["user"] }); // All user queries including stats
         queryClient.invalidateQueries({ queryKey: ["progress"] }); // All progress queries
         queryClient.invalidateQueries({ queryKey: ["progress", "streak"] }); // Explicitly streak
         queryClient.invalidateQueries({ queryKey: ["progress", "mood"] }); // Explicitly mood trends
         queryClient.invalidateQueries({ queryKey: ["goals"] });
+        queryClient.invalidateQueries({ queryKey: ["challenges"] });
+        queryClient.invalidateQueries({ queryKey: ["homeDashboard"] });
+        queryClient.invalidateQueries({ queryKey: ["partners"] }); // Partner data
       }
 
       appStateRef.current = nextAppState;
@@ -84,19 +90,19 @@ export function RealtimeProvider({ children }: RealtimeProviderProps) {
 
     const subscription = AppState.addEventListener(
       "change",
-      handleAppStateChange
+      handleAppStateChange,
     );
 
     return () => {
       subscription.remove();
     };
-  }, [isAuthenticated, queryClient]);
+  }, [isAuthenticated, user?.id, queryClient]);
 
   useEffect(() => {
     if (!ENABLE_REALTIME) {
       if (__DEV__) {
         console.log(
-          "[RealtimeContext] ⚠️ Realtime DISABLED (EXPO_PUBLIC_ENABLE_REALTIME=false)"
+          "[RealtimeContext] ⚠️ Realtime DISABLED (EXPO_PUBLIC_ENABLE_REALTIME=false)",
         );
         console.log("[RealtimeContext] App will use polling for updates");
       }
@@ -122,10 +128,12 @@ export function RealtimeProvider({ children }: RealtimeProviderProps) {
       return () => {
         clearTimeout(startupDelay); // Cancel delayed startup if unmounting
         clearInterval(statusInterval);
-        realtimeService.stop();
+        // Don't clear userId on cleanup - allows reconnection after background
+        realtimeService.stop(false);
       };
     } else {
-      realtimeService.stop();
+      // User logged out or not authenticated - full cleanup
+      realtimeService.cleanup();
     }
   }, [isAuthenticated, user?.id, isVerifyingUser]);
 

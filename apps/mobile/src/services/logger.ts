@@ -5,8 +5,8 @@
  * Wraps Sentry with consistent API for error tracking and debugging
  */
 
-import * as Sentry from '@sentry/react-native';
-import { Platform } from 'react-native';
+import * as Sentry from "@sentry/react-native";
+import { Platform } from "react-native";
 
 /**
  * User context interface
@@ -26,7 +26,7 @@ export interface UserContext {
 export interface Breadcrumb {
   message: string;
   category?: string;
-  level?: 'debug' | 'info' | 'warning' | 'error' | 'fatal';
+  level?: "debug" | "info" | "warning" | "error" | "fatal";
   data?: Record<string, any>;
 }
 
@@ -58,7 +58,7 @@ class VendorLogger {
    */
   setUser(user: UserContext | null): void {
     if (!this.initialized) {
-      console.warn('[VendorLogger] Not initialized, skipping setUser');
+      console.warn("[VendorLogger] Not initialized, skipping setUser");
       return;
     }
 
@@ -72,25 +72,25 @@ class VendorLogger {
 
         // Set additional context
         if (user.tenantId) {
-          Sentry.setTag('tenantId', user.tenantId);
+          Sentry.setTag("tenantId", user.tenantId);
         }
         if (user.displayName) {
-          Sentry.setTag('displayName', user.displayName);
+          Sentry.setTag("displayName", user.displayName);
         }
         if (user.role) {
-          Sentry.setTag('role', user.role);
+          Sentry.setTag("role", user.role);
         }
 
         // Always tag as vendor app
-        Sentry.setTag('app', 'vendor');
+        Sentry.setTag("app", "vendor");
       } else {
         Sentry.setUser(null);
-        Sentry.setTag('tenantId', undefined);
-        Sentry.setTag('displayName', undefined);
-        Sentry.setTag('role', undefined);
+        Sentry.setTag("tenantId", undefined);
+        Sentry.setTag("displayName", undefined);
+        Sentry.setTag("role", undefined);
       }
     } catch (error) {
-      console.error('[VendorLogger] Failed to set user:', error);
+      console.error("[VendorLogger] Failed to set user:", error);
     }
   }
 
@@ -105,17 +105,17 @@ class VendorLogger {
    * Log error with Sentry
    */
   error(error: Error | string, context?: Record<string, any>): void {
-    const errorObj = typeof error === 'string' ? new Error(error) : error;
+    const errorObj = typeof error === "string" ? new Error(error) : error;
 
     if (!this.initialized) {
       return;
     }
 
     try {
-      Sentry.withScope(scope => {
-        scope.setTag('platform', Platform.OS);
-        scope.setTag('app', 'vendor');
-        scope.setTag('level', 'error');
+      Sentry.withScope((scope) => {
+        scope.setTag("platform", Platform.OS);
+        scope.setTag("app", "vendor");
+        scope.setTag("level", "error");
         if (context) {
           Object.entries(context).forEach(([key, value]) => {
             scope.setExtra(key, value);
@@ -128,8 +128,8 @@ class VendorLogger {
         console.error(`[VendorLogger] Error captured`, errorObj, context);
       }
     } catch (sentryError) {
-      console.error('[VendorLogger] Failed to capture error:', sentryError);
-      console.error('[VendorLogger Fallback]', errorObj, context);
+      console.error("[VendorLogger] Failed to capture error:", sentryError);
+      console.error("[VendorLogger Fallback]", errorObj, context);
     }
   }
 
@@ -138,29 +138,29 @@ class VendorLogger {
    */
   info(message: string, context?: Record<string, any>): void {
     if (!this.initialized) {
-      console.info('[VendorLogger Fallback]', message, context);
+      console.info("[VendorLogger Fallback]", message, context);
       return;
     }
 
     try {
-      Sentry.withScope(scope => {
-        scope.setTag('platform', Platform.OS);
-        scope.setTag('app', 'vendor');
-        scope.setTag('level', 'info');
+      Sentry.withScope((scope) => {
+        scope.setTag("platform", Platform.OS);
+        scope.setTag("app", "vendor");
+        scope.setTag("level", "info");
         if (context) {
           Object.entries(context).forEach(([key, value]) => {
             scope.setExtra(key, value);
           });
         }
-        Sentry.captureMessage(message, 'info');
+        Sentry.captureMessage(message, "info");
       });
 
       if (__DEV__) {
         console.info(`[VendorLogger] Info captured`, message);
       }
     } catch (error) {
-      console.error('[VendorLogger] Failed to capture info:', error);
-      console.info('[VendorLogger Fallback]', message, context);
+      console.error("[VendorLogger] Failed to capture info:", error);
+      console.info("[VendorLogger Fallback]", message, context);
     }
   }
 
@@ -169,29 +169,29 @@ class VendorLogger {
    */
   warn(message: string, context?: Record<string, any>): void {
     if (!this.initialized) {
-      console.warn('[VendorLogger Fallback]', message, context);
+      console.warn("[VendorLogger Fallback]", message, context);
       return;
     }
 
     try {
-      Sentry.withScope(scope => {
-        scope.setTag('platform', Platform.OS);
-        scope.setTag('app', 'vendor');
-        scope.setTag('level', 'warning');
+      Sentry.withScope((scope) => {
+        scope.setTag("platform", Platform.OS);
+        scope.setTag("app", "vendor");
+        scope.setTag("level", "warning");
         if (context) {
           Object.entries(context).forEach(([key, value]) => {
             scope.setExtra(key, value);
           });
         }
-        Sentry.captureMessage(message, 'warning');
+        Sentry.captureMessage(message, "warning");
       });
 
       if (__DEV__) {
         console.warn(`[VendorLogger] Warning captured`, message);
       }
     } catch (error) {
-      console.error('[VendorLogger] Failed to capture warning:', error);
-      console.warn('[VendorLogger Fallback]', message, context);
+      console.error("[VendorLogger] Failed to capture warning:", error);
+      console.warn("[VendorLogger Fallback]", message, context);
     }
   }
 
@@ -200,16 +200,16 @@ class VendorLogger {
    */
   debug(message: string, context?: Record<string, any>): void {
     if (__DEV__) {
-      console.debug('[VendorLogger Debug]', message, context);
+      console.debug("[VendorLogger Debug]", message, context);
     }
 
     if (!this.initialized) return;
 
     try {
-      Sentry.withScope(scope => {
-        scope.setTag('platform', Platform.OS);
-        scope.setTag('app', 'vendor');
-        scope.setTag('level', 'debug');
+      Sentry.withScope((scope) => {
+        scope.setTag("platform", Platform.OS);
+        scope.setTag("app", "vendor");
+        scope.setTag("level", "debug");
         if (context) {
           Object.entries(context).forEach(([key, value]) => {
             scope.setExtra(key, value);
@@ -218,7 +218,7 @@ class VendorLogger {
         Sentry.captureMessage(message);
       });
     } catch (error) {
-      console.error('[VendorLogger] Failed to capture debug:', error);
+      console.error("[VendorLogger] Failed to capture debug:", error);
     }
   }
 
@@ -227,23 +227,23 @@ class VendorLogger {
    */
   captureMessage(
     message: string,
-    level: 'debug' | 'info' | 'warning' | 'error' | 'fatal' = 'info',
-    context?: Record<string, any>
+    level: "debug" | "info" | "warning" | "error" | "fatal" = "info",
+    context?: Record<string, any>,
   ): void {
     if (!this.initialized) {
       console.log(
         `[VendorLogger Fallback ${level.toUpperCase()}]`,
         message,
-        context
+        context,
       );
       return;
     }
 
     try {
-      Sentry.withScope(scope => {
-        scope.setTag('platform', Platform.OS);
-        scope.setTag('app', 'vendor');
-        scope.setTag('level', level);
+      Sentry.withScope((scope) => {
+        scope.setTag("platform", Platform.OS);
+        scope.setTag("app", "vendor");
+        scope.setTag("level", level);
         if (context) {
           Object.entries(context).forEach(([key, value]) => {
             scope.setExtra(key, value);
@@ -256,11 +256,11 @@ class VendorLogger {
         console.log(`[VendorLogger] Message captured`, message);
       }
     } catch (error) {
-      console.error('[VendorLogger] Failed to capture message:', error);
+      console.error("[VendorLogger] Failed to capture message:", error);
       console.log(
         `[VendorLogger Fallback ${level.toUpperCase()}]`,
         message,
-        context
+        context,
       );
     }
   }
@@ -270,21 +270,21 @@ class VendorLogger {
    */
   addBreadcrumb(breadcrumb: Breadcrumb): void {
     if (!this.initialized) {
-      console.log('[VendorLogger Breadcrumb]', breadcrumb);
+      console.log("[VendorLogger Breadcrumb]", breadcrumb);
       return;
     }
 
     try {
       Sentry.addBreadcrumb({
         message: breadcrumb.message,
-        category: breadcrumb.category || 'vendor',
-        level: breadcrumb.level || 'info',
+        category: breadcrumb.category || "vendor",
+        level: breadcrumb.level || "info",
         data: breadcrumb.data,
         timestamp: Date.now() / 1000,
       });
     } catch (error) {
-      console.error('[VendorLogger] Failed to add breadcrumb:', error);
-      console.log('[VendorLogger Breadcrumb]', breadcrumb);
+      console.error("[VendorLogger] Failed to add breadcrumb:", error);
+      console.log("[VendorLogger Breadcrumb]", breadcrumb);
     }
   }
 
@@ -297,7 +297,7 @@ class VendorLogger {
     try {
       Sentry.setTag(key, value);
     } catch (error) {
-      console.error('[VendorLogger] Failed to set tag:', error);
+      console.error("[VendorLogger] Failed to set tag:", error);
     }
   }
 
@@ -310,7 +310,7 @@ class VendorLogger {
     try {
       Sentry.setExtra(key, value);
     } catch (error) {
-      console.error('[VendorLogger] Failed to set extra:', error);
+      console.error("[VendorLogger] Failed to set extra:", error);
     }
   }
 
@@ -325,7 +325,7 @@ class VendorLogger {
           const duration = Date.now() - startTime;
           console.log(
             `[VendorLogger Span] ${context.operation}: ${duration}ms`,
-            result
+            result,
           );
         },
       };
@@ -338,8 +338,8 @@ class VendorLogger {
       // Add start breadcrumb
       Sentry.addBreadcrumb({
         message: `Started: ${context.operation}`,
-        category: 'performance',
-        level: 'info',
+        category: "performance",
+        level: "info",
         data: context.tags,
       });
 
@@ -351,35 +351,35 @@ class VendorLogger {
             // Add finish breadcrumb with timing
             Sentry.addBreadcrumb({
               message: `Finished: ${context.operation}`,
-              category: 'performance',
-              level: 'info',
+              category: "performance",
+              level: "info",
               data: {
                 ...context.tags,
                 duration: `${duration}ms`,
-                result: result ? 'success' : 'completed',
+                result: result ? "success" : "completed",
               },
             });
 
             if (__DEV__) {
               console.log(
                 `[VendorLogger Span] ${context.operation}: ${duration}ms`,
-                result
+                result,
               );
             }
           } catch (error) {
-            console.error('[VendorLogger] Failed to finish span:', error);
+            console.error("[VendorLogger] Failed to finish span:", error);
           }
         },
       };
     } catch (error) {
-      console.error('[VendorLogger] Failed to start span:', error);
+      console.error("[VendorLogger] Failed to start span:", error);
       const startTime = Date.now();
       return {
         finish: (result?: any) => {
           const duration = Date.now() - startTime;
           console.log(
             `[VendorLogger Span] ${context.operation}: ${duration}ms`,
-            result
+            result,
           );
         },
       };

@@ -156,7 +156,7 @@ export const AuthScreen: React.FC = () => {
 
   const renderImagePlaceholder = (
     key: number,
-    SvgComponent?: React.ComponentType<any> | null
+    SvgComponent?: React.ComponentType<any> | null,
   ) => (
     <View key={key} style={styles.imageContainer}>
       {SvgComponent ? (

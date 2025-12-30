@@ -18,7 +18,7 @@ These rules are **non-negotiable**. Code that violates them will be rejected.
    <Text style={{ color: 'blue' }} />
 
    // ✅ CORRECT
-   <View style={{ backgroundColor: colors.bg.primary }} />
+   <View style={{ backgroundColor: colors.bg.canvas }} />
    <Text style={{ color: colors.text.primary }} />
    ```
 
@@ -123,7 +123,7 @@ These rules are **non-negotiable**. Code that violates them will be rejected.
 
     // ✅ CORRECT
     const { colors, brand } = useTheme();
-    backgroundColor: colors.bg.primary; // Adapts to light/dark mode
+    backgroundColor: colors.bg.canvas; // Adapts to light/dark mode
     ```
 
 11. **ALL DESIGN MUST LOOK GOOD ON IOS AND ANDROID AND COMPATIBLE**
@@ -1559,7 +1559,7 @@ backgroundColor: tokens.colors.light.primary; // Doesn't adapt to dark mode
 
 // ✅ CORRECT
 const { colors } = useTheme();
-backgroundColor: colors.bg.primary; // Adapts to theme
+backgroundColor: colors.bg.canvas; // Adapts to theme
 ```
 
 **Mistake 5: Mixing Token and Hardcoded Values**

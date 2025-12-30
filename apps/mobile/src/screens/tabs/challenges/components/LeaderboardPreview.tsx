@@ -237,7 +237,7 @@ export function LeaderboardPreview({
 const makeLeaderboardPreviewStyles = (
   tokens: any,
   colors: any,
-  brand: any
+  brand: any,
 ) => ({
   container: {
     padding: toRN(tokens.spacing[4]),

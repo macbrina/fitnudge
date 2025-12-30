@@ -85,6 +85,7 @@ def _generate_ai_goals(
     user_plan: str,
     goal_type: str = "habit",
     user_timezone: Optional[str] = None,
+    user_id: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
     Generate AI goals using the goal-type-aware suggestion service.
@@ -94,6 +95,7 @@ def _generate_ai_goals(
         user_plan: User's subscription plan (not currently used by new service)
         goal_type: Type of goals - "habit", "time_challenge", "target_challenge", or "mixed"
         user_timezone: User's timezone (e.g., 'America/New_York') for time-aware suggestions
+        user_id: User's ID for fetching existing goals to avoid duplicates
     """
     try:
         # Get current UTC time
@@ -105,6 +107,7 @@ def _generate_ai_goals(
             goal_type,
             user_timezone=user_timezone,
             current_time=current_time,
+            user_id=user_id,
         )
 
         if goals:
@@ -114,6 +117,7 @@ def _generate_ai_goals(
                     "goal_type": goal_type,
                     "count": len(goals),
                     "timezone": user_timezone,
+                    "user_id": user_id,
                 },
             )
 
@@ -220,20 +224,9 @@ def _get_suggested_goals_from_db(
 
 
 def _fetch_user_timezone(supabase, user_id: str) -> Optional[str]:
-    """Fetch user's timezone from their profile or preferences."""
+    """Fetch user's timezone from the users table."""
     try:
-        # Try to get timezone from user_fitness_profiles first
-        result = (
-            supabase.table("user_fitness_profiles")
-            .select("timezone")
-            .eq("user_id", user_id)
-            .maybe_single()
-            .execute()
-        )
-        if result.data and result.data.get("timezone"):
-            return result.data["timezone"]
-
-        # Fallback: try users table
+        # Get timezone from users table (timezone column exists there, not in user_fitness_profiles)
         result = (
             supabase.table("users")
             .select("timezone")
@@ -280,7 +273,11 @@ def generate_suggested_goals_for_user(
 
     user_plan = _fetch_user_plan(supabase, user_id)
     ai_goals = _generate_ai_goals(
-        profile, user_plan, goal_type=goal_type, user_timezone=user_timezone
+        profile,
+        user_plan,
+        goal_type=goal_type,
+        user_timezone=user_timezone,
+        user_id=user_id,
     )
     transformed_goals: List[SuggestedGoalItem] = []
 

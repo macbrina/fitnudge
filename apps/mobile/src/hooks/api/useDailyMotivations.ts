@@ -38,6 +38,7 @@ export const useDailyMotivations = (limit: number = 30, offset: number = 0) => {
       return response.data;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
+    placeholderData: [],
   });
 };
 
@@ -69,7 +70,7 @@ export const useShareDailyMotivation = () => {
       });
 
       const previousToday = queryClient.getQueryData(
-        dailyMotivationsQueryKeys.today()
+        dailyMotivationsQueryKeys.today(),
       );
 
       // Optimistically increment share count
@@ -78,7 +79,7 @@ export const useShareDailyMotivation = () => {
         (old: any) => {
           if (!old) return old;
           return { ...old, share_count: (old.share_count || 0) + 1 };
-        }
+        },
       );
 
       return { previousToday };
@@ -87,7 +88,7 @@ export const useShareDailyMotivation = () => {
       if (context?.previousToday) {
         queryClient.setQueryData(
           dailyMotivationsQueryKeys.today(),
-          context.previousToday
+          context.previousToday,
         );
       }
     },
@@ -102,7 +103,7 @@ export const useRegenerateDailyMotivation = () => {
       const response = await dailyMotivationService.regenerate();
       if (response.status !== 200 || !response.data) {
         throw new Error(
-          response.error || "Failed to regenerate daily motivation"
+          response.error || "Failed to regenerate daily motivation",
         );
       }
       return response.data;
@@ -111,7 +112,7 @@ export const useRegenerateDailyMotivation = () => {
       // Update the cache directly with the new motivation
       queryClient.setQueryData(
         dailyMotivationsQueryKeys.today(),
-        newMotivation
+        newMotivation,
       );
       // Also invalidate to ensure fresh data
       queryClient.invalidateQueries({

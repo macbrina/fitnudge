@@ -3,27 +3,33 @@ from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime, date, timedelta
 from app.core.flexible_auth import get_current_user
+from app.core.entity_validation import validate_entity_is_active
 
 router = APIRouter(
     redirect_slashes=False
 )  # Disable redirects to preserve Authorization header
 
 
-# Pydantic models
+# Valid mood values (consistent with challenge_check_ins structure)
+VALID_MOODS = ["great", "good", "okay", "bad", "terrible"]
+
+
+# Pydantic models for goal check-ins
+# Note: Challenge check-ins use a separate endpoint (/challenge-check-ins)
 class CheckInCreate(BaseModel):
-    goal_id: str
-    date: date
-    completed: bool
-    reflection: Optional[str] = None
-    mood: Optional[int] = None  # 1-5 scale
-    photo_urls: Optional[List[str]] = None  # Array of photo URLs
+    goal_id: str  # Required for goal check-ins
+    check_in_date: date
+    completed: bool = False
+    notes: Optional[str] = None
+    mood: Optional[str] = None  # Text: great, good, okay, bad, terrible
+    photo_url: Optional[str] = None  # Single photo URL
 
 
 class CheckInUpdate(BaseModel):
     completed: Optional[bool] = None
-    reflection: Optional[str] = None
-    mood: Optional[int] = None
-    photo_urls: Optional[List[str]] = None  # Array of photo URLs
+    notes: Optional[str] = None
+    mood: Optional[str] = None  # Text: great, good, okay, bad, terrible
+    photo_url: Optional[str] = None  # Single photo URL
     is_checked_in: Optional[bool] = None  # True when user responds (yes or no)
 
 
@@ -31,15 +37,15 @@ class CheckInResponse(BaseModel):
     id: str
     goal_id: str
     user_id: str
-    date: date
+    check_in_date: date
     completed: bool
-    reflection: Optional[str]
-    mood: Optional[int]
-    photo_urls: Optional[List[str]]  # Array of photo URLs
+    notes: Optional[str] = None
+    mood: Optional[str] = None  # Text: great, good, okay, bad, terrible
+    photo_url: Optional[str] = None  # Single photo URL
     is_checked_in: Optional[bool] = None  # True when user has responded
     created_at: str
-    updated_at: Optional[str] = None  # May not exist in older records
-    goal: dict  # Goal info
+    updated_at: Optional[str] = None
+    goal: Optional[dict] = None  # Goal info
 
 
 class CheckInStats(BaseModel):
@@ -72,7 +78,7 @@ async def _get_check_ins_data(
     page: int = 1,
     limit: int = 20,
 ):
-    """Helper function to get check-ins data"""
+    """Helper function to get goal check-ins data"""
     from app.core.database import get_supabase_client
 
     supabase = get_supabase_client()
@@ -92,11 +98,15 @@ async def _get_check_ins_data(
     if goal_id:
         query = query.eq("goal_id", goal_id)
     if start_date:
-        query = query.gte("date", start_date.isoformat())
+        query = query.gte("check_in_date", start_date.isoformat())
     if end_date:
-        query = query.lte("date", end_date.isoformat())
+        query = query.lte("check_in_date", end_date.isoformat())
 
-    result = query.order("date", desc=True).range(offset, offset + limit - 1).execute()
+    result = (
+        query.order("check_in_date", desc=True)
+        .range(offset, offset + limit - 1)
+        .execute()
+    )
 
     return result.data
 
@@ -120,7 +130,7 @@ async def get_check_ins(
 async def create_check_in(
     checkin_data: CheckInCreate, current_user: dict = Depends(get_current_user)
 ):
-    """Create a new check-in"""
+    """Create a new check-in for a goal"""
     from app.core.database import get_supabase_client
 
     supabase = get_supabase_client()
@@ -135,13 +145,14 @@ async def create_check_in(
         )
 
     goal = goal_result.data[0]
-    is_owner = goal.get("user_id") == current_user["id"]
-
-    if not is_owner:
+    if goal.get("user_id") != current_user["id"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You don't have access to this goal",
         )
+
+    # Validate that the goal is active before allowing check-in
+    validate_entity_is_active(goal, "goal", allow_upcoming=False)
 
     # Check if user has already completed a check-in for this goal today
     existing_checkin = (
@@ -149,7 +160,7 @@ async def create_check_in(
         .select("id, completed")
         .eq("goal_id", checkin_data.goal_id)
         .eq("user_id", current_user["id"])
-        .eq("date", checkin_data.date.isoformat())
+        .eq("check_in_date", checkin_data.check_in_date.isoformat())
         .execute()
     )
 
@@ -161,19 +172,29 @@ async def create_check_in(
                 detail="You have already completed your check-in for today.",
             )
 
+    # Validate mood if provided
+    if checkin_data.mood and checkin_data.mood not in VALID_MOODS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid mood value. Must be one of: {', '.join(VALID_MOODS)}",
+        )
+
+    # Build check-in data
     checkin = {
         "goal_id": checkin_data.goal_id,
         "user_id": current_user["id"],
-        "date": checkin_data.date.isoformat(),
+        "check_in_date": checkin_data.check_in_date.isoformat(),
         "completed": checkin_data.completed,
-        "reflection": checkin_data.reflection,
+        "notes": checkin_data.notes,
         "mood": checkin_data.mood,
-        "photo_urls": checkin_data.photo_urls or [],
+        "photo_url": checkin_data.photo_url,
+        "is_checked_in": True,  # User is actively checking in
     }
 
+    # Upsert the check-in
     result = (
         supabase.table("check_ins")
-        .upsert(checkin, on_conflict="goal_id,date,user_id")
+        .upsert(checkin, on_conflict="user_id,goal_id,check_in_date")
         .execute()
     )
 
@@ -203,10 +224,11 @@ async def create_check_in(
             # Queue achievement check as Celery task (non-blocking)
             check_achievements_task.delay(
                 user_id=current_user["id"],
-                goal_id=checkin_data.goal_id,
+                source_type="goal",
+                source_id=checkin_data.goal_id,
             )
 
-            # Queue challenge progress update as Celery task (non-blocking)
+            # Queue challenge progress update (for linked challenges)
             update_challenge_progress_task.delay(
                 user_id=current_user["id"],
                 goal_id=checkin_data.goal_id,
@@ -247,7 +269,25 @@ async def update_check_in(
             status_code=status.HTTP_404_NOT_FOUND, detail="Check-in not found"
         )
 
+    existing_record = existing_checkin.data[0]
+
+    # Validate that the goal is active before allowing check-in update
+    goal_id = existing_record.get("goal_id")
+    if goal_id:
+        goal_result = (
+            supabase.table("goals").select("id, status").eq("id", goal_id).execute()
+        )
+        if goal_result.data:
+            validate_entity_is_active(goal_result.data[0], "goal", allow_upcoming=False)
+
     update_data = {k: v for k, v in checkin_data.dict().items() if v is not None}
+
+    # Validate mood if provided
+    if "mood" in update_data and update_data["mood"] not in VALID_MOODS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid mood value. Must be one of: {', '.join(VALID_MOODS)}",
+        )
 
     # Automatically set is_checked_in to True when user responds (yes or no)
     if "completed" in update_data:
@@ -270,14 +310,31 @@ async def update_check_in(
         .execute()
     )
 
-    return result.data[0]
+    record = result.data[0]
+
+    # Trigger achievement check if completed
+    if update_data.get("completed"):
+        try:
+            from app.services.tasks import check_achievements_task
+
+            check_achievements_task.delay(
+                user_id=current_user["id"],
+                source_type="goal",
+                source_id=record.get("goal_id"),
+            )
+        except Exception as e:
+            from app.services.logger import logger
+
+            logger.warning(f"Failed to queue achievement check: {e}")
+
+    return record
 
 
 @router.delete("/{checkin_id}")
 async def delete_check_in(
     checkin_id: str, current_user: dict = Depends(get_current_user)
 ):
-    """Delete a check-in and cleanup associated photos"""
+    """Delete a check-in and cleanup associated photo"""
     from app.core.database import get_supabase_client
     from app.core.config import settings
     from app.services.tasks import delete_media_from_r2_task
@@ -298,16 +355,16 @@ async def delete_check_in(
         )
 
     checkin_data = existing_checkin.data[0]
-    photo_urls = checkin_data.get("photo_urls") or []
+    photo_url = checkin_data.get("photo_url")
 
     # Delete the check-in
     supabase.table("check_ins").delete().eq("id", checkin_id).execute()
 
-    # Queue background tasks to delete photos from R2
-    public_url_base = settings.CLOUDFLARE_R2_PUBLIC_URL.rstrip("/")
-    for url in photo_urls:
-        if url.startswith(public_url_base):
-            r2_key = url[len(public_url_base) :].lstrip("/")
+    # Queue background task to delete photo from R2 if exists
+    if photo_url:
+        public_url_base = settings.CLOUDFLARE_R2_PUBLIC_URL.rstrip("/")
+        if photo_url.startswith(public_url_base):
+            r2_key = photo_url[len(public_url_base) :].lstrip("/")
             delete_media_from_r2_task.delay(
                 file_path=r2_key,
                 media_id=f"checkin-delete-{checkin_id}",
@@ -323,7 +380,7 @@ async def get_check_in_stats(
     start_date: Optional[date] = Query(None),
     end_date: Optional[date] = Query(None),
 ):
-    """Get check-in statistics"""
+    """Get goal check-in statistics"""
     from app.core.database import get_supabase_client
 
     supabase = get_supabase_client()
@@ -333,9 +390,9 @@ async def get_check_in_stats(
     if goal_id:
         query = query.eq("goal_id", goal_id)
     if start_date:
-        query = query.gte("date", start_date.isoformat())
+        query = query.gte("check_in_date", start_date.isoformat())
     if end_date:
-        query = query.lte("date", end_date.isoformat())
+        query = query.lte("check_in_date", end_date.isoformat())
 
     result = query.execute()
     check_ins = result.data
@@ -347,7 +404,7 @@ async def get_check_in_stats(
     )
 
     # Calculate streaks
-    sorted_checkins = sorted(check_ins, key=lambda x: x["date"], reverse=True)
+    sorted_checkins = sorted(check_ins, key=lambda x: x["check_in_date"], reverse=True)
     current_streak = 0
     longest_streak = 0
     temp_streak = 0
@@ -363,10 +420,12 @@ async def get_check_in_stats(
 
     longest_streak = max(longest_streak, temp_streak)
 
-    # Calculate mood stats
-    mood_checkins = [c for c in check_ins if c["mood"] is not None]
+    # Calculate mood stats - mood is now text-based
+    # Map text moods to numeric values for averaging
+    mood_value_map = {"great": 5, "good": 4, "okay": 3, "bad": 2, "terrible": 1}
+    mood_checkins = [c for c in check_ins if c.get("mood") in mood_value_map]
     average_mood = (
-        sum(c["mood"] for c in mood_checkins) / len(mood_checkins)
+        sum(mood_value_map[c["mood"]] for c in mood_checkins) / len(mood_checkins)
         if mood_checkins
         else None
     )
@@ -376,11 +435,15 @@ async def get_check_in_stats(
     recent_mood_checkins = [
         c
         for c in mood_checkins
-        if datetime.fromisoformat(c["date"]).date() >= thirty_days_ago
+        if datetime.fromisoformat(c["check_in_date"]).date() >= thirty_days_ago
     ]
     mood_trend = [
-        {"date": c["date"], "mood": c["mood"]}
-        for c in sorted(recent_mood_checkins, key=lambda x: x["date"])
+        {
+            "date": c["check_in_date"],
+            "mood": c["mood"],
+            "mood_value": mood_value_map.get(c["mood"]),
+        }
+        for c in sorted(recent_mood_checkins, key=lambda x: x["check_in_date"])
     ]
 
     return CheckInStats(
@@ -400,7 +463,7 @@ async def get_check_in_calendar(
     year: int = Query(None),
     month: int = Query(None),
 ):
-    """Get check-ins in calendar format"""
+    """Get goal check-ins in calendar format"""
     from app.core.database import get_supabase_client
 
     supabase = get_supabase_client()
@@ -412,25 +475,25 @@ async def get_check_in_calendar(
         month = now.month
 
     # Get first and last day of month
-    start_date = date(year, month, 1)
+    start_date_val = date(year, month, 1)
     if month == 12:
-        end_date = date(year + 1, 1, 1) - timedelta(days=1)
+        end_date_val = date(year + 1, 1, 1) - timedelta(days=1)
     else:
-        end_date = date(year, month + 1, 1) - timedelta(days=1)
+        end_date_val = date(year, month + 1, 1) - timedelta(days=1)
 
     result = (
         supabase.table("check_ins")
-        .select("date, completed, mood, goal_id, goal:goals(title)")
+        .select("check_in_date, completed, mood, goal_id, goal:goals(title)")
         .eq("user_id", current_user["id"])
-        .gte("date", start_date.isoformat())
-        .lte("date", end_date.isoformat())
+        .gte("check_in_date", start_date_val.isoformat())
+        .lte("check_in_date", end_date_val.isoformat())
         .execute()
     )
 
     # Group by date
     calendar_data = {}
     for checkin in result.data:
-        checkin_date = checkin["date"]
+        checkin_date = checkin["check_in_date"]
         if checkin_date not in calendar_data:
             calendar_data[checkin_date] = []
         calendar_data[checkin_date].append(checkin)
@@ -461,101 +524,71 @@ async def get_streak_info(
     current_user: dict = Depends(get_current_user),
     goal_id: Optional[str] = Query(None),
 ):
-    """Get streak information - calculates consecutive days with completed check-ins"""
+    """Get streak information from cached goal_statistics or user_stats_cache tables"""
     from app.core.database import get_supabase_client
-    from datetime import timedelta
 
     supabase = get_supabase_client()
-
-    query = (
-        supabase.table("check_ins")
-        .select("date, completed")
-        .eq("user_id", current_user["id"])
-        .eq("completed", True)
-    )
+    user_id = current_user["id"]
 
     if goal_id:
-        query = query.eq("goal_id", goal_id)
-
-    result = query.order("date", desc=True).execute()
-    check_ins = result.data
-
-    if not check_ins:
-        return StreakInfo(
-            current_streak=0,
-            longest_streak=0,
-            last_check_in=None,
-            streak_start=None,
+        # Get streak from goal_statistics table (cached per-goal stats)
+        result = (
+            supabase.table("goal_statistics")
+            .select(
+                "current_streak, longest_streak, last_checkin_date, streak_start_date"
+            )
+            .eq("goal_id", goal_id)
+            .maybe_single()
+            .execute()
         )
 
-    # Get unique dates with completed check-ins (a day counts if any check-in is completed)
-    completed_dates = sorted(list({c["date"] for c in check_ins}), reverse=True)
-
-    if not completed_dates:
-        return StreakInfo(
-            current_streak=0,
-            longest_streak=0,
-            last_check_in=None,
-            streak_start=None,
+        if result.data:
+            return StreakInfo(
+                current_streak=result.data.get("current_streak", 0),
+                longest_streak=result.data.get("longest_streak", 0),
+                last_check_in=result.data.get("last_checkin_date"),
+                streak_start=result.data.get("streak_start_date"),
+            )
+        else:
+            # No stats yet for this goal
+            return StreakInfo(
+                current_streak=0,
+                longest_streak=0,
+                last_check_in=None,
+                streak_start=None,
+            )
+    else:
+        # Get overall user streak from user_stats_cache table
+        result = (
+            supabase.table("user_stats_cache")
+            .select("current_streak, longest_streak, last_checkin_date")
+            .eq("user_id", user_id)
+            .maybe_single()
+            .execute()
         )
 
-    last_check_in = completed_dates[0]
-    today = date.today()
-
-    # Calculate current streak (consecutive days backwards from today or yesterday)
-    current_streak = 0
-    streak_start = None
-
-    # Convert to date objects for easier comparison
-    completed_date_set = {date.fromisoformat(d) for d in completed_dates}
-
-    # Start from today and count backwards
-    check_date = today
-    while check_date in completed_date_set:
-        current_streak += 1
-        streak_start = check_date.isoformat()
-        check_date = check_date - timedelta(days=1)
-
-    # If today not checked, check if streak continues from yesterday
-    if current_streak == 0:
-        check_date = today - timedelta(days=1)
-        while check_date in completed_date_set:
-            current_streak += 1
-            streak_start = check_date.isoformat()
-            check_date = check_date - timedelta(days=1)
-
-    # Calculate longest streak (iterate through all dates)
-    longest_streak = 0
-    if completed_dates:
-        # Sort dates oldest first for longest streak calculation
-        sorted_dates = sorted([date.fromisoformat(d) for d in completed_dates])
-        temp_streak = 1
-        longest_streak = 1
-
-        for i in range(1, len(sorted_dates)):
-            diff = (sorted_dates[i] - sorted_dates[i - 1]).days
-            if diff == 1:
-                temp_streak += 1
-                longest_streak = max(longest_streak, temp_streak)
-            elif diff > 1:
-                temp_streak = 1
-
-    # Ensure longest is at least as long as current
-    longest_streak = max(longest_streak, current_streak)
-
-    return StreakInfo(
-        current_streak=current_streak,
-        longest_streak=longest_streak,
-        last_check_in=last_check_in,
-        streak_start=streak_start,
-    )
+        if result.data:
+            return StreakInfo(
+                current_streak=result.data.get("current_streak", 0),
+                longest_streak=result.data.get("longest_streak", 0),
+                last_check_in=result.data.get("last_checkin_date"),
+                streak_start=None,  # user_stats_cache doesn't have streak_start
+            )
+        else:
+            # No stats yet for this user
+            return StreakInfo(
+                current_streak=0,
+                longest_streak=0,
+                last_check_in=None,
+                streak_start=None,
+            )
 
 
 @router.post("/bulk", status_code=status.HTTP_201_CREATED)
 async def bulk_create_check_ins(
     bulk_data: BulkCheckInCreate, current_user: dict = Depends(get_current_user)
 ):
-    """Create multiple check-ins at once"""
+    """Create multiple goal check-ins at once"""
     from app.core.database import get_supabase_client
 
     supabase = get_supabase_client()
@@ -580,10 +613,11 @@ async def bulk_create_check_ins(
             {
                 "goal_id": bulk_data.goal_id,
                 "user_id": current_user["id"],
-                "date": checkin_data.date.isoformat(),
+                "check_in_date": checkin_data.check_in_date.isoformat(),
                 "completed": checkin_data.completed,
-                "reflection": checkin_data.reflection,
+                "notes": checkin_data.notes,
                 "mood": checkin_data.mood,
+                "is_checked_in": True,
             }
         )
 
@@ -605,29 +639,33 @@ async def get_mood_trends(
     supabase = get_supabase_client()
 
     # Get check-ins with mood from the last N days
-    start_date = (datetime.now() - timedelta(days=days)).date()
+    start_date_val = (datetime.now() - timedelta(days=days)).date()
 
     query = (
         supabase.table("check_ins")
-        .select("date, mood")
+        .select("check_in_date, mood")
         .eq("user_id", current_user["id"])
-        .gte("date", start_date.isoformat())
+        .gte("check_in_date", start_date_val.isoformat())
         .not_.is_("mood", "null")
     )
 
     if goal_id:
         query = query.eq("goal_id", goal_id)
 
-    result = query.order("date").execute()
+    result = query.order("check_in_date").execute()
+
+    # Map text moods to numeric values for averaging
+    mood_value_map = {"great": 5, "good": 4, "okay": 3, "bad": 2, "terrible": 1}
 
     # Group by day for daily trend analysis
     daily_moods = {}
     for checkin in result.data:
-        checkin_date = checkin["date"].split("T")[0]  # Get just the date part
-
-        if checkin_date not in daily_moods:
-            daily_moods[checkin_date] = []
-        daily_moods[checkin_date].append(checkin["mood"])
+        checkin_date = checkin["check_in_date"].split("T")[0]  # Get just the date part
+        mood_value = mood_value_map.get(checkin["mood"])
+        if mood_value:
+            if checkin_date not in daily_moods:
+                daily_moods[checkin_date] = []
+            daily_moods[checkin_date].append(mood_value)
 
     # Calculate daily averages - return as array for mobile compatibility
     daily_averages = []

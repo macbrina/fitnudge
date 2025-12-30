@@ -55,7 +55,7 @@ export const OnboardingCarousel: React.FC<OnboardingCarouselProps> = ({
   const [currentIndex, setCurrentIndex] = useState(0);
   const { t } = useTranslation();
   const { tokens, colors, brandColors } = useStyles(
-    (tokens, colors, brandColors) => ({ tokens, colors, brandColors })
+    (tokens, colors, brandColors) => ({ tokens, colors, brandColors }),
   );
 
   const onboardingData = getOnboardingData(t);
@@ -65,7 +65,7 @@ export const OnboardingCarousel: React.FC<OnboardingCarouselProps> = ({
       makeOnboardingCarouselStyles(tokens, colors, brandColors, {
         currentIndex,
       }),
-    [tokens, colors, brandColors, currentIndex]
+    [tokens, colors, brandColors, currentIndex],
   );
   const insets = useSafeAreaInsets();
   const flatListRef = useRef<FlatList>(null);

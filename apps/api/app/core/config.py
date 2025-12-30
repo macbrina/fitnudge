@@ -33,6 +33,14 @@ class Settings(BaseSettings):
     SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
     SUPABASE_SERVICE_KEY: str = os.getenv("SUPABASE_SERVICE_KEY", "")
 
+    # Connection Pooling (for direct Postgres connections if needed)
+    # Supabase provides pooler URLs in the format:
+    # postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres
+    # Use mode=transaction for Celery workers
+    DATABASE_POOL_URL: str = os.getenv("DATABASE_POOL_URL", "")
+    DATABASE_POOL_MIN_SIZE: int = int(os.getenv("DATABASE_POOL_MIN_SIZE", "2"))
+    DATABASE_POOL_MAX_SIZE: int = int(os.getenv("DATABASE_POOL_MAX_SIZE", "10"))
+
     # JWT - Use Supabase JWT secret for compatibility with Supabase Realtime
     # Get your SUPABASE_JWT_SECRET from: Supabase Dashboard → Settings → API → JWT Secret
     SECRET_KEY: str = os.getenv("SUPABASE_JWT_SECRET", os.getenv("SECRET_KEY", ""))

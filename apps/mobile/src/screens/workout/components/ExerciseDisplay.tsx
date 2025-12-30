@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -6,7 +6,7 @@ import {
   ActivityIndicator,
   ScrollView,
 } from "react-native";
-import { useVideoPlayer, VideoView } from "expo-video";
+import Video, { ResizeMode } from "react-native-video";
 import { Ionicons } from "@expo/vector-icons";
 import { useStyles, useTheme } from "@/themes";
 import { tokens } from "@/themes/tokens";
@@ -58,41 +58,6 @@ export function ExerciseDisplay({
   // MP4 URLs are now full Cloudflare CDN URLs stored in the database
   const mp4Url = exercise.demo?.mp4_url || null;
 
-  // Create video player with expo-video
-  const player = useVideoPlayer(mp4Url || "", (player) => {
-    player.loop = true;
-    player.playbackRate = 0.5; // Slow motion
-    player.muted = true;
-  });
-
-  // Listen for player status changes to know when video is ready
-  useEffect(() => {
-    if (!player) return;
-
-    const subscription = player.addListener("statusChange", (status) => {
-      if (status.status === "readyToPlay") {
-        setVideoLoaded(true);
-      } else if (status.status === "error") {
-        setVideoError(true);
-      }
-    });
-
-    return () => {
-      subscription.remove();
-    };
-  }, [player]);
-
-  // Sync video playback with workout pause state
-  useEffect(() => {
-    if (player && mp4Url) {
-      if (isPaused || isResting) {
-        player.pause();
-      } else {
-        player.play();
-      }
-    }
-  }, [isPaused, isResting, mp4Url, player]);
-
   const getDifficultyColor = (difficulty?: string) => {
     switch (difficulty?.toLowerCase()) {
       case "beginner":
@@ -137,11 +102,17 @@ export function ExerciseDisplay({
               <ActivityIndicator size="large" color={brandColors.primary} />
             </View>
           )}
-          <VideoView
-            player={player}
+          <Video
+            source={{ uri: mp4Url }}
             style={[styles.video, !videoLoaded && styles.videoHidden]}
-            contentFit="contain"
-            nativeControls={false}
+            resizeMode={ResizeMode.CONTAIN}
+            repeat={true}
+            rate={0.75}
+            muted={true}
+            paused={isPaused || isResting}
+            controls={false}
+            onLoad={() => setVideoLoaded(true)}
+            onError={() => setVideoError(true)}
           />
         </View>
       )}

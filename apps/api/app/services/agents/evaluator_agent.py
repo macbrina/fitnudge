@@ -395,6 +395,10 @@ class EvaluatorAgent:
         if "plan_type" not in validated_plan:
             validated_plan["plan_type"] = "workout_plan"
 
+        # Ensure tracking_type is set (workout plans always use workout tracking)
+        if "tracking_type" not in validated_plan:
+            validated_plan["tracking_type"] = "workout"
+
         overall_valid = len(all_errors) == 0
 
         if overall_valid:

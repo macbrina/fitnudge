@@ -70,7 +70,7 @@ CREATE TABLE goals (
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
     description TEXT,
-    category TEXT CHECK (category IN ('fitness', 'nutrition', 'wellness', 'custom')),
+    category TEXT CHECK (category IN ('fitness', 'nutrition', 'wellness', 'mindfulness', 'sleep')),
     frequency TEXT NOT NULL, -- 'daily', 'weekly', 'custom'
     target_days INTEGER, -- for weekly goals
     reminder_times TEXT[], -- array of times like ['09:00', '18:00']

@@ -98,12 +98,6 @@ celery_app.conf.update(
             # Performance: 280x faster queries with pre-computed data
             # Alternative: crontab(minute=0) for every hour on the hour
         },
-        "check-goal-completions": {
-            "task": "check_goal_completions",
-            "schedule": 60.0 * 60.0 * 24.0,  # Run DAILY
-            # Checks for completed time/target challenges and auto-completes them
-            # Sends celebration notifications to users who completed challenges
-        },
         # Challenge lifecycle tasks
         "check-ended-challenges": {
             "task": "check_ended_challenges",
@@ -142,6 +136,24 @@ celery_app.conf.update(
             # Retries failed RevenueCat webhook events
             # Ensures subscription state stays in sync
         },
+        "cleanup-expired-creator-challenges": {
+            "task": "subscription.cleanup_expired_creator_challenges",
+            "schedule": 60.0 * 60.0 * 24.0,  # Run DAILY
+            # Cancels challenges where creator lost subscription
+            # Catches missed webhooks and edge cases
+        },
+        "cleanup-expired-partner-requests": {
+            "task": "subscription.cleanup_expired_partner_requests",
+            "schedule": 60.0 * 60.0 * 24.0,  # Run DAILY
+            # Deletes pending partner requests from users who lost subscription
+            # Catches missed webhooks and edge cases
+        },
+        "cleanup-expired-subscription-goals": {
+            "task": "subscription.cleanup_expired_subscription_goals",
+            "schedule": 60.0 * 60.0 * 24.0,  # Run DAILY
+            # Deactivates excess goals for users with expired subscriptions
+            # Catches missed EXPIRATION webhooks and edge cases
+        },
         # Auth maintenance tasks
         "cleanup-expired-refresh-tokens": {
             "task": "cleanup_expired_refresh_tokens",
@@ -154,7 +166,6 @@ celery_app.conf.update(
             "task": "cleanup_orphaned_notifications",
             "schedule": 60.0 * 60.0 * 24.0 * 7,  # Run WEEKLY
             # Removes notifications referencing deleted entities (goals, challenges, etc.)
-            # Only cleans up notifications older than 30 days
             # Keeps notification_history table clean
         },
         # Stale task cleanup - CRITICAL for production reliability

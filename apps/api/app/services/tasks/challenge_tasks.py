@@ -42,7 +42,7 @@ def check_ended_challenges_task(self) -> Dict[str, Any]:
         ended_challenges = (
             supabase.table("challenges")
             .select("*")
-            .eq("is_active", True)
+            .eq("status", "active")
             .lt("end_date", today.isoformat())  # end_date < today
             .execute()
         )
@@ -120,10 +120,10 @@ def _process_ended_challenge(supabase, challenge: Dict[str, Any]) -> None:
 
     if not participants:
         print(f"    ⚠️ No participants in challenge {challenge_id}")
-        # Still deactivate the challenge
+        # Still mark challenge as completed
         supabase.table("challenges").update(
             {
-                "is_active": False,
+                "status": "completed",
                 "metadata": {
                     **challenge.get("metadata", {}),
                     "completed": True,
@@ -131,6 +131,15 @@ def _process_ended_challenge(supabase, challenge: Dict[str, Any]) -> None:
                 },
             }
         ).eq("id", challenge_id).execute()
+
+        # Cleanup pending invites and notifications
+        from app.services.cleanup_service import (
+            cleanup_challenge_invites_and_notifications_sync,
+        )
+
+        cleanup_challenge_invites_and_notifications_sync(
+            supabase, challenge_id, reason="completed"
+        )
         return
 
     # 3. Mark all participants as completed
@@ -162,15 +171,32 @@ def _process_ended_challenge(supabase, challenge: Dict[str, Any]) -> None:
 
     supabase.table("challenges").update(
         {
-            "is_active": False,
+            "status": "completed",
             "metadata": challenge_metadata,
         }
     ).eq("id", challenge_id).execute()
 
-    print(f"    ✅ Deactivated challenge with {len(participants)} participants")
+    # Cleanup pending invites and notifications
+    from app.services.cleanup_service import (
+        cleanup_challenge_invites_and_notifications_sync,
+    )
+
+    cleanup_challenge_invites_and_notifications_sync(
+        supabase, challenge_id, reason="completed"
+    )
+
+    print(f"    ✅ Completed challenge with {len(participants)} participants")
 
     # 5. Send notifications to all participants
     _send_challenge_completion_notifications(supabase, challenge, participants, winners)
+
+    # 6. Notify all participants' partners that the challenge has ended
+    from app.services.social_accountability_service import social_accountability_service
+
+    participant_user_ids = [p["user_id"] for p in participants]
+    social_accountability_service.notify_partners_for_multiple_users_sync(
+        participant_user_ids, "challenge_completed"
+    )
 
 
 def _send_challenge_completion_notifications(
@@ -242,7 +268,7 @@ def _send_challenge_completion_notifications(
                         "rank": rank,
                         "points": points,
                         "isWinner": is_winner,
-                        "deepLink": f"/challenges/{challenge_id}",
+                        "deepLink": f"/(user)/challenges/{challenge_id}",
                     },
                     notification_type="challenge",
                     entity_type="challenge",
@@ -291,7 +317,7 @@ def send_challenge_reminder_task(
             supabase.table("challenges")
             .select("*")
             .eq("id", challenge_id)
-            .eq("is_active", True)
+            .in_("status", ["upcoming", "active"])
             .maybe_single()
             .execute()
         )
@@ -335,34 +361,60 @@ def send_challenge_reminder_task(
             title = "💪 Challenge Reminder"
             body = f'Don\'t forget to check in for "{challenge_title}"!'
 
-        sent_count = 0
-        for participant in participants.data:
-            user_id = participant["user_id"]
-            try:
-                loop.run_until_complete(
-                    send_push_to_user(
-                        user_id=user_id,
-                        title=title,
-                        body=body,
-                        data={
-                            "type": "challenge_reminder",
-                            "challengeId": challenge_id,
-                            "messageType": message_type,
-                            "deepLink": f"/challenges/{challenge_id}",
-                        },
-                        notification_type="challenge",
-                        entity_type="challenge",
-                        entity_id=challenge_id,
-                    )
-                )
-                sent_count += 1
-            except Exception as e:
-                logger.warning(
-                    f"Failed to send challenge reminder",
-                    {"error": str(e), "user_id": user_id, "challenge_id": challenge_id},
-                )
+        # SCALABILITY: For large challenges, use chunked task dispatch
+        user_ids = [p["user_id"] for p in participants.data if p.get("user_id")]
 
-        return {"success": True, "sent": sent_count}
+        INLINE_THRESHOLD = 10
+        if len(user_ids) <= INLINE_THRESHOLD:
+            # Small number - process inline
+            sent_count = 0
+            for user_id in user_ids:
+                try:
+                    loop.run_until_complete(
+                        send_push_to_user(
+                            user_id=user_id,
+                            title=title,
+                            body=body,
+                            data={
+                                "type": "challenge_reminder",
+                                "challengeId": challenge_id,
+                                "messageType": message_type,
+                                "deepLink": f"/(user)/challenges/{challenge_id}",
+                            },
+                            notification_type="challenge",
+                            entity_type="challenge",
+                            entity_id=challenge_id,
+                        )
+                    )
+                    sent_count += 1
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to send challenge reminder",
+                        {
+                            "error": str(e),
+                            "user_id": user_id,
+                            "challenge_id": challenge_id,
+                        },
+                    )
+            return {"success": True, "sent": sent_count}
+        else:
+            # Large number - dispatch chunked tasks
+            from app.services.tasks.task_utils import dispatch_chunked_tasks
+
+            result = dispatch_chunked_tasks(
+                task=send_challenge_reminder_chunk_task,
+                items=user_ids,
+                chunk_size=50,
+                challenge_id=challenge_id,
+                title=title,
+                body=body,
+                message_type=message_type,
+            )
+            return {
+                "success": True,
+                "dispatched": result["dispatched"],
+                "total": len(user_ids),
+            }
 
     except Exception as e:
         logger.error(
@@ -404,7 +456,7 @@ def check_challenges_ending_soon_task(self) -> Dict[str, Any]:
         ending_tomorrow = (
             supabase.table("challenges")
             .select("id, title")
-            .eq("is_active", True)
+            .eq("status", "active")
             .eq("end_date", tomorrow.isoformat())
             .execute()
         )
@@ -418,7 +470,7 @@ def check_challenges_ending_soon_task(self) -> Dict[str, Any]:
         ending_soon = (
             supabase.table("challenges")
             .select("id, title")
-            .eq("is_active", True)
+            .eq("status", "active")
             .eq("end_date", three_days.isoformat())
             .execute()
         )
@@ -442,3 +494,69 @@ def check_challenges_ending_soon_task(self) -> Dict[str, Any]:
             return {"success": False, "error": str(e)}
 
         raise self.retry(exc=e)
+
+
+# =====================================================
+# CHUNKED NOTIFICATION TASKS
+# =====================================================
+
+
+@celery_app.task(
+    name="send_challenge_reminder_chunk",
+    bind=True,
+    max_retries=2,
+    default_retry_delay=60,
+)
+def send_challenge_reminder_chunk_task(
+    self,
+    user_ids: list,
+    challenge_id: str,
+    title: str,
+    body: str,
+    message_type: str,
+) -> dict:
+    """
+    Process a chunk of challenge reminder notifications.
+
+    SCALABILITY: Called by send_challenge_reminder_task for challenges
+    with many participants (10+).
+    """
+    import asyncio
+    from app.services.expo_push_service import send_push_to_user
+
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_closed():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+    sent_count = 0
+    for user_id in user_ids:
+        try:
+            loop.run_until_complete(
+                send_push_to_user(
+                    user_id=user_id,
+                    title=title,
+                    body=body,
+                    data={
+                        "type": "challenge_reminder",
+                        "challengeId": challenge_id,
+                        "messageType": message_type,
+                        "deepLink": f"/(user)/challenges/{challenge_id}",
+                    },
+                    notification_type="challenge",
+                    entity_type="challenge",
+                    entity_id=challenge_id,
+                )
+            )
+            sent_count += 1
+        except Exception as e:
+            logger.warning(
+                f"Failed to send challenge reminder in chunk",
+                {"error": str(e), "user_id": user_id, "challenge_id": challenge_id},
+            )
+
+    return {"processed": len(user_ids), "sent": sent_count}

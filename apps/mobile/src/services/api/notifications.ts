@@ -1,9 +1,50 @@
-import { BaseApiService } from "./base";
+/**
+ * Notifications Service
+ *
+ * Handles notification history and preferences API calls
+ */
+
+import { BaseApiService, ApiResponse } from "./base";
 import { ROUTES } from "@/lib/routes";
 import {
   DeviceTokenInfo,
   NotificationPreferences,
 } from "../notifications/notificationTypes";
+
+export type NotificationType =
+  | "reminder"
+  | "ai_motivation"
+  | "subscription"
+  | "reengagement"
+  | "achievement"
+  | "social"
+  | "nudge"
+  | "general"
+  | "partner_request"
+  | "partner_accepted"
+  | "partner_nudge"
+  | "partner_cheer"
+  | "partner_milestone"
+  | "partner_inactive"
+  | "challenge"
+  | "challenge_invite"
+  | "challenge_joined"
+  | "challenge_overtaken"
+  | "challenge_lead"
+  | "challenge_nudge"
+  | "challenge_starting"
+  | "challenge_ending"
+  | "challenge_ended"
+  | "plan_ready"
+  | "motivation_message"
+  | "weekly_recap"
+  | "streak_milestone"
+  | "goal_complete";
+
+export interface RegisterDeviceResponse {
+  success: boolean;
+  device_id: string;
+}
 
 export interface RegisterDeviceRequest {
   fcm_token: string;
@@ -14,41 +55,76 @@ export interface RegisterDeviceRequest {
   os_version: string;
 }
 
-export interface RegisterDeviceResponse {
-  success: boolean;
-  device_id: string;
+export interface NotificationHistoryItem {
+  id: string;
+  notification_type: NotificationType;
+  title: string;
+  body: string;
+  data?: Record<string, any> | null;
+  sent_at: string;
+  delivered_at?: string | null;
+  opened_at?: string | null;
+  entity_type?: string | null;
+  entity_id?: string | null;
+  created_at: string;
 }
 
-export interface NotificationPreferencesResponse {
-  enabled: boolean;
-  push_notifications: boolean;
-  email_notifications: boolean;
-  ai_motivation: boolean;
-  reminders: boolean;
-  social: boolean;
-  achievements: boolean;
-  reengagement: boolean;
-  quiet_hours_enabled: boolean;
-  quiet_hours_start: string;
-  quiet_hours_end: string;
-}
+class NotificationsService extends BaseApiService {
+  /**
+   * Get notification history with pagination
+   */
+  async getHistory(
+    limit: number = 20,
+    offset: number = 0,
+    notificationType?: string,
+  ): Promise<ApiResponse<NotificationHistoryItem[]>> {
+    const params = new URLSearchParams();
+    params.append("limit", limit.toString());
+    params.append("offset", offset.toString());
+    if (notificationType) {
+      params.append("notification_type", notificationType);
+    }
 
-export interface ScheduledNotificationsResponse {
-  notifications: Array<{
-    id: string;
-    title: string;
-    body: string;
-    scheduled_for: string;
-    category: string;
-  }>;
-}
+    return this.get<NotificationHistoryItem[]>(
+      `${ROUTES.NOTIFICATIONS.HISTORY}?${params.toString()}`,
+    );
+  }
 
-class NotificationApiService extends BaseApiService {
+  /**
+   * Mark a notification as opened
+   */
+  async markOpened(
+    notificationId: string,
+  ): Promise<ApiResponse<{ success: boolean }>> {
+    return this.post<{ success: boolean }>(
+      `${ROUTES.NOTIFICATIONS.HISTORY}/${notificationId}/opened`,
+    );
+  }
+
+  /**
+   * Get notification preferences
+   */
+  async getPreferences(): Promise<ApiResponse<NotificationPreferences>> {
+    return this.get<NotificationPreferences>(ROUTES.NOTIFICATIONS.PREFERENCES);
+  }
+
+  /**
+   * Update notification preferences
+   */
+  async updatePreferences(
+    preferences: Partial<NotificationPreferences>,
+  ): Promise<ApiResponse<NotificationPreferences>> {
+    return this.put<NotificationPreferences>(
+      ROUTES.NOTIFICATIONS.PREFERENCES,
+      preferences,
+    );
+  }
+
   /**
    * Register device for push notifications
    */
   async registerDevice(
-    deviceInfo: DeviceTokenInfo
+    deviceInfo: DeviceTokenInfo,
   ): Promise<RegisterDeviceResponse> {
     const response = await this.post(ROUTES.NOTIFICATIONS.REGISTER_DEVICE, {
       fcm_token: deviceInfo.fcmToken,
@@ -63,87 +139,15 @@ class NotificationApiService extends BaseApiService {
   }
 
   /**
-   * Update notification preferences
-   */
-  async updateNotificationPreferences(
-    preferences: NotificationPreferences
-  ): Promise<NotificationPreferencesResponse> {
-    const response = await this.put(ROUTES.NOTIFICATIONS.PREFERENCES, {
-      preferences,
-    });
-
-    return response.data as NotificationPreferencesResponse;
-  }
-
-  /**
-   * Get notification preferences
-   */
-  async getNotificationPreferences(): Promise<NotificationPreferencesResponse> {
-    const response = await this.get(ROUTES.NOTIFICATIONS.PREFERENCES);
-    return response.data as NotificationPreferencesResponse;
-  }
-
-  /**
-   * Get scheduled notifications from backend
-   */
-  async getScheduledNotifications(): Promise<ScheduledNotificationsResponse> {
-    const response = await this.get(ROUTES.NOTIFICATIONS.HISTORY);
-    return response.data as ScheduledNotificationsResponse;
-  }
-
-  /**
    * Unregister device from push notifications
    */
-  async unregisterDevice(fcmToken: string): Promise<{ success: boolean }> {
-    const response = await this.delete(
-      `${ROUTES.NOTIFICATIONS.UNREGISTER_DEVICE}?fcm_token=${encodeURIComponent(
-        fcmToken
-      )}`
+  async unregisterDevice(
+    fcmToken: string,
+  ): Promise<ApiResponse<{ success: boolean }>> {
+    return this.delete<{ success: boolean }>(
+      `${ROUTES.NOTIFICATIONS.UNREGISTER_DEVICE}?fcm_token=${encodeURIComponent(fcmToken)}`,
     );
-
-    return response.data as { success: boolean };
-  }
-
-  /**
-   * Test notification (for development)
-   */
-  async sendTestNotification(
-    type:
-      | "ai_motivation"
-      | "reminder"
-      | "achievement"
-      | "social"
-      | "reengagement",
-    data?: Record<string, any>
-  ): Promise<{ success: boolean; message_id: string }> {
-    const response = await this.post(ROUTES.NOTIFICATIONS.TEST, {
-      type,
-      data,
-    });
-
-    return response.data as { success: boolean; message_id: string };
-  }
-
-  /**
-   * Get notification analytics
-   */
-  async getNotificationAnalytics(): Promise<{
-    total_sent: number;
-    total_opened: number;
-    open_rate: number;
-    by_category: Record<string, { sent: number; opened: number; rate: number }>;
-  }> {
-    const response = await this.get(ROUTES.NOTIFICATIONS.ANALYTICS);
-    return response.data as {
-      total_sent: number;
-      total_opened: number;
-      open_rate: number;
-      by_category: Record<
-        string,
-        { sent: number; opened: number; rate: number }
-      >;
-    };
   }
 }
 
-export const notificationApi = new NotificationApiService();
+export const notificationsService = new NotificationsService();

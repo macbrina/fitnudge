@@ -63,7 +63,7 @@ class StorageUtil {
       // Don't save null or undefined values
       if (value === null || value === undefined) {
         console.warn(
-          `Attempted to save null/undefined value for key: ${key}. Use removeItem instead.`
+          `Attempted to save null/undefined value for key: ${key}. Use removeItem instead.`,
         );
         return;
       }
@@ -125,7 +125,7 @@ class StorageUtil {
       } catch (notificationError) {
         console.warn(
           "[StorageUtil] Failed to clear notification data:",
-          notificationError
+          notificationError,
         );
       }
 
@@ -181,7 +181,7 @@ class StorageUtil {
           key.startsWith("cache_") ||
           key.startsWith("offline_") ||
           key.startsWith("user_pref_") ||
-          key.startsWith("secure_")
+          key.startsWith("secure_"),
       );
 
       if (dynamicKeys.length > 0) {
@@ -282,7 +282,7 @@ class StorageUtil {
   async setCacheItem(
     key: string,
     value: any,
-    ttl: number = 3600000
+    ttl: number = 3600000,
   ): Promise<void> {
     try {
       const cacheData = {

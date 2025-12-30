@@ -22,25 +22,25 @@ export class DailyMotivationService extends BaseApiService {
 
   async getList(
     limit: number = 30,
-    offset: number = 0
+    offset: number = 0,
   ): Promise<ApiResponse<DailyMotivation[]>> {
     return this.get<DailyMotivation[]>(
-      `${ROUTES.DAILY_MOTIVATIONS.LIST}?limit=${limit}&offset=${offset}`
+      `${ROUTES.DAILY_MOTIVATIONS.LIST}?limit=${limit}&offset=${offset}`,
     );
   }
 
   async getById(motivationId: string): Promise<ApiResponse<DailyMotivation>> {
     return this.get<DailyMotivation>(
-      `${ROUTES.DAILY_MOTIVATIONS.BASE}/${motivationId}`
+      `${ROUTES.DAILY_MOTIVATIONS.BASE}/${motivationId}`,
     );
   }
 
   async share(
-    motivationId: string
+    motivationId: string,
   ): Promise<ApiResponse<{ share_count: number }>> {
     return this.post<{ share_count: number }>(
       `${ROUTES.DAILY_MOTIVATIONS.BASE}/${motivationId}/share`,
-      {}
+      {},
     );
   }
 

@@ -5,15 +5,15 @@
  */
 
 // RevenueCat types - these will be properly typed when package is installed
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 export type CustomerInfo = any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 export type PurchasesPackage = any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 export type PurchasesOffering = any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 export type PurchasesStoreProduct = any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 export type PurchasesPromotionalOffer = any;
 
 // Our app's subscription tiers

@@ -30,6 +30,7 @@ import {
   useSendPartnerRequest,
   useCancelPartnerRequest,
   useAcceptPartnerRequest,
+  usePartnerAccess,
 } from "@/hooks/api/usePartners";
 import { SearchUserResult, RequestStatus } from "@/services/api/partners";
 
@@ -41,7 +42,7 @@ export const FindPartnerScreen: React.FC = () => {
   const styles = useStyles(makeStyles);
   const { colors, brandColors } = useTheme();
   const { t } = useTranslation();
-  const { showAlert } = useAlertModal();
+  const { showAlert, showConfirm } = useAlertModal();
 
   const [activeTab, setActiveTab] = useState<PartnerTab>("search");
   const [searchQuery, setSearchQuery] = useState("");
@@ -53,7 +54,7 @@ export const FindPartnerScreen: React.FC = () => {
       { id: "search", label: t("social.tabs.search") },
       { id: "suggested", label: t("social.tabs.suggested") },
     ],
-    [t]
+    [t],
   );
 
   // Debounce search query
@@ -91,9 +92,18 @@ export const FindPartnerScreen: React.FC = () => {
   const cancelRequestMutation = useCancelPartnerRequest();
   const acceptRequestMutation = useAcceptPartnerRequest();
 
+  // Partner access - combines subscription store (immediate) + cached limits (accurate counts)
+  const {
+    hasFeature: hasPartnerFeature,
+    canSendRequest,
+    acceptedCount,
+    pendingSentCount,
+    limit: partnerLimit,
+  } = usePartnerAccess();
+
   // Track which users are currently being processed (for showing loading on specific buttons)
   const [processingUsers, setProcessingUsers] = useState<Set<string>>(
-    new Set()
+    new Set(),
   );
 
   // Track manual refresh state (don't show RefreshControl for background refetches)
@@ -171,6 +181,53 @@ export const FindPartnerScreen: React.FC = () => {
 
   const handleSendRequest = useCallback(
     async (user: SearchUserResult) => {
+      const userName = user.name || user.username || t("partners.unknown_user");
+
+      // Check if user has the feature (from subscription store - updates immediately after purchase)
+      if (!hasPartnerFeature) {
+        showAlert({
+          title: t("common.premium_feature") || "Premium Feature",
+          message:
+            t("partners.feature_required") ||
+            "Accountability partners require a subscription. Upgrade to connect with others!",
+          variant: "warning",
+          confirmLabel: t("common.ok"),
+        });
+        return;
+      }
+
+      // Check if user is within limits (combines store limit + cached counts)
+      if (!canSendRequest) {
+        showAlert({
+          title: t("partners.limit_reached_title") || "Partner Limit Reached",
+          message:
+            t("partners.limit_reached_message", {
+              limit: partnerLimit ?? 0,
+              accepted: acceptedCount,
+              pending: pendingSentCount,
+            }) ||
+            `You have reached your partner limit (${partnerLimit}). You have ${acceptedCount} partners and ${pendingSentCount} pending requests.`,
+          variant: "warning",
+          confirmLabel: t("common.ok"),
+        });
+        return;
+      }
+
+      // Show confirmation modal explaining what accountability partnership means
+      const confirmed = await showConfirm({
+        title: t("partners.send_request_title") || "Send Partner Request",
+        message:
+          t("partners.send_request_message") ||
+          "By becoming accountability partners, you will both be able to:\n\n• See each other's active goals and challenges\n• View each other's progress and streaks\n• Send nudges to motivate each other\n\nThis helps you stay accountable together on your fitness journey.",
+        confirmLabel: t("partners.send_request_confirm") || "Send Request",
+        cancelLabel: t("partners.send_request_cancel") || "Cancel",
+        variant: "info",
+        size: "lg",
+        messageAlign: "left",
+      });
+
+      if (!confirmed) return;
+
       addProcessingUser(user.id);
       try {
         await sendRequestMutation.mutateAsync({
@@ -188,7 +245,19 @@ export const FindPartnerScreen: React.FC = () => {
         removeProcessingUser(user.id);
       }
     },
-    [sendRequestMutation, showAlert, t, addProcessingUser, removeProcessingUser]
+    [
+      sendRequestMutation,
+      showAlert,
+      showConfirm,
+      t,
+      addProcessingUser,
+      removeProcessingUser,
+      hasPartnerFeature,
+      canSendRequest,
+      partnerLimit,
+      acceptedCount,
+      pendingSentCount,
+    ],
   );
 
   const handleCancelRequest = useCallback(
@@ -219,7 +288,7 @@ export const FindPartnerScreen: React.FC = () => {
       t,
       addProcessingUser,
       removeProcessingUser,
-    ]
+    ],
   );
 
   const handleAcceptRequest = useCallback(
@@ -250,7 +319,7 @@ export const FindPartnerScreen: React.FC = () => {
       t,
       addProcessingUser,
       removeProcessingUser,
-    ]
+    ],
   );
 
   const renderUserCard = useCallback(
@@ -384,14 +453,14 @@ export const FindPartnerScreen: React.FC = () => {
 
             {/* User Info */}
             <View style={styles.userInfo}>
-              <Text style={styles.userName} numberOfLines={1}>
-                {item.name || t("social.unknown_user")}
-              </Text>
               {item.username && (
                 <Text style={styles.userUsername} numberOfLines={1}>
                   @{item.username}
                 </Text>
               )}
+              <Text style={styles.userName} numberOfLines={1}>
+                {item.name || (item.username ? "" : t("social.unknown_user"))}
+              </Text>
             </View>
 
             {/* Action Button */}
@@ -409,7 +478,7 @@ export const FindPartnerScreen: React.FC = () => {
       processingUsers,
       styles,
       t,
-    ]
+    ],
   );
 
   const renderEmptyState = useCallback(() => {
@@ -484,7 +553,7 @@ export const FindPartnerScreen: React.FC = () => {
         ))}
       </View>
     ),
-    [styles]
+    [styles],
   );
 
   // Show skeleton loading for initial load
@@ -774,6 +843,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     padding: toRN(tokens.spacing[4]),
     borderTopWidth: 1,
     borderTopColor: colors.border.default,
+    marginBottom: toRN(tokens.spacing[3]),
   },
 });
 

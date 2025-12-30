@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, status, Depends, Query
 from pydantic import BaseModel
 from typing import List, Optional
 from app.core.flexible_auth import get_current_user
+from app.core.entity_validation import validate_entity_is_active_by_id
 from app.services.logger import logger
 from app.services.social_accountability_service import social_accountability_service
 
@@ -110,7 +111,7 @@ async def request_accountability_partner(
     if request_data.goal_id:
         goal = (
             supabase.table("goals")
-            .select("id, user_id")
+            .select("id, user_id, status")
             .eq("id", request_data.goal_id)
             .maybe_single()
             .execute()
@@ -126,12 +127,18 @@ async def request_accountability_partner(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You can only add accountability partners for your own goals",
             )
+        # Goal must be active
+        validate_entity_is_active_by_id(
+            entity_id=request_data.goal_id,
+            entity_type="goal",
+            supabase=supabase,
+        )
 
     # Validate challenge exists if scoped to challenge
     if request_data.challenge_id:
         challenge = (
             supabase.table("challenges")
-            .select("id, created_by")
+            .select("id, created_by, status")
             .eq("id", request_data.challenge_id)
             .maybe_single()
             .execute()
@@ -156,6 +163,12 @@ async def request_accountability_partner(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You must be a participant to add accountability partners",
             )
+        # Challenge must be active
+        validate_entity_is_active_by_id(
+            entity_id=request_data.challenge_id,
+            entity_type="challenge",
+            supabase=supabase,
+        )
 
     try:
         # Check if partnership already exists with same scope
@@ -235,11 +248,24 @@ async def request_accountability_partner(
                 else "Someone"
             )
 
+            # Determine entity type and ID based on scope
+            # partner_request entity is the partnership record itself
+            partnership_id = result.data[0].get("id")
+
             await send_partner_notification(
                 notification_type=SocialNotificationType.PARTNER_REQUEST,
                 recipient_id=request_data.partner_user_id,
                 sender_id=user_id,
                 sender_name=sender_name,
+                partnership_id=partnership_id,
+                goal_id=request_data.goal_id if request_data.scope == "goal" else None,
+                challenge_id=(
+                    request_data.challenge_id
+                    if request_data.scope == "challenge"
+                    else None
+                ),
+                entity_type="partner_request",
+                entity_id=partnership_id,
                 supabase=supabase,
             )
         except Exception as e:
@@ -383,7 +409,7 @@ async def generate_partner_invite_link(
     if request_data.goal_id:
         goal = (
             supabase.table("goals")
-            .select("id, user_id, title")
+            .select("id, user_id, title, status")
             .eq("id", request_data.goal_id)
             .maybe_single()
             .execute()
@@ -398,11 +424,17 @@ async def generate_partner_invite_link(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You can only create partner invites for your own goals",
             )
+        # Goal must be active
+        validate_entity_is_active_by_id(
+            entity_id=request_data.goal_id,
+            entity_type="goal",
+            supabase=supabase,
+        )
 
     if request_data.challenge_id:
         challenge = (
             supabase.table("challenges")
-            .select("id, created_by, title")
+            .select("id, created_by, title, status")
             .eq("id", request_data.challenge_id)
             .maybe_single()
             .execute()
@@ -427,6 +459,12 @@ async def generate_partner_invite_link(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You must be a participant to create partner invites",
             )
+        # Challenge must be active
+        validate_entity_is_active_by_id(
+            entity_id=request_data.challenge_id,
+            entity_type="challenge",
+            supabase=supabase,
+        )
 
     # Generate invite code
     invite_code = generate_invite_code()
@@ -577,6 +615,20 @@ async def join_via_partner_invite(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="You are already accountability partners",
+        )
+
+    # Validate goal/challenge is still active if scoped
+    if invite_data.get("goal_id"):
+        validate_entity_is_active_by_id(
+            entity_id=invite_data["goal_id"],
+            entity_type="goal",
+            supabase=supabase,
+        )
+    if invite_data.get("challenge_id"):
+        validate_entity_is_active_by_id(
+            entity_id=invite_data["challenge_id"],
+            entity_type="challenge",
+            supabase=supabase,
         )
 
     # Update the invite to set the actual partner and reset status to pending

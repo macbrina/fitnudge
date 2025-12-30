@@ -15,9 +15,9 @@ export const getColorLuminance = (hex: string): number => {
   const b = parseInt(cleanHex.substring(4, 6), 16) / 255;
 
   // Apply gamma correction (WCAG formula)
-  const rsRGB = r <= 0.03928 ? r / 12.92 : Math.pow((r + 0.055) / 1.055, 2.4);
-  const gsRGB = g <= 0.03928 ? g / 12.92 : Math.pow((g + 0.055) / 1.055, 2.4);
-  const bsRGB = b <= 0.03928 ? b / 12.92 : Math.pow((b + 0.055) / 1.055, 2.4);
+  const rsRGB = r <= 0.03928 ? r / 12.92 : ((r + 0.055) / 1.055) ** 2.4;
+  const gsRGB = g <= 0.03928 ? g / 12.92 : ((g + 0.055) / 1.055) ** 2.4;
+  const bsRGB = b <= 0.03928 ? b / 12.92 : ((b + 0.055) / 1.055) ** 2.4;
 
   // Calculate relative luminance
   return 0.2126 * rsRGB + 0.7152 * gsRGB + 0.0722 * bsRGB;
@@ -58,7 +58,7 @@ export const getContrastingTextColor = (backgroundColors: string[]): string => {
  */
 export const convertTimeToDeviceTimezone = (
   reminderTime: string,
-  userTimezone: string
+  userTimezone: string,
 ): { hours: number; minutes: number } => {
   // Parse reminder time (HH:MM format)
   const [userHours, userMinutes] = reminderTime.split(":").map(Number);
@@ -86,7 +86,7 @@ export const convertTimeToDeviceTimezone = (
       day,
       userHours,
       userMinutes,
-      0
+      0,
     );
 
     // fromZonedTime: Treats the date as if it represents local time in userTimezone,
@@ -109,7 +109,7 @@ export const convertTimeToDeviceTimezone = (
     console.error(
       "Error converting timezone, using original time:",
       error,
-      `User timezone: ${userTimezone}, Device timezone: ${deviceTimezone}, Reminder time: ${reminderTime}`
+      `User timezone: ${userTimezone}, Device timezone: ${deviceTimezone}, Reminder time: ${reminderTime}`,
     );
     // Fallback to original time if conversion fails
     return { hours: userHours, minutes: userMinutes };
@@ -124,7 +124,7 @@ export const convertTimeToDeviceTimezone = (
  */
 export const formatDate = (
   date: string | Date,
-  format: "short" | "long" = "short"
+  format: "short" | "long" = "short",
 ): string => {
   try {
     const dateObj = typeof date === "string" ? new Date(date) : date;
@@ -154,6 +154,65 @@ export const formatDate = (
 };
 
 /**
+ * Format a date range for weekly recaps (e.g., "Jan 15 - Jan 21, 2024" or "January 15 - January 21, 2024")
+ * @param startDate - Start date string or Date object
+ * @param endDate - End date string or Date object
+ * @param format - Format type: "short" uses abbreviated month, "long" uses full month name
+ * @returns Formatted date range string
+ */
+export const formatWeekRange = (
+  startDate: string | Date,
+  endDate: string | Date,
+  format: "short" | "long" = "short",
+): string => {
+  try {
+    const startObj =
+      typeof startDate === "string" ? new Date(startDate) : startDate;
+    const endObj = typeof endDate === "string" ? new Date(endDate) : endDate;
+
+    if (isNaN(startObj.getTime()) || isNaN(endObj.getTime())) {
+      return ""; // Invalid date
+    }
+
+    const monthFormat = format === "short" ? "short" : "long";
+
+    const startMonth = new Intl.DateTimeFormat("en-US", {
+      month: monthFormat,
+    }).format(startObj);
+    const startDay = startObj.getDate();
+
+    const endMonth = new Intl.DateTimeFormat("en-US", {
+      month: monthFormat,
+    }).format(endObj);
+    const endDay = endObj.getDate();
+    const endYear = endObj.getFullYear();
+
+    // If same month, don't repeat month name
+    if (
+      startMonth === endMonth &&
+      startObj.getFullYear() === endObj.getFullYear()
+    ) {
+      return `${startMonth} ${startDay} - ${endDay}, ${endYear}`;
+    }
+
+    return `${startMonth} ${startDay} - ${endMonth} ${endDay}, ${endYear}`;
+  } catch (error) {
+    console.error("Error formatting week range:", error);
+    return "";
+  }
+};
+
+/**
+ * Parse an ISO date string to a Date object
+ * Simple wrapper to avoid date-fns dependency
+ * @param dateString - ISO date string (e.g., "2024-01-15" or "2024-01-15T10:30:00Z")
+ * @returns Date object
+ */
+export const parseISODate = (dateString: string): Date => {
+  return new Date(dateString);
+};
+
+/**
  * Format a date to relative time (e.g., "2 minutes ago", "5 hours ago", "3 days ago")
  * This is a replacement for date-fns formatDistanceToNow
  * @param date - Date string or Date object
@@ -162,7 +221,7 @@ export const formatDate = (
  */
 export const formatTimeAgo = (
   date: string | Date,
-  options?: { addSuffix?: boolean }
+  options?: { addSuffix?: boolean },
 ): string => {
   try {
     const dateObj = typeof date === "string" ? new Date(date) : date;
@@ -173,7 +232,7 @@ export const formatTimeAgo = (
 
     const now = new Date();
     const diffInSeconds = Math.floor(
-      (now.getTime() - dateObj.getTime()) / 1000
+      (now.getTime() - dateObj.getTime()) / 1000,
     );
 
     // Handle future dates
@@ -229,4 +288,14 @@ export const formatTimeAgo = (
     console.error("Error formatting time ago:", error);
     return "";
   }
+};
+
+/**
+ * Format a date as relative time (e.g., "2 hours ago")
+ * Convenience wrapper around formatTimeAgo with addSuffix: true
+ * @param date - Date string or Date object
+ * @returns Formatted relative time string (e.g., "5 minutes ago")
+ */
+export const formatRelativeTime = (date: string | Date): string => {
+  return formatTimeAgo(date, { addSuffix: true });
 };

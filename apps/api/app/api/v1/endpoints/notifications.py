@@ -16,31 +16,71 @@ router = APIRouter(
 
 # Pydantic models
 class NotificationPreferencesRequest(BaseModel):
+    # Global settings
     enabled: bool = True
     push_notifications: bool = True
     email_notifications: bool = True
+
+    # Core notification types
     ai_motivation: bool = True
     reminders: bool = True
     social: bool = True
     achievements: bool = True
     reengagement: bool = True
+
+    # Quiet hours
     quiet_hours_enabled: bool = False
     quiet_hours_start: str = "22:00"
     quiet_hours_end: str = "08:00"
 
+    # Social - Partner notifications
+    social_partner_requests: bool = True
+    social_partner_nudges: bool = True
+    social_partner_cheers: bool = True
+    social_partner_milestones: bool = True
+
+    # Social - Challenge notifications
+    social_challenge_invites: bool = True
+    social_challenge_leaderboard: bool = True
+    social_challenge_nudges: bool = True
+    social_challenge_reminders: bool = True
+
+    # AI/Motivation messages
+    social_motivation_messages: bool = True
+
 
 class NotificationPreferencesResponse(BaseModel):
+    # Global settings
     enabled: bool
     push_notifications: bool
     email_notifications: bool
+
+    # Core notification types
     ai_motivation: bool
     reminders: bool
     social: bool
     achievements: bool
     reengagement: bool
+
+    # Quiet hours
     quiet_hours_enabled: bool
     quiet_hours_start: str
     quiet_hours_end: str
+
+    # Social - Partner notifications
+    social_partner_requests: bool
+    social_partner_nudges: bool
+    social_partner_cheers: bool
+    social_partner_milestones: bool
+
+    # Social - Challenge notifications
+    social_challenge_invites: bool
+    social_challenge_leaderboard: bool
+    social_challenge_nudges: bool
+    social_challenge_reminders: bool
+
+    # AI/Motivation messages
+    social_motivation_messages: bool
 
 
 class DeviceTokenRequest(BaseModel):
@@ -62,9 +102,13 @@ class NotificationHistoryResponse(BaseModel):
     notification_type: str
     title: str
     body: str
+    data: Optional[Dict[str, Any]] = None
     sent_at: datetime
     delivered_at: Optional[datetime]
     opened_at: Optional[datetime]
+    entity_type: Optional[str] = None
+    entity_id: Optional[str] = None
+    created_at: datetime
 
 
 @router.get("/preferences", response_model=NotificationPreferencesResponse)
@@ -97,6 +141,15 @@ async def get_notification_preferences(
                 quiet_hours_enabled=False,
                 quiet_hours_start="22:00",
                 quiet_hours_end="08:00",
+                social_partner_requests=True,
+                social_partner_nudges=True,
+                social_partner_cheers=True,
+                social_partner_milestones=True,
+                social_challenge_invites=True,
+                social_challenge_leaderboard=True,
+                social_challenge_nudges=True,
+                social_challenge_reminders=True,
+                social_motivation_messages=True,
             )
 
         prefs = result.data[0]
@@ -112,6 +165,17 @@ async def get_notification_preferences(
             quiet_hours_enabled=prefs["quiet_hours_enabled"],
             quiet_hours_start=str(prefs["quiet_hours_start"]),
             quiet_hours_end=str(prefs["quiet_hours_end"]),
+            social_partner_requests=prefs.get("social_partner_requests", True),
+            social_partner_nudges=prefs.get("social_partner_nudges", True),
+            social_partner_cheers=prefs.get("social_partner_cheers", True),
+            social_partner_milestones=prefs.get("social_partner_milestones", True),
+            social_challenge_invites=prefs.get("social_challenge_invites", True),
+            social_challenge_leaderboard=prefs.get(
+                "social_challenge_leaderboard", True
+            ),
+            social_challenge_nudges=prefs.get("social_challenge_nudges", True),
+            social_challenge_reminders=prefs.get("social_challenge_reminders", True),
+            social_motivation_messages=prefs.get("social_motivation_messages", True),
         )
     except Exception as e:
         raise HTTPException(
@@ -156,6 +220,15 @@ async def update_notification_preferences(
                     "quiet_hours_enabled": preferences.quiet_hours_enabled,
                     "quiet_hours_start": preferences.quiet_hours_start,
                     "quiet_hours_end": preferences.quiet_hours_end,
+                    "social_partner_requests": preferences.social_partner_requests,
+                    "social_partner_nudges": preferences.social_partner_nudges,
+                    "social_partner_cheers": preferences.social_partner_cheers,
+                    "social_partner_milestones": preferences.social_partner_milestones,
+                    "social_challenge_invites": preferences.social_challenge_invites,
+                    "social_challenge_leaderboard": preferences.social_challenge_leaderboard,
+                    "social_challenge_nudges": preferences.social_challenge_nudges,
+                    "social_challenge_reminders": preferences.social_challenge_reminders,
+                    "social_motivation_messages": preferences.social_motivation_messages,
                 }
             )
             .execute()
@@ -174,6 +247,15 @@ async def update_notification_preferences(
             quiet_hours_enabled=preferences.quiet_hours_enabled,
             quiet_hours_start=preferences.quiet_hours_start,
             quiet_hours_end=preferences.quiet_hours_end,
+            social_partner_requests=preferences.social_partner_requests,
+            social_partner_nudges=preferences.social_partner_nudges,
+            social_partner_cheers=preferences.social_partner_cheers,
+            social_partner_milestones=preferences.social_partner_milestones,
+            social_challenge_invites=preferences.social_challenge_invites,
+            social_challenge_leaderboard=preferences.social_challenge_leaderboard,
+            social_challenge_nudges=preferences.social_challenge_nudges,
+            social_challenge_reminders=preferences.social_challenge_reminders,
+            social_motivation_messages=preferences.social_motivation_messages,
         )
     except HTTPException:
         raise
@@ -271,47 +353,118 @@ async def unregister_device(
 async def get_notification_history(
     limit: int = 50,
     offset: int = 0,
+    notification_type: Optional[str] = None,
     current_user: Dict[str, Any] = Depends(get_current_user),
 ):
-    """Get user's notification history"""
+    """Get user's notification history
+
+    Args:
+        limit: Max notifications to return (default 50)
+        offset: Pagination offset (default 0)
+        notification_type: Optional filter by type (e.g., 'reminder', 'ai_motivation', 'social')
+    """
+    try:
+        supabase = get_supabase_client()
+        import json
+
+        query = (
+            supabase.table("notification_history")
+            .select("*")
+            .eq("user_id", current_user["id"])
+        )
+
+        # Optional filter by notification type
+        if notification_type:
+            query = query.eq("notification_type", notification_type)
+
+        result = (
+            query.order("sent_at", desc=True)
+            .range(offset, offset + limit - 1)
+            .execute()
+        )
+
+        notifications = []
+        for row in result.data:
+            # Parse data JSON string if present
+            data = None
+            if row.get("data"):
+                try:
+                    data = (
+                        json.loads(row["data"])
+                        if isinstance(row["data"], str)
+                        else row["data"]
+                    )
+                except (json.JSONDecodeError, TypeError):
+                    data = None
+
+            notifications.append(
+                NotificationHistoryResponse(
+                    id=str(row["id"]),
+                    notification_type=row["notification_type"],
+                    title=row["title"],
+                    body=row["body"],
+                    data=data,
+                    sent_at=datetime.fromisoformat(
+                        row["sent_at"].replace("Z", "+00:00")
+                    ),
+                    delivered_at=(
+                        datetime.fromisoformat(
+                            row["delivered_at"].replace("Z", "+00:00")
+                        )
+                        if row["delivered_at"]
+                        else None
+                    ),
+                    opened_at=(
+                        datetime.fromisoformat(row["opened_at"].replace("Z", "+00:00"))
+                        if row["opened_at"]
+                        else None
+                    ),
+                    entity_type=row.get("entity_type"),
+                    entity_id=str(row["entity_id"]) if row.get("entity_id") else None,
+                    created_at=datetime.fromisoformat(
+                        row["created_at"].replace("Z", "+00:00")
+                    ),
+                )
+            )
+
+        return notifications
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get notification history: {str(e)}",
+        )
+
+
+@router.post("/history/{notification_id}/opened")
+async def mark_notification_opened(
+    notification_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+):
+    """Mark a notification as opened"""
     try:
         supabase = get_supabase_client()
 
         result = (
             supabase.table("notification_history")
-            .select(
-                "id, notification_type, title, body, sent_at, delivered_at, opened_at"
-            )
+            .update({"opened_at": datetime.utcnow().isoformat()})
+            .eq("id", notification_id)
             .eq("user_id", current_user["id"])
-            .order("sent_at", desc=True)
-            .range(offset, offset + limit - 1)
             .execute()
         )
 
-        return [
-            NotificationHistoryResponse(
-                id=str(row["id"]),
-                notification_type=row["notification_type"],
-                title=row["title"],
-                body=row["body"],
-                sent_at=datetime.fromisoformat(row["sent_at"].replace("Z", "+00:00")),
-                delivered_at=(
-                    datetime.fromisoformat(row["delivered_at"].replace("Z", "+00:00"))
-                    if row["delivered_at"]
-                    else None
-                ),
-                opened_at=(
-                    datetime.fromisoformat(row["opened_at"].replace("Z", "+00:00"))
-                    if row["opened_at"]
-                    else None
-                ),
+        if not result.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Notification not found",
             )
-            for row in result.data
-        ]
+
+        return {"success": True}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get notification history: {str(e)}",
+            detail=f"Failed to mark notification as opened: {str(e)}",
         )
 
 

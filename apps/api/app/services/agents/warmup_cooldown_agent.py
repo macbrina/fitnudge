@@ -138,6 +138,7 @@ USER PROFILE:
 - Available Time: {user_profile.get("available_time", "30-60min")}
 - Motivation Style: {user_profile.get("motivation_style", "gentle_encouragement")}
 - Biggest Challenge: {user_profile.get("biggest_challenge", "staying_consistent")}
+- Biological Sex: {user_profile.get("biological_sex", "not specified")}
 
 IMPORTANT: Select exercises appropriate for a {user_profile.get("fitness_level", "beginner")} fitness level!
 

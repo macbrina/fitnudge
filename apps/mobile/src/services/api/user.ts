@@ -71,7 +71,7 @@ export class UserService extends BaseApiService {
 
   async updatePassword(
     currentPassword: string,
-    newPassword: string
+    newPassword: string,
   ): Promise<ApiResponse> {
     return this.post(ROUTES.USERS.CHANGE_PASSWORD, {
       current_password: currentPassword,
@@ -80,7 +80,7 @@ export class UserService extends BaseApiService {
   }
 
   async uploadProfilePicture(
-    imageUri: string
+    imageUri: string,
   ): Promise<ApiResponse<{ profile_picture_url: string }>> {
     // This would typically upload to your media service first
     // For now, we'll assume the imageUri is already uploaded
@@ -88,7 +88,7 @@ export class UserService extends BaseApiService {
       ROUTES.USERS.PROFILE_PICTURE,
       {
         image_url: imageUri,
-      }
+      },
     );
   }
 

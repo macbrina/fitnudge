@@ -33,7 +33,7 @@ export function HabitChainCompact({
 
   // Calculate stats
   const completedCount = data.filter(
-    (day) => day.completed && !day.isFuture
+    (day) => day.completed && !day.isFuture,
   ).length;
   const totalPastDays = data.filter((day) => !day.isFuture).length;
   const percentage =
@@ -67,7 +67,9 @@ export function HabitChainCompact({
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>{t("home.progress.last_30_days")}</Text>
+        <Text style={styles.title}>
+          {t("goals.progress.last_days", { days }) || `Last ${days} days`}
+        </Text>
         <Text style={styles.stats}>
           {completedCount}/{totalPastDays} ({percentage}%)
         </Text>

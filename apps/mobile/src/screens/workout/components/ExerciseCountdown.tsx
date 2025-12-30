@@ -37,7 +37,7 @@ export function ExerciseCountdown({
   const translateY = useRef(new Animated.Value(-100)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const scale = useRef(new Animated.Value(0.5)).current;
-  
+
   // Track animation state
   const animationRef = useRef<Animated.CompositeAnimation | null>(null);
   const isMountedRef = useRef(true);
@@ -61,16 +61,16 @@ export function ExerciseCountdown({
       // User resumed after pausing during countdown - skip it immediately
       // Reset state first
       setWasEverPaused(false);
-      
+
       // Stop any animations
       if (animationRef.current) {
         animationRef.current.stop();
         animationRef.current = null;
       }
-      
+
       // Say "Let's go!" and complete
       if (coachVoiceEnabled) {
-        Speech.speak("Let's go!", {
+        Speech.speak("Do the exercise!", {
           rate: 1.0,
           pitch: 1.2,
           onDone: () => {
@@ -84,7 +84,14 @@ export function ExerciseCountdown({
         onComplete();
       }
     }
-  }, [visible, isPaused, wasEverPaused, countdownStarted, coachVoiceEnabled, onComplete]);
+  }, [
+    visible,
+    isPaused,
+    wasEverPaused,
+    countdownStarted,
+    coachVoiceEnabled,
+    onComplete,
+  ]);
 
   // Run countdown when visible
   useEffect(() => {
@@ -186,8 +193,8 @@ export function ExerciseCountdown({
           // Countdown complete - say "Go!" and trigger callback after speech
           if (coachVoiceEnabled) {
             isSpeakingGo = true;
-            const phrases = ["Go!", "Start!", "Let's go!"];
-            const phrase = phrases[Math.floor(Math.random() * phrases.length)];
+            const phrases = ["Do the exercise!", "Start!", "Let's go!"];
+            const phrase = "Do the exercise!";
             Speech.speak(phrase, {
               rate: 1.0,
               pitch: 1.2,

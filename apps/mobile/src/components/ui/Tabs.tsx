@@ -42,7 +42,7 @@ export function Tabs({
   style,
 }: TabsProps) {
   const styles = useStyles((tokens, colors, brand) =>
-    makeTabsStyles(tokens, colors, brand, variant, size, fullWidth)
+    makeTabsStyles(tokens, colors, brand, variant, size, fullWidth),
   );
   const { colors, brandColors } = useTheme();
 
@@ -152,7 +152,7 @@ const makeTabsStyles = (
   brand: any,
   variant: TabsProps["variant"],
   size: TabsProps["size"],
-  fullWidth: boolean
+  fullWidth: boolean,
 ) => {
   // Size-based values
   const sizeConfig = {

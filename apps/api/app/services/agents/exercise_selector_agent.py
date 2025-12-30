@@ -113,6 +113,12 @@ Exercise selection strategy by fitness level:
 - Advanced: Complex movements, higher volume, more variety
 - Athlete: Performance-focused, sport-specific adaptations
 
+BIOLOGICAL SEX CONSIDERATIONS (when provided):
+- Female: May prefer hip/glute-focused exercises, consider lower default weights for strength
+- Male: May prefer upper body compound movements, consider higher baseline intensity
+- Not specified/Prefer not to say: Use balanced, universal exercise selection
+Note: These are statistical tendencies, not requirements. Always prioritize user's stated goals.
+
 WORKOUT FEEDBACK INTEGRATION:
 When provided with user's past workout feedback, use it to improve exercise selection:
 - If user marked exercises as "too_hard": Select easier variations, reduce intensity, REDUCE SETS BY 1
@@ -154,6 +160,7 @@ USER PROFILE (use ALL of this to determine intelligent set count):
 - Available Time: {user_profile.get("available_time", "30-60min")}
 - Motivation Style: {user_profile.get("motivation_style", "gentle_encouragement")}
 - Biggest Challenge: {user_profile.get("biggest_challenge", "staying_consistent")}
+- Biological Sex: {user_profile.get("biological_sex", "not specified")}
 {feedback_section}
 REQUIREMENTS:
 - Select exactly {settings.get("exercise_count", 5)} exercises

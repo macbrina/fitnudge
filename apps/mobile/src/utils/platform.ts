@@ -43,7 +43,7 @@ export interface ExitOfferPricing {
  */
 export function getProductIdFromPlan(
   productIds: PlanProductIds,
-  period: BillingPeriod
+  period: BillingPeriod,
 ): string | null {
   if (isIOS) {
     return period === "monthly"
@@ -85,7 +85,7 @@ export function getAllProductIdsFromPlans(plans: PlanProductIds[]): string[] {
  */
 export function getPlanFromProductId(
   productId: string,
-  plans: PlanProductIds[]
+  plans: PlanProductIds[],
 ): { planId: string; period: BillingPeriod } | null {
   for (const plan of plans) {
     // Check iOS product IDs
@@ -125,7 +125,7 @@ export function getStoreName(): "App Store" | "Google Play" {
  */
 export function calculateDiscountPercent(
   originalPrice: number,
-  discountedPrice: number
+  discountedPrice: number,
 ): number {
   if (originalPrice <= 0) return 0;
   return Math.round(((originalPrice - discountedPrice) / originalPrice) * 100);

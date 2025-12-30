@@ -23,11 +23,25 @@ import { fontFamily } from "@/lib/fonts";
 import { Ionicons } from "@expo/vector-icons";
 
 type AlertVariant = "success" | "warning" | "error" | "info";
+type AlertSize = "sm" | "md" | "lg";
+
+// Size configuration for different modal widths
+const SIZE_CONFIG: Record<AlertSize, number> = {
+  sm: 260,
+  md: 300,
+  lg: 340,
+};
 
 export interface AlertOptions {
   title: string;
   message?: string;
   variant?: AlertVariant;
+  /** Size of the modal - sm (260px), md (300px), lg (340px). Default: md */
+  size?: AlertSize;
+  /** Text alignment for message - useful for lists/bullet points. Default: center */
+  messageAlign?: "left" | "center" | "right";
+  /** Custom content to render instead of message string */
+  content?: React.ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
   showCancel?: boolean;
@@ -47,7 +61,7 @@ interface AlertModalContextValue {
   showAlert: (options: AlertOptions) => Promise<boolean>;
   showConfirm: (options: AlertOptions) => Promise<boolean>;
   showToast: (
-    options: Omit<AlertOptions, "showCancel"> & { duration?: number }
+    options: Omit<AlertOptions, "showCancel"> & { duration?: number },
   ) => void;
   dismiss: () => void;
   // Internal state for AlertOverlay
@@ -56,13 +70,15 @@ interface AlertModalContextValue {
 }
 
 const AlertModalContext = createContext<AlertModalContextValue | undefined>(
-  undefined
+  undefined,
 );
 
 const DEFAULT_OPTIONS: AlertOptions = {
   title: "",
   message: "",
   variant: "info",
+  size: "md",
+  messageAlign: "center",
   confirmLabel: "OK",
   cancelLabel: "Cancel",
   showCancel: false,
@@ -130,25 +146,26 @@ const variantConfig: Record<
 const makeStyles = (tokens: any, colors: any, brandColors: any) => ({
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: colors.bg.overlayLight,
+    backgroundColor: "rgba(0, 0, 0, 0.4)", // Slightly lighter overlay
     justifyContent: "center" as const,
     alignItems: "center" as const,
-    paddingHorizontal: toRN(tokens.spacing[8]),
+    paddingHorizontal: toRN(tokens.spacing[6]),
     zIndex: 9999,
   },
+  // Base card style - maxWidth is applied dynamically based on size prop
   card: {
     width: "100%",
-    maxWidth: 280,
-    borderRadius: toRN(tokens.borderRadius.xl),
+    maxWidth: SIZE_CONFIG.md, // Default, overridden dynamically
+    borderRadius: toRN(tokens.borderRadius["2xl"]),
     backgroundColor: colors.bg.canvas,
-    paddingTop: toRN(tokens.spacing[5]),
-    paddingBottom: toRN(tokens.spacing[4]),
-    paddingHorizontal: toRN(tokens.spacing[5]),
+    paddingTop: toRN(tokens.spacing[6]),
+    paddingBottom: toRN(tokens.spacing[5]),
+    paddingHorizontal: toRN(tokens.spacing[6]),
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 12,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
+    elevation: 16,
     position: "relative" as const,
     overflow: "visible" as const,
   },
@@ -181,11 +198,20 @@ const makeStyles = (tokens: any, colors: any, brandColors: any) => ({
   },
   message: {
     fontSize: toRN(tokens.typography.fontSize.sm),
-    lineHeight: toRN(tokens.typography.fontSize.sm) * 1.35,
-    textAlign: "center" as const,
+    lineHeight: toRN(tokens.typography.fontSize.sm) * 1.5,
+    textAlign: "center" as const, // Default, overridden dynamically
     color: colors.text.secondary,
     fontFamily: fontFamily.regular,
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[5]),
+  },
+  messageLeft: {
+    textAlign: "left" as const,
+  },
+  messageRight: {
+    textAlign: "right" as const,
+  },
+  contentContainer: {
+    marginBottom: toRN(tokens.spacing[5]),
   },
   buttonRow: {
     flexDirection: "column" as const,
@@ -305,6 +331,7 @@ export const AlertOverlay: React.FC<AlertOverlayProps> = ({
         style={[
           styles.card,
           {
+            maxWidth: SIZE_CONFIG[currentAlert.size ?? "md"],
             transform: [{ translateY }],
           },
         ]}
@@ -321,9 +348,9 @@ export const AlertOverlay: React.FC<AlertOverlayProps> = ({
         <View style={styles.illustrationContainer}>
           <View
             style={{
-              width: 48,
-              height: 48,
-              borderRadius: 24,
+              width: 52,
+              height: 52,
+              borderRadius: 26,
               backgroundColor: variantStyle.illustrationColor,
               alignItems: "center",
               justifyContent: "center",
@@ -331,7 +358,7 @@ export const AlertOverlay: React.FC<AlertOverlayProps> = ({
           >
             <Ionicons
               name={currentAlert.iconName ?? variantStyle.icon}
-              size={24}
+              size={26}
               color={iconColor}
             />
           </View>
@@ -348,8 +375,21 @@ export const AlertOverlay: React.FC<AlertOverlayProps> = ({
           {currentAlert.title}
         </Text>
 
-        {!!currentAlert.message && (
-          <Text style={styles.message}>{currentAlert.message}</Text>
+        {/* Custom content takes precedence over message string */}
+        {currentAlert.content ? (
+          <View style={styles.contentContainer}>{currentAlert.content}</View>
+        ) : (
+          !!currentAlert.message && (
+            <Text
+              style={[
+                styles.message,
+                currentAlert.messageAlign === "left" && styles.messageLeft,
+                currentAlert.messageAlign === "right" && styles.messageRight,
+              ]}
+            >
+              {currentAlert.message}
+            </Text>
+          )
         )}
 
         <View style={styles.buttonRow}>
@@ -442,7 +482,7 @@ export const AlertModalProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const showAlert = useCallback(
     (options: AlertOptions) => enqueueAlert({ ...options, showCancel: false }),
-    [enqueueAlert]
+    [enqueueAlert],
   );
 
   const showConfirm = useCallback(
@@ -453,7 +493,7 @@ export const AlertModalProvider: React.FC<{ children: React.ReactNode }> = ({
         showCloseIcon: true,
         dismissible: false,
       }),
-    [enqueueAlert]
+    [enqueueAlert],
   );
 
   const showToast = useCallback(
@@ -465,7 +505,7 @@ export const AlertModalProvider: React.FC<{ children: React.ReactNode }> = ({
         autoCloseMs: options.autoCloseMs ?? options.duration ?? 2400,
       });
     },
-    [enqueueAlert]
+    [enqueueAlert],
   );
 
   const dismiss = useCallback(() => {
@@ -482,7 +522,7 @@ export const AlertModalProvider: React.FC<{ children: React.ReactNode }> = ({
       currentAlert.resolve(result);
       setVisible(false);
     },
-    [currentAlert]
+    [currentAlert],
   );
 
   const value = useMemo<AlertModalContextValue>(
@@ -503,7 +543,7 @@ export const AlertModalProvider: React.FC<{ children: React.ReactNode }> = ({
       currentAlert,
       visible,
       handleResolve,
-    ]
+    ],
   );
 
   return (
@@ -595,6 +635,7 @@ const AlertModal: React.FC<{
           style={[
             styles.card,
             {
+              maxWidth: SIZE_CONFIG[alert.size ?? "md"],
               transform: [{ translateY }],
             },
           ]}
@@ -611,9 +652,9 @@ const AlertModal: React.FC<{
           <View style={styles.illustrationContainer}>
             <View
               style={{
-                width: 48,
-                height: 48,
-                borderRadius: 24,
+                width: 52,
+                height: 52,
+                borderRadius: 26,
                 backgroundColor: variantStyle.illustrationColor,
                 alignItems: "center",
                 justifyContent: "center",
@@ -621,7 +662,7 @@ const AlertModal: React.FC<{
             >
               <Ionicons
                 name={alert.iconName ?? variantStyle.icon}
-                size={24}
+                size={26}
                 color={iconColor}
               />
             </View>
@@ -638,8 +679,21 @@ const AlertModal: React.FC<{
             {alert.title}
           </Text>
 
-          {!!alert.message && (
-            <Text style={styles.message}>{alert.message}</Text>
+          {/* Custom content takes precedence over message string */}
+          {alert.content ? (
+            <View style={styles.contentContainer}>{alert.content}</View>
+          ) : (
+            !!alert.message && (
+              <Text
+                style={[
+                  styles.message,
+                  alert.messageAlign === "left" && styles.messageLeft,
+                  alert.messageAlign === "right" && styles.messageRight,
+                ]}
+              >
+                {alert.message}
+              </Text>
+            )
           )}
 
           <View style={styles.buttonRow}>

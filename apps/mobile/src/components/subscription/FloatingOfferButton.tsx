@@ -59,7 +59,7 @@ export function FloatingOfferButton({
           easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
         }),
-      ])
+      ]),
     );
     pulse.start();
 
@@ -99,7 +99,7 @@ export function FloatingOfferButton({
         }),
         // Pause between wiggles
         Animated.delay(2000),
-      ])
+      ]),
     );
 
     // Bounce animation
@@ -118,7 +118,7 @@ export function FloatingOfferButton({
           useNativeDriver: true,
         }),
         Animated.delay(2000),
-      ])
+      ]),
     );
 
     wiggle.start();
@@ -213,7 +213,7 @@ export function FloatingOfferButton({
 const makeFloatingOfferButtonStyles = (
   tokens: any,
   colors: any,
-  brand: any
+  brand: any,
 ) => ({
   container: {
     position: "absolute" as const,

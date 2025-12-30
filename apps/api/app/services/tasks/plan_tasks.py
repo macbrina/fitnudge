@@ -14,6 +14,7 @@ from app.services.tasks.base import (
 from app.services.plan_generator import PlanGenerator
 from app.services.suggested_goals_service import generate_suggested_goals_for_user
 from app.services.expo_push_service import send_push_to_user_sync
+from app.services.social_accountability_service import social_accountability_service
 
 
 @celery_app.task(
@@ -128,9 +129,25 @@ def generate_plan_task(
                 }
             ).eq("id", plan_id).execute()
 
+            # Update goal's tracking_type from the generated plan
+            # This determines which check-in UI the user will see
+            tracking_type = plan.get("tracking_type")
+            if tracking_type:
+                supabase.table("goals").update({"tracking_type": tracking_type}).eq(
+                    "id", goal_id
+                ).execute()
+                logger.info(
+                    f"Updated goal tracking_type to '{tracking_type}'",
+                    {"goal_id": goal_id, "tracking_type": tracking_type},
+                )
+
             print(
                 f"Successfully generated plan for goal {goal_id}",
-                {"plan_id": plan_id, "plan_type": plan["plan_type"]},
+                {
+                    "plan_id": plan_id,
+                    "plan_type": plan["plan_type"],
+                    "tracking_type": tracking_type,
+                },
             )
 
             # ✅ ACTIVATE GOAL AND CREATE CHECK-IN NOW THAT PLAN IS READY
@@ -169,6 +186,13 @@ def generate_plan_task(
                         f"Failed to send plan ready notification: {notif_error}"
                     )
 
+            # 👥 Notify accountability partners of the new goal
+            # This triggers realtime events so partners' dashboards refresh
+            if user_id:
+                social_accountability_service.notify_partners_of_data_change_sync(
+                    user_id, "goal_created"
+                )
+
             return {
                 "success": True,
                 "plan_id": plan_id,
@@ -193,7 +217,7 @@ def generate_plan_task(
             # Mark the goal as failed so user can retry
             supabase.table("goals").update(
                 {
-                    "is_active": False,
+                    "status": "paused",
                     "archived_reason": "failed",
                 }
             ).eq("id", goal_id).execute()
@@ -231,7 +255,7 @@ def generate_plan_task(
                 # so user can see the failure and retry
                 supabase.table("goals").update(
                     {
-                        "is_active": False,
+                        "status": "paused",
                         "archived_reason": "failed",
                     }
                 ).eq("id", goal_id).execute()
@@ -250,6 +274,210 @@ def generate_plan_task(
             return {"success": False, "error": error_message}
 
         # Retry the task (Celery will automatically retry based on decorator settings)
+        raise self.retry(exc=e)
+
+
+@celery_app.task(
+    name="generate_challenge_plan",
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=600,
+    retry_jitter=True,
+)
+def generate_challenge_plan_task(
+    self,
+    plan_id: str,
+    challenge_id: str,
+    challenge_data: Dict[str, Any],
+    user_id: str,
+    user_profile: Optional[Dict[str, Any]] = None,
+    user_plan: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Celery task to generate an actionable plan for a standalone challenge.
+
+    Similar to generate_plan_task but for challenges instead of goals.
+    The plan is stored in actionable_plans with challenge_id instead of goal_id.
+
+    Args:
+        self: Celery task instance (for retry mechanism)
+        plan_id: The plan ID in database
+        challenge_id: The challenge ID
+        challenge_data: Challenge data dictionary (goal-like structure)
+        user_id: User ID who created the challenge
+        user_profile: Optional user profile for personalization
+        user_plan: User's subscription plan
+
+    Returns:
+        Dict with success status and plan details
+    """
+    supabase = get_supabase_client()
+    plan_generator = PlanGenerator()
+
+    try:
+        # If user_plan not provided, get it from user record
+        if not user_plan and user_id:
+            from app.core.subscriptions import get_user_effective_plan
+
+            user_plan = get_user_effective_plan(user_id, supabase=supabase)
+
+        # Update status to generating
+        supabase.table("actionable_plans").update({"status": "generating"}).eq(
+            "id", plan_id
+        ).execute()
+
+        logger.info(
+            f"Starting plan generation for challenge {challenge_id} (attempt {self.request.retries + 1}/{self.max_retries + 1})",
+            {
+                "plan_id": plan_id,
+                "challenge_id": challenge_id,
+                "retry_count": self.request.retries,
+                "user_plan": user_plan,
+            },
+        )
+
+        # Run async plan generation in sync context
+        import asyncio
+
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_closed():
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        plan = loop.run_until_complete(
+            plan_generator.generate_plan(
+                challenge_data, user_profile, user_plan=user_plan, user_id=user_id
+            )
+        )
+
+        if plan:
+            # Save the generated plan
+            supabase.table("actionable_plans").update(
+                {
+                    "plan_type": plan["plan_type"],
+                    "structured_data": plan,
+                    "status": "completed",
+                    "generated_at": "now()",
+                }
+            ).eq("id", plan_id).execute()
+
+            # Update challenge's tracking_type from the generated plan
+            # This determines which check-in UI the user will see
+            tracking_type = plan.get("tracking_type")
+            if tracking_type:
+                supabase.table("challenges").update(
+                    {"tracking_type": tracking_type}
+                ).eq("id", challenge_id).execute()
+                logger.info(
+                    f"Updated challenge tracking_type to '{tracking_type}'",
+                    {"challenge_id": challenge_id, "tracking_type": tracking_type},
+                )
+
+            logger.info(
+                f"Successfully generated plan for challenge {challenge_id}",
+                {
+                    "plan_id": plan_id,
+                    "plan_type": plan["plan_type"],
+                    "tracking_type": tracking_type,
+                },
+            )
+
+            # Send push notification - Plan is ready!
+            challenge_title = challenge_data.get("title", "Your challenge")
+            try:
+                send_push_to_user_sync(
+                    user_id=user_id,
+                    title="Your challenge plan is ready! 🏆",
+                    body=f"Your personalized plan for '{challenge_title}' is ready. Tap to view.",
+                    data={
+                        "type": "challenge_plan_ready",
+                        "challengeId": challenge_id,
+                        "planId": plan_id,
+                        "url": f"/challenge?id={challenge_id}",
+                    },
+                    notification_type="plan_ready",
+                    entity_type="challenge",
+                    entity_id=challenge_id,
+                )
+                logger.info(
+                    f"Sent plan ready notification for challenge {challenge_id}"
+                )
+            except Exception as notif_error:
+                logger.warning(
+                    f"Failed to send challenge plan ready notification: {notif_error}"
+                )
+
+            # 👥 Notify accountability partners of the new challenge
+            # This triggers realtime events so partners' dashboards refresh
+            if user_id:
+                social_accountability_service.notify_partners_of_data_change_sync(
+                    user_id, "challenge_created"
+                )
+
+            return {
+                "success": True,
+                "plan_id": plan_id,
+                "challenge_id": challenge_id,
+                "plan_type": plan["plan_type"],
+            }
+        else:
+            # Plan generation returned None
+            error_msg = "Plan generation returned no result"
+            supabase.table("actionable_plans").update(
+                {
+                    "status": "failed",
+                    "error_message": error_msg,
+                }
+            ).eq("id", plan_id).execute()
+
+            logger.warning(
+                f"Plan generation returned None for challenge {challenge_id}"
+            )
+            return {"success": False, "error": error_msg}
+
+    except Exception as e:
+        error_message = str(e)[:500]
+
+        logger.error(
+            f"Failed to generate plan for challenge {challenge_id} (attempt {self.request.retries + 1}/{self.max_retries + 1})",
+            {
+                "error": error_message,
+                "plan_id": plan_id,
+                "challenge_id": challenge_id,
+                "retry_count": self.request.retries,
+            },
+        )
+
+        # Update status to failed only if we've exhausted retries
+        if self.request.retries >= self.max_retries:
+            try:
+                supabase.table("actionable_plans").update(
+                    {
+                        "status": "failed",
+                        "error_message": error_message,
+                    }
+                ).eq("id", plan_id).execute()
+
+                logger.warning(
+                    f"Challenge plan {plan_id} marked as failed after all retries",
+                    {"challenge_id": challenge_id, "plan_id": plan_id},
+                )
+            except Exception as update_error:
+                logger.error(
+                    f"Failed to update plan status for challenge {challenge_id}",
+                    {"error": str(update_error)},
+                )
+
+            return {"success": False, "error": error_message}
+
+        # Retry the task
         raise self.retry(exc=e)
 
 

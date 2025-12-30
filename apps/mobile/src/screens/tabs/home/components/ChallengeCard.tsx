@@ -16,9 +16,21 @@ import { Challenge } from "@/services/api/challenges";
 import { useJoinChallenge } from "@/hooks/api/useChallenges";
 import { useSubscriptionStore } from "@/stores/subscriptionStore";
 import { useChallengeMenu } from "@/hooks/useChallengeMenu";
+import {
+  useChallengePlanStatus,
+  useRetryChallengePlanGeneration,
+} from "@/hooks/api/useActionablePlans";
+import { PlanStatusBadge } from "@/screens/tabs/goals/components/PlanStatusBadge";
+import { PlanStatus } from "@/services/api/actionablePlans";
+
+interface PlanStatusData {
+  status: PlanStatus;
+  [key: string]: any;
+}
 
 interface ChallengeCardProps {
   challenge: Challenge;
+  planStatus?: PlanStatusData; // Optional: pass from parent to avoid individual fetching
   onPress?: () => void;
   onJoined?: () => void;
   onLeft?: () => void;
@@ -30,6 +42,7 @@ interface ChallengeCardProps {
 
 export function ChallengeCard({
   challenge,
+  planStatus: planStatusProp,
   onPress,
   onJoined,
   onLeft,
@@ -47,14 +60,30 @@ export function ChallengeCard({
   const [menuVisible, setMenuVisible] = useState(false);
 
   const joinChallenge = useJoinChallenge();
+  const retryPlan = useRetryChallengePlanGeneration();
+
+  // Fetch plan status if not provided from parent (for creator/participant)
+  const isCreatorOrParticipant =
+    challenge.is_creator === true || challenge.is_participant === true;
+  const { data: fetchedPlanStatus } = useChallengePlanStatus(
+    challenge.id,
+    !planStatusProp && isCreatorOrParticipant, // Only fetch if not passed from parent
+  );
+  const planStatus = planStatusProp || fetchedPlanStatus;
+
+  // Check if plan is ready (for navigation)
+  const isPlanReady = planStatus?.status === "completed";
+  const isPlanGenerating =
+    planStatus?.status === "pending" || planStatus?.status === "generating";
+  const isPlanFailed = planStatus?.status === "failed";
 
   // Subscription store for feature access
   const hasFeature = useSubscriptionStore((state) => state.hasFeature);
   const canParticipateInChallenge = useSubscriptionStore(
-    (state) => state.canParticipateInChallenge
+    (state) => state.canParticipateInChallenge,
   );
   const getChallengeLimit = useSubscriptionStore(
-    (state) => state.getChallengeLimit
+    (state) => state.getChallengeLimit,
   );
 
   // Feature checks
@@ -67,8 +96,7 @@ export function ChallengeCard({
   const isCreator = challenge.is_creator === true;
   const isParticipant = challenge.is_participant === true;
   const isUpcoming = challenge.status === "upcoming";
-  const isActive =
-    challenge.status === "active" || challenge.is_active === true;
+  const isActive = challenge.status === "active";
   const isCompleted = challenge.status === "completed";
   const isCancelled = challenge.status === "cancelled";
 
@@ -115,7 +143,7 @@ export function ChallengeCard({
   // Get challenge type icon
   const getChallengeIcon = () => {
     if (
-      challenge.challenge_type === "target" ||
+      challenge.challenge_type === "streak" ||
       challenge.challenge_type === "checkin_count"
     ) {
       return "flag";
@@ -123,12 +151,35 @@ export function ChallengeCard({
     return "timer";
   };
 
-  // Handle card press
+  // Handle card press - only allow if plan is ready (for creators/participants)
   const handlePress = () => {
+    // For creators/participants, require plan to be ready before navigation
+    if (isCreatorOrParticipant && !isPlanReady) {
+      return; // Card is disabled - don't navigate
+    }
+
     if (onPress) {
       onPress();
     } else {
       router.push(MOBILE_ROUTES.CHALLENGES.DETAILS(challenge.id));
+    }
+  };
+
+  // Handle retry plan generation
+  const handleRetryPlan = async () => {
+    try {
+      await retryPlan.mutateAsync(challenge.id);
+    } catch (error: any) {
+      const errorMessage =
+        error?.response?.data?.detail ||
+        t("goals.retry_plan_error") ||
+        "Failed to retry plan generation";
+      showAlert({
+        title: t("common.error"),
+        message: errorMessage,
+        variant: "error",
+        confirmLabel: t("common.ok"),
+      });
     }
   };
 
@@ -180,11 +231,17 @@ export function ChallengeCard({
 
   const statusBadge = getStatusBadge();
 
+  // Determine if card should be disabled (plan not ready for creator/participant)
+  const isCardDisabled = isCreatorOrParticipant && !isPlanReady;
+
   // Compact variant (for discovery/lists)
   if (variant === "compact" || variant === "discovery") {
     return (
-      <TouchableOpacity onPress={handlePress} activeOpacity={0.7}>
-        <Card style={[styles.compactCard, style]}>
+      <TouchableOpacity
+        onPress={isCardDisabled ? undefined : handlePress}
+        activeOpacity={0.7}
+      >
+        <Card style={[styles.compactCard, style]} disabled={isCardDisabled}>
           <View style={styles.compactContent}>
             {/* Icon */}
             <View
@@ -273,11 +330,16 @@ export function ChallengeCard({
     );
   }
 
+  // console.log("challenge", challenge);
+
   // Default variant (full card)
   return (
     <>
-      <TouchableOpacity onPress={handlePress} activeOpacity={0.7}>
-        <Card style={[styles.card, style]}>
+      <TouchableOpacity
+        onPress={isCardDisabled ? undefined : handlePress}
+        activeOpacity={0.7}
+      >
+        <Card style={[styles.card, style]} disabled={isCardDisabled}>
           {/* Header */}
           <View style={styles.header}>
             {/* Icon */}
@@ -490,6 +552,63 @@ export function ChallengeCard({
               </Text>
             </TouchableOpacity>
           )}
+
+          {/* Plan Status - show for pending, generating, completed, or failed (for creator/participant) */}
+          {isCreatorOrParticipant &&
+            planStatus &&
+            (planStatus.status === "pending" ||
+              planStatus.status === "generating" ||
+              planStatus.status === "completed" ||
+              planStatus.status === "failed") && (
+              <View
+                style={[
+                  styles.planStatusRow,
+                  {
+                    justifyContent:
+                      planStatus.status === "completed"
+                        ? "flex-end"
+                        : "space-between",
+                  },
+                ]}
+              >
+                {planStatus.status !== "completed" && (
+                  <PlanStatusBadge status={planStatus.status} size="sm" />
+                )}
+                {planStatus.status === "completed" && (
+                  <TouchableOpacity
+                    onPress={handlePress}
+                    style={styles.viewPlanButton}
+                  >
+                    <Text style={styles.viewPlanText}>
+                      {t("challenges.view_details") || "View Details"}
+                    </Text>
+                    <Ionicons
+                      name="chevron-forward"
+                      size={toRN(tokens.typography.fontSize.xs)}
+                      color={brandColors.primary}
+                    />
+                  </TouchableOpacity>
+                )}
+                {planStatus.status === "failed" && (
+                  <TouchableOpacity
+                    onPress={handleRetryPlan}
+                    style={styles.retryButton}
+                    disabled={retryPlan.isPending}
+                  >
+                    <Ionicons
+                      name="refresh-outline"
+                      size={toRN(tokens.typography.fontSize.sm)}
+                      color={brandColors.primary}
+                    />
+                    <Text style={styles.retryButtonText}>
+                      {retryPlan.isPending
+                        ? t("common.loading") || "..."
+                        : t("goals.retry") || "Retry"}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
         </Card>
       </TouchableOpacity>
 
@@ -738,5 +857,39 @@ const makeChallengeCardStyles = (tokens: any, colors: any, brand: any) => ({
   },
   participantBadge: {
     padding: toRN(tokens.spacing[1]),
+  },
+  // Plan status styles (like GoalCard)
+  planStatusRow: {
+    marginTop: toRN(tokens.spacing[3]),
+    paddingTop: toRN(tokens.spacing[3]),
+    borderTopWidth: 1,
+    borderTopColor: colors.border.default + "40",
+    flexDirection: "row" as const,
+    justifyContent: "space-between" as const,
+    alignItems: "center" as const,
+  },
+  viewPlanButton: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 2,
+  },
+  viewPlanText: {
+    fontSize: toRN(tokens.typography.fontSize.xs),
+    fontFamily: fontFamily.medium,
+    color: brand.primary,
+  },
+  retryButton: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 4,
+    paddingHorizontal: toRN(tokens.spacing[2]),
+    paddingVertical: toRN(tokens.spacing[1]),
+    borderRadius: toRN(tokens.borderRadius.md),
+    backgroundColor: `${brand.primary}15`,
+  },
+  retryButtonText: {
+    fontSize: toRN(tokens.typography.fontSize.xs),
+    fontFamily: fontFamily.medium,
+    color: brand.primary,
   },
 });

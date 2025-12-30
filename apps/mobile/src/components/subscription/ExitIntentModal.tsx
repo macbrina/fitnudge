@@ -87,7 +87,7 @@ export function ExitIntentModal({
       const now = Date.now();
       const remaining = Math.max(
         0,
-        Math.floor((expiryTime.getTime() - now) / 1000)
+        Math.floor((expiryTime.getTime() - now) / 1000),
       );
       setTimeRemaining(remaining);
 
@@ -126,7 +126,7 @@ export function ExitIntentModal({
   // - One clear choice = higher conversion
   // - Users who experience voice AI are more likely to renew
   const proPlan = plans.find(
-    (p) => p.id === "pro" && (p.exit_offer_enabled ?? true)
+    (p) => p.id === "pro" && (p.exit_offer_enabled ?? true),
   );
 
   // Only show modal if Pro plan exists and has exit offer enabled

@@ -65,6 +65,7 @@ async def handle_subscription_expiry_deactivation(
     summary = {
         "goals_deactivated": 0,
         "challenges_cancelled": 0,
+        "partner_requests_deleted": 0,
         "deactivated_goal_ids": [],
         "cancelled_challenge_ids": [],
     }
@@ -78,10 +79,9 @@ async def handle_subscription_expiry_deactivation(
         # Get all active goals, ordered by creation date (keep oldest/most invested)
         active_goals_result = (
             supabase.table("goals")
-            .select("id, title, created_at, is_active, converted_to_challenge_id")
+            .select("id, title, created_at, status")
             .eq("user_id", user_id)
-            .eq("is_active", True)
-            .is_("converted_to_challenge_id", "null")
+            .eq("status", "active")
             .order("created_at", desc=False)
             .execute()
         )
@@ -92,7 +92,7 @@ async def handle_subscription_expiry_deactivation(
         for goal in goals_to_deactivate:
             supabase.table("goals").update(
                 {
-                    "is_active": False,
+                    "status": "archived",
                     "archived_reason": "subscription_expired",
                     "updated_at": datetime.utcnow().isoformat(),
                 }
@@ -106,97 +106,125 @@ async def handle_subscription_expiry_deactivation(
         )
 
         # =========================================
-        # 2. CHALLENGES - Leave/cancel excess beyond free tier limit
+        # 2. CHALLENGES - Cancel ALL created + limit joined
         # =========================================
-        # NOTE: Status is computed, not stored:
-        # - is_active=false -> cancelled
-        # - is_active=true, today < start_date -> upcoming
-        # - is_active=true, start_date <= today <= end_date -> active
-        # - is_active=true, today > end_date -> completed
+        # FREE users CANNOT create challenges (no challenge_create feature)
+        # So ALL created challenges must be cancelled
+        # They can still PARTICIPATE in challenges they joined (up to limit)
+
         challenge_limit = free_limits.get("challenge_limit", 1) or 1
         today = datetime.utcnow().date().isoformat()
 
-        # Get all active challenges user created (ongoing = not ended)
+        # STEP 2a: Cancel ALL challenges user CREATED
+        # (Free users don't have challenge_create feature)
+        # SCALABILITY: Uses batch operations instead of loops
         created_challenges_result = (
             supabase.table("challenges")
-            .select("id, title, end_date, created_at")
+            .select("id, title")
             .eq("created_by", user_id)
-            .eq("is_active", True)
+            .in_("status", ["upcoming", "active"])
             .execute()
         )
 
-        # Get all challenges user joined (from challenge_participants)
+        created_challenges = created_challenges_result.data or []
+        if created_challenges:
+            challenge_ids = [c["id"] for c in created_challenges]
+
+            # BATCH UPDATE: Cancel all challenges in one query
+            supabase.table("challenges").update(
+                {
+                    "status": "cancelled",
+                    "cancelled_reason": "creator_subscription_expired",
+                    "cancelled_at": datetime.utcnow().isoformat(),
+                    "updated_at": datetime.utcnow().isoformat(),
+                }
+            ).in_("id", challenge_ids).execute()
+
+            # BATCH CLEANUP: Clean invites and notifications for all challenges at once
+            from app.services.cleanup_service import cleanup_challenges_batch_sync
+
+            cleanup_challenges_batch_sync(
+                supabase, challenge_ids, reason="creator_subscription_expired"
+            )
+
+            summary["challenges_cancelled"] += len(challenge_ids)
+            summary["cancelled_challenge_ids"].extend(challenge_ids)
+
+            logger.info(
+                f"Batch cancelled {len(challenge_ids)} challenges (creator subscription expired)"
+            )
+
+            # Notify participants (still per-challenge for personalized messages)
+            for challenge in created_challenges:
+                _notify_challenge_participants_cancelled(
+                    supabase,
+                    challenge["id"],
+                    challenge["title"],
+                    "creator_subscription_expired",
+                )
+
+        # STEP 2b: For JOINED challenges, keep up to challenge_limit (oldest first)
         joined_challenges_result = (
             supabase.table("challenge_participants")
-            .select(
-                "challenge_id, joined_at, challenges!inner(id, title, end_date, created_by, is_active)"
-            )
+            .select("id, challenge_id, joined_at, challenges!inner(id, title, status)")
             .eq("user_id", user_id)
-            .eq("challenges.is_active", True)
-            .neq("challenges.created_by", user_id)  # Exclude ones they created
+            .in_("challenges.status", ["upcoming", "active"])
+            .neq("challenges.created_by", user_id)  # Only joined, not created
+            .order("joined_at", desc=False)  # Oldest first
             .execute()
         )
 
-        # Filter for ongoing challenges (end_date >= today or null)
-        def is_ongoing(end_date):
-            return end_date is None or end_date >= today
+        joined_challenges = joined_challenges_result.data or []
 
-        # Combine and sort by date (keep oldest)
-        all_challenges = []
-        for c in created_challenges_result.data or []:
-            if is_ongoing(c.get("end_date")):
-                all_challenges.append(
-                    {
-                        "id": c["id"],
-                        "title": c["title"],
-                        "is_creator": True,
-                        "date": c["created_at"],
-                    }
-                )
-        for p in joined_challenges_result.data or []:
-            challenge_data = p.get("challenges")
-            if challenge_data and is_ongoing(challenge_data.get("end_date")):
-                all_challenges.append(
-                    {
-                        "id": challenge_data["id"],
-                        "title": challenge_data["title"],
-                        "is_creator": False,
-                        "date": p["joined_at"],
-                    }
-                )
+        # Remove excess joined challenges beyond limit
+        # SCALABILITY: Uses batch delete instead of loop
+        joined_to_remove = joined_challenges[challenge_limit:]
 
-        # Sort by date (oldest first to keep most invested)
-        all_challenges.sort(key=lambda x: x["date"])
+        if joined_to_remove:
+            participant_ids = [p["id"] for p in joined_to_remove]
+            challenge_ids_removed = [p["challenge_id"] for p in joined_to_remove]
 
-        # Keep only up to the limit, remove the rest
-        challenges_to_remove = all_challenges[challenge_limit:]
+            # BATCH DELETE: Remove all participations in one query
+            supabase.table("challenge_participants").delete().in_(
+                "id", participant_ids
+            ).execute()
 
-        for challenge in challenges_to_remove:
-            if challenge["is_creator"]:
-                # Cancel challenges they created (set is_active=false)
-                supabase.table("challenges").update(
-                    {
-                        "is_active": False,  # This makes status = cancelled
-                        "cancelled_reason": "creator_subscription_expired",
-                        "cancelled_at": datetime.utcnow().isoformat(),
-                        "updated_at": datetime.utcnow().isoformat(),
-                    }
-                ).eq("id", challenge["id"]).execute()
-            else:
-                # Leave challenges they joined
-                supabase.table("challenge_participants").delete().eq(
-                    "challenge_id", challenge["id"]
-                ).eq("user_id", user_id).execute()
+            summary["challenges_cancelled"] += len(participant_ids)
+            summary["cancelled_challenge_ids"].extend(challenge_ids_removed)
 
-            summary["challenges_cancelled"] += 1
-            summary["cancelled_challenge_ids"].append(challenge["id"])
+            logger.info(
+                f"Batch removed user from {len(participant_ids)} challenges (subscription expired)"
+            )
 
         logger.info(
-            f"Removed from {summary['challenges_cancelled']} challenges for user {user_id}"
+            f"Cancelled {len(created_challenges)} created challenges, "
+            f"removed from {len(joined_to_remove)} joined challenges for user {user_id}"
         )
 
         # =========================================
-        # 3. LOG THE DEACTIVATION
+        # 3. PARTNER REQUESTS - Delete pending requests SENT by this user
+        # =========================================
+        # Free users don't have social_accountability feature
+        # So delete any pending requests they initiated (not received ones)
+        # SCALABILITY: Uses paginated batch cleanup for large datasets
+        from app.services.cleanup_service import paginated_cleanup_partner_requests_sync
+
+        try:
+            cleanup_stats = paginated_cleanup_partner_requests_sync(
+                supabase, user_id, reason="sender_subscription_expired"
+            )
+
+            if cleanup_stats["deleted_requests"] > 0:
+                summary["partner_requests_deleted"] = cleanup_stats["deleted_requests"]
+                logger.info(
+                    f"Deleted {cleanup_stats['deleted_requests']} pending partner requests "
+                    f"and {cleanup_stats['deleted_notifications']} notifications for user {user_id}"
+                )
+        except Exception as e:
+            logger.error(f"Failed to cleanup partner requests for user {user_id}: {e}")
+
+        # =========================================
+        # 4. LOG THE DEACTIVATION
         # =========================================
         supabase.table("subscription_deactivation_logs").insert(
             {
@@ -208,6 +236,7 @@ async def handle_subscription_expiry_deactivation(
                 "deactivation_reason": reason,
                 "deactivated_goal_ids": summary["deactivated_goal_ids"],
                 "cancelled_challenge_ids": summary["cancelled_challenge_ids"],
+                # Note: partner_requests_deleted not stored in DB, but logged in summary
             }
         ).execute()
 
@@ -224,7 +253,10 @@ async def check_user_feature_limit(
     supabase, user_id: str, feature_key: str, current_count: int
 ) -> Dict[str, Any]:
     """
-    Check if user can perform an action based on their plan limits.
+    Check if user can perform an action based on their plan limits with TIER INHERITANCE.
+
+    Users have access to features where minimum_tier <= user_tier.
+    Gets the highest tier version of the feature the user qualifies for.
 
     Returns:
     {
@@ -235,25 +267,32 @@ async def check_user_feature_limit(
         "plan": str
     }
     """
+    from app.core.subscriptions import get_user_plan_tier
+
     try:
-        # Get user's plan
+        # Get user's plan and tier
         user_result = (
             supabase.table("users").select("plan").eq("id", user_id).single().execute()
         )
 
         plan = user_result.data.get("plan", "free") if user_result.data else "free"
+        user_tier = get_user_plan_tier(plan, supabase)
 
-        # Get feature limit for plan
+        # Query features where user's tier qualifies (minimum_tier <= user_tier)
+        # Then get the highest tier version the user qualifies for (not highest overall)
+        # e.g., tier 2 user gets tier 2's value, NOT tier 3's value
         feature_result = (
             supabase.table("plan_features")
-            .select("feature_value, is_enabled")
-            .eq("plan_id", plan)
+            .select("feature_value, is_enabled, minimum_tier")
             .eq("feature_key", feature_key)
-            .single()
+            .eq("is_enabled", True)
+            .lte("minimum_tier", user_tier)  # Excludes tiers above user's tier
+            .order("minimum_tier", desc=True)  # Best version user qualifies for
+            .limit(1)
             .execute()
         )
 
-        if not feature_result.data or not feature_result.data.get("is_enabled"):
+        if not feature_result.data:
             return {
                 "allowed": False,
                 "limit": 0,
@@ -262,7 +301,7 @@ async def check_user_feature_limit(
                 "plan": plan,
             }
 
-        limit = feature_result.data.get("feature_value")
+        limit = feature_result.data[0].get("feature_value")
 
         # None means unlimited
         if limit is None:
@@ -296,3 +335,223 @@ async def check_user_feature_limit(
             "remaining": 0,
             "plan": "free",
         }
+
+
+async def get_user_feature_value(
+    supabase, user_id: str, feature_key: str
+) -> Optional[Any]:
+    """
+    Get the value of a specific feature for a user with TIER INHERITANCE.
+
+    Users have access to features where minimum_tier <= user_tier.
+    Returns the highest tier version of the feature the user qualifies for.
+
+    Returns:
+    - None if feature is not found, disabled, or user doesn't have access
+    - feature_value for the feature (None = unlimited for limits)
+    """
+    from app.core.subscriptions import get_user_plan_tier
+
+    try:
+        # Get user's plan and tier
+        user_result = (
+            supabase.table("users").select("plan").eq("id", user_id).single().execute()
+        )
+
+        plan = user_result.data.get("plan", "free") if user_result.data else "free"
+        user_tier = get_user_plan_tier(plan, supabase)
+
+        # Query features where user's tier qualifies (minimum_tier <= user_tier)
+        # Then get the highest tier version the user qualifies for (not highest overall)
+        # e.g., tier 2 user gets tier 2's value, NOT tier 3's value
+        feature_result = (
+            supabase.table("plan_features")
+            .select("feature_value, is_enabled, minimum_tier")
+            .eq("feature_key", feature_key)
+            .eq("is_enabled", True)
+            .lte("minimum_tier", user_tier)  # Excludes tiers above user's tier
+            .order("minimum_tier", desc=True)  # Best version user qualifies for
+            .limit(1)
+            .execute()
+        )
+
+        if not feature_result.data:
+            return None
+
+        # Return feature_value (could be None for unlimited, integer for limits)
+        return feature_result.data[0].get("feature_value")
+
+    except Exception as e:
+        logger.error(
+            f"Error getting feature value {feature_key} for user {user_id}: {e}"
+        )
+        return None
+
+
+async def has_user_feature(supabase, user_id: str, feature_key: str) -> bool:
+    """
+    Check if a user has access to a specific feature based on their plan with TIER INHERITANCE.
+
+    Users have access to features where minimum_tier <= user_tier.
+
+    Returns:
+    - True if feature is enabled and user's tier qualifies
+    - False otherwise
+    """
+    from app.core.subscriptions import get_user_plan_tier
+
+    try:
+        # Get user's plan and tier
+        user_result = (
+            supabase.table("users").select("plan").eq("id", user_id).single().execute()
+        )
+
+        plan = user_result.data.get("plan", "free") if user_result.data else "free"
+        user_tier = get_user_plan_tier(plan, supabase)
+
+        # Check if ANY feature with this key exists where user's tier qualifies
+        # (minimum_tier <= user_tier means user has access to this feature)
+        feature_result = (
+            supabase.table("plan_features")
+            .select("id, is_enabled, feature_value")
+            .eq("feature_key", feature_key)
+            .eq("is_enabled", True)
+            .lte("minimum_tier", user_tier)  # Excludes tiers above user's tier
+            .limit(1)
+            .execute()
+        )
+
+        if not feature_result.data:
+            return False
+
+        # Feature exists and user qualifies
+        # For limit features, check if value > 0 (0 means disabled)
+        feature_value = feature_result.data[0].get("feature_value")
+        if feature_value == 0:
+            return False
+
+        return True
+
+    except Exception as e:
+        logger.error(f"Error checking feature {feature_key} for user {user_id}: {e}")
+        return False
+
+
+def _notify_challenge_participants_cancelled(
+    supabase, challenge_id: str, challenge_title: str, reason: str
+):
+    """
+    Notify all participants of a challenge that it has been cancelled.
+
+    SCALABILITY: For large challenges, dispatches notifications via Celery task
+    to avoid blocking the main thread. Uses chunking for 100+ participants.
+    """
+    try:
+        # Get all participant user_ids
+        participants_result = (
+            supabase.table("challenge_participants")
+            .select("user_id")
+            .eq("challenge_id", challenge_id)
+            .execute()
+        )
+
+        if not participants_result.data:
+            return
+
+        user_ids = [p["user_id"] for p in participants_result.data if p.get("user_id")]
+
+        if not user_ids:
+            return
+
+        # For small numbers, process inline
+        # For large numbers, dispatch to Celery task
+        INLINE_THRESHOLD = 10
+
+        if len(user_ids) <= INLINE_THRESHOLD:
+            _send_cancellation_notifications_sync(
+                supabase, user_ids, challenge_id, challenge_title, reason
+            )
+        else:
+            # Dispatch to Celery task for async processing
+            from app.services.tasks.subscription_tasks import (
+                notify_challenge_cancelled_chunk_task,
+            )
+
+            # Dispatch chunked tasks for scalable processing
+            from app.services.tasks.task_utils import dispatch_chunked_tasks
+
+            dispatch_chunked_tasks(
+                task=notify_challenge_cancelled_chunk_task,
+                items=user_ids,
+                chunk_size=50,
+                challenge_id=challenge_id,
+                challenge_title=challenge_title,
+                reason=reason,
+            )
+
+    except Exception as e:
+        logger.error(
+            f"Error notifying participants about challenge {challenge_id} cancellation: {e}"
+        )
+
+
+def _send_cancellation_notifications_sync(
+    supabase,
+    user_ids: List[str],
+    challenge_id: str,
+    challenge_title: str,
+    reason: str,
+) -> int:
+    """
+    Send cancellation notifications to a list of users (sync version).
+    Used both inline and by Celery tasks.
+
+    Returns:
+        Number of notifications delivered
+    """
+    from app.services.expo_push_service import send_push_to_user_sync
+
+    reason_messages = {
+        "creator_subscription_expired": (
+            "Challenge Cancelled",
+            f"'{challenge_title}' has been cancelled because the creator's subscription expired.",
+        ),
+        "no_participants": (
+            "Challenge Cancelled",
+            f"'{challenge_title}' was cancelled because no one joined before the deadline.",
+        ),
+    }
+
+    title, body = reason_messages.get(
+        reason,
+        ("Challenge Cancelled", f"'{challenge_title}' has been cancelled."),
+    )
+
+    notified_count = 0
+    for user_id in user_ids:
+        try:
+            result = send_push_to_user_sync(
+                user_id=user_id,
+                title=title,
+                body=body,
+                data={
+                    "type": "challenge_cancelled",
+                    "challenge_id": challenge_id,
+                    "reason": reason,
+                },
+                notification_type="social",
+                entity_type="challenge",
+                entity_id=challenge_id,
+            )
+            if result.get("delivered"):
+                notified_count += 1
+        except Exception as e:
+            logger.error(
+                f"Failed to send cancellation notification to participant {user_id}: {e}"
+            )
+
+    logger.info(
+        f"Notified {notified_count}/{len(user_ids)} participants about challenge cancellation"
+    )
+
+    return notified_count

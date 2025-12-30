@@ -73,39 +73,48 @@ export interface WarmupCooldownExercise {
 
 // Warm-up section
 export interface WarmupSection {
-  duration_seconds: number;
+  duration_seconds?: number;
   description?: string;
   exercises: WarmupCooldownExercise[];
 }
 
 // Main workout section
 export interface MainWorkoutSection {
-  rest_between_exercises_seconds: number;
+  rest_between_exercises_seconds?: number;
   exercises: WorkoutExercise[];
   style?: "traditional" | "circuit" | "superset";
 }
 
 // Cool-down section
 export interface CooldownSection {
-  duration_seconds: number;
+  duration_seconds?: number;
   description?: string;
   exercises: WarmupCooldownExercise[];
 }
 
-// Weekly progression adjustment
+// Weekly progression adjustment (flexible to accept API and internal formats)
 export interface WeeklyAdjustment {
   week: number;
-  intensity: string;
-  reps_modifier: number;
+  intensity?: string;
+  focus?: string;
+  reps_modifier?: number;
   sets_modifier?: number;
   rest_modifier?: number;
   notes?: string;
 }
 
-// Progression schedule
+// Progression schedule (flexible to accept API format)
 export interface ProgressionSchedule {
-  current_week: number;
-  weekly_adjustments: WeeklyAdjustment[];
+  current_week?: number;
+  weekly_focus?: string;
+  weekly_adjustments?: WeeklyAdjustment[];
+  // Multi-agent system also includes these
+  goal_type?: "habit" | "time_challenge" | "target_challenge";
+  streak_milestones?: Array<{
+    days: number;
+    title: string;
+    description?: string;
+  }>;
 }
 
 // Complete workout structure
@@ -171,6 +180,11 @@ export interface WorkoutSession {
   current_round: number;
   completion_percentage: number;
   paused_at: string | null;
+  // Practice mode and enhanced tracking
+  is_practice_session?: boolean;
+  actual_exercise_time_seconds?: number;
+  calories_burned?: number;
+  feedback_rating?: "hard" | "just_right" | "easy" | null;
 }
 
 // Active session response from API
@@ -198,7 +212,8 @@ export interface SaveProgressRequest {
 // Submit feedback request
 export interface SubmitFeedbackRequest {
   session_id?: string;
-  goal_id: string;
+  goal_id?: string; // For goal-based workouts
+  challenge_id?: string; // For standalone challenge workouts
   plan_id?: string;
   quit_reason: QuitReason;
   additional_feedback?: string;

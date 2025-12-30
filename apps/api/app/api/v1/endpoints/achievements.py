@@ -16,12 +16,12 @@ class AchievementResponse(BaseModel):
     id: str
     user_id: str
     achievement_type_id: str
-    goal_id: Optional[str]
+    goal_id: Optional[str] = None  # Deprecated - now stored in metadata as source_id
     unlocked_at: str
     metadata: dict
     badge_key: str
     badge_name: str
-    badge_description: Optional[str]
+    badge_description: Optional[str] = None
     points: int
     rarity: str
 
@@ -61,27 +61,31 @@ async def get_achievement_types(
 @router.get("/me", response_model=List[AchievementResponse])
 async def get_my_achievements(
     current_user: dict = Depends(get_current_user),
-    goal_id: Optional[str] = Query(None),
 ):
     """Get user's unlocked achievements"""
     try:
         achievements = await achievement_service.get_user_achievements(
             user_id=current_user["id"],
-            goal_id=goal_id,
         )
 
         # Format response
         formatted = []
         for achievement in achievements:
             achievement_type = achievement.get("achievement_types", {})
+            metadata = achievement.get("metadata", {})
+            # Extract goal_id from metadata for backward compatibility
+            # It's stored as source_id when source_type is "goal"
+            goal_id = None
+            if metadata.get("source_type") == "goal":
+                goal_id = metadata.get("source_id")
             formatted.append(
                 {
                     "id": achievement["id"],
                     "user_id": achievement["user_id"],
                     "achievement_type_id": achievement["achievement_type_id"],
-                    "goal_id": achievement.get("goal_id"),
+                    "goal_id": goal_id,
                     "unlocked_at": achievement["unlocked_at"],
-                    "metadata": achievement.get("metadata", {}),
+                    "metadata": metadata,
                     "badge_key": achievement_type.get("badge_key", ""),
                     "badge_name": achievement_type.get("badge_name", ""),
                     "badge_description": achievement_type.get("badge_description"),
@@ -106,13 +110,11 @@ async def get_my_achievements(
 @router.post("/check", response_model=List[AchievementResponse])
 async def check_achievements(
     current_user: dict = Depends(get_current_user),
-    goal_id: Optional[str] = Query(None),
 ):
     """Manually trigger achievement check for current user"""
     try:
         newly_unlocked = await achievement_service.check_and_unlock_achievements(
             user_id=current_user["id"],
-            goal_id=goal_id,
         )
 
         # Format response
@@ -123,7 +125,6 @@ async def check_achievements(
                     "id": achievement["id"],
                     "user_id": achievement["user_id"],
                     "achievement_type_id": achievement["achievement_type_id"],
-                    "goal_id": achievement.get("goal_id"),
                     "unlocked_at": achievement["unlocked_at"],
                     "metadata": achievement.get("metadata", {}),
                     "badge_key": achievement.get("badge_key", ""),

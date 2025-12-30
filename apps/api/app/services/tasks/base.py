@@ -62,7 +62,7 @@ def _activate_goal_and_create_checkin(
             supabase.table("check_ins")
             .select("id")
             .eq("goal_id", goal_id)
-            .eq("date", user_today.isoformat())
+            .eq("check_in_date", user_today.isoformat())
             .execute()
         )
 
@@ -76,9 +76,8 @@ def _activate_goal_and_create_checkin(
         checkin_data = {
             "goal_id": goal_id,
             "user_id": user_id,
-            "date": user_today.isoformat(),
+            "check_in_date": user_today.isoformat(),
             "completed": False,
-            "photo_urls": [],
         }
 
         result = supabase.table("check_ins").insert(checkin_data).execute()

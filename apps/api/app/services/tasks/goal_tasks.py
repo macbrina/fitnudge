@@ -43,11 +43,30 @@ def auto_create_daily_checkins_task(self) -> Dict[str, Any]:
             .select(
                 "id, user_id, title, frequency, days_of_week, users!inner(timezone)"
             )
-            .eq("is_active", True)
+            .eq("status", "active")
             .execute()
         )
 
-        for goal in active_goals_result.data or []:
+        goals = active_goals_result.data or []
+        if goals:
+            # SCALABILITY: Batch fetch all existing check-ins for today
+            goal_ids = [g["id"] for g in goals]
+            today_str = datetime.now().strftime("%Y-%m-%d")
+
+            existing_checkins_result = (
+                supabase.table("check_ins")
+                .select("goal_id, check_in_date")
+                .in_("goal_id", goal_ids)
+                .gte("check_in_date", today_str)
+                .execute()
+            )
+
+            # Build set of (goal_id, date) pairs that already exist
+            existing_checkin_keys = set()
+            for ci in existing_checkins_result.data or []:
+                existing_checkin_keys.add((ci["goal_id"], ci["check_in_date"]))
+
+        for goal in goals:
             goal_id = goal["id"]
             user_id = goal["user_id"]
             goal_title = goal.get("title", "Unknown")
@@ -72,17 +91,8 @@ def auto_create_daily_checkins_task(self) -> Dict[str, Any]:
                 if not should_create:
                     continue
 
-                # Check if check-in already exists for this date
-                existing_checkin = (
-                    supabase.table("check_ins")
-                    .select("id")
-                    .eq("goal_id", goal_id)
-                    .eq("user_id", user_id)
-                    .eq("date", user_today.isoformat())
-                    .execute()
-                )
-
-                if existing_checkin.data:
+                # Check if check-in already exists (from batch data)
+                if (goal_id, user_today.isoformat()) in existing_checkin_keys:
                     goal_skipped_count += 1
                     continue
 
@@ -90,9 +100,8 @@ def auto_create_daily_checkins_task(self) -> Dict[str, Any]:
                 checkin_data = {
                     "goal_id": goal_id,
                     "user_id": user_id,
-                    "date": user_today.isoformat(),
+                    "check_in_date": user_today.isoformat(),
                     "completed": False,
-                    "photo_urls": [],
                 }
 
                 result = supabase.table("check_ins").insert(checkin_data).execute()
@@ -126,20 +135,46 @@ def auto_create_daily_checkins_task(self) -> Dict[str, Any]:
                 supabase.table("challenge_participants")
                 .select(
                     "user_id, challenge_id, "
-                    "challenges!inner(id, title, is_active, start_date, end_date, goal_template), "
+                    "challenges!inner(id, title, status, start_date, end_date, frequency, days_of_week), "
                     "users!inner(timezone)"
                 )
                 .execute()
             )
 
-            for participant in participants_result.data or []:
+            participants = participants_result.data or []
+            if participants:
+                # SCALABILITY: Batch fetch all existing challenge check-ins
+                challenge_ids = list(
+                    set(
+                        p.get("challenges", {}).get("id")
+                        for p in participants
+                        if p.get("challenges")
+                    )
+                )
+
+                existing_challenge_checkins = (
+                    supabase.table("challenge_check_ins")
+                    .select("challenge_id, user_id, check_in_date")
+                    .in_("challenge_id", challenge_ids)
+                    .gte("check_in_date", today_str)
+                    .execute()
+                )
+
+                # Build set of (challenge_id, user_id, date) keys
+                existing_challenge_keys = set()
+                for ci in existing_challenge_checkins.data or []:
+                    existing_challenge_keys.add(
+                        (ci["challenge_id"], ci["user_id"], ci["check_in_date"])
+                    )
+
+            for participant in participants:
                 user_id = participant["user_id"]
                 challenge = participant.get("challenges", {})
                 challenge_id = challenge.get("id")
                 challenge_title = challenge.get("title", "Unknown")
 
                 # Skip if challenge is not active
-                if not challenge.get("is_active"):
+                if challenge.get("status") not in ("upcoming", "active"):
                     continue
 
                 # Get user's timezone
@@ -168,10 +203,9 @@ def auto_create_daily_checkins_task(self) -> Dict[str, Any]:
                         if user_today > end_date:
                             continue  # Challenge has ended
 
-                    # Check if today is a scheduled day based on goal_template
-                    goal_template = challenge.get("goal_template") or {}
-                    frequency = goal_template.get("frequency", "daily")
-                    days_of_week = goal_template.get("days_of_week") or []
+                    # Check if today is a scheduled day (direct fields on challenge)
+                    frequency = challenge.get("frequency", "daily")
+                    days_of_week = challenge.get("days_of_week") or []
 
                     should_create = _is_scheduled_day(
                         frequency, days_of_week, user_today
@@ -180,17 +214,12 @@ def auto_create_daily_checkins_task(self) -> Dict[str, Any]:
                     if not should_create:
                         continue
 
-                    # Check if check-in already exists for this date
-                    existing_checkin = (
-                        supabase.table("challenge_check_ins")
-                        .select("id")
-                        .eq("challenge_id", challenge_id)
-                        .eq("user_id", user_id)
-                        .eq("check_in_date", user_today.isoformat())
-                        .execute()
-                    )
-
-                    if existing_checkin.data:
+                    # Check if check-in exists (from batch data)
+                    if (
+                        challenge_id,
+                        user_id,
+                        user_today.isoformat(),
+                    ) in existing_challenge_keys:
                         challenge_skipped_count += 1
                         continue
 
@@ -286,7 +315,7 @@ def _is_scheduled_day(frequency: str, days_of_week: list, check_date) -> bool:
     """
     if frequency == "daily":
         return True
-    elif frequency == "weekly" or frequency == "custom":
+    elif frequency == "weekly":
         if not days_of_week:
             return True  # If no days specified, treat as daily
         # Convert Python weekday (0=Mon, 6=Sun) to our format (0=Sun, 1=Mon, ..., 6=Sat)
@@ -294,240 +323,3 @@ def _is_scheduled_day(frequency: str, days_of_week: list, check_date) -> bool:
         our_weekday = (python_weekday + 1) % 7
         return our_weekday in days_of_week
     return True  # Default to daily if unknown frequency
-
-
-@celery_app.task(
-    name="check_goal_completions",
-    bind=True,
-    max_retries=2,
-    default_retry_delay=60,
-)
-def check_goal_completions_task(self) -> Dict[str, Any]:
-    """
-    Check and auto-complete challenge goals.
-
-    For time_challenge: Complete when challenge_end_date is reached
-    For target_challenge: Complete when completed check-ins >= target_checkins
-
-    Should be scheduled to run daily (e.g., at 00:05 UTC).
-    """
-    from datetime import datetime, date, timedelta
-    from app.services.expo_push_service import send_push_message_sync
-
-    try:
-        supabase = get_supabase_client()
-        today = date.today()
-
-        completed_count = 0
-        failed_count = 0
-
-        # 1. Check time-based challenges that have ended
-        time_challenges = (
-            supabase.table("goals")
-            .select(
-                "id, user_id, title, challenge_start_date, challenge_end_date, goal_type, frequency, days_of_week"
-            )
-            .eq("goal_type", "time_challenge")
-            .is_("completed_at", "null")
-            .lte("challenge_end_date", today.isoformat())
-            .execute()
-        )
-
-        for goal in time_challenges.data or []:
-            try:
-                # Calculate actual completion stats from check_ins table
-                # Count completed check-ins during the challenge period
-                challenge_start = goal.get("challenge_start_date")
-                challenge_end = goal.get("challenge_end_date")
-                frequency = goal.get("frequency", "daily")
-                days_of_week = goal.get("days_of_week") or []
-
-                checkins_result = (
-                    supabase.table("check_ins")
-                    .select("id, completed, date", count="exact")
-                    .eq("goal_id", goal["id"])
-                    .eq("completed", True)
-                    .execute()
-                )
-
-                completed_days = checkins_result.count or 0
-
-                # Calculate total SCHEDULED days (respecting frequency and days_of_week)
-                # For weekly goals, only count the scheduled days within the challenge period
-                total_scheduled_days = 0
-                if challenge_start and challenge_end:
-                    try:
-                        start_date = (
-                            datetime.fromisoformat(challenge_start).date()
-                            if isinstance(challenge_start, str)
-                            else challenge_start
-                        )
-                        end_date = (
-                            datetime.fromisoformat(challenge_end).date()
-                            if isinstance(challenge_end, str)
-                            else challenge_end
-                        )
-
-                        if frequency == "daily":
-                            # Daily goals: every day counts
-                            total_scheduled_days = (end_date - start_date).days + 1
-                        elif frequency == "weekly" and days_of_week:
-                            # Weekly goals: count only scheduled days
-                            # days_of_week uses 0=Sunday, 1=Monday, ..., 6=Saturday
-                            current_date = start_date
-                            while current_date <= end_date:
-                                # Python weekday: 0=Monday, 6=Sunday
-                                # Convert to our format: 0=Sunday, 1=Monday, ..., 6=Saturday
-                                python_weekday = current_date.weekday()
-                                our_weekday = (python_weekday + 1) % 7
-                                if our_weekday in days_of_week:
-                                    total_scheduled_days += 1
-                                current_date += timedelta(days=1)
-                        else:
-                            # Fallback: assume daily
-                            total_scheduled_days = (end_date - start_date).days + 1
-                    except Exception:
-                        total_scheduled_days = 30  # Default fallback
-
-                completion_rate = (
-                    round((completed_days / max(total_scheduled_days, 1)) * 100)
-                    if total_scheduled_days > 0
-                    else 0
-                )
-
-                # Mark as completed with stats
-                supabase.table("goals").update(
-                    {
-                        "completed_at": datetime.now().isoformat(),
-                        "completion_reason": "duration",
-                        "is_active": False,
-                    }
-                ).eq("id", goal["id"]).execute()
-
-                # Send celebration notification with completion stats
-                user_result = (
-                    supabase.table("users")
-                    .select("expo_push_token, name")
-                    .eq("id", goal["user_id"])
-                    .maybe_single()
-                    .execute()
-                )
-
-                if user_result.data and user_result.data.get("expo_push_token"):
-                    # Personalize message based on completion rate
-                    if completion_rate >= 90:
-                        celebration_emoji = "🏆"
-                        message = f"Amazing! You crushed your '{goal['title']}' challenge with {completed_days}/{total_scheduled_days} check-ins ({completion_rate}%)!"
-                    elif completion_rate >= 70:
-                        celebration_emoji = "🎉"
-                        message = f"Great job! You completed your '{goal['title']}' challenge with {completed_days}/{total_scheduled_days} check-ins!"
-                    elif completion_rate >= 50:
-                        celebration_emoji = "👏"
-                        message = f"You finished your '{goal['title']}' challenge! {completed_days}/{total_scheduled_days} check-ins completed."
-                    else:
-                        celebration_emoji = "✅"
-                        message = f"Your '{goal['title']}' challenge ended. You completed {completed_days}/{total_scheduled_days} check-ins."
-
-                    send_push_message_sync(
-                        token=user_result.data["expo_push_token"],
-                        title=f"{celebration_emoji} Challenge Complete!",
-                        body=message,
-                        data={
-                            "type": "challenge_complete",
-                            "goal_id": goal["id"],
-                            "completed_checkins": completed_days,
-                            "total_scheduled_checkins": total_scheduled_days,
-                            "completion_rate": completion_rate,
-                        },
-                    )
-
-                completed_count += 1
-                print(
-                    f"✅ Completed time challenge: {goal['title']} ({completed_days}/{total_scheduled_days} check-ins, {completion_rate}%) (goal_id: {goal['id']})"
-                )
-
-            except Exception as e:
-                failed_count += 1
-                print(f"❌ Failed to complete time challenge {goal['id']}: {e}")
-
-        # 2. Check target-based challenges that have reached their target
-        target_challenges = (
-            supabase.table("goals")
-            .select("id, user_id, title, target_checkins, goal_type")
-            .eq("goal_type", "target_challenge")
-            .is_("completed_at", "null")
-            .not_.is_("target_checkins", "null")
-            .execute()
-        )
-
-        for goal in target_challenges.data or []:
-            try:
-                # Count completed check-ins for this goal
-                checkins_result = (
-                    supabase.table("check_ins")
-                    .select("id", count="exact")
-                    .eq("goal_id", goal["id"])
-                    .eq("completed", True)
-                    .execute()
-                )
-
-                completed_checkins = checkins_result.count or 0
-                target = goal.get("target_checkins", 0)
-
-                if completed_checkins >= target:
-                    # Mark as completed
-                    supabase.table("goals").update(
-                        {
-                            "completed_at": datetime.now().isoformat(),
-                            "completion_reason": "target",
-                            "is_active": False,
-                        }
-                    ).eq("id", goal["id"]).execute()
-
-                    # Send celebration notification
-                    user_result = (
-                        supabase.table("users")
-                        .select("expo_push_token, name")
-                        .eq("id", goal["user_id"])
-                        .maybe_single()
-                        .execute()
-                    )
-
-                    if user_result.data and user_result.data.get("expo_push_token"):
-                        send_push_message_sync(
-                            token=user_result.data["expo_push_token"],
-                            title="🎉 Target Reached!",
-                            body=f"Amazing! You hit {completed_checkins}/{target} check-ins for '{goal['title']}'!",
-                            data={
-                                "type": "challenge_complete",
-                                "goal_id": goal["id"],
-                            },
-                        )
-
-                    completed_count += 1
-                    print(
-                        f"✅ Completed target challenge: {goal['title']} ({completed_checkins}/{target})"
-                    )
-
-            except Exception as e:
-                failed_count += 1
-                print(f"❌ Failed to check target challenge {goal['id']}: {e}")
-
-        print(
-            f"Goal completion check done: {completed_count} completed, {failed_count} failed"
-        )
-
-        return {
-            "success": True,
-            "completed": completed_count,
-            "failed": failed_count,
-        }
-
-    except Exception as e:
-        logger.error(
-            "Failed to check goal completions",
-            {"error": str(e)},
-        )
-        if self.request.retries < self.max_retries:
-            raise self.retry(exc=e)
-        return {"success": False, "error": str(e)}

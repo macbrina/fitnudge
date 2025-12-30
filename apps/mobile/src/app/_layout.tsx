@@ -15,8 +15,9 @@ import { setupDeepLinkListener } from "@/utils/deepLinkHandler";
 import { initDeviceInfo } from "@/utils/deviceInfo";
 import "@i18n";
 import * as Sentry from "@sentry/react-native";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { Stack, usePathname, useSegments } from "expo-router";
+import { queryClient, queryPersister } from "@/lib/queryClient";
 import * as ScreenOrientation from "expo-screen-orientation";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, type ReactElement, type ReactNode } from "react";
@@ -46,20 +47,7 @@ try {
   console.warn("Sentry initialization failed:", error);
 }
 
-// Initialize React Query
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      retry: 3,
-      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-    },
-    mutations: {
-      retry: 1,
-    },
-  },
-});
-
+// QueryClient is now imported from @/lib/queryClient with persistent cache
 // LaunchDarkly is now handled by the provider pattern
 
 function SafeAreaWrapper() {
@@ -80,13 +68,23 @@ function SafeAreaWrapper() {
   const inChallenges =
     segments.includes("(user)") && segments.includes("challenges");
   const inWorkout = segments.includes("(user)") && segments.includes("workout");
-
+  const inAchievements =
+    segments.includes("(user)") && segments.includes("achievements");
+  const isSocial = segments.includes("(user)") && segments.includes("social");
   // Workout screens handle their own safe areas for full-screen overlays
   const isSafeAreaHidden = inOnboarding || isAuthBase || inWorkout;
+  const isProfile = segments.includes("(user)") && segments.includes("profile");
 
   // For tabs, exclude bottom edge since tab bar handles its own safe area insets
   const safeAreaEdges: ("bottom" | "left" | "right" | "top")[] =
-    inTabs || inGoals || inChallenges || inAuth || inWorkout
+    inTabs ||
+    inGoals ||
+    inChallenges ||
+    inAuth ||
+    inWorkout ||
+    inAchievements ||
+    isSocial ||
+    isProfile
       ? ["left", "right", "top"]
       : ["bottom", "left", "right", "top"];
 
@@ -146,7 +144,7 @@ function StatusBarWrapper() {
       RNStatusBar.setBackgroundColor(backgroundColor, true);
       RNStatusBar.setBarStyle(
         statusBarStyle === "light" ? "light-content" : "dark-content",
-        true
+        true,
       );
       RNStatusBar.setTranslucent(false);
     }
@@ -158,13 +156,11 @@ function StatusBarWrapper() {
   }
 
   return (
-    <>
-      <StatusBar
-        style={statusBarStyle}
-        translucent={false}
-        backgroundColor={colors.bg.canvas}
-      />
-    </>
+    <StatusBar
+      style={statusBarStyle}
+      translucent={false}
+      backgroundColor={colors.bg.canvas}
+    />
   );
 }
 
@@ -183,7 +179,7 @@ function RootLayout(): ReactElement {
   // Lock to portrait on app start (workout player can override this)
   useEffect(() => {
     ScreenOrientation.lockAsync(
-      ScreenOrientation.OrientationLock.PORTRAIT_UP
+      ScreenOrientation.OrientationLock.PORTRAIT_UP,
     ).catch((error) => {
       console.warn("[RootLayout] Failed to lock orientation:", error);
     });
@@ -203,7 +199,10 @@ function RootLayout(): ReactElement {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <QueryClientProvider client={queryClient}>
+        <PersistQueryClientProvider
+          client={queryClient}
+          persistOptions={{ persister: queryPersister }}
+        >
           <ThemeProvider initialBrand="fitnudge">
             <PostHogProvider>
               <LaunchDarklyProvider>
@@ -223,7 +222,7 @@ function RootLayout(): ReactElement {
               </LaunchDarklyProvider>
             </PostHogProvider>
           </ThemeProvider>
-        </QueryClientProvider>
+        </PersistQueryClientProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

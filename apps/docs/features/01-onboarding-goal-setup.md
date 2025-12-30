@@ -50,7 +50,7 @@ After completing the profile, users receive AI-generated goal suggestions using 
 - Each suggestion includes:
   - **Title**: Goal name
   - **Description**: Detailed explanation
-  - **Category**: fitness, nutrition, wellness, mindfulness, sleep, custom
+  - **Category**: fitness, nutrition, wellness, mindfulness, sleep
   - **Frequency**: daily, weekly, monthly, custom
   - **Target Days**: Specific days per week/month (optional)
   - **Reminder Times**: Suggested reminder times

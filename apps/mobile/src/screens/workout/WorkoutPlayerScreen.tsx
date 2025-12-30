@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react";
 import {
   View,
   Text,
@@ -7,7 +13,7 @@ import {
   Animated,
   Vibration,
 } from "react-native";
-import { useVideoPlayer, VideoView } from "expo-video";
+import Video, { ResizeMode } from "react-native-video";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   SafeAreaView,
@@ -15,16 +21,16 @@ import {
 } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as ScreenOrientation from "expo-screen-orientation";
+import * as Speech from "expo-speech";
 import { useStyles, useTheme } from "@/themes";
 import { tokens } from "@/themes/tokens";
 import { toRN } from "@/lib/units";
 import { fontFamily } from "@/lib/fonts";
 import { useTranslation } from "@/lib/i18n";
-import { useGoalPlan } from "@/hooks/api/useActionablePlans";
+import { useGoalPlan, useChallengePlan } from "@/hooks/api/useActionablePlans";
 import { useWorkoutTimer } from "@/hooks/useWorkoutTimer";
 import { useWorkoutSession } from "@/hooks/useWorkoutSession";
 import {
-  WorkoutComplete,
   ReadyCountdown,
   ExerciseCountdown,
   RestScreen,
@@ -32,15 +38,31 @@ import {
   QuitFeedback,
   LandscapeWorkoutView,
   MusicVoiceModal,
+  CompletionFlow,
+  WorkoutCompletingScreen,
 } from "./components";
+import type { CompletedSessionResponse } from "@/services/api/workoutSessions";
+import { workoutSessionsService } from "@/services/api/workoutSessions";
 import { ExerciseDetailModal } from "@/components/exercises/ExerciseDetailModal";
 import type { WorkoutExercise, WorkoutPlan, QuitReason } from "@/types/workout";
 import { useWorkoutAudio } from "@/hooks/useWorkoutAudio";
+import { useWorkoutMusic } from "@/hooks/api/useWorkoutMusic";
+import {
+  useAudioPreferences,
+  useUpdateAudioPreferences,
+  useAudioPreferencesCache,
+} from "@/hooks/api/useAudioPreferences";
+
+// Need to import StyleSheet for absoluteFillObject
+import { StyleSheet as RNStyleSheet } from "react-native";
 
 export function WorkoutPlayerScreen() {
   const router = useRouter();
-  const { goalId, resume, restart } = useLocalSearchParams<{
-    goalId: string;
+  // Support both goal and challenge routes
+  // Route: /workout/[goalId] OR /workout/challenge/[challengeId]
+  const { goalId, challengeId, resume, restart } = useLocalSearchParams<{
+    goalId?: string;
+    challengeId?: string;
     resume?: string;
     restart?: string;
   }>();
@@ -49,10 +71,25 @@ export function WorkoutPlayerScreen() {
   const styles = useStyles(makeStyles);
   const { t } = useTranslation();
 
-  // Fetch the workout plan
-  const { data: planData, isLoading: planLoading } = useGoalPlan(goalId!, true);
+  // Determine if this is a challenge or goal workout
+  const isChallenge = !!challengeId && !goalId;
+  const entityId = goalId || challengeId || "";
 
-  // Workout session hook
+  // Fetch the workout plan based on entity type
+  const { data: goalPlanData, isLoading: goalPlanLoading } = useGoalPlan(
+    goalId,
+    !!goalId,
+  );
+  const { data: challengePlanData, isLoading: challengePlanLoading } =
+    useChallengePlan(challengeId, isChallenge);
+
+  const planData = isChallenge ? challengePlanData : goalPlanData;
+  const planLoading = isChallenge ? challengePlanLoading : goalPlanLoading;
+
+  // Fetch workout music tracks
+  const { data: musicTracks = [] } = useWorkoutMusic();
+
+  // Workout session hook - pass isChallenge flag
   const {
     activeSession,
     canResume,
@@ -61,7 +98,7 @@ export function WorkoutPlayerScreen() {
     saveProgress,
     completeSession,
     submitFeedback,
-  } = useWorkoutSession(goalId);
+  } = useWorkoutSession(entityId, isChallenge);
 
   // Workout timer hook
   const {
@@ -91,9 +128,11 @@ export function WorkoutPlayerScreen() {
     resumeWorkout,
     skipToNext,
     skipToPrevious,
+    jumpToExercise,
     completeWorkout,
     skipReadyCountdown,
     startExerciseAfterCountdown,
+    restartCurrentExercise,
     markExerciseDone,
     extendRest,
     skipRest,
@@ -110,11 +149,19 @@ export function WorkoutPlayerScreen() {
   const [isLandscape, setIsLandscape] = useState(false);
   const [showMusicModal, setShowMusicModal] = useState(false);
   const [showExerciseDetail, setShowExerciseDetail] = useState(false);
+  const [completionData, setCompletionData] =
+    useState<CompletedSessionResponse | null>(null);
 
   // Track if user manually paused before opening modals
   const wasManuallyPausedRef = useRef(false);
+  // Track if music was actually playing before opening modals
+  const wasMusicPlayingRef = useRef(false);
   // Track original music volume before reducing for modals
   const originalMusicVolumeRef = useRef<number | null>(null);
+
+  // Load audio preferences from backend (prefetched in PlanSection)
+  const { data: savedAudioPrefs } = useAudioPreferences();
+  const updateAudioPrefsMutation = useUpdateAudioPreferences();
 
   // Audio hook for music, sound effects, and coach voice
   const {
@@ -130,9 +177,52 @@ export function WorkoutPlayerScreen() {
     preferences: audioPreferences,
     updatePreferences: updateAudioPreferences,
     playDing,
+    stopDing,
     playlist: musicPlaylist,
+    setPlaylist,
     playTrack: playMusicTrack,
-  } = useWorkoutAudio({ autoPlay: true });
+    speakCountdown,
+    speakCoachPhrase,
+  } = useWorkoutAudio({
+    autoPlay: false,
+    // Map API response to hook's expected format (handle null -> undefined)
+    initialPreferences: savedAudioPrefs
+      ? {
+          ...savedAudioPrefs,
+          preferred_music_app: savedAudioPrefs.preferred_music_app ?? undefined,
+          last_played_track_id:
+            savedAudioPrefs.last_played_track_id ?? undefined,
+        }
+      : undefined,
+  });
+
+  // Track if we should auto-play music when playlist becomes available
+  const shouldAutoPlayMusicRef = useRef(false);
+
+  // Set playlist when music tracks load
+  useEffect(() => {
+    if (musicTracks.length > 0 && musicPlaylist.length === 0) {
+      setPlaylist(musicTracks);
+    }
+  }, [musicTracks, musicPlaylist.length, setPlaylist]);
+
+  // Auto-play music when playlist becomes available and we wanted to play
+  useEffect(() => {
+    if (
+      shouldAutoPlayMusicRef.current &&
+      musicPlaylist.length > 0 &&
+      audioPreferences.music_enabled &&
+      hasStarted
+    ) {
+      shouldAutoPlayMusicRef.current = false;
+      playMusic();
+    }
+  }, [
+    musicPlaylist.length,
+    audioPreferences.music_enabled,
+    hasStarted,
+    playMusic,
+  ]);
 
   // Animation refs
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -142,21 +232,18 @@ export function WorkoutPlayerScreen() {
     try {
       if (isLandscape) {
         // Switch back to portrait
-        console.log("Switching to portrait...");
         await ScreenOrientation.lockAsync(
-          ScreenOrientation.OrientationLock.PORTRAIT_UP
+          ScreenOrientation.OrientationLock.PORTRAIT_UP,
         );
         setIsLandscape(false);
       } else {
         // Switch to landscape - use LANDSCAPE to allow both directions
         await ScreenOrientation.lockAsync(
-          ScreenOrientation.OrientationLock.LANDSCAPE
+          ScreenOrientation.OrientationLock.LANDSCAPE,
         );
         setIsLandscape(true);
-        console.log("Switched to landscape successfully");
       }
     } catch (error) {
-      console.error("Failed to toggle orientation:", error);
       // Still toggle the UI even if orientation fails
       setIsLandscape(!isLandscape);
     }
@@ -166,16 +253,155 @@ export function WorkoutPlayerScreen() {
   useEffect(() => {
     return () => {
       ScreenOrientation.lockAsync(
-        ScreenOrientation.OrientationLock.PORTRAIT_UP
+        ScreenOrientation.OrientationLock.PORTRAIT_UP,
       ).catch(() => {});
     };
   }, []);
+
+  // Track last spoken countdown number to avoid repeating
+  const lastSpokenCountdownRef = useRef<number | null>(null);
+
+  // Countdown speech effect - speak 5, 4, 3, 2, 1 during timed exercises
+  useEffect(() => {
+    // Only speak during active timed exercises (not rest, not ready countdown, not exercise countdown)
+    if (
+      !isPlaying ||
+      isPaused ||
+      showReadyCountdown ||
+      showExerciseCountdown ||
+      phase === "rest" ||
+      phase === "completed" ||
+      !isCurrentExerciseTimed
+    ) {
+      // Reset last spoken when not in countdown range
+      if (timeRemaining > 5) {
+        lastSpokenCountdownRef.current = null;
+      }
+      return;
+    }
+
+    // Speak countdown from 5 to 1
+    if (timeRemaining >= 1 && timeRemaining <= 5) {
+      // Only speak if we haven't spoken this number yet
+      if (lastSpokenCountdownRef.current !== timeRemaining) {
+        lastSpokenCountdownRef.current = timeRemaining;
+        speakCountdown(timeRemaining);
+      }
+    }
+  }, [
+    timeRemaining,
+    isPlaying,
+    isPaused,
+    showReadyCountdown,
+    showExerciseCountdown,
+    phase,
+    isCurrentExerciseTimed,
+    speakCountdown,
+  ]);
+
+  // Track previous phase to detect transition to rest
+  const prevPhaseRef = useRef<string | null>(null);
+
+  // Play ding and speak "Next {duration} {name}" when transitioning to rest phase
+  useEffect(() => {
+    // Check if we just transitioned to rest phase
+    if (
+      phase === "rest" &&
+      prevPhaseRef.current !== "rest" &&
+      prevPhaseRef.current !== null
+    ) {
+      // Play ding sound when entering rest
+      playDing();
+
+      // Small delay after ding, then stop ding before speaking to avoid audio conflict
+      setTimeout(() => {
+        // Stop the ding sound to free up audio session for speech
+        stopDing();
+
+        // Get the next exercise info for speech
+        const nextInfo = getNextExerciseInfo();
+        if (nextInfo?.exercise) {
+          const duration = (() => {
+            const ex = nextInfo.exercise;
+            if ("duration_seconds" in ex && ex.duration_seconds) {
+              return `${ex.duration_seconds} seconds`;
+            }
+            if ("work_duration_seconds" in ex && ex.work_duration_seconds) {
+              return `${ex.work_duration_seconds} seconds`;
+            }
+            if ("reps" in ex && ex.reps) {
+              return `${ex.reps} reps`;
+            }
+            return "";
+          })();
+          const speechText = duration
+            ? `Next, ${duration}, ${nextInfo.exercise.name}`
+            : `Next, ${nextInfo.exercise.name}`;
+          speakCoachPhrase("rest", speechText);
+        } else {
+          speakCoachPhrase("rest", "Take a rest");
+        }
+      }, 700); // Allow ding to play fully before stopping and starting speech
+    }
+    prevPhaseRef.current = phase;
+  }, [phase, speakCoachPhrase, getNextExerciseInfo, playDing, stopDing]);
+
+  // Combined list of all exercises for the exercise list modal
+  const allExercisesForList = useMemo(() => {
+    return [...warmUpExercises, ...exercises, ...coolDownExercises];
+  }, [warmUpExercises, exercises, coolDownExercises]);
+
+  // Handle jumping to a specific exercise from the exercise list modal
+  const handleJumpToExercise = useCallback(
+    (globalIndex: number) => {
+      // Jump to the selected exercise using the global index
+      jumpToExercise(globalIndex);
+
+      // Save progress after jump
+      if (sessionId) {
+        saveProgress({
+          sessionId,
+          data: {
+            current_phase: phase,
+            current_exercise_index: currentExerciseIndex,
+            current_set: currentSetIndex + 1,
+            current_round: currentRound,
+            completion_percentage: progress,
+            exercises_completed: globalIndex,
+            sets_completed: globalIndex,
+            paused_duration_seconds: workoutStats.pausedDurationSeconds,
+          },
+        }).catch((error) => console.error("Failed to save progress:", error));
+      }
+    },
+    [
+      jumpToExercise,
+      saveProgress,
+      sessionId,
+      phase,
+      currentExerciseIndex,
+      currentSetIndex,
+      currentRound,
+      progress,
+      workoutStats.pausedDurationSeconds,
+    ],
+  );
 
   // Handle workout start
   const handleStartWorkout = useCallback(async () => {
     if (hasStarted) return; // Prevent double-start
     setHasStarted(true);
     startWorkout();
+
+    // Start music if enabled and playlist is ready
+    if (audioPreferences.music_enabled) {
+      if (musicPlaylist.length > 0) {
+        playMusic();
+      } else {
+        // Playlist not ready yet, set flag to auto-play when it becomes available
+        shouldAutoPlayMusicRef.current = true;
+      }
+    }
 
     // Start fade animation IMMEDIATELY - don't wait for session creation
     Animated.timing(fadeAnim, {
@@ -194,7 +420,8 @@ export function WorkoutPlayerScreen() {
     const totalSetsCount = warmupSets + workoutSets + cooldownSets;
 
     startSession({
-      goal_id: goalId!,
+      goal_id: isChallenge ? undefined : entityId,
+      challenge_id: isChallenge ? entityId : undefined,
       plan_id: planData?.plan?.id,
       exercises_total: totalExercises,
       sets_total: totalSetsCount,
@@ -206,11 +433,15 @@ export function WorkoutPlayerScreen() {
     startWorkout,
     fadeAnim,
     startSession,
-    goalId,
+    entityId,
+    isChallenge,
     planData,
     warmUpExercises,
     exercises,
     coolDownExercises,
+    audioPreferences.music_enabled,
+    musicPlaylist.length,
+    playMusic,
   ]);
 
   // Handle resume from saved progress
@@ -227,13 +458,30 @@ export function WorkoutPlayerScreen() {
         currentRound: saved.current_round,
       });
 
+      // Start music if enabled and playlist is ready
+      if (audioPreferences.music_enabled) {
+        if (musicPlaylist.length > 0) {
+          playMusic();
+        } else {
+          // Playlist not ready yet, set flag to auto-play when it becomes available
+          shouldAutoPlayMusicRef.current = true;
+        }
+      }
+
       Animated.timing(fadeAnim, {
         toValue: 1,
         duration: 300,
         useNativeDriver: true,
       }).start();
     }
-  }, [activeSession, resumeFromProgress, fadeAnim]);
+  }, [
+    activeSession,
+    resumeFromProgress,
+    fadeAnim,
+    audioPreferences.music_enabled,
+    musicPlaylist.length,
+    playMusic,
+  ]);
 
   // Handle close/exit - show exit confirmation (auto-pause like modals)
   const handleClose = useCallback(() => {
@@ -251,15 +499,16 @@ export function WorkoutPlayerScreen() {
 
     // Remember if user manually paused before opening
     wasManuallyPausedRef.current = isPaused;
+    wasMusicPlayingRef.current = isMusicPlaying; // Track if music was playing
 
     // Auto-pause if not already paused
     if (!isPaused) {
       pauseWorkout();
-      pauseMusic();
     }
 
-    // Reduce music volume without reflecting on slider
-    if (isMusicPlaying && audioPreferences.music_enabled) {
+    // Pause music and reduce volume (only if playing)
+    if (isMusicPlaying) {
+      pauseMusic();
       originalMusicVolumeRef.current = audioPreferences.music_volume;
       setMusicVolume(audioPreferences.music_volume * 0.3);
     }
@@ -273,7 +522,6 @@ export function WorkoutPlayerScreen() {
     pauseWorkout,
     pauseMusic,
     isMusicPlaying,
-    audioPreferences.music_enabled,
     audioPreferences.music_volume,
     setMusicVolume,
     router,
@@ -289,21 +537,18 @@ export function WorkoutPlayerScreen() {
       originalMusicVolumeRef.current = null;
     }
 
-    // Only resume if user didn't manually pause before opening modal
+    // Only resume workout if user didn't manually pause before opening modal
     if (!wasManuallyPausedRef.current) {
       resumeWorkout();
-      if (audioPreferences.music_enabled) {
-        playMusic();
-      }
     }
-  }, [
-    resumeWorkout,
-    playMusic,
-    setMusicVolume,
-    audioPreferences.music_enabled,
-  ]);
 
-  // Handle restart from exit modal
+    // Only resume music if it was actually playing before
+    if (wasMusicPlayingRef.current) {
+      playMusic();
+    }
+  }, [resumeWorkout, playMusic, setMusicVolume]);
+
+  // Handle restart from exit modal - restarts CURRENT exercise, not from beginning
   const handleRestart = useCallback(() => {
     setShowExitModal(false);
 
@@ -313,13 +558,98 @@ export function WorkoutPlayerScreen() {
       originalMusicVolumeRef.current = null;
     }
 
-    startWorkout();
+    // Restart current exercise with 3-2-1 countdown (not ReadyCountdown)
+    restartCurrentExercise();
 
-    // Resume music
-    if (audioPreferences.music_enabled) {
+    // Resume music only if it was playing before
+    if (wasMusicPlayingRef.current) {
       playMusic();
     }
-  }, [startWorkout, setMusicVolume, playMusic, audioPreferences.music_enabled]);
+  }, [restartCurrentExercise, setMusicVolume, playMusic]);
+
+  // Handle skip rest - stop any ongoing speech first
+  const handleSkipRest = useCallback(() => {
+    Speech.stop(); // Stop "Next 30 seconds..." announcement
+    skipRest();
+  }, [skipRest]);
+
+  // Handle extend rest - this doesn't need to stop speech as we're just adding time
+  // but let's wrap it for consistency
+
+  // Handle jump to exercise from rest screen - stop speech first
+  const handleJumpFromRest = useCallback(
+    (index: number) => {
+      Speech.stop(); // Stop any ongoing speech
+      handleJumpToExercise(index);
+    },
+    [handleJumpToExercise],
+  );
+
+  // Handle next exercise - save progress for crash protection
+  const handleNext = useCallback(() => {
+    // Save current progress before navigating
+    if (sessionId) {
+      saveProgress({
+        sessionId,
+        data: {
+          current_phase: phase,
+          current_exercise_index: currentExerciseIndex,
+          current_set: currentSetIndex + 1,
+          current_round: currentRound,
+          completion_percentage: progress,
+          exercises_completed: workoutStats.exercisesCompleted,
+          sets_completed: workoutStats.setsCompleted,
+          paused_duration_seconds: workoutStats.pausedDurationSeconds,
+        },
+      }).catch((error) =>
+        console.error("Failed to save progress on next:", error),
+      );
+    }
+    skipToNext();
+  }, [
+    sessionId,
+    saveProgress,
+    phase,
+    currentExerciseIndex,
+    currentSetIndex,
+    currentRound,
+    progress,
+    workoutStats,
+    skipToNext,
+  ]);
+
+  // Handle previous exercise - save progress for crash protection
+  const handlePrevious = useCallback(() => {
+    // Save current progress before navigating
+    if (sessionId) {
+      saveProgress({
+        sessionId,
+        data: {
+          current_phase: phase,
+          current_exercise_index: currentExerciseIndex,
+          current_set: currentSetIndex + 1,
+          current_round: currentRound,
+          completion_percentage: progress,
+          exercises_completed: workoutStats.exercisesCompleted,
+          sets_completed: workoutStats.setsCompleted,
+          paused_duration_seconds: workoutStats.pausedDurationSeconds,
+        },
+      }).catch((error) =>
+        console.error("Failed to save progress on prev:", error),
+      );
+    }
+    skipToPrevious();
+  }, [
+    sessionId,
+    saveProgress,
+    phase,
+    currentExerciseIndex,
+    currentSetIndex,
+    currentRound,
+    progress,
+    workoutStats,
+    skipToPrevious,
+  ]);
 
   // Handle quit - show feedback screen (progress saved there when user confirms)
   const handleQuit = useCallback(() => {
@@ -351,7 +681,8 @@ export function WorkoutPlayerScreen() {
       // Submit feedback in background (fire and forget)
       submitFeedback({
         session_id: sessionId || undefined,
-        goal_id: goalId!,
+        goal_id: isChallenge ? undefined : entityId,
+        challenge_id: isChallenge ? entityId : undefined,
         plan_id: planData?.plan?.id,
         quit_reason: reason,
         exercises_completed: workoutStats.exercisesCompleted,
@@ -367,7 +698,8 @@ export function WorkoutPlayerScreen() {
       submitFeedback,
       saveProgress,
       sessionId,
-      goalId,
+      entityId,
+      isChallenge,
       planData,
       workoutStats,
       progress,
@@ -377,7 +709,7 @@ export function WorkoutPlayerScreen() {
       currentSetIndex,
       currentRound,
       currentExercise,
-    ]
+    ],
   );
 
   // Handle quit without feedback - save progress in background and exit immediately
@@ -424,19 +756,16 @@ export function WorkoutPlayerScreen() {
       originalMusicVolumeRef.current = null;
     }
 
-    // Only resume if user didn't manually pause before opening modal
+    // Only resume workout if user didn't manually pause before opening modal
     if (!wasManuallyPausedRef.current) {
       resumeWorkout();
-      if (audioPreferences.music_enabled) {
-        playMusic();
-      }
     }
-  }, [
-    resumeWorkout,
-    playMusic,
-    setMusicVolume,
-    audioPreferences.music_enabled,
-  ]);
+
+    // Only resume music if it was actually playing before
+    if (wasMusicPlayingRef.current) {
+      playMusic();
+    }
+  }, [resumeWorkout, playMusic, setMusicVolume]);
 
   // ========== MUSIC SYNC WITH WORKOUT ==========
 
@@ -467,13 +796,14 @@ export function WorkoutPlayerScreen() {
   // Open music modal - auto pause if not already paused
   const handleOpenMusicModal = useCallback(() => {
     wasManuallyPausedRef.current = isPaused;
+    wasMusicPlayingRef.current = isMusicPlaying; // Track if music was actually playing
 
     if (!isPaused) {
       pauseWorkout();
     }
 
-    // Reduce music volume without reflecting on slider
-    if (isMusicPlaying && audioPreferences.music_enabled) {
+    // Reduce music volume without reflecting on slider (only if music is playing)
+    if (isMusicPlaying) {
       originalMusicVolumeRef.current = audioPreferences.music_volume;
       setMusicVolume(audioPreferences.music_volume * 0.3); // Reduce to 30%
     }
@@ -483,7 +813,6 @@ export function WorkoutPlayerScreen() {
     isPaused,
     pauseWorkout,
     isMusicPlaying,
-    audioPreferences.music_enabled,
     audioPreferences.music_volume,
     setMusicVolume,
   ]);
@@ -492,36 +821,34 @@ export function WorkoutPlayerScreen() {
   const handleCloseMusicModal = useCallback(() => {
     setShowMusicModal(false);
 
-    // Restore original music volume
+    // Restore original music volume (only if we reduced it)
     if (originalMusicVolumeRef.current !== null) {
       setMusicVolume(originalMusicVolumeRef.current);
       originalMusicVolumeRef.current = null;
     }
 
-    // Only resume if user didn't manually pause before opening modal
+    // Only resume workout if user didn't manually pause before opening modal
     if (!wasManuallyPausedRef.current) {
       resumeWorkout();
-      if (audioPreferences.music_enabled) {
-        playMusic();
-      }
     }
-  }, [
-    resumeWorkout,
-    playMusic,
-    setMusicVolume,
-    audioPreferences.music_enabled,
-  ]);
+
+    // Only resume music if it was actually playing before opening modal
+    if (wasMusicPlayingRef.current) {
+      playMusic();
+    }
+  }, [resumeWorkout, playMusic, setMusicVolume]);
 
   // Open exercise detail modal - auto pause if not already paused
   const handleOpenExerciseDetail = useCallback(() => {
     wasManuallyPausedRef.current = isPaused;
+    wasMusicPlayingRef.current = isMusicPlaying; // Track if music was playing
 
     if (!isPaused) {
       pauseWorkout();
     }
 
-    // Reduce music volume without reflecting on slider
-    if (isMusicPlaying && audioPreferences.music_enabled) {
+    // Reduce music volume (only if playing)
+    if (isMusicPlaying) {
       originalMusicVolumeRef.current = audioPreferences.music_volume;
       setMusicVolume(audioPreferences.music_volume * 0.3); // Reduce to 30%
     }
@@ -531,7 +858,6 @@ export function WorkoutPlayerScreen() {
     isPaused,
     pauseWorkout,
     isMusicPlaying,
-    audioPreferences.music_enabled,
     audioPreferences.music_volume,
     setMusicVolume,
   ]);
@@ -546,25 +872,38 @@ export function WorkoutPlayerScreen() {
       originalMusicVolumeRef.current = null;
     }
 
-    // Only resume if user didn't manually pause before opening modal
+    // Only resume workout if user didn't manually pause before opening modal
     if (!wasManuallyPausedRef.current) {
       resumeWorkout();
-      if (audioPreferences.music_enabled) {
-        playMusic();
-      }
     }
-  }, [
-    resumeWorkout,
-    playMusic,
-    setMusicVolume,
-    audioPreferences.music_enabled,
-  ]);
+
+    // Only resume music if it was actually playing before
+    if (wasMusicPlayingRef.current) {
+      playMusic();
+    }
+  }, [resumeWorkout, playMusic, setMusicVolume]);
+
+  // Handle audio preferences update (local only - for immediate UI feedback)
+  const handleUpdateAudioPreferencesLocal = useCallback(
+    (updates: Parameters<typeof updateAudioPreferences>[0]) => {
+      // Update local state immediately (no backend call)
+      updateAudioPreferences(updates);
+    },
+    [updateAudioPreferences],
+  );
+
+  // Save audio preferences to backend (called when Done is clicked)
+  const handleSaveAudioPreferencesToBackend = useCallback(() => {
+    // Save current preferences to backend (fire and forget)
+    updateAudioPrefsMutation.mutate(audioPreferences);
+  }, [updateAudioPrefsMutation, audioPreferences]);
 
   // Handle workout completion
   const handleWorkoutComplete = useCallback(async () => {
     if (sessionId) {
       try {
-        await completeSession({
+        // completeSession returns CompletedSessionResponse directly (unwrapped by mutateAsync)
+        const completionResult = await completeSession({
           sessionId,
           data: {
             exercises_completed: workoutStats.exercisesCompleted,
@@ -573,8 +912,28 @@ export function WorkoutPlayerScreen() {
             paused_duration_seconds: workoutStats.pausedDurationSeconds,
           },
         });
+
+        // Store completion data for CompletionFlow
+        if (completionResult) {
+          setCompletionData(completionResult);
+        }
       } catch (error) {
         console.error("Failed to complete session:", error);
+        // Still show completion flow with basic data even if API fails
+        setCompletionData({
+          session: {} as any,
+          achievements_unlocked: [],
+          streak: {
+            current_streak: 0,
+            longest_streak: 0,
+            milestone_target: 7,
+            days_until_milestone: 7,
+            workout_dates_this_week: [],
+          },
+          workout_number_today: 1,
+          is_practice: false,
+          can_add_reflection: false, // Don't show reflection if API failed
+        });
       }
     }
   }, [sessionId, completeSession, workoutStats]);
@@ -598,14 +957,18 @@ export function WorkoutPlayerScreen() {
   // Track previous showReadyCountdown value to detect when countdown ends
   const prevShowReadyCountdownRef = useRef(showReadyCountdown);
 
-  // Save initial progress when ready countdown ends (user enters first exercise)
+  // Save initial progress and play ding when ready countdown ends (user enters first exercise)
   useEffect(() => {
     // Detect transition from showReadyCountdown=true to showReadyCountdown=false
     const wasShowingCountdown = prevShowReadyCountdownRef.current;
     prevShowReadyCountdownRef.current = showReadyCountdown;
 
-    if (wasShowingCountdown && !showReadyCountdown && sessionId) {
-      // Countdown just ended, user is now on first exercise - save initial progress
+    if (wasShowingCountdown && !showReadyCountdown) {
+      // Countdown just ended, user is now on first exercise - play ding!
+      playDing();
+
+      // Save initial progress if we have a session
+      if (!sessionId) return;
       saveProgress({
         sessionId,
         data: {
@@ -619,7 +982,7 @@ export function WorkoutPlayerScreen() {
           paused_duration_seconds: 0,
         },
       }).catch((error) =>
-        console.error("Failed to save initial progress:", error)
+        console.error("Failed to save initial progress:", error),
       );
     }
   }, [
@@ -631,6 +994,7 @@ export function WorkoutPlayerScreen() {
     currentSetIndex,
     currentRound,
     progress,
+    playDing,
   ]);
 
   // Auto-start or auto-resume when plan loads
@@ -711,14 +1075,54 @@ export function WorkoutPlayerScreen() {
   }
 
   // Completion screen
-  if (phase === "completed") {
+  if (phase === "completed" && completionData) {
+    // Calculate day number (could be enhanced with actual program day tracking)
+    const dayNumber = completionData.workout_number_today || 1;
+
     return (
-      <WorkoutComplete
+      <CompletionFlow
         stats={workoutStats}
-        onClose={() => router.back()}
-        goalId={goalId!}
+        completionData={{
+          achievements_unlocked: completionData.achievements_unlocked || [],
+          streak: completionData.streak || {
+            current_streak: 0,
+            longest_streak: 0,
+            milestone_target: 7,
+            days_until_milestone: 7,
+            workout_dates_this_week: [],
+          },
+          workout_number_today: completionData.workout_number_today || 1,
+          is_practice: completionData.is_practice || false,
+          can_add_reflection: completionData.can_add_reflection || false,
+        }}
+        dayNumber={dayNumber}
+        onComplete={(feedback) => {
+          // Update feedback if provided
+          if (feedback && sessionId) {
+            workoutSessionsService
+              .updateFeedback(sessionId, feedback)
+              .catch(console.error);
+          }
+          router.back();
+        }}
+        onSaveReflection={(data) => {
+          // Save reflection data (mood, notes, photo) to the check-in
+          // Returns a promise that CompletionFlow handles in background
+          return workoutSessionsService.saveReflection({
+            goal_id: isChallenge ? undefined : entityId,
+            challenge_id: isChallenge ? entityId : undefined,
+            mood: data.mood,
+            notes: data.notes,
+            photo_url: data.photo_url,
+          });
+        }}
       />
     );
+  }
+
+  // Waiting for completion data to load - show fun animated screen
+  if (phase === "completed" && !completionData) {
+    return <WorkoutCompletingScreen />;
   }
 
   // Get current exercise for display (even during ready countdown)
@@ -756,24 +1160,6 @@ export function WorkoutPlayerScreen() {
     return null;
   })();
 
-  // Video player for exercise demonstration
-  const exercisePlayer = useVideoPlayer(displayMp4Url || "", (player) => {
-    player.loop = true;
-    player.playbackRate = 0.5; // Slow motion
-    player.muted = true;
-  });
-
-  // Sync video playback with workout pause state
-  useEffect(() => {
-    if (exercisePlayer && displayMp4Url) {
-      if (isPaused || showReadyCountdown) {
-        exercisePlayer.pause();
-      } else {
-        exercisePlayer.play();
-      }
-    }
-  }, [isPaused, showReadyCountdown, displayMp4Url, exercisePlayer]);
-
   // Landscape mode view (note: completed phase returns early above)
   if (isLandscape && phase !== "rest" && !showReadyCountdown) {
     return (
@@ -789,7 +1175,7 @@ export function WorkoutPlayerScreen() {
         totalExercisesCount={totalExercisesCount}
         overallExerciseIndex={overallExerciseIndex}
         onTogglePause={isPaused ? resumeWorkout : pauseWorkout}
-        onSkipNext={skipToNext}
+        onSkipNext={handleNext}
         onMarkDone={markExerciseDone}
         onExitLandscape={toggleLandscape}
       />
@@ -800,26 +1186,37 @@ export function WorkoutPlayerScreen() {
   if (phase === "rest") {
     const nextInfo = getNextExerciseInfo();
     const nextExercise = nextInfo?.exercise || null;
-    // Calculate the display index based on total workout progress
-    const nextDisplayIndex = nextInfo
-      ? (nextInfo.phase === "warmup"
-          ? nextInfo.exerciseIndex
-          : nextInfo.phase === "workout"
-            ? warmUpExercises.length + nextInfo.exerciseIndex
-            : warmUpExercises.length +
-              exercises.length +
-              nextInfo.exerciseIndex) + 1
-      : 0;
+
+    // Calculate the 0-based global index for highlighting in modal
+    const nextGlobalIndex = nextInfo
+      ? nextInfo.phase === "warmup"
+        ? nextInfo.exerciseIndex
+        : nextInfo.phase === "workout"
+          ? warmUpExercises.length +
+            ((nextInfo.round || currentRound) - 1) * exercises.length +
+            nextInfo.exerciseIndex
+          : warmUpExercises.length +
+            exercises.length * maxSets +
+            nextInfo.exerciseIndex
+      : overallExerciseIndex;
+
+    // 1-based display index for "NEXT X/Y" label
+    const nextDisplayIndex = nextGlobalIndex + 1;
 
     return (
       <View style={styles.restContainer}>
         <RestScreen
           timeRemaining={timeRemaining}
           nextExerciseIndex={nextDisplayIndex}
+          nextExerciseGlobalIndex={nextGlobalIndex}
           totalExercises={totalExercisesCount}
           nextExercise={nextExercise}
+          allExercises={allExercisesForList}
           onExtendRest={extendRest}
-          onSkipRest={skipRest}
+          onSkipRest={handleSkipRest}
+          onJumpToExercise={handleJumpFromRest}
+          onPauseTimer={pauseWorkout}
+          onResumeTimer={resumeWorkout}
         />
         {/* Exit confirmation modal */}
         <ExitConfirmationModal
@@ -913,14 +1310,15 @@ export function WorkoutPlayerScreen() {
         {/* Video Display */}
         <View style={styles.videoContainer}>
           {displayMp4Url ? (
-            <VideoView
-              player={exercisePlayer}
-              style={[
-                styles.exerciseVideo,
-                isPaused && !showReadyCountdown && styles.videoPaused,
-              ]}
-              contentFit="contain"
-              nativeControls={false}
+            <Video
+              source={{ uri: displayMp4Url }}
+              style={styles.exerciseVideo}
+              resizeMode={ResizeMode.CONTAIN}
+              repeat={true}
+              rate={0.75}
+              muted={true}
+              paused={isPaused || showReadyCountdown}
+              controls={false}
             />
           ) : (
             <View style={styles.videoPlaceholder}>
@@ -928,7 +1326,7 @@ export function WorkoutPlayerScreen() {
             </View>
           )}
           {isPaused && !showReadyCountdown && (
-            <View style={styles.pausedOverlay}>
+            <View style={styles.pauseIconContainer}>
               <Ionicons name="pause" size={60} color="white" />
             </View>
           )}
@@ -960,7 +1358,7 @@ export function WorkoutPlayerScreen() {
 
             {/* Exercise name with help */}
             <View style={styles.exerciseNameRow}>
-              <Text style={styles.bottomExerciseName}>
+              <Text style={styles.bottomExerciseName} numberOfLines={2}>
                 {currentExercise?.name || ""}
               </Text>
               <TouchableOpacity
@@ -1016,7 +1414,7 @@ export function WorkoutPlayerScreen() {
               {overallExerciseIndex > 0 ? (
                 <TouchableOpacity
                   style={styles.navButton}
-                  onPress={skipToPrevious}
+                  onPress={handlePrevious}
                 >
                   <Ionicons name="play-skip-back" size={28} color="white" />
                 </TouchableOpacity>
@@ -1035,7 +1433,7 @@ export function WorkoutPlayerScreen() {
                 />
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.navButton} onPress={skipToNext}>
+              <TouchableOpacity style={styles.navButton} onPress={handleNext}>
                 <Ionicons name="play-skip-forward" size={28} color="white" />
               </TouchableOpacity>
             </View>
@@ -1088,7 +1486,8 @@ export function WorkoutPlayerScreen() {
         onShuffle={toggleShuffle}
         isShuffleOn={audioPreferences.shuffle_enabled}
         preferences={audioPreferences}
-        onUpdatePreferences={updateAudioPreferences}
+        onUpdatePreferences={handleUpdateAudioPreferencesLocal}
+        onSavePreferences={handleSaveAudioPreferencesToBackend}
         tracks={musicPlaylist}
         onSelectTrack={playMusicTrack}
       />
@@ -1221,16 +1620,16 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     width: "100%",
     height: "100%",
   },
-  videoPaused: {
-    opacity: 0.5,
-  },
   videoPlaceholder: {
     alignItems: "center" as const,
     justifyContent: "center" as const,
   },
-  pausedOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.4)",
+  pauseIconContainer: {
+    position: "absolute" as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     alignItems: "center" as const,
     justifyContent: "center" as const,
   },
@@ -1258,16 +1657,20 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     alignItems: "center" as const,
     justifyContent: "center" as const,
     marginBottom: toRN(tokens.spacing[1]),
+    paddingHorizontal: toRN(tokens.spacing[2]),
   },
   bottomExerciseName: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.groteskBold,
     color: "white",
     textTransform: "capitalize" as const,
+    textAlign: "center" as const,
+    flexShrink: 1,
   },
   helpIcon: {
-    marginLeft: toRN(tokens.spacing[1]),
+    marginLeft: toRN(tokens.spacing[2]),
     padding: toRN(4),
+    flexShrink: 0,
   },
   roundLabel: {
     fontSize: toRN(tokens.typography.fontSize.sm),
@@ -1339,9 +1742,6 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     justifyContent: "center" as const,
   },
 });
-
-// Need to import StyleSheet for absoluteFillObject
-import { StyleSheet as RNStyleSheet } from "react-native";
 const StyleSheet = RNStyleSheet;
 
 export default WorkoutPlayerScreen;

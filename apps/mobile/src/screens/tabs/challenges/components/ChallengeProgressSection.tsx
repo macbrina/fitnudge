@@ -14,6 +14,8 @@ import { StreakCards } from "@/screens/tabs/home/components/StreakCards";
 import { WeeklyProgressBar } from "@/screens/tabs/home/components/WeeklyProgressBar";
 import { HabitChainCompact } from "@/screens/tabs/home/components/HabitChainCompact";
 import { MoodTrendMini } from "@/screens/tabs/home/components/MoodTrendMini";
+import { TrackingTypeStats } from "@/components/progress";
+import type { TrackingType } from "@/components/progress";
 
 /**
  * Format a Date to YYYY-MM-DD in local timezone (not UTC)
@@ -38,7 +40,9 @@ interface ChallengeProgressSectionProps {
   checkIns: ChallengeCheckIn[];
   daysOfWeek?: number[];
   frequency?: "daily" | "weekly";
+  trackingType?: TrackingType;
   isLoading?: boolean;
+  isPartnerView?: boolean;
 }
 
 // Helper function to calculate scheduled days in a date range
@@ -46,12 +50,12 @@ const calculateScheduledDays = (
   startDate: Date,
   endDate: Date,
   frequency: "daily" | "weekly",
-  daysOfWeek?: number[]
+  daysOfWeek?: number[],
 ): number => {
   if (frequency === "daily") {
     return (
       Math.ceil(
-        (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
+        (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
       ) + 1
     );
   }
@@ -71,7 +75,7 @@ const calculateScheduledDays = (
   // Fallback: assume daily
   return (
     Math.ceil(
-      (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
+      (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
     ) + 1
   );
 };
@@ -88,7 +92,9 @@ export function ChallengeProgressSection({
   checkIns,
   daysOfWeek,
   frequency = "daily",
+  trackingType = "checkin",
   isLoading = false,
+  isPartnerView = false,
 }: ChallengeProgressSectionProps) {
   const styles = useStyles(makeChallengeProgressSectionStyles);
   const { colors, brandColors } = useTheme();
@@ -102,7 +108,7 @@ export function ChallengeProgressSection({
     const sorted = [...checkIns].sort(
       (a, b) =>
         new Date(b.check_in_date).getTime() -
-        new Date(a.check_in_date).getTime()
+        new Date(a.check_in_date).getTime(),
     );
 
     let streak = 0;
@@ -133,7 +139,7 @@ export function ChallengeProgressSection({
     const sorted = [...checkIns].sort(
       (a, b) =>
         new Date(a.check_in_date).getTime() -
-        new Date(b.check_in_date).getTime()
+        new Date(b.check_in_date).getTime(),
     );
 
     let longest = 1;
@@ -283,7 +289,7 @@ export function ChallengeProgressSection({
   // Challenge-specific progress
   const renderChallengeProgress = () => {
     if (
-      (challengeType === "target" || challengeType === "checkin_count") &&
+      (challengeType === "streak" || challengeType === "checkin_count") &&
       targetValue
     ) {
       const progress = Math.min(checkIns.length, targetValue);
@@ -323,7 +329,7 @@ export function ChallengeProgressSection({
       );
     }
 
-    if (challengeType === "duration" && startDate && endDate) {
+    if (challengeType === "streak" && startDate && endDate) {
       const start = new Date(startDate);
       const end = new Date(endDate);
       const today = new Date();
@@ -332,17 +338,17 @@ export function ChallengeProgressSection({
         start,
         end,
         frequency,
-        daysOfWeek
+        daysOfWeek,
       );
 
       const calendarDaysRemaining = Math.max(
         0,
-        Math.ceil((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+        Math.ceil((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)),
       );
 
       const percentage = Math.min(
         100,
-        Math.round((checkIns.length / Math.max(totalScheduledDays, 1)) * 100)
+        Math.round((checkIns.length / Math.max(totalScheduledDays, 1)) * 100),
       );
       const isCompleted = today > end;
 
@@ -433,7 +439,9 @@ export function ChallengeProgressSection({
         activeOpacity={0.7}
       >
         <Text style={styles.sectionTitle}>
-          {t("goals.progress.your_progress") || "Your Progress"}
+          {isPartnerView
+            ? t("goals.progress.partners_progress") || "Partner's Progress"
+            : t("goals.progress.your_progress") || "Your Progress"}
         </Text>
         <Ionicons
           name={isExpanded ? "chevron-up" : "chevron-down"}
@@ -496,6 +504,16 @@ export function ChallengeProgressSection({
           {/* Challenge Progress */}
           {renderChallengeProgress()}
 
+          {/* Tracking-Type Specific Stats */}
+          {trackingType !== "checkin" && (
+            <TrackingTypeStats
+              entityId={challengeId}
+              entityType="challenge"
+              trackingType={trackingType}
+              period={30}
+            />
+          )}
+
           {/* Completion Rate Card */}
           <View style={styles.completionRateCard}>
             <View style={styles.completionRateHeader}>
@@ -546,7 +564,7 @@ export function ChallengeProgressSection({
 const makeChallengeProgressSectionStyles = (
   tokens: any,
   colors: any,
-  brand: any
+  brand: any,
 ) => ({
   container: {
     padding: toRN(tokens.spacing[5]),

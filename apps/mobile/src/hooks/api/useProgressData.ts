@@ -29,6 +29,9 @@ export const progressQueryKeys = {
     [...progressQueryKeys.all, "mood", goalId, days] as const,
 } as const;
 
+// Empty placeholder for streak data
+const EMPTY_STREAK = { current_streak: 0, longest_streak: 0 };
+
 // Hook for streak info (current + longest)
 export const useStreakInfo = (goalId?: string) => {
   return useQuery({
@@ -38,6 +41,8 @@ export const useStreakInfo = (goalId?: string) => {
       return response.data;
     },
     staleTime: 0, // Refetch immediately when invalidated (realtime updates)
+    refetchOnMount: false,
+    placeholderData: EMPTY_STREAK,
     // NOTE: Don't use keepPreviousData for goal-specific queries!
     // It causes stale data to show when switching between goals.
   });
@@ -60,7 +65,7 @@ export const useWeekProgress = (goalId?: string) => {
       const response = await checkInsService.getCheckInsByDateRange(
         formatLocalDate(monday),
         formatLocalDate(sunday),
-        goalId
+        goalId,
       );
       return response.data || [];
     },
@@ -85,7 +90,7 @@ export const useWeekProgress = (goalId?: string) => {
     checkIns.forEach((checkIn: any) => {
       if (checkIn.completed) {
         // Use local day parsing to avoid timezone issues
-        const dayOfWeek = getLocalDayOfWeek(checkIn.date);
+        const dayOfWeek = getLocalDayOfWeek(checkIn.check_in_date);
         const dayIndex = (dayOfWeek + 6) % 7; // Convert to Mon=0, Sun=6
         daysCompleted[dayIndex] = true;
         completedCount++;
@@ -148,7 +153,7 @@ export const useHabitChain = (goalId?: string, days: number = 30) => {
       const response = await checkInsService.getCheckInsByDateRange(
         formatLocalDate(startDate),
         formatLocalDate(endDate),
-        goalId
+        goalId,
       );
       return response.data || [];
     },
@@ -170,7 +175,7 @@ export const useHabitChain = (goalId?: string, days: number = 30) => {
 
       // Check-in date might be "2024-12-06" or "2024-12-06T00:00:00Z"
       const checkIn = checkIns?.find((ci: any) => {
-        const ciDateStr = ci.date?.split("T")[0];
+        const ciDateStr = ci.check_in_date?.split("T")[0];
         return ciDateStr === dateStr;
       });
       // Use string comparison to avoid Date object comparison issues

@@ -18,6 +18,7 @@ export const useNudges = (unreadOnly: boolean = false) => {
     queryKey: nudgesQueryKeys.listFiltered(unreadOnly),
     queryFn: () => nudgesService.getNudges(unreadOnly),
     staleTime: 30 * 1000, // 30 seconds - nudges should refresh often
+    placeholderData: { data: [] as Nudge[], status: 200 },
   });
 };
 
@@ -29,6 +30,7 @@ export const useSentNudges = () => {
     queryKey: nudgesQueryKeys.sent(),
     queryFn: () => nudgesService.getSentNudges(),
     staleTime: 60 * 1000, // 1 minute
+    placeholderData: { data: [] as Nudge[], status: 200 },
   });
 };
 
@@ -41,6 +43,7 @@ export const useUnreadNudgesCount = () => {
     queryFn: () => nudgesService.getUnreadCount(),
     staleTime: 30 * 1000, // 30 seconds
     refetchInterval: 60 * 1000, // Poll every minute
+    placeholderData: { data: { unread_count: 0 }, status: 200 },
   });
 };
 
@@ -143,7 +146,7 @@ export const useMarkNudgeRead = () => {
 
       const previousList = queryClient.getQueryData(nudgesQueryKeys.list());
       const previousCount = queryClient.getQueryData(
-        nudgesQueryKeys.unreadCount()
+        nudgesQueryKeys.unreadCount(),
       );
 
       // Update list
@@ -152,7 +155,7 @@ export const useMarkNudgeRead = () => {
         return {
           ...old,
           data: old.data.map((n: Nudge) =>
-            n.id === nudgeId ? { ...n, is_read: true } : n
+            n.id === nudgeId ? { ...n, is_read: true } : n,
           ),
         };
       });
@@ -165,10 +168,10 @@ export const useMarkNudgeRead = () => {
           return {
             ...old,
             data: old.data.map((n: Nudge) =>
-              n.id === nudgeId ? { ...n, is_read: true } : n
+              n.id === nudgeId ? { ...n, is_read: true } : n,
             ),
           };
-        }
+        },
       );
 
       // Decrement count
@@ -191,7 +194,7 @@ export const useMarkNudgeRead = () => {
       if (context?.previousCount) {
         queryClient.setQueryData(
           nudgesQueryKeys.unreadCount(),
-          context.previousCount
+          context.previousCount,
         );
       }
     },
@@ -215,7 +218,7 @@ export const useMarkAllNudgesRead = () => {
 
       const previousList = queryClient.getQueryData(nudgesQueryKeys.list());
       const previousCount = queryClient.getQueryData(
-        nudgesQueryKeys.unreadCount()
+        nudgesQueryKeys.unreadCount(),
       );
 
       // Mark all as read in cache
@@ -242,7 +245,7 @@ export const useMarkAllNudgesRead = () => {
       if (context?.previousCount) {
         queryClient.setQueryData(
           nudgesQueryKeys.unreadCount(),
-          context.previousCount
+          context.previousCount,
         );
       }
     },

@@ -145,7 +145,7 @@ export type TypographyToken = keyof typeof tokens.typography;
  */
 export const lineHeight = (
   fontSize: number | string,
-  lineHeightMultiplier: number | string
+  lineHeightMultiplier: number | string,
 ): number => {
   return calculateLineHeight(fontSize, lineHeightMultiplier);
 };

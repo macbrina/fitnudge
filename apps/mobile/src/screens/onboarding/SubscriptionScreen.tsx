@@ -3,8 +3,7 @@ import { Card } from "@/components/ui/Card";
 import LinkText from "@/components/ui/LinkText";
 import { LoadingOverlay } from "@/components/ui/LoadingOverlay";
 import { SkeletonCard } from "@/components/ui/SkeletonBox";
-import { ExitIntentModal } from "@/components/subscription";
-import { useAlertModal, AlertOverlay } from "@/contexts/AlertModalContext";
+import { AlertOverlay, useAlertModal } from "@/contexts/AlertModalContext";
 import { useRevenueCat } from "@/contexts/RevenueCatContext";
 import { usePostHog } from "@/hooks/usePostHog";
 import { usePricing } from "@/hooks/usePricing";
@@ -14,6 +13,7 @@ import { MOBILE_ROUTES } from "@/lib/routes";
 import { toRN } from "@/lib/units";
 import { logger } from "@/services/logger";
 import { useExitOfferStore } from "@/stores/exitOfferStore";
+import { useSubscriptionStore } from "@/stores/subscriptionStore";
 import { useTheme } from "@/themes";
 import { useStyles } from "@/themes/makeStyles";
 import { tokens } from "@/themes/tokens";
@@ -23,7 +23,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Image,
+  Linking,
   Modal,
   ScrollView,
   Text,
@@ -54,7 +54,9 @@ export default function SubscriptionScreen({
   const [planCardHeight, setPlanCardHeight] = useState<number | null>(null);
   const [showAllFeatures, setShowAllFeatures] = useState(false);
   const [canShowExitOffer, setCanShowExitOffer] = useState(false);
-  const [exitOfferExpiry, setExitOfferExpiry] = useState<Date | null>(null);
+  const [trialEligibility, setTrialEligibility] = useState<
+    Record<string, boolean>
+  >({});
 
   const { t } = useTranslation();
   const styles = useStyles(makeSubscriptionScreenStyles);
@@ -63,22 +65,34 @@ export default function SubscriptionScreen({
   const { capture } = usePostHog();
   const { plans, isLoading: plansLoading } = usePricing();
   const { showAlert } = useAlertModal();
+  const { getPlan } = useSubscriptionStore();
+  const currentPlan = getPlan();
+
+  // Plan tier hierarchy: free=0, starter=1, pro=2, elite=3
+  type PlanId = "free" | "starter" | "pro" | "elite";
+  const PLAN_TIERS: Record<PlanId, number> = {
+    free: 0,
+    starter: 1,
+    pro: 2,
+    elite: 3,
+  };
+
+  const currentTier = PLAN_TIERS[currentPlan as PlanId] || 0;
+  const isOnHighestPlan = currentPlan === "elite";
+  const hasActiveSubscription = currentPlan !== "free";
   const {
     setExitOffer,
-    clearExitOffer,
     markAsSubscribed,
-    markExitIntentDismissed,
     showExitIntentModal,
     openExitIntentModal,
-    closeExitIntentModal,
   } = useExitOfferStore();
   const {
     purchase,
-    purchaseProExitOffer,
     purchasePackage,
     restorePurchases,
     offerings,
     currentOffering,
+    checkTrialEligibility: checkTrialEligibilityApi,
   } = useRevenueCat();
 
   // Exit Offer Configuration
@@ -98,7 +112,7 @@ export default function SubscriptionScreen({
       try {
         // Get show count - read raw value first
         const rawShowCount = await storageUtil.getItem<number>(
-          STORAGE_KEYS.EXIT_OFFER_SHOW_COUNT
+          STORAGE_KEYS.EXIT_OFFER_SHOW_COUNT,
         );
         const showCount = rawShowCount || 0;
 
@@ -126,13 +140,22 @@ export default function SubscriptionScreen({
     });
   }, []);
 
-  const activePlans = useMemo(
-    () =>
-      (plans ?? [])
-        .filter((plan) => plan.is_active && plan.id !== "free")
-        .sort((a, b) => a.sort_order - b.sort_order),
-    [plans]
-  );
+  // Filter to only show plans higher than current (upgrade options only)
+  const activePlans = useMemo(() => {
+    const allActive = (plans ?? [])
+      .filter((plan) => plan.is_active && plan.id !== "free")
+      .sort((a, b) => a.sort_order - b.sort_order);
+
+    // If user has a subscription, only show plans that are upgrades
+    if (hasActiveSubscription) {
+      return allActive.filter((plan) => {
+        const planTier = PLAN_TIERS[plan.id as PlanId] ?? 0;
+        return planTier > currentTier;
+      });
+    }
+
+    return allActive;
+  }, [plans, hasActiveSubscription, currentTier]);
 
   useEffect(() => {
     if (!selectedPlanId && activePlans.length > 0) {
@@ -146,7 +169,7 @@ export default function SubscriptionScreen({
 
   const selectedPlan = useMemo(
     () => activePlans.find((plan) => plan.id === selectedPlanId) ?? null,
-    [activePlans, selectedPlanId]
+    [activePlans, selectedPlanId],
   );
 
   const selectedPlanIndex = useMemo(() => {
@@ -173,13 +196,82 @@ export default function SubscriptionScreen({
         const monthlyTotal = monthly * 12;
         const pct = Math.max(
           0,
-          Math.round(((monthlyTotal - annual) / monthlyTotal) * 100)
+          Math.round(((monthlyTotal - annual) / monthlyTotal) * 100),
         );
         return Math.max(max, pct);
       }
       return max;
     }, 0);
   }, [activePlans, billingPeriod]);
+
+  // Check trial eligibility using RevenueCat context API
+  useEffect(() => {
+    const checkAllTrialEligibility = async () => {
+      if (!activePlans.length) return;
+
+      try {
+        // Collect all product IDs for current billing period
+        const productIds: string[] = [];
+        const productToPlanMap: Record<string, string> = {};
+
+        for (const plan of activePlans) {
+          const productId = isIOS
+            ? billingPeriod === "annual"
+              ? plan.product_id_ios_annual
+              : plan.product_id_ios_monthly
+            : billingPeriod === "annual"
+              ? plan.product_id_android_annual
+              : plan.product_id_android_monthly;
+
+          if (productId) {
+            productIds.push(productId);
+            productToPlanMap[productId] = plan.id;
+          }
+        }
+
+        if (productIds.length === 0) return;
+
+        // Use the context API to check eligibility
+        const eligibilityResult = await checkTrialEligibilityApi(productIds);
+
+        // Map product eligibility back to plan IDs
+        const newEligibility: Record<string, boolean> = {};
+        for (const [productId, isEligible] of Object.entries(
+          eligibilityResult,
+        )) {
+          const planId = productToPlanMap[productId];
+          if (planId) {
+            newEligibility[planId] = isEligible;
+          }
+        }
+        setTrialEligibility(newEligibility);
+      } catch (error) {
+        logger.error("Failed to check trial eligibility", { error });
+        // Default to false (not eligible) on error
+        const newEligibility: Record<string, boolean> = {};
+        for (const plan of activePlans) {
+          newEligibility[plan.id] = false;
+        }
+        setTrialEligibility(newEligibility);
+      }
+    };
+
+    checkAllTrialEligibility();
+  }, [activePlans, billingPeriod, checkTrialEligibilityApi]);
+
+  // Helper to check eligibility for a specific plan
+  const checkTrialEligibility = useCallback(
+    (plan: any): boolean => {
+      if (!plan) return false;
+      return trialEligibility[plan.id] ?? false;
+    },
+    [trialEligibility],
+  );
+
+  // Memoized eligibility check for the currently selected plan
+  const isUserEligibleForTrial = useMemo(() => {
+    return checkTrialEligibility(selectedPlan);
+  }, [checkTrialEligibility, selectedPlan]);
 
   const handleBillingToggle = (period: BillingPeriod) => {
     setBillingPeriod(period);
@@ -239,7 +331,7 @@ export default function SubscriptionScreen({
 
       if (!productId) {
         throw new Error(
-          `No product ID found for ${selectedPlan.id} ${billingPeriod}`
+          `No product ID found for ${selectedPlan.id} ${billingPeriod}`,
         );
       }
 
@@ -251,14 +343,14 @@ export default function SubscriptionScreen({
         ? [
             currentOffering,
             ...offerings.filter(
-              (o) => o.identifier !== currentOffering.identifier
+              (o) => o.identifier !== currentOffering.identifier,
             ),
           ]
         : offerings;
 
       for (const offering of allOfferings) {
         const pkg = offering.packages.find(
-          (p) => p.identifier === productId || p.identifier.includes(productId)
+          (p) => p.identifier === productId || p.identifier.includes(productId),
         );
         if (pkg) {
           targetPackage = pkg;
@@ -320,7 +412,7 @@ export default function SubscriptionScreen({
     // Check eligibility at the moment of close (not from cached state)
     // This avoids race conditions with resetForTesting
     const rawShowCount = await storageUtil.getItem<number>(
-      STORAGE_KEYS.EXIT_OFFER_SHOW_COUNT
+      STORAGE_KEYS.EXIT_OFFER_SHOW_COUNT,
     );
     const currentCount = rawShowCount || 0;
     const canShowNow = currentCount === 0 && !showExitIntentModal;
@@ -330,18 +422,17 @@ export default function SubscriptionScreen({
     if (canShowNow) {
       await storageUtil.setItem(
         STORAGE_KEYS.EXIT_OFFER_SHOW_COUNT,
-        currentCount + 1
+        currentCount + 1,
       );
       await storageUtil.setItem(
         STORAGE_KEYS.EXIT_OFFER_LAST_SHOWN,
-        new Date().toISOString()
+        new Date().toISOString(),
       );
 
       // Set expiry time for countdown
       const expiry = new Date(
-        Date.now() + EXIT_OFFER_COUNTDOWN_MINUTES * 60 * 1000
+        Date.now() + EXIT_OFFER_COUNTDOWN_MINUTES * 60 * 1000,
       );
-      setExitOfferExpiry(expiry);
 
       // Also set in global store for floating button on other screens
       setExitOffer(expiry);
@@ -381,6 +472,30 @@ export default function SubscriptionScreen({
     openExitIntentModal,
   ]);
 
+  // Open platform subscription management (iOS/Android)
+  const handleManageSubscription = useCallback(async () => {
+    capture("subscription_manage_pressed", { current_plan: currentPlan });
+
+    try {
+      if (isIOS) {
+        // iOS: Opens Settings > Apple ID > Subscriptions
+        await Linking.openURL("https://apps.apple.com/account/subscriptions");
+      } else {
+        // Android: Opens Google Play subscription management
+        await Linking.openURL(
+          "https://play.google.com/store/account/subscriptions",
+        );
+      }
+    } catch (error) {
+      logger.error("Failed to open subscription management", { error });
+      await showAlert({
+        title: t("onboarding.subscription.manage_error_title"),
+        message: t("onboarding.subscription.manage_error_message"),
+        variant: "error",
+      });
+    }
+  }, [capture, currentPlan, showAlert, t]);
+
   // Handle restore purchases
   // Note: Alerts are shown by RevenueCatContext
   const handleRestorePurchases = useCallback(async () => {
@@ -408,7 +523,7 @@ export default function SubscriptionScreen({
   }, [capture, restorePurchases, markAsSubscribed, handleClose]);
 
   const ctaLabel =
-    selectedPlan && selectedPlan.has_trial
+    selectedPlan && selectedPlan.has_trial && isUserEligibleForTrial
       ? t("onboarding.subscription.cta_trial", {
           days: selectedPlan.trial_days ?? 0,
         })
@@ -434,6 +549,7 @@ export default function SubscriptionScreen({
     const price = getDisplayedPrice(plan);
     const comparePrice = getComparePrice(plan);
     const isSelected = selectedPlanId === plan.id;
+    const isPlanEligibleForTrial = checkTrialEligibility(plan);
 
     const isLast =
       typeof index === "number" ? index === activePlans.length - 1 : false;
@@ -481,7 +597,7 @@ export default function SubscriptionScreen({
                 ${price.toFixed(2)}
                 {billingPeriod === "annual" ? "/year" : "/month"}
               </Text>
-              {plan.has_trial && plan.trial_days ? (
+              {plan.has_trial && plan.trial_days && isPlanEligibleForTrial ? (
                 <Text style={styles.trialPillText}>
                   {t("onboarding.subscription.trial_pill", {
                     days: plan.trial_days,
@@ -526,84 +642,122 @@ export default function SubscriptionScreen({
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.hero}>
-          <View style={styles.heroText}>
-            <Text style={styles.heroTitle}>
-              {t("onboarding.subscription.hero_title")}
-            </Text>
-            <Text style={styles.heroSubtitle}>
-              {t("onboarding.subscription.hero_subtitle")}
-            </Text>
+          {/* Compact icon instead of large image */}
+          <View style={styles.heroIconContainer}>
+            <Ionicons
+              name={isOnHighestPlan ? "trophy" : "rocket"}
+              size={32}
+              color={brandColors.primary}
+            />
           </View>
-          <Image
-            source={require("@assetsimages/images/propic.png")}
-            style={styles.heroImage}
-            resizeMode="contain"
-          />
-        </View>
 
-        <View style={styles.billingToggle}>
-          <TouchableOpacity
-            onPress={() => handleBillingToggle("monthly")}
-            style={[
-              styles.toggleOption,
-              billingPeriod === "monthly" && styles.toggleOptionSelected,
-            ]}
-          >
-            <Text
-              style={[
-                styles.toggleText,
-                billingPeriod === "monthly" && styles.toggleTextSelected,
-              ]}
-            >
-              {t("onboarding.subscription.toggle_monthly")}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => handleBillingToggle("annual")}
-            style={[
-              styles.toggleOption,
-              billingPeriod === "annual" && styles.toggleOptionSelected,
-            ]}
-          >
-            <Text
-              style={[
-                styles.toggleText,
-                billingPeriod === "annual" && styles.toggleTextSelected,
-              ]}
-            >
-              {maxAnnualSavingsPercent > 0
-                ? t("onboarding.subscription.toggle_annual_savings", {
-                    percent: maxAnnualSavingsPercent,
+          <Text style={styles.heroTitle}>
+            {isOnHighestPlan
+              ? t("onboarding.subscription.on_highest_plan_title")
+              : hasActiveSubscription
+                ? t("onboarding.subscription.upgrade_title")
+                : t("onboarding.subscription.hero_title")}
+          </Text>
+          <Text style={styles.heroSubtitle}>
+            {isOnHighestPlan
+              ? t("onboarding.subscription.on_highest_plan_subtitle")
+              : hasActiveSubscription
+                ? t("onboarding.subscription.upgrade_subtitle", {
+                    plan: currentPlan,
                   })
-                : t("onboarding.subscription.toggle_annual")}
-            </Text>
-          </TouchableOpacity>
-        </View>
+                : t("onboarding.subscription.hero_subtitle")}
+          </Text>
 
-        <View style={styles.planCarousel}>
-          {plansLoading ? (
-            <View style={styles.skeletonContainer}>
-              {Array.from({ length: 2 }).map((_, index) => (
-                <View key={index} style={styles.skeletonCardWrapper}>
-                  <SkeletonCard
-                    width={planCardWidth}
-                    height={skeletonCardHeight}
-                  />
-                </View>
-              ))}
+          {/* Trust badges */}
+          <View style={styles.trustBadges}>
+            <View style={styles.trustBadge}>
+              <Ionicons
+                name="lock-closed"
+                size={14}
+                color={brandColors.primary}
+              />
+              <Text style={styles.trustBadgeText}>
+                {t("onboarding.subscription.cancel_anytime")}
+              </Text>
             </View>
-          ) : (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.planList}
-            >
-              {activePlans.map(renderPlanCard)}
-            </ScrollView>
-          )}
+            <View style={styles.trustBadgeDivider} />
+            <View style={styles.trustBadge}>
+              <Ionicons name="star" size={14} color="#F59E0B" />
+              <Text style={styles.trustBadgeText}>
+                {t("onboarding.subscription.rating_badge")}
+              </Text>
+            </View>
+          </View>
         </View>
 
-        {selectedPlan && (
+        {/* Only show billing toggle and plans if not on highest plan */}
+        {!isOnHighestPlan && (
+          <>
+            <View style={styles.billingToggle}>
+              <TouchableOpacity
+                onPress={() => handleBillingToggle("monthly")}
+                style={[
+                  styles.toggleOption,
+                  billingPeriod === "monthly" && styles.toggleOptionSelected,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.toggleText,
+                    billingPeriod === "monthly" && styles.toggleTextSelected,
+                  ]}
+                >
+                  {t("onboarding.subscription.toggle_monthly")}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => handleBillingToggle("annual")}
+                style={[
+                  styles.toggleOption,
+                  billingPeriod === "annual" && styles.toggleOptionSelected,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.toggleText,
+                    billingPeriod === "annual" && styles.toggleTextSelected,
+                  ]}
+                >
+                  {maxAnnualSavingsPercent > 0
+                    ? t("onboarding.subscription.toggle_annual_savings", {
+                        percent: maxAnnualSavingsPercent,
+                      })
+                    : t("onboarding.subscription.toggle_annual")}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.planCarousel}>
+              {plansLoading ? (
+                <View style={styles.skeletonContainer}>
+                  {Array.from({ length: 2 }).map((_, index) => (
+                    <View key={index} style={styles.skeletonCardWrapper}>
+                      <SkeletonCard
+                        width={planCardWidth}
+                        height={skeletonCardHeight}
+                      />
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.planList}
+                >
+                  {activePlans.map(renderPlanCard)}
+                </ScrollView>
+              )}
+            </View>
+          </>
+        )}
+
+        {selectedPlan && !isOnHighestPlan && (
           <View style={styles.selectedFeaturesWrapper}>
             <Card shadow="xl" style={styles.selectedFeaturesCard}>
               {previousPlanName ? (
@@ -676,7 +830,11 @@ export default function SubscriptionScreen({
                           style={styles.detailItem}
                         >
                           <View style={styles.detailIconWrapper}>
-                            <Text style={styles.detailIcon}>•</Text>
+                            <Ionicons
+                              name="checkmark-circle"
+                              size={18}
+                              color={brandColors.primary}
+                            />
                           </View>
                           <View style={styles.detailCopy}>
                             <Text style={styles.detailTitle}>{title}</Text>
@@ -712,6 +870,17 @@ export default function SubscriptionScreen({
 
         <View style={styles.linksSectionWrapper}>
           <Card shadow="xl" style={styles.linksSection}>
+            {/* Show Manage Subscription for existing subscribers */}
+            {hasActiveSubscription && (
+              <TouchableOpacity
+                style={styles.linkRow}
+                onPress={handleManageSubscription}
+              >
+                <Text style={styles.linkText}>
+                  {t("onboarding.subscription.manage_subscription")}
+                </Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               style={styles.linkRow}
               onPress={handleRestorePurchases}
@@ -755,41 +924,56 @@ export default function SubscriptionScreen({
       </ScrollView>
 
       <View style={styles.ctaBar}>
-        <Button
-          title={isProcessing ? t("common.loading") : ctaLabel}
-          onPress={handleContinue}
-          disabled={isProcessing || !selectedPlan}
-        />
-        <View style={styles.offerPill}>
-          <Text style={styles.offerText}>
-            {selectedPlan?.has_trial
-              ? t("onboarding.subscription.trial_pill_note")
-              : t("onboarding.subscription.offer_note")}
-          </Text>
-        </View>
+        {isOnHighestPlan ? (
+          <>
+            <Button
+              title={t("onboarding.subscription.manage_subscription")}
+              onPress={handleManageSubscription}
+              variant="secondary"
+            />
+            <View style={styles.offerPill}>
+              <Text style={styles.offerText}>
+                {t("onboarding.subscription.on_highest_plan_note")}
+              </Text>
+            </View>
+          </>
+        ) : (
+          <>
+            <Button
+              title={isProcessing ? t("common.loading") : ctaLabel}
+              onPress={handleContinue}
+              disabled={isProcessing || !selectedPlan}
+            />
+            <View style={styles.offerPill}>
+              <Text style={styles.offerText}>
+                {selectedPlan?.has_trial && isUserEligibleForTrial
+                  ? t("onboarding.subscription.trial_pill_note")
+                  : t("onboarding.subscription.offer_note")}
+              </Text>
+            </View>
+          </>
+        )}
       </View>
     </View>
   );
 
   return (
-    <>
-      <Modal
-        statusBarTranslucent
-        visible={visible}
-        animationType="slide"
-        onRequestClose={handleClose}
-      >
-        <View style={styles.modalContainer}>
-          {modalContent}
+    <Modal
+      statusBarTranslucent
+      visible={visible}
+      animationType="slide"
+      onRequestClose={handleClose}
+    >
+      <View style={styles.modalContainer}>
+        {modalContent}
 
-          {/* Loading Overlay */}
-          <LoadingOverlay visible={isRestoring || isProcessing} />
+        {/* Loading Overlay */}
+        <LoadingOverlay visible={isRestoring || isProcessing} />
 
-          {/* Alert Overlay - renders alerts on top of this modal */}
-          <AlertOverlay />
-        </View>
-      </Modal>
-    </>
+        {/* Alert Overlay - renders alerts on top of this modal */}
+        <AlertOverlay />
+      </View>
+    </Modal>
   );
 }
 
@@ -831,38 +1015,71 @@ const makeSubscriptionScreenStyles = (tokens: any, colors: any, brand: any) => {
       paddingBottom: toRN(tokens.spacing[6]),
     },
     hero: {
-      flexDirection: "column" as const,
-      justifyContent: "space-between" as const,
       alignItems: "center" as const,
       paddingHorizontal: toRN(tokens.spacing[6]),
       paddingTop: toRN(tokens.spacing[16]), // Space for close button
-      paddingBottom: toRN(tokens.spacing[6]),
-      backgroundColor: brand.primary + "26", // ~15% opacity in hex
-      borderTopLeftRadius: toRN(tokens.borderRadius["3xl"]),
-      borderTopRightRadius: toRN(tokens.borderRadius["3xl"]),
+      paddingBottom: toRN(tokens.spacing[5]),
+      backgroundColor: brand.primary + "12", // ~7% opacity - subtle
     },
-    heroText: {
-      flex: 1,
+    heroIconContainer: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      backgroundColor: brand.primary + "20",
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+      marginBottom: toRN(tokens.spacing[3]),
+      // Subtle shadow
+      shadowColor: brand.primary,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 8,
+      elevation: 4,
     },
     heroTitle: {
       fontSize: toRN(tokens.typography.fontSize["2xl"]),
       fontWeight: tokens.typography.fontWeight.bold,
       fontFamily: fontFamily.groteskBold,
       color: colors.text.primary,
-      marginBottom: toRN(tokens.spacing[2]),
+      marginBottom: toRN(tokens.spacing[1]),
       letterSpacing: -0.5,
+      textAlign: "center" as const,
     },
     heroSubtitle: {
-      fontSize: toRN(tokens.typography.fontSize.base),
+      fontSize: toRN(tokens.typography.fontSize.sm),
       color: colors.text.secondary,
       fontFamily: fontFamily.groteskRegular,
-      lineHeight: toRN(tokens.typography.fontSize.base * 1.4),
+      textAlign: "center" as const,
+      marginBottom: toRN(tokens.spacing[4]),
     },
-    heroImage: {
-      width: toRN(tokens.spacing[12]) * 5, // 15rem = 240px
-      height: toRN(tokens.spacing[12]) * 5, // 15rem = 240px
-      backgroundColor: "transparent",
-      resizeMode: "contain",
+    trustBadges: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      backgroundColor: colors.bg.card,
+      paddingVertical: toRN(tokens.spacing[2]),
+      paddingHorizontal: toRN(tokens.spacing[4]),
+      borderRadius: toRN(tokens.borderRadius.full),
+      shadowColor: colors.shadow.md,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.08,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    trustBadge: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: toRN(tokens.spacing[1.5]),
+    },
+    trustBadgeDivider: {
+      width: 1,
+      height: 16,
+      backgroundColor: colors.border.default,
+      marginHorizontal: toRN(tokens.spacing[3]),
+    },
+    trustBadgeText: {
+      fontSize: toRN(tokens.typography.fontSize.xs),
+      color: colors.text.secondary,
+      fontFamily: fontFamily.groteskMedium,
     },
     billingToggle: {
       flexDirection: "row" as const,
@@ -1001,13 +1218,9 @@ const makeSubscriptionScreenStyles = (tokens: any, colors: any, brand: any) => {
       marginBottom: toRN(tokens.spacing[3]),
     },
     detailIconWrapper: {
-      width: toRN(tokens.spacing[4]),
+      width: toRN(tokens.spacing[5]),
       alignItems: "center" as const,
-    },
-    detailIcon: {
-      fontSize: toRN(tokens.typography.fontSize.xl) + 2,
-      color: brand.primary,
-      lineHeight: toRN(tokens.typography.fontSize.base) + 2,
+      paddingTop: toRN(tokens.spacing[0.5]),
     },
     detailCopy: {
       flex: 1,

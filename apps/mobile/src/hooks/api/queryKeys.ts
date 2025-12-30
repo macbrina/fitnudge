@@ -21,9 +21,15 @@ export const goalsQueryKeys = {
 // Actionable Plans Query Keys
 export const actionablePlansQueryKeys = {
   all: ["actionable-plans"] as const,
+  // Goal plan keys
   planStatus: (goalId: string) =>
     ["actionable-plans", "status", goalId] as const,
   plan: (goalId: string) => ["actionable-plans", "plan", goalId] as const,
+  // Challenge plan keys (same structure, different prefix)
+  challengePlanStatus: (challengeId: string) =>
+    ["actionable-plans", "challenge-status", challengeId] as const,
+  challengePlan: (challengeId: string) =>
+    ["actionable-plans", "challenge-plan", challengeId] as const,
 } as const;
 
 // User Query Keys (matches useUser.ts)
@@ -55,6 +61,7 @@ export const checkInsQueryKeys = {
 export const challengesQueryKeys = {
   all: ["challenges"] as const,
   list: () => [...challengesQueryKeys.all, "list"] as const,
+  my: () => [...challengesQueryKeys.all, "my"] as const,
   public: () => [...challengesQueryKeys.all, "public"] as const,
   detail: (id: string) => [...challengesQueryKeys.all, "detail", id] as const,
   leaderboard: (id: string) =>
@@ -81,6 +88,7 @@ export const nudgesQueryKeys = {
 export const partnersQueryKeys = {
   all: ["partners"] as const,
   list: () => [...partnersQueryKeys.all, "list"] as const,
+  limits: () => [...partnersQueryKeys.all, "limits"] as const,
   pending: () => [...partnersQueryKeys.all, "pending"] as const,
   sent: () => [...partnersQueryKeys.all, "sent"] as const,
   search: (query: string) =>
@@ -90,6 +98,8 @@ export const partnersQueryKeys = {
   suggested: () => [...partnersQueryKeys.all, "suggested"] as const,
   suggestedInfinite: () =>
     [...partnersQueryKeys.all, "suggested-infinite"] as const,
+  dashboard: (partnerUserId: string) =>
+    [...partnersQueryKeys.all, "dashboard", partnerUserId] as const,
 } as const;
 
 // Challenge Invites Query Keys

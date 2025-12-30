@@ -13,8 +13,8 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- Create custom types
 CREATE TYPE auth_provider_type AS ENUM ('email', 'apple', 'google');
-CREATE TYPE goal_frequency AS ENUM ('daily', 'weekly', 'monthly', 'custom');
-CREATE TYPE goal_category AS ENUM ('fitness', 'nutrition', 'wellness', 'mindfulness', 'sleep', 'custom');
+CREATE TYPE goal_frequency AS ENUM ('daily', 'weekly');
+CREATE TYPE goal_category AS ENUM ('fitness', 'nutrition', 'wellness', 'mindfulness', 'sleep');
 CREATE TYPE post_media_type AS ENUM ('text', 'image', 'voice', 'video');
 CREATE TYPE reaction_type AS ENUM ('like', 'cheer', 'love', 'fire');
 CREATE TYPE subscription_status AS ENUM ('active', 'cancelled', 'expired', 'past_due', 'pending');

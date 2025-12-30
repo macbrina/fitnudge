@@ -319,8 +319,8 @@ export function BottomMenuSheet({
                   {section.options.map((option, optionIndex) =>
                     renderOption(
                       option,
-                      optionIndex === section.options.length - 1
-                    )
+                      optionIndex === section.options.length - 1,
+                    ),
                   )}
                 </View>
               </View>

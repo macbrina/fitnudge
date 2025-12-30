@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { View, Text, TouchableOpacity } from "react-native";
+import { useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/Card";
 import { SkeletonBox } from "@/components/ui/SkeletonBox";
 import { useStyles } from "@/themes";
@@ -14,208 +15,152 @@ import {
   useWeekProgress,
   useHabitChain,
   useMoodTrends,
+  progressQueryKeys,
 } from "@/hooks/api/useProgressData";
+import { trackingStatsQueryKeys } from "@/hooks/api/useTrackingStats";
+import { trackingStatsService } from "@/services/api/trackingStats";
+import { checkInsService } from "@/services/api";
 import { StreakCards } from "@/screens/tabs/home/components/StreakCards";
 import { HabitChainCompact } from "@/screens/tabs/home/components/HabitChainCompact";
 import { WeeklyProgressBar } from "@/screens/tabs/home/components/WeeklyProgressBar";
 import { MoodTrendMini } from "@/screens/tabs/home/components/MoodTrendMini";
+import { TrackingTypeStats } from "@/components/progress";
+import type { TrackingType } from "@/components/progress";
+
+// Available period options for rolling window
+const PERIOD_OPTIONS = [7, 30, 90] as const;
+type PeriodOption = (typeof PERIOD_OPTIONS)[number];
 
 interface GoalProgressSectionProps {
   goalId: string;
-  goalType?: "habit" | "time_challenge" | "target_challenge";
-  targetCheckins?: number;
-  challengeStartDate?: string;
-  challengeEndDate?: string;
+  trackingType?: TrackingType;
   frequency?: "daily" | "weekly";
-  daysOfWeek?: number[]; // 0=Sunday, 1=Monday, ..., 6=Saturday
+  daysOfWeek?: number[];
+  isPartnerView?: boolean;
 }
 
-// Helper function to calculate scheduled days in a date range
-const calculateScheduledDays = (
-  startDate: Date,
-  endDate: Date,
-  frequency: "daily" | "weekly",
-  daysOfWeek?: number[]
-): number => {
-  if (frequency === "daily") {
-    return (
-      Math.ceil(
-        (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
-      ) + 1
-    );
-  }
-
-  if (frequency === "weekly" && daysOfWeek && daysOfWeek.length > 0) {
-    let count = 0;
-    const current = new Date(startDate);
-    while (current <= endDate) {
-      // JavaScript getDay(): 0=Sunday, 1=Monday, ..., 6=Saturday (matches our format)
-      if (daysOfWeek.includes(current.getDay())) {
-        count++;
-      }
-      current.setDate(current.getDate() + 1);
-    }
-    return count;
-  }
-
-  // Fallback: assume daily
-  return (
-    Math.ceil(
-      (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
-    ) + 1
-  );
+// Helper to format date as YYYY-MM-DD in LOCAL timezone
+const formatLocalDate = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 };
 
 export function GoalProgressSection({
   goalId,
-  goalType = "habit",
-  targetCheckins,
-  challengeStartDate,
-  challengeEndDate,
+  trackingType = "checkin",
   frequency = "daily",
   daysOfWeek,
+  isPartnerView = false,
 }: GoalProgressSectionProps) {
   const styles = useStyles(makeGoalProgressSectionStyles);
   const { colors, brandColors } = useTheme();
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const [isExpanded, setIsExpanded] = useState(true);
+  const [selectedPeriod, setSelectedPeriod] = useState<PeriodOption>(30);
+
+  // Prefetch all periods on mount to enable instant switching
+  useEffect(() => {
+    if (!goalId) return;
+
+    // Prefetch tracking stats for all periods
+    PERIOD_OPTIONS.forEach((period) => {
+      // Prefetch meal/hydration/workout stats based on tracking type
+      if (trackingType !== "checkin") {
+        queryClient.prefetchQuery({
+          queryKey: trackingStatsQueryKeys.stats(
+            "goal",
+            goalId,
+            trackingType,
+            period,
+          ),
+          queryFn: () =>
+            trackingStatsService
+              .getStats(goalId, "goal", trackingType, period)
+              .then((r) => r.data),
+          staleTime: 1000 * 60 * 5, // 5 minutes
+        });
+      }
+
+      // Prefetch habit chain for all periods
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(endDate.getDate() - period + 1);
+
+      queryClient.prefetchQuery({
+        queryKey: [...progressQueryKeys.all, "chain", goalId, period],
+        queryFn: () =>
+          checkInsService
+            .getCheckInsByDateRange(
+              formatLocalDate(startDate),
+              formatLocalDate(endDate),
+              goalId,
+            )
+            .then((r) => r.data || []),
+        staleTime: 0,
+      });
+
+      // Prefetch mood trends for all periods (only for checkin tracking)
+      if (trackingType === "checkin") {
+        queryClient.prefetchQuery({
+          queryKey: progressQueryKeys.moodTrend(goalId, period),
+          queryFn: () =>
+            checkInsService.getMoodTrends(goalId, period).then((r) => r.data),
+          staleTime: 0,
+        });
+      }
+    });
+  }, [goalId, trackingType, queryClient]);
 
   // Fetch all progress data for this specific goal
   const { data: streakInfo, isLoading: streakLoading } = useStreakInfo(goalId);
   const { data: weekProgress, isLoading: weekLoading } =
     useWeekProgress(goalId);
+  // Use selected period for habit chain
   const { data: habitChain, isLoading: chainLoading } = useHabitChain(
     goalId,
-    30
+    selectedPeriod,
   );
-  const { data: moodTrend, isLoading: moodLoading } = useMoodTrends(goalId, 7);
+  // Fetch mood trends only for checkin tracking type (mood is captured via check-ins)
+  const { data: moodTrend, isLoading: moodLoading } = useMoodTrends(
+    trackingType === "checkin" ? goalId : undefined,
+    selectedPeriod,
+  );
 
-  const isLoading = streakLoading || weekLoading || chainLoading || moodLoading;
+  const isLoading = streakLoading || weekLoading || chainLoading;
 
-  // Calculate completion rate from habit chain data
-  const completedDays =
-    habitChain?.filter((day) => day.completed && !day.isFuture).length || 0;
-  const totalPastDays = habitChain?.filter((day) => !day.isFuture).length || 0;
-  const completionRate =
-    totalPastDays > 0 ? Math.round((completedDays / totalPastDays) * 100) : 0;
-
-  // For challenges, calculate progress towards target
-  const renderChallengeProgress = () => {
-    if (goalType === "target_challenge" && targetCheckins) {
-      const progress = Math.min(completedDays, targetCheckins);
-      const percentage = Math.round((progress / targetCheckins) * 100);
-
-      return (
-        <View style={styles.challengeProgress}>
-          <View style={styles.challengeHeader}>
-            <Text style={styles.challengeTitle}>
-              {t("goals.progress.challenge_progress") || "Challenge Progress"}
-            </Text>
-            <Text style={styles.challengeStats}>
-              {progress}/{targetCheckins} ({percentage}%)
-            </Text>
-          </View>
-          <View style={styles.progressBarBg}>
-            <View
-              style={[
-                styles.progressBarFill,
-                {
-                  width: `${percentage}%`,
-                  backgroundColor: brandColors.primary,
-                },
-              ]}
-            />
-          </View>
-          {percentage >= 100 && (
-            <View style={styles.completedBadge}>
-              <Ionicons name="trophy" size={16} color="#FFD700" />
-              <Text style={styles.completedBadgeText}>
-                {t("goals.progress.challenge_complete") ||
-                  "Challenge Complete!"}
-              </Text>
-            </View>
-          )}
-        </View>
-      );
+  // Calculate consistency rate from habit chain data, respecting scheduled days
+  const { completedDays, totalScheduledDays, consistencyRate } = useMemo(() => {
+    if (!habitChain) {
+      return { completedDays: 0, totalScheduledDays: 0, consistencyRate: 0 };
     }
 
-    if (
-      goalType === "time_challenge" &&
-      challengeStartDate &&
-      challengeEndDate
-    ) {
-      const start = new Date(challengeStartDate);
-      const end = new Date(challengeEndDate);
-      const today = new Date();
+    let completed = 0;
+    let scheduled = 0;
 
-      // Calculate SCHEDULED days (respecting frequency and days_of_week)
-      const totalScheduledDays = calculateScheduledDays(
-        start,
-        end,
-        frequency,
-        daysOfWeek
-      );
+    for (const day of habitChain) {
+      if (day.isFuture) continue;
 
-      // Calculate calendar days for time remaining
-      const calendarDaysRemaining = Math.max(
-        0,
-        Math.ceil((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-      );
+      // For weekly frequency, only count scheduled days
+      if (frequency === "weekly" && daysOfWeek?.length) {
+        const dayDate = new Date(day.date);
+        const dayOfWeek = dayDate.getDay();
+        if (!daysOfWeek.includes(dayOfWeek)) continue;
+      }
 
-      // Progress is based on completed check-ins vs total scheduled
-      const percentage = Math.min(
-        100,
-        Math.round((completedDays / Math.max(totalScheduledDays, 1)) * 100)
-      );
-      const isCompleted = today > end;
-
-      return (
-        <View style={styles.challengeProgress}>
-          <View style={styles.challengeHeader}>
-            <Text style={styles.challengeTitle}>
-              {t("goals.progress.time_challenge_progress") || "Time Challenge"}
-            </Text>
-            <Text style={styles.challengeStats}>
-              {isCompleted
-                ? t("goals.progress.completed") || "Completed"
-                : `${calendarDaysRemaining} ${t("goals.progress.days_left") || "days left"}`}
-            </Text>
-          </View>
-          <View style={styles.progressBarBg}>
-            <View
-              style={[
-                styles.progressBarFill,
-                {
-                  width: `${percentage}%`,
-                  backgroundColor: brandColors.primary,
-                },
-              ]}
-            />
-          </View>
-          <View style={styles.challengeMeta}>
-            <Text style={styles.challengeMetaText}>
-              {completedDays}/{totalScheduledDays}{" "}
-              {t("goals.progress.checkins") || "check-ins"}
-            </Text>
-            <Text style={styles.challengeMetaText}>
-              {percentage}% {t("goals.progress.complete") || "complete"}
-            </Text>
-          </View>
-          {isCompleted && (
-            <View style={styles.completedBadge}>
-              <Ionicons name="trophy" size={16} color="#FFD700" />
-              <Text style={styles.completedBadgeText}>
-                {t("goals.progress.challenge_complete") ||
-                  "Challenge Complete!"}
-              </Text>
-            </View>
-          )}
-        </View>
-      );
+      scheduled++;
+      if (day.completed) completed++;
     }
 
-    return null;
-  };
+    return {
+      completedDays: completed,
+      totalScheduledDays: scheduled,
+      consistencyRate:
+        scheduled > 0 ? Math.round((completed / scheduled) * 100) : 0,
+    };
+  }, [habitChain, frequency, daysOfWeek]);
 
   if (isLoading && !streakInfo) {
     return (
@@ -260,7 +205,9 @@ export function GoalProgressSection({
         activeOpacity={0.7}
       >
         <Text style={styles.sectionTitle}>
-          {t("goals.progress.your_progress") || "Your Progress"}
+          {isPartnerView
+            ? t("goals.progress.partners_progress") || "Partner's Progress"
+            : t("goals.progress.your_progress") || "Your Progress"}
         </Text>
         <Ionicons
           name={isExpanded ? "chevron-up" : "chevron-down"}
@@ -278,48 +225,94 @@ export function GoalProgressSection({
             isLoading={streakLoading}
           />
 
-          {/* Challenge Progress (for challenges only) */}
-          {renderChallengeProgress()}
+          {/* Period Selector */}
+          <View style={styles.periodSelector}>
+            {PERIOD_OPTIONS.map((period) => (
+              <TouchableOpacity
+                key={period}
+                style={[
+                  styles.periodButton,
+                  selectedPeriod === period && styles.periodButtonActive,
+                ]}
+                onPress={() => setSelectedPeriod(period)}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.periodButtonText,
+                    selectedPeriod === period && styles.periodButtonTextActive,
+                  ]}
+                >
+                  {period} {t("goals.progress.days") || "days"}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
 
-          {/* Completion Rate Card */}
-          <View style={styles.completionRateCard}>
-            <View style={styles.completionRateHeader}>
-              <Text style={styles.completionRateLabel}>
-                {t("goals.progress.completion_rate") || "Completion Rate"}
+          {/* Consistency Rate Card (renamed from Completion Rate) */}
+          <View style={styles.consistencyCard}>
+            <View style={styles.consistencyHeader}>
+              <Text style={styles.consistencyLabel}>
+                {t("goals.progress.consistency") || "Consistency"}
               </Text>
-              <Text style={styles.completionRateValue}>{completionRate}%</Text>
+              <Text style={styles.consistencyValue}>{consistencyRate}%</Text>
             </View>
             <View style={styles.progressBarBg}>
               <View
                 style={[
                   styles.progressBarFill,
                   {
-                    width: `${completionRate}%`,
+                    width: `${consistencyRate}%`,
                     backgroundColor:
-                      completionRate >= 80
+                      consistencyRate >= 80
                         ? colors.feedback.success
-                        : completionRate >= 50
+                        : consistencyRate >= 50
                           ? brandColors.primary
                           : colors.feedback.warning,
                   },
                 ]}
               />
             </View>
-            <Text style={styles.completionRateSubtext}>
-              {completedDays} {t("goals.progress.of") || "of"} {totalPastDays}{" "}
-              {t("goals.progress.days") || "days"}
+            <Text style={styles.consistencySubtext}>
+              {completedDays} {t("goals.progress.of") || "of"}{" "}
+              {totalScheduledDays}{" "}
+              {frequency === "weekly"
+                ? t("goals.scheduled_days") || "scheduled days"
+                : t("goals.progress.days") || "days"}{" "}
+              (
+              {t("goals.progress.last_days", { days: selectedPeriod }) ||
+                `Last ${selectedPeriod} days`}
+              )
             </Text>
           </View>
+
+          {/* Tracking-Type Specific Stats */}
+          {trackingType !== "checkin" && (
+            <TrackingTypeStats
+              entityId={goalId}
+              entityType="goal"
+              trackingType={trackingType}
+              period={selectedPeriod}
+            />
+          )}
 
           {/* Weekly Progress */}
           <WeeklyProgressBar {...weekProgress} isLoading={weekLoading} />
 
           {/* Habit Chain */}
-          <HabitChainCompact data={habitChain || []} isLoading={chainLoading} />
+          <HabitChainCompact
+            data={habitChain || []}
+            days={selectedPeriod}
+            isLoading={chainLoading}
+          />
 
-          {/* Mood Trend */}
-          {moodTrend && moodTrend.length > 0 && (
-            <MoodTrendMini data={moodTrend} isLoading={moodLoading} />
+          {/* Mood Trend - only for checkin tracking type */}
+          {trackingType === "checkin" && (
+            <MoodTrendMini
+              data={moodTrend || []}
+              days={selectedPeriod}
+              isLoading={moodLoading}
+            />
           )}
         </>
       )}
@@ -330,7 +323,7 @@ export function GoalProgressSection({
 const makeGoalProgressSectionStyles = (
   tokens: any,
   colors: any,
-  brand: any
+  brand: any,
 ) => ({
   container: {
     padding: toRN(tokens.spacing[5]),
@@ -352,77 +345,63 @@ const makeGoalProgressSectionStyles = (
     gap: toRN(tokens.spacing[3]),
     marginBottom: toRN(tokens.spacing[4]),
   },
-  challengeProgress: {
+  // Period Selector styles
+  periodSelector: {
+    flexDirection: "row" as const,
+    gap: toRN(tokens.spacing[2]),
     marginBottom: toRN(tokens.spacing[4]),
-    padding: toRN(tokens.spacing[4]),
     backgroundColor: colors.bg.muted,
-    borderRadius: toRN(tokens.borderRadius.lg),
+    borderRadius: toRN(tokens.borderRadius.full),
+    padding: toRN(tokens.spacing[1]),
   },
-  challengeHeader: {
-    flexDirection: "row" as const,
-    justifyContent: "space-between" as const,
+  periodButton: {
+    flex: 1,
+    paddingVertical: toRN(tokens.spacing[2]),
+    paddingHorizontal: toRN(tokens.spacing[3]),
+    borderRadius: toRN(tokens.borderRadius.full),
     alignItems: "center" as const,
-    marginBottom: toRN(tokens.spacing[3]),
   },
-  challengeTitle: {
-    fontSize: toRN(tokens.typography.fontSize.base),
-    fontFamily: fontFamily.groteskSemiBold,
-    color: colors.text.primary,
+  periodButtonActive: {
+    backgroundColor: colors.bg.card,
+    shadowColor: colors.shadow?.sm || "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
-  challengeStats: {
+  periodButtonText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
-    fontFamily: fontFamily.groteskMedium,
-    color: colors.text.secondary,
-  },
-  challengeMeta: {
-    flexDirection: "row" as const,
-    justifyContent: "space-between" as const,
-    marginTop: toRN(tokens.spacing[2]),
-  },
-  challengeMetaText: {
-    fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.groteskMedium,
     color: colors.text.tertiary,
   },
-  completedBadge: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    justifyContent: "center" as const,
-    gap: toRN(tokens.spacing[2]),
-    marginTop: toRN(tokens.spacing[3]),
-    paddingVertical: toRN(tokens.spacing[2]),
-    paddingHorizontal: toRN(tokens.spacing[3]),
-    backgroundColor: "rgba(255, 215, 0, 0.2)",
-    borderRadius: toRN(tokens.borderRadius.md),
+  periodButtonTextActive: {
+    color: brand.primary,
+    fontFamily: fontFamily.groteskSemiBold,
   },
-  completedBadgeText: {
-    fontSize: toRN(tokens.typography.fontSize.sm),
-    fontFamily: fontFamily.groteskBold,
-    color: "#B8860B",
-  },
-  completionRateCard: {
+  // Consistency Card styles (renamed from completionRate)
+  consistencyCard: {
     marginBottom: toRN(tokens.spacing[4]),
     padding: toRN(tokens.spacing[4]),
     backgroundColor: colors.bg.muted,
     borderRadius: toRN(tokens.borderRadius.lg),
   },
-  completionRateHeader: {
+  consistencyHeader: {
     flexDirection: "row" as const,
     justifyContent: "space-between" as const,
     alignItems: "center" as const,
     marginBottom: toRN(tokens.spacing[2]),
   },
-  completionRateLabel: {
+  consistencyLabel: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.groteskSemiBold,
     color: colors.text.primary,
   },
-  completionRateValue: {
+  consistencyValue: {
     fontSize: toRN(tokens.typography.fontSize.xl),
     fontFamily: fontFamily.groteskBold,
     color: brand.primary,
   },
-  completionRateSubtext: {
+  consistencySubtext: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.groteskMedium,
     color: colors.text.tertiary,

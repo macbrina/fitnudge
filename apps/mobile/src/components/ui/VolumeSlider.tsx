@@ -1,12 +1,12 @@
 import { useStyles, useTheme } from "@/themes";
-import React, { useCallback, useRef } from "react";
+import React, { useCallback, useRef, useState, useMemo } from "react";
 import {
   View,
   PanResponder,
-  StyleSheet,
   LayoutChangeEvent,
   GestureResponderEvent,
   ViewStyle,
+  Animated,
 } from "react-native";
 
 interface VolumeSliderProps {
@@ -27,34 +27,66 @@ export function VolumeSlider({
   style,
 }: VolumeSliderProps) {
   const trackWidth = useRef(0);
+  const trackOffsetX = useRef(0);
   const styles = useStyles(makeStyles);
   const { colors } = useTheme();
 
-  const calculateValue = useCallback(
-    (evt: GestureResponderEvent) => {
-      if (trackWidth.current === 0) return;
-      const x = evt.nativeEvent.locationX;
-      const newValue = Math.max(0, Math.min(1, x / trackWidth.current));
-      onValueChange(newValue);
-    },
-    [onValueChange]
-  );
+  // Local state for smooth visual updates during drag
+  const [localValue, setLocalValue] = useState(value);
+  const isDraggingRef = useRef(false);
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: calculateValue,
-      onPanResponderMove: calculateValue,
-    })
-  ).current;
+  // Sync with external value when not dragging
+  const displayValue = isDraggingRef.current ? localValue : value;
+
+  const calculateValue = useCallback((pageX: number) => {
+    if (trackWidth.current === 0) return;
+    const x = pageX - trackOffsetX.current;
+    const newValue = Math.max(0, Math.min(1, x / trackWidth.current));
+    return newValue;
+  }, []);
+
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderGrant: (evt) => {
+          isDraggingRef.current = true;
+          const newValue = calculateValue(evt.nativeEvent.pageX);
+          if (newValue !== undefined) {
+            setLocalValue(newValue);
+            onValueChange(newValue);
+          }
+        },
+        onPanResponderMove: (evt) => {
+          const newValue = calculateValue(evt.nativeEvent.pageX);
+          if (newValue !== undefined) {
+            setLocalValue(newValue);
+            onValueChange(newValue);
+          }
+        },
+        onPanResponderRelease: () => {
+          isDraggingRef.current = false;
+        },
+        onPanResponderTerminate: () => {
+          isDraggingRef.current = false;
+        },
+      }),
+    [calculateValue, onValueChange],
+  );
 
   const handleLayout = useCallback((event: LayoutChangeEvent) => {
     trackWidth.current = event.nativeEvent.layout.width;
+    // Measure the offset of the track from the left edge of the screen
+    event.target.measureInWindow((x) => {
+      trackOffsetX.current = x;
+    });
   }, []);
 
   // Clamp value between 0 and 1
-  const clampedValue = Math.max(0, Math.min(1, value));
+  const clampedValue = Math.max(0, Math.min(1, displayValue));
+  // Calculate pixel position for absolute positioning
+  const thumbPosition = trackWidth.current * clampedValue;
 
   return (
     <View

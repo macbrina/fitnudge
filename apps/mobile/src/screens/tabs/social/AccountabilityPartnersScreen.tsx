@@ -46,7 +46,7 @@ export const AccountabilityPartnersScreen: React.FC = () => {
       { id: "received", label: t("social.received") || "Received" },
       { id: "sent", label: t("social.sent") || "Sent" },
     ],
-    [t]
+    [t],
   );
 
   // Use React Query hooks
@@ -135,7 +135,7 @@ export const AccountabilityPartnersScreen: React.FC = () => {
   const handleCancelRequest = async (
     partnerId: string,
     userId: string,
-    partnerName: string
+    partnerName: string,
   ) => {
     const confirmed = await showConfirm({
       title: t("social.cancel_request_title") || "Cancel Request",
@@ -164,7 +164,7 @@ export const AccountabilityPartnersScreen: React.FC = () => {
 
   const handleRemovePartner = async (
     partnerId: string,
-    partnerName: string
+    partnerName: string,
   ) => {
     const confirmed = await showConfirm({
       title: t("social.remove_partner_title"),
@@ -221,7 +221,7 @@ export const AccountabilityPartnersScreen: React.FC = () => {
               onPress={() =>
                 handleRemovePartner(
                   partner.id,
-                  partnerInfo?.name || "this partner"
+                  partnerInfo?.name || "this partner",
                 )
               }
               style={styles.menuButton}
@@ -332,7 +332,7 @@ export const AccountabilityPartnersScreen: React.FC = () => {
               handleCancelRequest(
                 partner.id,
                 partnerInfo?.id || "",
-                partnerInfo?.name || "this user"
+                partnerInfo?.name || "this user",
               )
             }
             style={styles.cancelButton}

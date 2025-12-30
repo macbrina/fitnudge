@@ -131,17 +131,17 @@ async def get_user_stats(user_id: str, current_user: dict = Depends(get_current_
 
     # Get goals stats
     goals_result = (
-        supabase.table("goals").select("id, is_active").eq("user_id", user_id).execute()
+        supabase.table("goals").select("id, status").eq("user_id", user_id).execute()
     )
 
     total_goals = len(goals_result.data)
-    active_goals = len([g for g in goals_result.data if g["is_active"]])
+    active_goals = len([g for g in goals_result.data if g.get("status") == "active"])
     completed_goals = total_goals - active_goals
 
     # Get check-ins stats
     checkins_result = (
         supabase.table("check_ins")
-        .select("date, completed")
+        .select("check_in_date, completed")
         .eq("user_id", user_id)
         .execute()
     )
@@ -155,7 +155,7 @@ async def get_user_stats(user_id: str, current_user: dict = Depends(get_current_
 
     # Sort check-ins by date
     sorted_checkins = sorted(
-        checkins_result.data, key=lambda x: x["date"], reverse=True
+        checkins_result.data, key=lambda x: x["check_in_date"], reverse=True
     )
 
     for checkin in sorted_checkins:
@@ -381,7 +381,7 @@ async def search_users(
         .select("id, username, name, profile_picture_url")
         .ilike("username", f"%{q}%")
         .neq("id", current_user["id"])  # Exclude current user
-        .eq("is_active", True)
+        .eq("status", "active")
         .limit(limit)
         .execute()
     )

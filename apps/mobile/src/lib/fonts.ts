@@ -40,7 +40,7 @@ export const getFontFamily = (
     | "groteskRegular"
     | "groteskMedium"
     | "groteskSemiBold"
-    | "groteskBold" = "regular"
+    | "groteskBold" = "regular",
 ) => {
   return fontFamily[weight as keyof typeof fontFamily];
 };
@@ -61,7 +61,7 @@ export const getFontStyle = (
     | "groteskRegular"
     | "groteskMedium"
     | "groteskSemiBold"
-    | "groteskBold" = "regular"
+    | "groteskBold" = "regular",
 ) => {
   return {
     fontFamily: getFontFamily(weight as keyof typeof fontFamily),

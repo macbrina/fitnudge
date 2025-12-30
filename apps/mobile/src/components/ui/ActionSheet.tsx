@@ -1,5 +1,11 @@
 import React from "react";
-import { View, Text, TouchableOpacity } from "react-native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Image,
+  ImageSourcePropType,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStyles, useTheme } from "@/themes";
 import { tokens } from "@/themes/tokens";
@@ -11,8 +17,11 @@ export interface ActionSheetOption {
   id: string;
   label: string;
   icon?: keyof typeof Ionicons.glyphMap;
+  image?: ImageSourcePropType; // Support for custom images
   onPress: () => void;
   destructive?: boolean;
+  disabled?: boolean;
+  badge?: string; // Optional badge text (e.g., "PRO", "NEW")
 }
 
 export interface ActionSheetProps {
@@ -89,33 +98,52 @@ export function ActionSheet({
             style={[
               styles.option,
               option.destructive && styles.optionDestructive,
+              option.disabled && styles.optionDisabled,
             ]}
             onPress={() => {
+              if (option.disabled) return;
               onClose();
               option.onPress();
             }}
-            activeOpacity={0.7}
+            activeOpacity={option.disabled ? 1 : 0.7}
           >
-            {option.icon && (
+            {option.image ? (
+              <Image
+                source={option.image}
+                style={[
+                  styles.optionImage,
+                  option.disabled && styles.optionImageDisabled,
+                ]}
+                resizeMode="contain"
+              />
+            ) : option.icon ? (
               <Ionicons
                 name={option.icon}
                 size={toRN(tokens.typography.fontSize["2xl"])}
                 color={
-                  option.destructive
-                    ? colors.feedback.error
-                    : colors.text.primary
+                  option.disabled
+                    ? colors.text.tertiary
+                    : option.destructive
+                      ? colors.feedback.error
+                      : colors.text.primary
                 }
                 style={styles.optionIcon}
               />
-            )}
+            ) : null}
             <Text
               style={[
                 styles.optionText,
                 option.destructive && styles.optionTextDestructive,
+                option.disabled && styles.optionTextDisabled,
               ]}
             >
               {option.label}
             </Text>
+            {option.badge && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{option.badge}</Text>
+              </View>
+            )}
           </TouchableOpacity>
         ))}
 
@@ -194,6 +222,12 @@ const makeActionSheetStyles = (tokens: any, colors: any, brand: any) => ({
   optionIcon: {
     marginRight: toRN(tokens.spacing[3]),
   },
+  optionImage: {
+    width: toRN(28),
+    height: toRN(28),
+    borderRadius: toRN(6),
+    marginRight: toRN(tokens.spacing[3]),
+  },
   optionText: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.medium,
@@ -202,6 +236,15 @@ const makeActionSheetStyles = (tokens: any, colors: any, brand: any) => ({
   },
   optionTextDestructive: {
     color: colors.feedback.error,
+  },
+  optionDisabled: {
+    opacity: 0.5,
+  },
+  optionTextDisabled: {
+    color: colors.text.tertiary,
+  },
+  optionImageDisabled: {
+    opacity: 0.5,
   },
   cancelButton: {
     marginTop: toRN(tokens.spacing[2]),
@@ -212,5 +255,18 @@ const makeActionSheetStyles = (tokens: any, colors: any, brand: any) => ({
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.semiBold,
     color: colors.text.secondary,
+  },
+  badge: {
+    backgroundColor: brand.gradient?.start || "#8B5CF6",
+    paddingHorizontal: toRN(tokens.spacing[2]),
+    paddingVertical: toRN(2),
+    borderRadius: toRN(tokens.borderRadius.sm),
+    marginLeft: toRN(tokens.spacing[2]),
+  },
+  badgeText: {
+    fontSize: toRN(tokens.typography.fontSize.xs),
+    fontFamily: fontFamily.bold,
+    color: "#FFFFFF",
+    textTransform: "uppercase" as const,
   },
 });

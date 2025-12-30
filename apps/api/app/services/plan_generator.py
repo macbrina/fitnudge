@@ -32,12 +32,30 @@ HABIT-SPECIFIC REQUIREMENTS:
 - Emphasize consistency, streaks, and habit formation
 - NO end date, NO completion target - this continues forever
 - Track progress through daily/weekly check-ins and streak counts
-- Celebrate consistency milestones (7 days, 30 days, 100 days, etc.)
+- Celebrate STREAK milestones (7 days, 30 days, 60 days, 100 days, etc.)
 
 DO NOT include:
 - "challenge_info" field (habits don't have challenges)
+- "weekly_focus" field (habits are ongoing, not time-boxed phases)
 - Duration or end date references
 - Target completion numbers
+- Finite progression phases (no Week 1-4 structure!)
+
+REQUIRED OUTPUT FORMAT for HABITS:
+Put "streak_milestones" in guidance (NOT in structure or challenge_info):
+
+"guidance": {{
+  "description": "...",
+  "tips": ["...", "..."],
+  "streak_milestones": [
+    {{"days": 7, "title": "First Week!", "description": "You're building momentum!"}},
+    {{"days": 30, "title": "30-Day Streak!", "description": "Habit is forming!"}},
+    {{"days": 60, "title": "60-Day Streak!", "description": "This is becoming part of you!"}},
+    {{"days": 100, "title": "100 Days!", "description": "You've mastered this habit!"}}
+  ]
+}}
+
+DO NOT include "progression" with weekly_adjustments for habits - they are ongoing!
 """
 
 # ==============================================================================
@@ -48,35 +66,55 @@ GOAL TYPE: TIME CHALLENGE
 This goal is a TIME CHALLENGE - a focused effort with a specific duration.
 
 CHALLENGE DETAILS:
-- Duration: {duration_days} days
+- Duration: {duration_days} days ({num_weeks} weeks)
 - Start Date: {start_date}
 - End Date: {end_date}
 
 TIME CHALLENGE REQUIREMENTS:
-- Create a PROGRESSIVE plan that builds over the {duration_days} days
-- Include weekly milestones and checkpoints
-- Plan should have phases (e.g., Week 1-2: Foundation, Week 3-4: Build, etc.)
+- Create a PROGRESSIVE plan that builds over {num_weeks} weeks
+- Generate weekly milestones for EACH week (not hardcoded 4 weeks!)
+- Plan phases based on ACTUAL duration:
+  - 30 days (4-5 weeks): Foundation → Build → Push → Finish
+  - 60 days (8-9 weeks): Foundation (2w) → Build (2w) → Intensify (2w) → Peak (2w)
+  - 90 days (12-13 weeks): Foundation (3w) → Build (3w) → Intensify (3w) → Peak (2w) → Finish (2w)
 - Emphasize completion and celebration at the end
 - This challenge can be shared with friends for accountability
 
-REQUIRED: Include "challenge_info" in your plan structure:
-"challenge_info": {{
-  "type": "time_challenge",
-  "duration_days": {duration_days},
-  "start_date": "{start_date}",
-  "end_date": "{end_date}",
-  "milestones": [
-    {{"day": 7, "title": "Week 1 Complete", "description": "You've built the foundation!"}},
-    {{"day": 14, "title": "Week 2 Complete", "description": "Habits are forming!"}},
-    {{"day": 21, "title": "Week 3 Complete", "description": "You're in the groove!"}},
-    {{"day": {duration_days}, "title": "Challenge Complete!", "description": "Amazing achievement!"}}
-  ],
-  "weekly_focus": [
-    {{"week": 1, "focus": "Building foundation", "intensity": "light"}},
-    {{"week": 2, "focus": "Establishing rhythm", "intensity": "moderate"}},
-    // ... add appropriate weeks based on duration
-  ]
+REQUIRED OUTPUT FORMAT for TIME CHALLENGES:
+Include BOTH "challenge_info" AND "progression" in structure:
+
+"structure": {{
+  // ... other fields ...
+  "challenge_info": {{
+    "type": "time_challenge",
+    "duration_days": {duration_days},
+    "start_date": "{start_date}",
+    "end_date": "{end_date}",
+    "milestones": [
+      // Generate milestone for EACH week + final day
+      {{"day": 7, "title": "Week 1 Complete", "description": "Foundation built!"}},
+      {{"day": 14, "title": "Week 2 Complete", "description": "Habits forming!"}},
+      // ... continue for all weeks ...
+      {{"day": {duration_days}, "title": "Challenge Complete!", "description": "You did it!"}}
+    ]
+  }},
+  "progression": {{
+    "current_week": 1,
+    "weekly_focus": "Week 1 focus description here",
+    "weekly_adjustments": [
+      // Generate EXACTLY {num_weeks} entries - one for each week
+      {{"week": 1, "focus": "Building foundation", "intensity": "light"}},
+      {{"week": 2, "focus": "Establishing rhythm", "intensity": "moderate"}},
+      // ... continue for all {num_weeks} weeks with progressive intensity
+    ]
+  }}
 }}
+
+INTENSITY PROGRESSION for {num_weeks} weeks:
+- First 25% of weeks: "light" intensity
+- Next 25% of weeks: "moderate" intensity  
+- Next 25% of weeks: "moderate-high" intensity
+- Final 25% of weeks: "high" intensity
 """
 
 # ==============================================================================
@@ -89,6 +127,7 @@ This goal is a TARGET CHALLENGE - complete a specific number of check-ins.
 CHALLENGE DETAILS:
 - Target: {target_checkins} check-ins to complete the challenge
 - No time limit - user completes at their own pace
+- Progress measured by CHECK-IN COUNT, not by weeks/days
 
 TARGET CHALLENGE REQUIREMENTS:
 - Track progress toward the target (e.g., "25/50 check-ins complete")
@@ -97,21 +136,30 @@ TARGET CHALLENGE REQUIREMENTS:
 - Celebrate each milestone reached
 - This challenge can be shared with friends to compete
 
-REQUIRED: Include "challenge_info" in your plan structure:
-"challenge_info": {{
-  "type": "target_challenge",
-  "target_checkins": {target_checkins},
-  "milestones": [
-    {{"count": {milestone_25}, "percent": 25, "title": "25% Complete", "description": "Great start!"}},
-    {{"count": {milestone_50}, "percent": 50, "title": "Halfway There!", "description": "You're crushing it!"}},
-    {{"count": {milestone_75}, "percent": 75, "title": "75% Complete", "description": "Almost there!"}},
-    {{"count": {target_checkins}, "percent": 100, "title": "Challenge Complete!", "description": "You did it!"}}
-  ],
-  "rewards": [
-    {{"at_percent": 25, "reward": "First milestone badge"}},
-    {{"at_percent": 50, "reward": "Halfway champion badge"}},
-    {{"at_percent": 100, "reward": "Challenge master badge"}}
-  ]
+⚠️ DO NOT include:
+- "weekly_focus" or "weekly_adjustments" - target challenges are PACE-BASED, not TIME-BASED!
+- "progression" field - progress is measured by check-in count, not by weeks
+
+REQUIRED OUTPUT FORMAT for TARGET CHALLENGES:
+Put "challenge_info" in structure with count-based milestones:
+
+"structure": {{
+  // ... other fields ...
+  "challenge_info": {{
+    "type": "target_challenge",
+    "target_checkins": {target_checkins},
+    "milestones": [
+      {{"count": {milestone_25}, "percent": 25, "title": "25% Complete", "description": "Great start!"}},
+      {{"count": {milestone_50}, "percent": 50, "title": "Halfway There!", "description": "You're crushing it!"}},
+      {{"count": {milestone_75}, "percent": 75, "title": "75% Complete", "description": "Almost there!"}},
+      {{"count": {target_checkins}, "percent": 100, "title": "Challenge Complete!", "description": "You did it!"}}
+    ],
+    "rewards": [
+      {{"at_percent": 25, "reward": "First milestone badge"}},
+      {{"at_percent": 50, "reward": "Halfway hero badge"}},
+      {{"at_percent": 100, "reward": "Challenge master badge"}}
+    ]
+  }}
 }}
 """
 
@@ -136,8 +184,11 @@ CRITICAL FEATURE CONSTRAINTS:
 - NEVER include features like "detailed workout logging", "calorie tracking", "macro tracking", "advanced analytics" unless explicitly listed as available
 - ALWAYS use "daily_check_ins" as the primary tracking method (this is always available)
 - If unsure about a feature, default to simple accountability check-ins
+
+REQUIRED JSON OUTPUT FORMAT:
 {
   "plan_type": "meal_plan|workout_plan|habit_plan|accountability_plan",
+  "tracking_type": "workout|meal|hydration|checkin",
   "structure": {
     // Structure varies by plan_type (see examples below)
   },
@@ -147,43 +198,156 @@ CRITICAL FEATURE CONSTRAINTS:
   }
 }
 
+⚠️ CRITICAL: tracking_type DETERMINES THE USER'S CHECK-IN INTERFACE:
+- "workout" → Opens the WorkoutPlayerScreen (guided workout with video demos)
+- "meal" → Opens the MealLogModal (log meals with AI nutrition estimation)  
+- "hydration" → Opens the HydrationModal (track water intake)
+- "checkin" → Opens the simple CheckInModal (yes/no with notes)
+
+HOW TO DETERMINE tracking_type:
+- category = "fitness" → tracking_type MUST be "workout"
+- category = "nutrition" → ANALYZE the goal title/description:
+  - If about water, hydration, drinking fluids → tracking_type = "hydration"
+  - If about food, meals, eating, protein, calories, diet → tracking_type = "meal"
+- category = "wellness" → tracking_type = "checkin"
+- category = "mindfulness" → tracking_type = "checkin"
+- category = "sleep" → tracking_type = "checkin"
+
+NUTRITION CATEGORY EXAMPLES:
+- "Drink 8 glasses of water daily" → tracking_type: "hydration"
+- "Stay hydrated throughout the day" → tracking_type: "hydration"
+- "Track my water intake" → tracking_type: "hydration"
+- "Eat 150g protein daily" → tracking_type: "meal"
+- "Log my meals" → tracking_type: "meal"
+- "Eat healthier" → tracking_type: "meal"
+- "Hit my calorie goal" → tracking_type: "meal"
+
 STRUCTURE EXAMPLES BY PLAN TYPE:
 
-1. MEAL_PLAN:
+=== INTELLIGENT MEAL PLAN GENERATION ===
+
+For MEAL_PLAN, you MUST analyze the user's profile to determine appropriate targets:
+
+USER PROFILE ANALYSIS (use these fields when available):
+- biological_sex: "male" | "female" | "prefer_not_to_say" (for accurate calorie calculations)
+- primary_goal: "lose_weight" | "build_muscle" | "stay_active" | "general_fitness" | "sport_specific"
+- fitness_level: "beginner" | "intermediate" | "advanced" | "athlete"
+- biggest_challenge: "staying_consistent" | "getting_started" | "time_management" | "lack_of_knowledge"
+- country: ISO 3166-1 alpha-2 code (for localized meal suggestions)
+
+CALORIE & PROTEIN CALCULATION GUIDELINES (adjust based on biological_sex):
+1. For weight loss (primary_goal = "lose_weight"):
+   - Female: 1400-1700 cal/day (moderate deficit)
+   - Male: 1800-2100 cal/day (moderate deficit)
+   - Prefer not to say/unknown: 1600-2000 cal/day
+   - Protein: 1.0-1.2g per kg bodyweight (or 80-120g as general guideline)
+   - Focus: portion_control, balanced_eating
+
+2. For muscle building (primary_goal = "build_muscle"):
+   - Female: 1900-2300 cal/day (moderate surplus)
+   - Male: 2400-2900 cal/day (moderate surplus)
+   - Prefer not to say/unknown: 2200-2600 cal/day
+   - Protein: 1.6-2.2g per kg bodyweight (or 120-180g as general guideline)
+   - Focus: high_protein, meal_timing
+
+3. For maintenance/general fitness:
+   - Female: 1700-2000 cal/day
+   - Male: 2200-2500 cal/day
+   - Prefer not to say/unknown: 1900-2200 cal/day
+   - Protein: 0.8-1.0g per kg bodyweight (or 60-100g as general guideline)
+   - Focus: balanced_eating, consistency
+
+4. If no user profile available, use conservative general guidelines.
+
+LOCALIZED MEAL SUGGESTIONS (based on country):
+- Suggest foods commonly available and culturally appropriate for the user's country
+- Examples by country code:
+  - NG (Nigeria): jollof rice, plantain, egusi soup, beans, fish stew, puff puff, moi moi
+  - US (United States): oatmeal, chicken breast, salads, quinoa, Greek yogurt, eggs
+  - IN (India): dal, roti, paneer, lentils, rice dishes, idli, dosa
+  - GB (United Kingdom): porridge, fish, roasted vegetables, whole grain bread
+  - MX (Mexico): beans, rice, grilled chicken, corn tortillas, avocado
+- If country not specified, suggest internationally common foods
+
+REMINDER TIMES (must be dynamic):
+- Use the provided user_timezone to suggest appropriate meal times
+- If no timezone, use general times like "morning", "midday", "evening" (not specific hours)
+- Consider user's available_time preference (less_30min = suggest quick prep meals)
+
+1. MEAL_PLAN (for food/eating goals):
 {
   "plan_type": "meal_plan",
+  "tracking_type": "meal",
   "structure": {
-    "meal_tracking": {
-      "enabled": true,
+    "daily_targets": {
+      "calories": 2000,  // Calculate based on user profile, or null if not primary focus
+      "protein_grams": 100,  // Calculate based on user profile and goal
+      "focus_area": "balanced_eating"  // One of: portion_control, high_protein, balanced_eating, calorie_deficit, calorie_surplus, meal_timing
+    },
+    "meal_schedule": {
       "meals_per_day": 3,
-      "snacks_per_day": 2
+      "include_snacks": true,
+      "suggested_times": {
+        "breakfast": "08:00",  // Adjust based on user_timezone or use "morning" if unknown
+        "lunch": "12:30",
+        "dinner": "19:00",
+        "snacks": ["10:30", "15:30"]  // Optional, only if include_snacks is true
+      }
     },
-    "nutritional_targets": {
-      "protein": 100,  // in grams, extract from goal or set reasonable default
-      "calories": null,  // null unless specified
-      "track_carbs": false,
-      "track_fats": false
-    },
-    "reminders": {
-      "breakfast": "08:00",
-      "lunch": "13:00",
-      "dinner": "19:00"
+    "meal_suggestions": {
+      "breakfast_ideas": ["Greek yogurt with berries", "Oatmeal with banana"],
+      "lunch_ideas": ["Grilled chicken salad", "Turkey wrap with veggies"],
+      "dinner_ideas": ["Salmon with roasted vegetables", "Lean beef stir-fry"],
+      "snack_ideas": ["Almonds", "Apple with peanut butter", "Protein shake"]
     },
     "accountability": {
       "check_in_frequency": "daily",
       "target_days_per_week": 7,
-      "tracking_method": "daily_check_ins"
+      "tracking_method": "meal_logging"
     }
   },
   "guidance": {
-    "description": "...",
-    "tips": ["..."]
+    "description": "Personalized description based on user's goal and challenges",
+    "tips": ["Personalized tips based on biggest_challenge and primary_goal"]
+  }
+}
+
+2. HYDRATION_PLAN (for water/hydration goals):
+{
+  "plan_type": "meal_plan",
+  "tracking_type": "hydration",
+  "structure": {
+    "daily_targets": {
+      "glasses": 8,  // Typical recommendation, adjust based on user activity
+      "total_ml": 2000,  // 8 glasses × 250ml
+      "glass_size_ml": 250
+    },
+    "reminder_schedule": {
+      "frequency": "every_2_hours",  // Or "custom"
+      "suggested_times": ["08:00", "10:00", "12:00", "14:00", "16:00", "18:00", "20:00"]
+      // Adjust based on user_timezone
+    },
+    "hydration_tips": [
+      "Start your day with a glass of water",
+      "Keep a water bottle at your desk",
+      "Drink before you feel thirsty"
+    ],
+    "accountability": {
+      "check_in_frequency": "daily",
+      "target_days_per_week": 7,
+      "tracking_method": "hydration_logging"
+    }
+  },
+  "guidance": {
+    "description": "Personalized hydration plan description",
+    "tips": ["Personalized tips"]
   }
 }
 
 2. WORKOUT_PLAN:
 {
   "plan_type": "workout_plan",
+  "tracking_type": "workout",  // ALWAYS "workout" for fitness goals
   "structure": {
     "routine": {
       "exercises": [
@@ -220,9 +384,10 @@ STRUCTURE EXAMPLES BY PLAN TYPE:
   }
 }
 
-3. HABIT_PLAN:
+3. HABIT_PLAN (for ongoing habits - NO end date, NO weekly_focus!):
 {
   "plan_type": "habit_plan",
+  "tracking_type": "checkin",  // ALWAYS "checkin" for wellness/mindfulness/sleep goals
   "structure": {
     "habit_tracking": {
       "check_in_frequency": "daily",
@@ -235,13 +400,20 @@ STRUCTURE EXAMPLES BY PLAN TYPE:
   },
   "guidance": {
     "description": "...",
-    "tips": ["..."]
+    "tips": ["..."],
+    "streak_milestones": [
+      {"days": 7, "title": "First Week!", "description": "You're building momentum!"},
+      {"days": 30, "title": "30-Day Streak!", "description": "Habit is forming!"},
+      {"days": 60, "title": "60-Day Streak!", "description": "This is becoming part of you!"},
+      {"days": 100, "title": "100 Days!", "description": "You've mastered this habit!"}
+    ]
   }
 }
 
 4. ACCOUNTABILITY_PLAN:
 {
   "plan_type": "accountability_plan",
+  "tracking_type": "checkin",  // ALWAYS "checkin" for general accountability
   "structure": {
     "tracking": {
       "method": "daily_check_ins",
@@ -258,6 +430,12 @@ STRUCTURE EXAMPLES BY PLAN TYPE:
 === CHALLENGE-SPECIFIC STRUCTURES ===
 
 For TIME CHALLENGES (goal_type: "time_challenge"), ADD "challenge_info" to structure:
+⚠️ IMPORTANT: Generate DYNAMIC milestones and weekly_focus based on ACTUAL duration!
+- 30 days = 5 milestones (7, 14, 21, 28, 30) + 5 weekly_focus entries
+- 60 days = 9 milestones + 9 weekly_focus entries  
+- 90 days = 13 milestones + 13 weekly_focus entries
+
+Example for 30-day challenge:
 {
   "plan_type": "workout_plan",  // or any other plan type
   "structure": {
@@ -271,20 +449,24 @@ For TIME CHALLENGES (goal_type: "time_challenge"), ADD "challenge_info" to struc
         {"day": 7, "title": "Week 1 Complete", "description": "Foundation built!"},
         {"day": 14, "title": "Week 2 Complete", "description": "Habits forming!"},
         {"day": 21, "title": "Week 3 Complete", "description": "You're unstoppable!"},
+        {"day": 28, "title": "Week 4 Complete", "description": "Almost there!"},
         {"day": 30, "title": "Challenge Complete!", "description": "You did it!"}
       ],
       "weekly_focus": [
         {"week": 1, "focus": "Building foundation", "intensity": "light"},
         {"week": 2, "focus": "Establishing rhythm", "intensity": "moderate"},
         {"week": 3, "focus": "Pushing limits", "intensity": "moderate-high"},
-        {"week": 4, "focus": "Finishing strong", "intensity": "high"}
+        {"week": 4, "focus": "Finishing strong", "intensity": "high"},
+        {"week": 5, "focus": "Final push", "intensity": "high"}
       ]
     }
   },
   "guidance": {...}
 }
+For 60+ day challenges, generate proportionally more entries with progressive intensity!
 
 For TARGET CHALLENGES (goal_type: "target_challenge"), ADD "challenge_info" to structure:
+⚠️ DO NOT include "weekly_focus" - progress is by CHECK-IN COUNT, not time!
 {
   "plan_type": "habit_plan",  // or any other plan type
   "structure": {
@@ -327,9 +509,7 @@ CRITICAL GUIDELINES:
    - category = "wellness" → plan_type MUST be "habit_plan"
    - category = "mindfulness" → plan_type MUST be "habit_plan"
    - category = "sleep" → plan_type MUST be "habit_plan"
-   - category = "custom" → plan_type = "accountability_plan"
    
-   DO NOT use accountability_plan for fitness, nutrition, wellness, mindfulness, or sleep categories!
    The category determines the plan_type - this is a HARD RULE.
 
 3. Make plans ACTIONABLE but SIMPLE:
@@ -381,23 +561,23 @@ class PlanGenerator:
         Returns:
             Structured plan dictionary matching database schema or None if generation fails
         """
-        category = goal.get("category", "custom")
-        
+        category = goal.get("category", "wellness")
+
         # Use multi-agent system for fitness category (workout plans)
         if use_multi_agent and category == "fitness":
             logger.info(
                 "Using multi-agent system for fitness plan generation",
-                {"goal_id": goal.get("id"), "category": category}
+                {"goal_id": goal.get("id"), "category": category},
             )
             return await self._generate_with_multi_agent(
                 goal, user_profile, user_plan, user_id
             )
-        
+
         # Use single-prompt approach for other plan types
         return await self._generate_with_single_prompt(
             goal, user_profile, user_plan, user_id
         )
-    
+
     async def _generate_with_multi_agent(
         self,
         goal: Dict[str, Any],
@@ -407,7 +587,7 @@ class PlanGenerator:
     ) -> Optional[Dict[str, Any]]:
         """
         Generate a workout plan using the multi-agent system.
-        
+
         The orchestrator coordinates multiple specialized agents:
         - Exercise Selector: Picks appropriate exercises
         - Timing Calculator: Calculates work/rest durations
@@ -417,15 +597,15 @@ class PlanGenerator:
         try:
             from app.services.agents import OrchestratorAgent
             from app.services.exercise_service import get_exercises_for_ai_prompt
-            
+
             # Get available exercises for the orchestrator
             available_exercises = get_exercises_for_ai_prompt(user_profile, limit=150)
-            
+
             # Fetch user's workout feedback to improve plan generation
             workout_feedback = None
             if user_id:
                 workout_feedback = self._fetch_workout_feedback(user_id)
-            
+
             # Create orchestrator and generate plan
             orchestrator = OrchestratorAgent()
             plan_json = await orchestrator.generate_workout_plan(
@@ -434,7 +614,7 @@ class PlanGenerator:
                 available_exercises=available_exercises,
                 workout_feedback=workout_feedback,
             )
-            
+
             if not plan_json:
                 logger.warning(
                     "Multi-agent system returned empty plan, falling back to single prompt"
@@ -442,7 +622,7 @@ class PlanGenerator:
                 return await self._generate_with_single_prompt(
                     goal, user_profile, user_plan, user_id
                 )
-            
+
             # Validate plan structure
             if not self._validate_plan(plan_json):
                 logger.warning(
@@ -451,17 +631,17 @@ class PlanGenerator:
                 return await self._generate_with_single_prompt(
                     goal, user_profile, user_plan, user_id
                 )
-            
+
             # Sanitize plan to remove unavailable features
             if user_plan and user_id:
                 plan_json = self._sanitize_plan_for_user(plan_json, user_plan, user_id)
-            
+
             # Enhance exercises with MP4 video demos and instructions
             plan_json = self._enhance_exercises_with_demos(plan_json)
-            
+
             # Also enhance warm-up and cool-down exercises
             plan_json = self._enhance_warmup_cooldown_with_demos(plan_json)
-            
+
             logger.info(
                 "Multi-agent system successfully generated workout plan",
                 {
@@ -474,11 +654,11 @@ class PlanGenerator:
                     "total_duration": plan_json.get("structure", {}).get(
                         "total_duration_minutes", 0
                     ),
-                }
+                },
             )
-            
+
             return plan_json
-            
+
         except Exception as e:
             logger.error(
                 f"Multi-agent plan generation failed: {str(e)}, falling back to single prompt",
@@ -487,7 +667,7 @@ class PlanGenerator:
             return await self._generate_with_single_prompt(
                 goal, user_profile, user_plan, user_id
             )
-    
+
     async def _generate_with_single_prompt(
         self,
         goal: Dict[str, Any],
@@ -530,8 +710,13 @@ class PlanGenerator:
 
             # CRITICAL: Enforce category → plan_type mapping
             # This is a safety net in case AI generates wrong plan_type
-            category = goal.get("category", "custom")
+            category = goal.get("category", "wellness")
             plan_json = self._fix_plan_type_for_category(plan_json, category)
+
+            # CRITICAL: Ensure tracking_type is present and valid
+            plan_json = self._ensure_tracking_type(
+                plan_json, category, goal.get("title", ""), goal.get("description", "")
+            )
 
             # Fix missing exercise_ids before validation (if possible)
             if plan_json.get("plan_type") == "workout_plan":
@@ -634,34 +819,54 @@ STRUCTURE EXAMPLES BY PLAN TYPE:
 1. MEAL_PLAN:
 {
   "plan_type": "meal_plan",
+  "tracking_type": "meal",
   "structure": {
-    "meal_tracking": {
-      "enabled": true,
-      "meals_per_day": 3,
-      "snacks_per_day": 2
+    "daily_targets": {
+      "calories": <integer or null>,  // SMART CALCULATION: Use user's weight, height, age, activity_level, and goal (weight loss/gain/maintenance). Set null if calorie counting is not the focus.
+      "protein_grams": <integer>,  // SMART CALCULATION: Based on user's weight (typically 1.6-2.2g per kg for active individuals, 0.8-1g for sedentary). Extract specific targets from goal description if mentioned.
+      "focus_area": "<string>"  // Choose based on goal analysis. Options: "portion_control", "high_protein", "balanced_eating", "calorie_deficit", "calorie_surplus", "meal_timing"
     },
-    "nutritional_targets": {
-      "protein": 100,  // in grams, extract from goal or set reasonable default
-      "calories": null,  // null unless specified
-      "track_carbs": false,  // ONLY set to true if advanced_nutrition_tracking is available
-      "track_fats": false  // ONLY set to true if advanced_nutrition_tracking is available
+    "meal_schedule": {
+      "meals_per_day": <integer>,  // Analyze goal and user preferences. Typically 3-5 meals.
+      "include_snacks": <boolean>,  // Based on goal - weight loss may prefer no snacks, muscle building may want snacks
+      "suggested_times": {
+        "breakfast": "<HH:MM>",  // Adjust based on user_timezone if provided
+        "lunch": "<HH:MM>",
+        "dinner": "<HH:MM>",
+        "snacks": ["<HH:MM>", ...]  // Only if include_snacks is true
+      }
     },
-    "reminders": {
-      "breakfast": "08:00",
-      "lunch": "13:00",
-      "dinner": "19:00"
+    "meal_suggestions": {
+      // IMPORTANT: Personalize based on user's country/region (if known from timezone) and dietary preferences
+      // Consider cultural eating patterns, locally available foods, and user's fitness goals
+      "breakfast_ideas": ["<culturally relevant + goal-aligned breakfast>", ...],  // 3-4 ideas
+      "lunch_ideas": ["<culturally relevant + goal-aligned lunch>", ...],  // 3-4 ideas
+      "dinner_ideas": ["<culturally relevant + goal-aligned dinner>", ...],  // 3-4 ideas
+      "snack_ideas": ["<healthy, goal-aligned snacks>", ...]  // 2-3 ideas
     },
     "accountability": {
       "check_in_frequency": "daily",
-      "target_days_per_week": 7,
-      "tracking_method": "daily_check_ins"
+      "target_days_per_week": <integer>,  // From goal.target_days or default to 7
+      "tracking_method": "meal_logging"
     }
   },
   "guidance": {
     "description": "...",
-    "tips": ["..."]
+    "tips": ["..."]  // Personalized tips based on user's specific goal and situation
   }
 }
+
+MEAL PLAN INTELLIGENCE GUIDELINES:
+- Calculate calories using: BMR × Activity Multiplier ± deficit/surplus based on goal
+  - BMR (Mifflin-St Jeor): Men = 10×weight(kg) + 6.25×height(cm) - 5×age + 5
+  - BMR (Mifflin-St Jeor): Women = 10×weight(kg) + 6.25×height(cm) - 5×age - 161
+  - Activity multipliers: sedentary=1.2, light=1.375, moderate=1.55, active=1.725, very_active=1.9
+- Protein recommendations: Weight loss = 1.6-2g/kg, Muscle gain = 1.8-2.2g/kg, Maintenance = 1.2-1.6g/kg
+- Meal suggestions should reflect the user's likely cultural context (infer from timezone if country not specified)
+- If user timezone suggests Asia: consider rice-based meals, Asian proteins, local vegetables
+- If user timezone suggests Europe: consider Mediterranean options, local cuisines
+- If user timezone suggests Americas: consider local preferences while keeping meals healthy
+- Always align meal suggestions with the user's stated goal (high protein for muscle building, low calorie for weight loss, etc.)
 
 2. WORKOUT_PLAN:
 {
@@ -701,9 +906,10 @@ STRUCTURE EXAMPLES BY PLAN TYPE:
   }
 }
 
-3. HABIT_PLAN:
+3. HABIT_PLAN (for ongoing habits - NO end date, NO weekly_focus!):
 {
   "plan_type": "habit_plan",
+  "tracking_type": "checkin",  // ALWAYS "checkin" for wellness/mindfulness/sleep goals
   "structure": {
     "habit_tracking": {
       "check_in_frequency": "daily",
@@ -716,13 +922,20 @@ STRUCTURE EXAMPLES BY PLAN TYPE:
   },
   "guidance": {
     "description": "...",
-    "tips": ["..."]
+    "tips": ["..."],
+    "streak_milestones": [
+      {"days": 7, "title": "First Week!", "description": "You're building momentum!"},
+      {"days": 30, "title": "30-Day Streak!", "description": "Habit is forming!"},
+      {"days": 60, "title": "60-Day Streak!", "description": "This is becoming part of you!"},
+      {"days": 100, "title": "100 Days!", "description": "You've mastered this habit!"}
+    ]
   }
 }
 
 4. ACCOUNTABILITY_PLAN:
 {
   "plan_type": "accountability_plan",
+  "tracking_type": "checkin",  // ALWAYS "checkin" for general accountability
   "structure": {
     "tracking": {
       "method": "daily_check_ins",
@@ -739,6 +952,12 @@ STRUCTURE EXAMPLES BY PLAN TYPE:
 === CHALLENGE-SPECIFIC STRUCTURES ===
 
 For TIME CHALLENGES (goal_type: "time_challenge"), ADD "challenge_info" to structure:
+⚠️ IMPORTANT: Generate DYNAMIC milestones and weekly_focus based on ACTUAL duration!
+- 30 days = 5 milestones (7, 14, 21, 28, 30) + 5 weekly_focus entries
+- 60 days = 9 milestones + 9 weekly_focus entries  
+- 90 days = 13 milestones + 13 weekly_focus entries
+
+Example for 30-day challenge:
 {
   "plan_type": "workout_plan",  // or any other plan type
   "structure": {
@@ -752,20 +971,24 @@ For TIME CHALLENGES (goal_type: "time_challenge"), ADD "challenge_info" to struc
         {"day": 7, "title": "Week 1 Complete", "description": "Foundation built!"},
         {"day": 14, "title": "Week 2 Complete", "description": "Habits forming!"},
         {"day": 21, "title": "Week 3 Complete", "description": "You're unstoppable!"},
+        {"day": 28, "title": "Week 4 Complete", "description": "Almost there!"},
         {"day": 30, "title": "Challenge Complete!", "description": "You did it!"}
       ],
       "weekly_focus": [
         {"week": 1, "focus": "Building foundation", "intensity": "light"},
         {"week": 2, "focus": "Establishing rhythm", "intensity": "moderate"},
         {"week": 3, "focus": "Pushing limits", "intensity": "moderate-high"},
-        {"week": 4, "focus": "Finishing strong", "intensity": "high"}
+        {"week": 4, "focus": "Finishing strong", "intensity": "high"},
+        {"week": 5, "focus": "Final push", "intensity": "high"}
       ]
     }
   },
   "guidance": {...}
 }
+For 60+ day challenges, generate proportionally more entries with progressive intensity!
 
 For TARGET CHALLENGES (goal_type: "target_challenge"), ADD "challenge_info" to structure:
+⚠️ DO NOT include "weekly_focus" - progress is by CHECK-IN COUNT, not time!
 {
   "plan_type": "habit_plan",  // or any other plan type
   "structure": {
@@ -808,9 +1031,7 @@ CRITICAL GUIDELINES:
    - category = "wellness" → plan_type MUST be "habit_plan"
    - category = "mindfulness" → plan_type MUST be "habit_plan"
    - category = "sleep" → plan_type MUST be "habit_plan"
-   - category = "custom" → plan_type = "accountability_plan"
    
-   DO NOT use accountability_plan for fitness, nutrition, wellness, mindfulness, or sleep categories!
    The category determines the plan_type - this is a HARD RULE.
 
 3. Make plans ACTIONABLE but SIMPLE:
@@ -884,11 +1105,14 @@ Target Days per Week: {target_days}
             start = challenge_start_date or "Today"
             end = challenge_end_date or f"{duration} days from start"
 
-            # Generate weekly focus based on duration
-            weeks = duration // 7
+            # Calculate number of weeks (round up to include partial weeks)
+            num_weeks = (
+                duration + 6
+            ) // 7  # e.g., 30 days = 5 weeks, 60 days = 9 weeks, 90 days = 13 weeks
 
             prompt += TIME_CHALLENGE_PLAN_CONTEXT.format(
                 duration_days=duration,
+                num_weeks=num_weeks,
                 start_date=start,
                 end_date=end,
             )
@@ -967,8 +1191,16 @@ If you generate a workout plan without exercise_id fields, it will be REJECTED.
             preferred_location = user_profile.get("preferred_location", "")
             available_time = user_profile.get("available_time", "")
             motivation_style = user_profile.get("motivation_style", "")
+            biological_sex = user_profile.get("biological_sex", "")
+            user_timezone = user_profile.get("timezone", "")
+            user_country = user_profile.get("country", "")
+            hydration_unit = user_profile.get("hydration_unit", "ml")
+            hydration_daily_target_ml = user_profile.get(
+                "hydration_daily_target_ml", 2000
+            )
 
             prompt += f"""USER PROFILE (for personalization and adaptation):
+Biological Sex: {biological_sex or "Not specified - use general calorie guidelines"}
 Fitness Level: {fitness_level}
 Primary Goal: {primary_goal}
 Current Exercise Frequency: {current_frequency}
@@ -976,6 +1208,35 @@ Preferred Workout Location: {preferred_location}
 Available Time: {available_time}
 Motivation Style: {motivation_style}
 Biggest Challenge: {biggest_challenge}
+User Timezone: {user_timezone or "Not specified - use general time references like 'morning', 'afternoon', 'evening'"}
+User Country: {user_country or "Not specified - suggest internationally common foods"}
+Hydration Preference: {hydration_unit} (daily target: {hydration_daily_target_ml}ml)
+
+⚠️ IMPORTANT FOR NUTRITION PLANS:
+- CALORIE CALCULATIONS based on biological_sex:
+  - If "male": Use male baseline (2000-2500 cal for maintenance, adjust for goal)
+  - If "female": Use female baseline (1600-2000 cal for maintenance, adjust for goal)
+  - If not specified: Use general guidelines (1800-2200 cal)
+- If primary_goal is "lose_weight": Focus on calorie deficit (subtract 300-500 cal from maintenance)
+- If primary_goal is "build_muscle": Focus on protein intake (1.6-2.2g/kg bodyweight), calorie surplus (add 300-500 cal)
+- If primary_goal is "stay_active" or "general_fitness": Focus on balanced eating, moderate targets
+- Use biggest_challenge to personalize tips (e.g., "time_management" = suggest quick meal prep ideas)
+- Use available_time to adjust meal complexity (e.g., "less_30min" = simple, quick meals)
+
+⚠️ MEAL SUGGESTIONS - LOCALIZED:
+- If country is specified, suggest foods commonly available in that country
+- Consider cultural food preferences and local ingredients
+- For unspecified country, suggest internationally common, accessible foods
+- Examples:
+  - Nigeria (NG): Include foods like jollof rice, plantain, egusi soup, beans
+  - United States (US): Include oatmeal, chicken breast, salads, quinoa
+  - India (IN): Include dal, roti, paneer, lentils, rice dishes
+  - UK (GB): Include porridge, fish, vegetables, whole grain bread
+
+⚠️ REMINDER TIMES:
+- If timezone is specified, calculate appropriate local times for meals/hydration reminders
+- If timezone is NOT specified, use descriptive times: "morning", "midday", "afternoon", "evening"
+- Never hardcode times like "08:00" without knowing the user's timezone
 
 """
 
@@ -1094,7 +1355,7 @@ Generate the complete plan JSON now."""
     def _fetch_workout_feedback(self, user_id: str) -> Optional[List[Dict[str, Any]]]:
         """
         Fetch user's past workout feedback to improve plan generation.
-        
+
         Returns recent feedback (last 30 days, max 50 entries) with reasons
         why user quit workouts. This helps AI avoid exercises that are:
         - Too hard for the user
@@ -1104,12 +1365,14 @@ Generate the complete plan JSON now."""
         try:
             from app.db.supabase import get_supabase_client
             from datetime import datetime, timedelta, timezone
-            
+
             supabase = get_supabase_client()
-            
+
             # Get feedback from last 30 days
-            thirty_days_ago = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
-            
+            thirty_days_ago = (
+                datetime.now(timezone.utc) - timedelta(days=30)
+            ).isoformat()
+
             result = (
                 supabase.table("workout_feedback")
                 .select("quit_reason, created_at, plan_id, exercise_name")
@@ -1119,20 +1382,20 @@ Generate the complete plan JSON now."""
                 .limit(50)
                 .execute()
             )
-            
+
             if result.data:
                 logger.info(
                     f"Fetched {len(result.data)} workout feedback entries for user",
-                    {"user_id": user_id, "feedback_count": len(result.data)}
+                    {"user_id": user_id, "feedback_count": len(result.data)},
                 )
                 return result.data
-            
+
             return None
-            
+
         except Exception as e:
             logger.warning(
                 f"Failed to fetch workout feedback: {e}",
-                {"user_id": user_id, "error": str(e)}
+                {"user_id": user_id, "error": str(e)},
             )
             return None
 
@@ -1225,7 +1488,7 @@ Generate the complete plan JSON now."""
 
             # Sanitize meal_plan features
             if plan_type == "meal_plan":
-                nutritional_targets = structure.get("nutritional_targets", {})
+                daily_targets = structure.get("daily_targets", {})
 
                 # Check if user has advanced nutrition tracking
                 has_advanced_nutrition = check_user_has_feature(
@@ -1233,18 +1496,16 @@ Generate the complete plan JSON now."""
                 )
 
                 if not has_advanced_nutrition:
-                    # Disable advanced tracking features
-                    if nutritional_targets.get("track_carbs"):
-                        nutritional_targets["track_carbs"] = False
+                    # Basic users don't get detailed macro tracking
+                    # But calories and protein are allowed for all users
+                    if daily_targets.get("track_carbs"):
+                        daily_targets["track_carbs"] = False
+                    if daily_targets.get("track_fats"):
+                        daily_targets["track_fats"] = False
 
-                    if nutritional_targets.get("track_fats"):
-                        nutritional_targets["track_fats"] = False
-
-                    # Remove calories if it's not a basic feature
-                    if nutritional_targets.get("calories") is not None:
-                        # Only keep calories if explicitly mentioned in goal
-                        # For now, we'll keep it but could remove if needed
-                        pass
+                # Ensure tracking_type is set for meal plans
+                if "tracking_type" not in sanitized:
+                    sanitized["tracking_type"] = "meal"
 
             # Sanitize workout_plan features
             elif plan_type == "workout_plan":
@@ -1286,9 +1547,108 @@ Generate the complete plan JSON now."""
             "wellness": "habit_plan",
             "mindfulness": "habit_plan",
             "sleep": "habit_plan",
-            "custom": "accountability_plan",
         }
-        return category_to_plan_type.get(category.lower(), "accountability_plan")
+        return category_to_plan_type.get(category.lower(), "habit_plan")
+
+    def _get_tracking_type(
+        self, category: str, title: str = "", description: str = ""
+    ) -> str:
+        """
+        Get the tracking_type based on category and goal content.
+
+        This determines which check-in UI the user will see:
+        - "workout" → WorkoutPlayerScreen (guided workout with video demos)
+        - "meal" → MealLogModal (log meals with AI nutrition estimation)
+        - "hydration" → HydrationModal (track water intake)
+        - "checkin" → CheckInModal (simple yes/no with notes)
+
+        Args:
+            category: Goal category
+            title: Goal title
+            description: Goal description
+
+        Returns:
+            tracking_type string
+        """
+        category_lower = category.lower()
+
+        # Fitness always uses workout tracking
+        if category_lower == "fitness":
+            return "workout"
+
+        # Nutrition can be either meal or hydration - analyze the content
+        if category_lower == "nutrition":
+            combined_text = f"{title} {description}".lower()
+
+            # Keywords that indicate hydration tracking
+            hydration_keywords = [
+                "water",
+                "hydrat",  # hydration, hydrated, hydrating
+                "drink",
+                "fluid",
+                "glass",
+                "liter",
+                "litre",
+                "oz",
+                "ounce",
+                "ml",
+                "h2o",
+            ]
+
+            for keyword in hydration_keywords:
+                if keyword in combined_text:
+                    return "hydration"
+
+            # Default to meal for nutrition category
+            return "meal"
+
+        # All other categories use simple check-in
+        return "checkin"
+
+    def _ensure_tracking_type(
+        self,
+        plan: Dict[str, Any],
+        category: str,
+        title: str = "",
+        description: str = "",
+    ) -> Dict[str, Any]:
+        """
+        Ensure the plan has a valid tracking_type.
+
+        If AI didn't provide tracking_type or provided an invalid one,
+        derive it from the category and goal content.
+
+        Args:
+            plan: Generated plan dictionary
+            category: Goal category
+            title: Goal title
+            description: Goal description
+
+        Returns:
+            Plan with valid tracking_type
+        """
+        current_tracking_type = plan.get("tracking_type")
+        valid_tracking_types = ["workout", "meal", "hydration", "checkin"]
+
+        if current_tracking_type not in valid_tracking_types:
+            expected_tracking_type = self._get_tracking_type(
+                category, title, description
+            )
+
+            if current_tracking_type:
+                logger.warning(
+                    f"⚠️ AI generated invalid tracking_type '{current_tracking_type}'. "
+                    f"Correcting to '{expected_tracking_type}' based on category '{category}'"
+                )
+            else:
+                logger.info(
+                    f"AI did not provide tracking_type. "
+                    f"Deriving '{expected_tracking_type}' from category '{category}'"
+                )
+
+            plan["tracking_type"] = expected_tracking_type
+
+        return plan
 
     def _fix_plan_type_for_category(
         self, plan: Dict[str, Any], category: str
@@ -1331,18 +1691,27 @@ Generate the complete plan JSON now."""
                     "days_of_week": ["Monday", "Wednesday", "Friday"],
                 }
             # If changing to meal_plan but missing structure
-            elif expected_plan_type == "meal_plan" and "meal_tracking" not in plan.get(
+            elif expected_plan_type == "meal_plan" and "daily_targets" not in plan.get(
                 "structure", {}
             ):
-                plan["structure"]["meal_tracking"] = {
-                    "enabled": True,
+                plan["structure"]["daily_targets"] = {
+                    "calories": None,
+                    "protein_grams": None,
+                    "focus_area": "balanced_eating",
+                }
+                plan["structure"]["meal_schedule"] = {
                     "meals_per_day": 3,
-                    "snacks_per_day": 2,
+                    "include_snacks": True,
+                    "suggested_times": {
+                        "breakfast": "morning",
+                        "lunch": "midday",
+                        "dinner": "evening",
+                    },
                 }
                 plan["structure"]["accountability"] = {
                     "check_in_frequency": "daily",
                     "target_days_per_week": 7,
-                    "tracking_method": "daily_check_ins",
+                    "tracking_method": "meal_logging",
                 }
             # If changing to habit_plan but missing structure
             elif (
@@ -1370,7 +1739,7 @@ Generate the complete plan JSON now."""
         """
         title = goal.get("title", "Your Goal")
         description = goal.get("description", "")
-        category = goal.get("category", "custom")
+        category = goal.get("category", "wellness")
         frequency = goal.get("frequency", "daily")
         target_days = goal.get("target_days", 7)
 
@@ -1388,10 +1757,14 @@ Generate the complete plan JSON now."""
         # Get the correct plan_type based on category
         plan_type = self._get_expected_plan_type(category)
 
+        # Get the correct tracking_type based on category and goal title/description
+        tracking_type = self._get_tracking_type(category, title, description)
+
         # Create category-appropriate fallback plan
         if plan_type == "workout_plan":
             fallback_plan = {
                 "plan_type": "workout_plan",
+                "tracking_type": tracking_type,
                 "structure": {
                     "routine": {
                         "exercises": [],
@@ -1422,39 +1795,118 @@ Generate the complete plan JSON now."""
                 },
             }
         elif plan_type == "meal_plan":
-            fallback_plan = {
-                "plan_type": "meal_plan",
-                "structure": {
-                    "meal_tracking": {
-                        "enabled": True,
-                        "meals_per_day": 3,
-                        "snacks_per_day": 2,
+            # For nutrition, determine if it's meal or hydration tracking
+            if tracking_type == "hydration":
+                fallback_plan = {
+                    "plan_type": "meal_plan",
+                    "tracking_type": "hydration",
+                    "structure": {
+                        "daily_targets": {
+                            "glasses": 8,
+                            "total_ml": 2000,
+                            "glass_size_ml": 250,
+                        },
+                        "reminder_schedule": {
+                            "frequency": "every_2_hours",
+                            "suggested_times": [
+                                "morning",
+                                "mid-morning",
+                                "noon",
+                                "afternoon",
+                                "evening",
+                            ],
+                        },
+                        "hydration_tips": [
+                            "Start your day with a glass of water",
+                            "Keep a water bottle at your desk",
+                            "Drink before you feel thirsty",
+                        ],
+                        "accountability": {
+                            "check_in_frequency": check_in_frequency,
+                            "target_days_per_week": target_days_per_week,
+                            "tracking_method": "hydration_logging",
+                        },
                     },
-                    "accountability": {
-                        "check_in_frequency": check_in_frequency,
-                        "target_days_per_week": target_days_per_week,
-                        "tracking_method": "daily_check_ins",
+                    "guidance": {
+                        "description": f"Hydration plan for: {title}. Track your water intake daily to stay energized and healthy.",
+                        "tips": [
+                            "Keep a water bottle with you throughout the day",
+                            "Set reminders to drink water regularly",
+                            "Drink a glass of water before each meal",
+                            "Stay consistent - proper hydration improves energy and focus",
+                        ],
                     },
-                },
-                "guidance": {
-                    "description": f"Nutrition plan for: {title}. Track your meals through daily check-ins.",
-                    "tips": [
-                        "Check in daily to track your nutrition progress",
-                        "Focus on making small, sustainable changes",
-                        "Use the reflection field to note what you ate",
-                        "Stay consistent - good nutrition habits compound over time",
-                    ],
-                },
-            }
+                }
+            else:
+                fallback_plan = {
+                    "plan_type": "meal_plan",
+                    "tracking_type": "meal",
+                    "structure": {
+                        "daily_targets": {
+                            "calories": None,  # Will be personalized when user profile is available
+                            "protein_grams": None,
+                            "focus_area": "balanced_eating",
+                        },
+                        "meal_schedule": {
+                            "meals_per_day": 3,
+                            "include_snacks": True,
+                            "suggested_times": {
+                                "breakfast": "morning",
+                                "lunch": "midday",
+                                "dinner": "evening",
+                            },
+                        },
+                        "meal_suggestions": {
+                            "breakfast_ideas": [
+                                "Greek yogurt with berries",
+                                "Oatmeal with banana",
+                                "Eggs with whole grain toast",
+                            ],
+                            "lunch_ideas": [
+                                "Grilled chicken salad",
+                                "Turkey wrap with veggies",
+                                "Quinoa bowl with vegetables",
+                            ],
+                            "dinner_ideas": [
+                                "Salmon with roasted vegetables",
+                                "Lean beef stir-fry",
+                                "Grilled chicken with sweet potato",
+                            ],
+                            "snack_ideas": [
+                                "Almonds",
+                                "Apple with peanut butter",
+                                "Greek yogurt",
+                            ],
+                        },
+                        "accountability": {
+                            "check_in_frequency": check_in_frequency,
+                            "target_days_per_week": target_days_per_week,
+                            "tracking_method": "meal_logging",
+                        },
+                    },
+                    "guidance": {
+                        "description": f"Nutrition plan for: {title}. Track your meals and build healthy eating habits.",
+                        "tips": [
+                            "Log your meals to stay aware of what you eat",
+                            "Focus on making small, sustainable changes",
+                            "Eat protein with every meal to stay satisfied",
+                            "Stay consistent - good nutrition habits compound over time",
+                        ],
+                    },
+                }
         elif plan_type == "habit_plan":
             fallback_plan = {
                 "plan_type": "habit_plan",
+                "tracking_type": tracking_type,
                 "structure": {
                     "habit_tracking": {
                         "check_in_frequency": check_in_frequency,
                         "target_days_per_week": target_days_per_week,
                         "tracking_method": "daily_check_ins",
-                    }
+                    },
+                    "reminders": {
+                        "optimal_times": ["morning", "evening"],
+                    },
                 },
                 "guidance": {
                     "description": f"Habit tracking for: {title}. Build consistency through daily check-ins.",
@@ -1464,11 +1916,34 @@ Generate the complete plan JSON now."""
                         "Use the reflection field to note your progress",
                         "Celebrate small wins - they add up!",
                     ],
+                    "streak_milestones": [
+                        {
+                            "days": 7,
+                            "title": "First Week!",
+                            "description": "You're building momentum!",
+                        },
+                        {
+                            "days": 30,
+                            "title": "30-Day Streak!",
+                            "description": "Habit is forming!",
+                        },
+                        {
+                            "days": 60,
+                            "title": "60-Day Streak!",
+                            "description": "This is becoming part of you!",
+                        },
+                        {
+                            "days": 100,
+                            "title": "100 Days!",
+                            "description": "You've mastered this habit!",
+                        },
+                    ],
                 },
             }
         else:
             fallback_plan = {
                 "plan_type": "accountability_plan",
+                "tracking_type": tracking_type,
                 "structure": {
                     "tracking": {
                         "method": "daily_check_ins",
@@ -1560,7 +2035,7 @@ Generate the complete plan JSON now."""
         # Support both legacy format (routine.exercises) and new format (main_workout.exercises)
         structure = plan.get("structure", {})
         exercises = structure.get("routine", {}).get("exercises", [])
-        
+
         # Also check main_workout.exercises (multi-agent format)
         if not exercises:
             exercises = structure.get("main_workout", {}).get("exercises", [])
@@ -1622,7 +2097,9 @@ Generate the complete plan JSON now."""
 
         return plan
 
-    def _enhance_warmup_cooldown_with_demos(self, plan: Dict[str, Any]) -> Dict[str, Any]:
+    def _enhance_warmup_cooldown_with_demos(
+        self, plan: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """
         Enhance warm-up and cool-down exercises with MP4 video demonstrations.
 
@@ -1649,19 +2126,19 @@ Generate the complete plan JSON now."""
         def enhance_exercise(exercise: Dict[str, Any], section_name: str) -> None:
             if not isinstance(exercise, dict):
                 return
-            
+
             exercise_id = exercise.get("exercise_id")
             exercise_name = exercise.get("name", "")
             exercise_data = None
-            
+
             if exercise_id:
                 exercise_data = get_exercise_by_id(exercise_id)
-            
+
             if not exercise_data and exercise_name:
                 exercise_data = get_exercise_by_name(exercise_name)
                 if exercise_data:
                     exercise["exercise_id"] = exercise_data["id"]
-            
+
             if exercise_data:
                 exercise["demo"] = {
                     "id": exercise_data["id"],

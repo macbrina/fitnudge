@@ -165,7 +165,7 @@ export default function AILoadingAnimation({
           easing: Easing.inOut(Easing.ease),
           useNativeDriver: false,
         }),
-      ])
+      ]),
     );
     animationRefs.current.push(morphLoop);
     morphLoop.start();
@@ -177,7 +177,7 @@ export default function AILoadingAnimation({
         duration: 2000,
         easing: Easing.linear,
         useNativeDriver: true,
-      })
+      }),
     );
     animationRefs.current.push(shimmerLoop);
     shimmerLoop.start();
@@ -197,7 +197,7 @@ export default function AILoadingAnimation({
           easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
         }),
-      ])
+      ]),
     );
     animationRefs.current.push(orbPulseScale);
     orbPulseScale.start();
@@ -216,7 +216,7 @@ export default function AILoadingAnimation({
           easing: Easing.inOut(Easing.ease),
           useNativeDriver: true, // Opacity can use native driver
         }),
-      ])
+      ]),
     );
     animationRefs.current.push(orbPulseGlow);
     orbPulseGlow.start();
@@ -228,7 +228,7 @@ export default function AILoadingAnimation({
         duration: 8000,
         easing: Easing.linear,
         useNativeDriver: true,
-      })
+      }),
     );
     animationRefs.current.push(orbRotate);
     orbRotate.start();
@@ -288,10 +288,10 @@ export default function AILoadingAnimation({
                 duration: 3000 + index * 500,
                 easing: Easing.linear,
                 useNativeDriver: true,
-              })
+              }),
             ),
           ]),
-        ])
+        ]),
       );
       animationRefs.current.push(floatAnimation);
       floatAnimation.start();
@@ -304,7 +304,7 @@ export default function AILoadingAnimation({
         duration: 3000,
         easing: Easing.linear,
         useNativeDriver: false,
-      })
+      }),
     );
     animationRefs.current.push(waveLoop);
     waveLoop.start();

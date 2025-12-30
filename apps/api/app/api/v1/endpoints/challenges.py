@@ -4,7 +4,7 @@ Challenges API endpoints
 
 from fastapi import APIRouter, HTTPException, status, Depends, Query
 from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 from datetime import date
 from app.core.flexible_auth import get_current_user
 from app.services.logger import logger
@@ -13,14 +13,134 @@ from app.services.challenge_service import challenge_service
 router = APIRouter(redirect_slashes=False)
 
 
+def check_challenge_access(
+    challenge_id: str, current_user_id: str, supabase
+) -> Tuple[bool, Optional[dict], bool, bool]:
+    """
+    Check if user can access a challenge.
+
+    Access is granted if:
+    - Challenge is public (anyone can view)
+    - User is the creator
+    - User is a participant
+    - User is a partner of a participant (read-only, partner view)
+
+    Returns:
+        Tuple of (has_access, challenge_data, is_partner_view, is_participant)
+    """
+    # Get challenge data
+    challenge_result = (
+        supabase.table("challenges")
+        .select("*, creator:created_by(id, name, username, profile_picture_url)")
+        .eq("id", challenge_id)
+        .maybe_single()
+        .execute()
+    )
+
+    if not challenge_result or not challenge_result.data:
+        return False, None, False, False
+
+    challenge = challenge_result.data
+    is_public = challenge.get("is_public", False)
+    is_creator = challenge.get("created_by") == current_user_id
+
+    # Check if user is a participant
+    participant_result = (
+        supabase.table("challenge_participants")
+        .select("id")
+        .eq("challenge_id", challenge_id)
+        .eq("user_id", current_user_id)
+        .maybe_single()
+        .execute()
+    )
+    is_participant = bool(participant_result and participant_result.data)
+
+    # Case 1: Public challenge - anyone can view
+    if is_public:
+        return True, challenge, False, is_participant
+
+    # Case 2: Creator always has access
+    if is_creator:
+        return True, challenge, False, True  # Creator is always considered participant
+
+    # Case 3: Participant has access
+    if is_participant:
+        return True, challenge, False, True
+
+    # Case 4: Check if user is a partner of any participant
+    # Get all participant user IDs
+    participants_result = (
+        supabase.table("challenge_participants")
+        .select("user_id")
+        .eq("challenge_id", challenge_id)
+        .execute()
+    )
+
+    if participants_result and participants_result.data:
+        participant_ids = [p["user_id"] for p in participants_result.data]
+
+        # Check if current user is a partner of any participant
+        for participant_id in participant_ids:
+            partnership_result = (
+                supabase.table("accountability_partners")
+                .select("id")
+                .eq("status", "accepted")
+                .or_(
+                    f"and(user_id.eq.{current_user_id},partner_user_id.eq.{participant_id}),"
+                    f"and(user_id.eq.{participant_id},partner_user_id.eq.{current_user_id})"
+                )
+                .maybe_single()
+                .execute()
+            )
+
+            if partnership_result and partnership_result.data:
+                return (
+                    True,
+                    challenge,
+                    True,
+                    False,
+                )  # Partner view (read-only, not a participant)
+
+    # No access
+    return False, None, False, False
+
+
 class ChallengeCreate(BaseModel):
+    """
+    Request body for creating a standalone challenge.
+
+    Challenges can now be created directly without needing a goal first.
+    The challenge will have its own actionable plan generated and stored
+    in the actionable_plans table (with challenge_id instead of goal_id).
+
+    Challenge types:
+    - streak: Time Challenge (duration-based, focus on maintaining streaks)
+    - checkin_count: Target Challenge (count-based, complete X check-ins)
+    """
+
     title: str
     description: Optional[str] = None
-    challenge_type: str  # streak, checkin_count, community, custom
+    challenge_type: str  # streak or checkin_count only
     duration_days: int
     start_date: date
+    end_date: Optional[date] = (
+        None  # Optional - calculated from start_date + duration_days if not provided
+    )
     is_public: bool = True
-    max_participants: Optional[int] = None
+    max_participants: Optional[int] = None  # null = unlimited
+    join_deadline: Optional[date] = None  # Must be before start_date
+
+    # Goal-like fields for plan generation
+    category: Optional[str] = None  # fitness, nutrition, wellness, etc.
+    frequency: Optional[str] = "daily"  # daily, weekly
+    days_of_week: Optional[List[int]] = None  # 0-6 for Sun-Sat
+    target_days: Optional[int] = None  # Target days per week
+    target_checkins: Optional[int] = None  # Required for checkin_count type
+    # Tracking type - how users complete their check-ins
+    # Default to None so backend can derive from category if not specified
+    tracking_type: Optional[str] = None  # workout, meal, hydration, checkin
+    reminder_times: Optional[List[str]] = None  # HH:MM format
+
     metadata: Optional[Dict[str, Any]] = None
 
 
@@ -33,7 +153,7 @@ class ChallengeResponse(BaseModel):
     start_date: date
     end_date: date
     is_public: bool
-    is_active: bool
+    status: str  # 'upcoming', 'active', 'completed', 'cancelled'
     max_participants: Optional[int]
     created_by: Optional[str]
     metadata: Dict[str, Any]
@@ -63,12 +183,22 @@ class ChallengeDetailResponse(BaseModel):
     join_deadline: Optional[date] = None
     target_value: Optional[int] = None
     is_public: bool
-    is_active: bool
+    status: str = "upcoming"  # 'upcoming', 'active', 'completed', 'cancelled'
     max_participants: Optional[int] = None
     created_by: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
     created_at: str
     updated_at: str
+    # Standalone challenge fields (direct on challenge, not in goal_template)
+    category: Optional[str] = None
+    frequency: Optional[str] = None
+    target_days: Optional[int] = None
+    days_of_week: Optional[List[int]] = None
+    target_checkins: Optional[int] = None
+    reminder_times: Optional[List[str]] = None
+    tracking_type: Optional[str] = (
+        None  # workout, meal, hydration, checkin - derived from category
+    )
     # Computed fields
     status: str  # upcoming, active, completed, cancelled
     creator_id: Optional[str] = None  # Alias for created_by
@@ -76,9 +206,9 @@ class ChallengeDetailResponse(BaseModel):
     participants_count: int = 0
     is_creator: bool = False
     is_participant: bool = False
+    is_partner_view: bool = False  # True if viewing as a partner (read-only)
     my_progress: Optional[int] = None
     my_rank: Optional[int] = None
-    goal_template: Optional[Dict[str, Any]] = None
 
     class Config:
         extra = "allow"  # Allow extra fields from database
@@ -143,9 +273,22 @@ async def create_challenge(
             challenge_type=challenge_data.challenge_type,
             duration_days=challenge_data.duration_days,
             start_date=challenge_data.start_date,
+            end_date=challenge_data.end_date,  # Optional - service calculates if not provided
             is_public=challenge_data.is_public,
             max_participants=challenge_data.max_participants,
+            join_deadline=challenge_data.join_deadline,
+            # Goal-like fields for plan generation
+            category=challenge_data.category,
+            frequency=challenge_data.frequency,
+            days_of_week=challenge_data.days_of_week,
+            target_days=challenge_data.target_days,
+            target_checkins=challenge_data.target_checkins,
+            reminder_times=challenge_data.reminder_times,
+            tracking_type=challenge_data.tracking_type,
             metadata=challenge_data.metadata or {},
+            # User context for plan generation (same as goals.py)
+            user_plan=user_plan,
+            user_timezone=current_user.get("timezone", "UTC"),
         )
 
         return challenge
@@ -165,7 +308,7 @@ async def create_challenge(
 async def get_challenges(
     current_user: dict = Depends(get_current_user),
     is_public: Optional[bool] = Query(None),
-    is_active: Optional[bool] = Query(True),
+    status_filter: Optional[str] = Query(None, alias="status"),
     my_challenges: bool = Query(False),
 ):
     """Get available challenges"""
@@ -175,7 +318,7 @@ async def get_challenges(
         challenges = await challenge_service.get_challenges(
             user_id=user_id,
             is_public=is_public,
-            is_active=is_active,
+            status=status_filter,
         )
 
         return challenges
@@ -225,98 +368,127 @@ async def get_my_challenges(
         )
 
 
+@router.get("/public")
+async def get_public_challenges(
+    current_user: dict = Depends(get_current_user),
+    status: Optional[str] = Query(
+        None, description="Filter by status: upcoming, active, completed, cancelled"
+    ),
+):
+    """
+    Get all public challenges for discovery.
+    Returns public challenges that can be joined (upcoming or active).
+    This is for the SocialScreen discover section.
+    """
+    try:
+        challenges = await challenge_service.get_challenges(
+            user_id=None,  # Don't filter by user
+            is_public=True,
+            status=status,
+        )
+
+        return challenges
+
+    except Exception as e:
+        logger.error(
+            f"Failed to get public challenges",
+            {"error": str(e), "user_id": current_user["id"]},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve public challenges",
+        )
+
+
 @router.get("/{challenge_id}", response_model=ChallengeDetailResponse)
 async def get_challenge(
     challenge_id: str, current_user: dict = Depends(get_current_user)
 ):
-    """Get challenge by ID with full details including computed fields"""
+    """
+    Get challenge by ID with full details including computed fields.
+
+    Access control:
+    - Public challenges: Anyone can view
+    - Private challenges: Only creator, participants, or partners of participants
+    """
     from app.core.database import get_supabase_client
     from datetime import date
 
     supabase = get_supabase_client()
+    user_id = current_user["id"]
 
-    # Get challenge with creator info
-    result = (
-        supabase.table("challenges")
-        .select("*, creator:created_by(id, name, username, profile_picture_url)")
-        .eq("id", challenge_id)
-        .maybe_single()
-        .execute()
+    # Check access using helper function
+    has_access, challenge, is_partner_view, is_participant_from_check = (
+        check_challenge_access(challenge_id, user_id, supabase)
     )
 
-    if not result.data:
+    if not has_access or not challenge:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Challenge not found"
         )
 
-    # maybe_single() returns a single object, not a list
-    challenge = result.data
-    user_id = current_user["id"]
+    # Status is stored in the database - no need to compute
+    # Just validate it's a valid status value
+    if challenge.get("status") not in ("upcoming", "active", "completed", "cancelled"):
+        challenge["status"] = "upcoming"  # Default fallback
 
-    # Compute status from dates and is_active
-    today = date.today()
-    start_date = (
-        date.fromisoformat(challenge.get("start_date"))
-        if challenge.get("start_date")
-        else None
-    )
-    end_date = (
-        date.fromisoformat(challenge.get("end_date"))
-        if challenge.get("end_date")
-        else None
-    )
-
-    if not challenge.get("is_active"):
-        challenge["status"] = "cancelled"
-    elif end_date and today > end_date:
-        challenge["status"] = "completed"
-    elif start_date and today < start_date:
-        challenge["status"] = "upcoming"
-    else:
-        challenge["status"] = "active"
+    # Set target_value based on challenge type for progress tracking
+    challenge_type = challenge.get("challenge_type")
+    if challenge_type == "checkin_count":
+        challenge["target_value"] = challenge.get("target_checkins")
+    elif challenge_type == "streak":
+        challenge["target_value"] = challenge.get("duration_days")
 
     # Add creator flag (column is created_by, not creator_id)
     is_creator = challenge.get("created_by") == user_id
     challenge["is_creator"] = is_creator
     challenge["creator_id"] = challenge.get("created_by")  # Alias for frontend
 
+    # Add partner view flag for frontend
+    challenge["is_partner_view"] = is_partner_view
+
+    # Privacy filter: hide sensitive schedule data for partner view
+    if is_partner_view:
+        challenge["reminder_times"] = None  # Hide daily schedule
+
     # Get participants count
-    participants_count_result = (
-        supabase.table("challenge_participants")
-        .select("id", count="exact")
-        .eq("challenge_id", challenge_id)
-        .execute()
-    )
-    challenge["participants_count"] = participants_count_result.count or 0
+    try:
+        participants_count_result = (
+            supabase.table("challenge_participants")
+            .select("id", count="exact")
+            .eq("challenge_id", challenge_id)
+            .execute()
+        )
+        challenge["participants_count"] = (
+            participants_count_result.count if participants_count_result else 0
+        ) or 0
+    except Exception:
+        challenge["participants_count"] = 0
 
-    # Check if user is a participant (membership only)
-    participant_result = (
-        supabase.table("challenge_participants")
-        .select("id")
-        .eq("challenge_id", challenge_id)
-        .eq("user_id", user_id)
-        .maybe_single()
-        .execute()
-    )
-
-    is_participant = bool(participant_result.data)
-    challenge["is_participant"] = is_participant or is_creator
+    # Use the is_participant from access check, or verify again
+    is_participant = is_participant_from_check or is_creator
+    challenge["is_participant"] = is_participant
 
     # Get scoring data from leaderboard (rank, points, progress_data all in one place)
-    leaderboard_result = (
-        supabase.table("challenge_leaderboard")
-        .select("rank, points, progress_data")
-        .eq("challenge_id", challenge_id)
-        .eq("user_id", user_id)
-        .maybe_single()
-        .execute()
-    )
+    try:
+        leaderboard_result = (
+            supabase.table("challenge_leaderboard")
+            .select("rank, points, progress_data")
+            .eq("challenge_id", challenge_id)
+            .eq("user_id", user_id)
+            .maybe_single()
+            .execute()
+        )
 
-    if leaderboard_result.data:
-        challenge["my_rank"] = leaderboard_result.data.get("rank")
-        challenge["my_progress"] = leaderboard_result.data.get("points", 0)
-    else:
-        # Not in leaderboard yet (no check-ins)
+        if leaderboard_result and leaderboard_result.data:
+            challenge["my_rank"] = leaderboard_result.data.get("rank")
+            challenge["my_progress"] = leaderboard_result.data.get("points", 0)
+        else:
+            # Not in leaderboard yet (no check-ins)
+            challenge["my_rank"] = None
+            challenge["my_progress"] = 0
+    except Exception:
+        # Leaderboard query failed - default to no rank
         challenge["my_rank"] = None
         challenge["my_progress"] = 0
 
@@ -376,6 +548,15 @@ async def join_challenge(
             challenge_id=challenge_id,
             user_id=user_id,
             goal_id=goal_id,
+        )
+
+        # Notify partners that user joined a challenge
+        from app.services.social_accountability_service import (
+            social_accountability_service,
+        )
+
+        await social_accountability_service.notify_partners_of_data_change(
+            user_id, "challenge_joined"
         )
 
         return participant
@@ -601,7 +782,7 @@ async def challenge_check_in(
     challenge = challenge_result.data
 
     # Check if challenge is active
-    if not challenge.get("is_active", False):
+    if challenge.get("status") not in ("upcoming", "active"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="This challenge is no longer active",
@@ -837,6 +1018,30 @@ async def challenge_check_in(
         },
     )
 
+    # Check and unlock achievements in background (non-blocking)
+    try:
+        from app.services.tasks import check_achievements_task
+
+        # Queue achievement check as Celery task (non-blocking)
+        check_achievements_task.delay(
+            user_id=user_id,
+            source_type="challenge",
+            source_id=challenge_id,
+        )
+    except Exception as e:
+        # Log error but don't fail check-in
+        logger.warning(
+            f"Failed to queue achievement task: {e}",
+            {"user_id": user_id, "challenge_id": challenge_id},
+        )
+
+    # Notify partners of the challenge check-in
+    from app.services.social_accountability_service import social_accountability_service
+
+    await social_accountability_service.notify_partners_of_data_change(
+        user_id, "challenge_checkin"
+    )
+
     return ChallengeCheckInResponse(
         id=check_in["id"],
         challenge_id=challenge_id,
@@ -863,6 +1068,21 @@ async def get_challenge_check_ins(
     from app.core.database import get_supabase_client
 
     supabase = get_supabase_client()
+    current_user_id = current_user["id"]
+
+    # Verify access to challenge
+    has_access, _, is_partner_view = check_challenge_access(
+        challenge_id, current_user_id, supabase
+    )
+    if not has_access:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Challenge not found",
+        )
+
+    # Privacy: partners viewing via PartnerDetailScreen cannot see check-in history
+    if is_partner_view:
+        return []
 
     # Build query - only return completed check-ins
     query = (
@@ -878,8 +1098,17 @@ async def get_challenge_check_ins(
         query = query.eq("user_id", user_id)
 
     result = query.execute()
+    checkins = result.data or []
 
-    return result.data or []
+    # Privacy filter: hide sensitive data when viewing other users' check-ins
+    # Only show full data for own check-ins
+    for checkin in checkins:
+        if checkin.get("user_id") != current_user_id:
+            checkin["notes"] = None  # Hide personal reflections
+            checkin["mood"] = None  # Hide emotional state
+            checkin["photo_url"] = None  # Hide photos
+
+    return checkins
 
 
 @router.get("/{challenge_id}/my-check-ins")
@@ -1138,10 +1367,11 @@ async def cancel_challenge(
     Cancel an active challenge.
 
     Only the creator can cancel a challenge.
-    The challenge is deactivated (is_active = false) but all data is preserved.
+    The challenge status is set to 'cancelled' but all data is preserved.
     Participants will be notified that the challenge was cancelled.
     """
     from app.core.database import get_supabase_client
+    from datetime import datetime
 
     supabase = get_supabase_client()
     user_id = current_user["id"]
@@ -1170,17 +1400,19 @@ async def cancel_challenge(
             detail="Only the challenge creator can cancel it",
         )
 
-    # Check if already inactive
-    if not challenge.get("is_active"):
+    # Check if already cancelled
+    if challenge.get("status") == "cancelled":
         return {
-            "message": "Challenge is already inactive",
+            "message": "Challenge is already cancelled",
             "challenge_id": challenge_id,
         }
 
     # Update challenge to inactive
     reason = data.reason if data else None
     update_data = {
-        "is_active": False,
+        "status": "cancelled",
+        "cancelled_at": datetime.now().isoformat(),
+        "cancelled_reason": reason,
         "metadata": {
             **challenge.get("metadata", {}),
             "cancelled": True,
@@ -1212,6 +1444,18 @@ async def cancel_challenge(
             "reason": reason,
             "participant_count": participant_count,
         },
+    )
+
+    # Fire-and-forget: cleanup pending invites and notifications
+    from app.services.cleanup_service import fire_and_forget_challenge_cleanup
+
+    fire_and_forget_challenge_cleanup(challenge_id, reason="cancelled")
+
+    # Notify partners of the challenge cancellation
+    from app.services.social_accountability_service import social_accountability_service
+
+    await social_accountability_service.notify_partners_of_data_change(
+        user_id, "challenge_cancelled"
     )
 
     # TODO: Send notifications to participants about cancellation
@@ -1280,21 +1524,28 @@ async def delete_challenge(
             "Use cancel instead to preserve their data.",
         )
 
+    # Fire-and-forget: cleanup pending invites and notifications BEFORE deleting
+    # (challenge_invites has ON DELETE CASCADE, but we still need to clean notifications)
+    from app.services.cleanup_service import fire_and_forget_challenge_cleanup
+
+    fire_and_forget_challenge_cleanup(challenge_id, reason="deleted")
+
     # Delete the challenge (cascade will handle participants and check-ins)
     supabase.table("challenges").delete().eq("id", challenge_id).execute()
 
-    # If this challenge came from a goal, update the goal
-    if challenge.get("metadata", {}).get("source") == "shared_goal":
-        source_goal_id = challenge.get("goal_template", {}).get("original_goal_id")
-        if source_goal_id:
-            # Clear the converted_to_challenge_id reference
-            supabase.table("goals").update({"converted_to_challenge_id": None}).eq(
-                "id", source_goal_id
-            ).execute()
+    # Note: Standalone challenges don't have source goals
+    # Legacy "shared_goal" challenges are deprecated
 
     logger.info(
         f"Challenge {challenge_id} deleted by creator {user_id}",
         {"challenge_id": challenge_id, "user_id": user_id},
+    )
+
+    # Notify partners of the challenge deletion
+    from app.services.social_accountability_service import social_accountability_service
+
+    await social_accountability_service.notify_partners_of_data_change(
+        user_id, "challenge_deleted"
     )
 
     return {"message": "Challenge deleted successfully"}
@@ -1379,6 +1630,13 @@ async def leave_challenge(
         {"challenge_id": challenge_id, "user_id": user_id},
     )
 
+    # Notify partners of the user leaving the challenge
+    from app.services.social_accountability_service import social_accountability_service
+
+    await social_accountability_service.notify_partners_of_data_change(
+        user_id, "challenge_left"
+    )
+
     return {"message": "You have left the challenge"}
 
 
@@ -1387,14 +1645,22 @@ async def leave_challenge(
 # =====================================================
 
 
-def validate_challenge_join(challenge: dict, user_id: str, supabase) -> tuple:
+def validate_challenge_join(
+    challenge: dict, user_id: str, supabase, skip_invite_check: bool = False
+) -> tuple:
     """Validate if user can join challenge
+
+    Args:
+        challenge: Challenge data dict
+        user_id: User ID attempting to join
+        supabase: Supabase client
+        skip_invite_check: If True, skip the invite check (for invite-based joins)
 
     Returns:
         (can_join: bool, error_message: str or None)
     """
-    # 1. Challenge must be active
-    if not challenge.get("is_active"):
+    # 1. Challenge must be active or upcoming
+    if challenge.get("status") not in ("upcoming", "active"):
         return False, "This challenge is no longer active"
 
     # 2. Challenge must not have ended
@@ -1444,6 +1710,26 @@ def validate_challenge_join(challenge: dict, user_id: str, supabase) -> tuple:
     )
     if existing.data:
         return False, "You have already joined this challenge"
+
+    # 6. For private challenges, check if user has a valid invite
+    if not skip_invite_check and not challenge.get("is_public", True):
+        # Check if user is the creator (creators don't need invites)
+        if challenge.get("created_by") != user_id:
+            # Check for a valid (pending or accepted) invite
+            invite = (
+                supabase.table("challenge_invites")
+                .select("id, status")
+                .eq("challenge_id", challenge["id"])
+                .eq("invited_user_id", user_id)
+                .in_("status", ["pending", "accepted"])
+                .maybe_single()
+                .execute()
+            )
+            if not invite.data:
+                return (
+                    False,
+                    "This is a private challenge. You need an invite to join.",
+                )
 
     return True, None
 
@@ -1624,7 +1910,10 @@ async def send_challenge_invite(
             recipient_id=invite_data.user_id,
             sender_id=user_id,
             challenge_title=challenge.data.get("title", "a challenge"),
+            challenge_id=challenge_id,
             sender_name=sender_name,
+            entity_type="challenge",
+            entity_id=challenge_id,
             supabase=supabase,
         )
     except Exception as e:
@@ -1788,8 +2077,10 @@ async def join_challenge_via_invite(
                 detail="This invite has expired",
             )
 
-    # Validate challenge join conditions
-    can_join, error_message = validate_challenge_join(challenge, user_id, supabase)
+    # Validate challenge join conditions (skip invite check since they have an invite)
+    can_join, error_message = validate_challenge_join(
+        challenge, user_id, supabase, skip_invite_check=True
+    )
     if not can_join:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -1837,6 +2128,15 @@ async def join_challenge_via_invite(
                 "user_id": user_id,
                 "invite_code": invite_code,
             },
+        )
+
+        # Notify partners that user joined a challenge
+        from app.services.social_accountability_service import (
+            social_accountability_service,
+        )
+
+        await social_accountability_service.notify_partners_of_data_change(
+            user_id, "challenge_joined"
         )
 
         return {
@@ -1900,7 +2200,7 @@ async def get_received_challenge_invites(
                 status,
                 created_at,
                 expires_at,
-                challenge:challenges!challenge_invites_challenge_id_fkey(id, title, description, start_date, end_date, is_public, challenge_type),
+                challenge:challenges!challenge_invites_challenge_id_fkey(id, title, description, start_date, end_date, is_public, challenge_type, status),
                 inviter:users!challenge_invites_invited_by_user_id_fkey(id, name, username, profile_picture_url)
             """
             )
@@ -1961,7 +2261,7 @@ async def get_sent_challenge_invites(
                 status,
                 created_at,
                 expires_at,
-                challenge:challenges!challenge_invites_challenge_id_fkey(id, title, description, start_date, end_date, is_public, challenge_type),
+                challenge:challenges!challenge_invites_challenge_id_fkey(id, title, description, start_date, end_date, is_public, challenge_type, status),
                 invitee:users!challenge_invites_invited_user_id_fkey(id, name, username, profile_picture_url)
             """
             )
@@ -2094,10 +2394,10 @@ async def decline_challenge_invite(
     user_id = current_user["id"]
 
     try:
-        # Get the invite
+        # Get the invite (need challenge_id for notification cleanup)
         invite = (
             supabase.table("challenge_invites")
-            .select("id")
+            .select("id, challenge_id")
             .eq("id", invite_id)
             .eq("invited_user_id", user_id)
             .eq("status", "pending")
@@ -2115,6 +2415,17 @@ async def decline_challenge_invite(
         supabase.table("challenge_invites").update({"status": "declined"}).eq(
             "id", invite_id
         ).execute()
+
+        # Fire-and-forget: cleanup the notification for this invite
+        from app.services.cleanup_service import (
+            fire_and_forget_invite_notification_cleanup,
+        )
+
+        challenge_id = invite.data.get("challenge_id")
+        if challenge_id:
+            fire_and_forget_invite_notification_cleanup(
+                challenge_id, user_id, reason="declined"
+            )
 
         logger.info(
             f"Challenge invite declined",
@@ -2148,10 +2459,10 @@ async def cancel_challenge_invite(
     user_id = current_user["id"]
 
     try:
-        # Get the invite (must be sender)
+        # Get the invite (must be sender, need challenge_id and invited_user_id for cleanup)
         invite = (
             supabase.table("challenge_invites")
-            .select("id")
+            .select("id, challenge_id, invited_user_id")
             .eq("id", invite_id)
             .eq("invited_by_user_id", user_id)
             .eq("status", "pending")
@@ -2167,6 +2478,18 @@ async def cancel_challenge_invite(
 
         # Delete the invite
         supabase.table("challenge_invites").delete().eq("id", invite_id).execute()
+
+        # Fire-and-forget: cleanup the notification for this invite
+        from app.services.cleanup_service import (
+            fire_and_forget_invite_notification_cleanup,
+        )
+
+        challenge_id = invite.data.get("challenge_id")
+        invited_user_id = invite.data.get("invited_user_id")
+        if challenge_id and invited_user_id:
+            fire_and_forget_invite_notification_cleanup(
+                challenge_id, invited_user_id, reason="cancelled"
+            )
 
         logger.info(
             f"Challenge invite cancelled",
@@ -2185,4 +2508,260 @@ async def cancel_challenge_invite(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to cancel invite",
+        )
+
+
+# =====================================================
+# CHALLENGE PLAN ENDPOINTS
+# =====================================================
+
+
+class ChallengePlanStatusResponse(BaseModel):
+    """Response for challenge plan status."""
+
+    challenge_id: str
+    status: str  # not_started, pending, generating, completed, failed
+    plan_type: Optional[str] = None
+    error_message: Optional[str] = None
+    generated_at: Optional[str] = None
+
+
+class ChallengePlanResponse(BaseModel):
+    """Response for challenge plan."""
+
+    challenge_id: str
+    plan: Optional[Dict[str, Any]] = None
+    status: str
+
+
+@router.get("/{challenge_id}/plan-status", response_model=ChallengePlanStatusResponse)
+async def get_challenge_plan_status(
+    challenge_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Get the plan generation status for a challenge.
+
+    Returns:
+    - not_started: No plan generation has been initiated
+    - pending: Plan generation is queued
+    - generating: Plan is being generated by AI
+    - completed: Plan is ready
+    - failed: Plan generation failed
+    - restricted: Partner viewing (has plan but details hidden)
+    """
+    from app.core.database import get_supabase_client
+    from app.services.task_queue import task_queue
+
+    supabase = get_supabase_client()
+    user_id = current_user["id"]
+
+    # Check access
+    has_access, _, is_partner_view, _ = check_challenge_access(
+        challenge_id, user_id, supabase
+    )
+
+    if not has_access:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Challenge not found",
+        )
+
+    # Partner view: return restricted immediately without querying plan
+    if is_partner_view:
+        return ChallengePlanStatusResponse(
+            challenge_id=challenge_id,
+            status="restricted",
+        )
+
+    # Use task_queue (same as goals)
+    plan_status = await task_queue.get_plan_status(challenge_id=challenge_id)
+
+    if not plan_status:
+        return ChallengePlanStatusResponse(
+            challenge_id=challenge_id,
+            status="not_started",
+        )
+
+    return ChallengePlanStatusResponse(
+        challenge_id=challenge_id,
+        status=plan_status.get("status", "not_started"),
+        plan_type=plan_status.get("plan_type"),
+        error_message=plan_status.get("error_message"),
+        generated_at=plan_status.get("generated_at"),
+    )
+
+
+@router.get("/{challenge_id}/plan", response_model=ChallengePlanResponse)
+async def get_challenge_plan(
+    challenge_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Get the complete actionable plan for a challenge.
+
+    Only returns the plan if status is "completed".
+    Partners get a restricted response (no plan details).
+    """
+    from app.core.database import get_supabase_client
+    from app.services.task_queue import task_queue
+
+    supabase = get_supabase_client()
+    user_id = current_user["id"]
+
+    # Check access
+    has_access, _, is_partner_view, _ = check_challenge_access(
+        challenge_id, user_id, supabase
+    )
+
+    if not has_access:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Challenge not found",
+        )
+
+    # Partner view: return restricted immediately without querying plan
+    # Same as goals endpoint - just indicate plan exists
+    if is_partner_view:
+        return {
+            "challenge_id": challenge_id,
+            "has_plan": True,
+            "status": "restricted",
+            "plan": None,
+        }
+
+    # Use task_queue (same as goals)
+    plan = await task_queue.get_plan(challenge_id=challenge_id)
+
+    if not plan:
+        # Check if plan exists but not completed yet
+        plan_status = await task_queue.get_plan_status(challenge_id=challenge_id)
+        if plan_status:
+            return ChallengePlanResponse(
+                challenge_id=challenge_id,
+                plan=None,
+                status=plan_status.get("status", "not_started"),
+            )
+        return ChallengePlanResponse(
+            challenge_id=challenge_id,
+            plan=None,
+            status="not_started",
+        )
+
+    return ChallengePlanResponse(
+        challenge_id=challenge_id,
+        plan=plan,
+        status="completed",
+    )
+
+
+@router.post("/{challenge_id}/plan/retry")
+async def retry_challenge_plan_generation(
+    challenge_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Retry plan generation for a failed challenge plan.
+
+    Only works if the current plan status is "failed".
+    """
+    from app.core.database import get_supabase_client
+    from app.services.tasks import generate_challenge_plan_task
+
+    supabase = get_supabase_client()
+    user_id = current_user["id"]
+
+    try:
+        # Verify challenge exists and user has access
+        challenge = (
+            supabase.table("challenges")
+            .select("*")
+            .eq("id", challenge_id)
+            .maybe_single()
+            .execute()
+        )
+
+        if not challenge.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Challenge not found",
+            )
+
+        # Get existing plan
+        plan_result = (
+            supabase.table("actionable_plans")
+            .select("*")
+            .eq("challenge_id", challenge_id)
+            .maybe_single()
+            .execute()
+        )
+
+        if not plan_result.data:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No plan exists for this challenge",
+            )
+
+        plan = plan_result.data
+
+        if plan.get("status") != "failed":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Can only retry failed plans",
+            )
+
+        # Reset plan status to pending
+        supabase.table("actionable_plans").update(
+            {
+                "status": "pending",
+                "error_message": None,
+            }
+        ).eq("id", plan["id"]).execute()
+
+        # Build challenge data for plan generator
+        challenge_data = challenge.data
+        challenge_as_goal = {
+            "id": challenge_id,
+            "user_id": challenge_data.get("created_by"),
+            "title": challenge_data.get("title"),
+            "description": challenge_data.get("description"),
+            "category": challenge_data.get("category"),
+            "goal_type": "time_challenge",
+            "frequency": challenge_data.get("frequency", "daily"),
+            "days_of_week": challenge_data.get("days_of_week"),
+            "target_days": challenge_data.get("target_days")
+            or challenge_data.get("duration_days"),
+            "duration_days": challenge_data.get("duration_days"),
+            "is_challenge": True,
+        }
+
+        # Queue plan generation
+        generate_challenge_plan_task.delay(
+            plan_id=plan["id"],
+            challenge_id=challenge_id,
+            challenge_data=challenge_as_goal,
+            user_id=user_id,
+        )
+
+        logger.info(
+            f"Queued plan retry for challenge {challenge_id}",
+            {"challenge_id": challenge_id, "plan_id": plan["id"], "user_id": user_id},
+        )
+
+        return {
+            "message": "Plan generation retried",
+            "status": "pending",
+            "challenge_id": challenge_id,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to retry plan for challenge {challenge_id}",
+            {"error": str(e), "challenge_id": challenge_id},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retry plan generation",
         )

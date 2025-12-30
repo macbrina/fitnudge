@@ -1,4 +1,6 @@
 // Centralized route definitions for FitNudge
+import Constants from "expo-constants";
+
 export const ROUTES = {
   // Authentication routes
   AUTH: {
@@ -51,9 +53,10 @@ export const ROUTES = {
     MY: "/challenges/my", // All challenges user has access to (created or joined)
     PUBLIC: "/challenges/public", // Public challenges for discovery
     GET: (id: string) => `/challenges/${id}`,
-    CREATE: "/challenges",
+    CREATE: "/challenges/",
     UPDATE: (id: string) => `/challenges/${id}`,
     DELETE: (id: string) => `/challenges/${id}`,
+    CANCEL: (id: string) => `/challenges/${id}/cancel`,
     JOIN: (id: string) => `/challenges/${id}/join`,
     LEAVE: (id: string) => `/challenges/${id}/leave`,
     CHECK_IN: (id: string) => `/challenges/${id}/check-in`,
@@ -95,6 +98,7 @@ export const ROUTES = {
   PARTNERS: {
     BASE: "/partners",
     LIST: "/partners",
+    LIMITS: "/partners/limits",
     PENDING: "/partners/pending",
     SENT: "/partners/sent",
     REQUEST: "/partners/request",
@@ -104,6 +108,8 @@ export const ROUTES = {
     REMOVE: (id: string) => `/partners/${id}`,
     SEARCH_USERS: "/partners/search",
     SUGGESTED_USERS: "/partners/suggested",
+    DASHBOARD: (partnerUserId: string) =>
+      `/partners/${partnerUserId}/dashboard`,
   },
 
   // Motivation routes
@@ -263,9 +269,28 @@ export const ROUTES = {
     CHECK: "/achievements/check",
     STATS: "/achievements/stats",
   },
-} as const;
 
-import Constants from "expo-constants";
+  // Meal tracking routes
+  MEALS: {
+    LIST: "/meals/",
+    CREATE: "/meals/",
+    GET: (id: string) => `/meals/${id}`,
+    UPDATE: (id: string) => `/meals/${id}`,
+    DELETE: (id: string) => `/meals/${id}`,
+    ESTIMATE_NUTRITION: "/meals/estimate-nutrition",
+    HISTORY: "/meals/history",
+  },
+
+  // Hydration tracking routes
+  HYDRATION: {
+    LIST: "/hydration/",
+    CREATE: "/hydration/",
+    GET: (id: string) => `/hydration/${id}`,
+    DELETE: (id: string) => `/hydration/${id}`,
+    SUMMARY: (date: string) => `/hydration/summary/${date}`,
+    PRESETS: "/hydration/presets",
+  },
+} as const;
 
 // API Base URL
 export const API_BASE_URL =
@@ -279,7 +304,7 @@ export const buildApiUrl = (route: string): string => {
 // Helper function to build API URLs with parameters
 export const buildApiUrlWithParams = (
   route: string,
-  params: Record<string, string | number>
+  params: Record<string, string | number>,
 ): string => {
   let url = route;
   Object.entries(params).forEach(([key, value]) => {
@@ -305,7 +330,8 @@ export const MOBILE_ROUTES = {
   MAIN: {
     HOME: "/(user)/(tabs)",
     GOALS: "/(user)/(tabs)/goals",
-    FEED: "/(user)/(tabs)/feed",
+    SOCIAL: "/(user)/(tabs)/feed",
+    NOTIFICATIONS: "/(user)/(tabs)/notifications",
     PROFILE: "/(user)/(tabs)/profile",
   },
 
@@ -316,18 +342,25 @@ export const MOBILE_ROUTES = {
     EDIT: "/(user)/(goals)/edit",
     DETAILS: "/(user)/(goals)/details",
     CHECKIN: "/(user)/(goals)/checkin",
+    MEAL_HISTORY: (goalId: string) =>
+      `/(user)/(goals)/meal-history?goalId=${goalId}`,
   },
 
-  // Social screens
+  // Social screens (Posts + Challenges discovery)
   SOCIAL: {
     FEED: "/(user)/(tabs)/feed",
     CREATE_POST: "/(user)/social/create",
     POST_DETAILS: "/(user)/social/post",
     USER_PROFILE: "/(user)/social/profile",
-    PARTNERS: "/(user)/social/partners",
-    FIND_PARTNER: "/(user)/social/find-partner",
-    NUDGES: "/(user)/social/nudges",
     REFERRAL: "/(user)/social/referral",
+    FIND_PARTNER: "/(user)/profile/find-partner",
+  },
+
+  // Notifications screens
+  NOTIFICATIONS: {
+    TAB: "/(user)/(tabs)/notifications",
+    CHALLENGE_INVITE: (inviteId: string) =>
+      `/(user)/notifications/challenge-invite/${inviteId}` as const,
   },
 
   // Profile screens
@@ -335,9 +368,26 @@ export const MOBILE_ROUTES = {
     MAIN: "/(user)/(tabs)/profile",
     EDIT: "/(user)/profile/edit",
     SETTINGS: "/(user)/profile/settings",
-    NOTIFICATIONS: "/(user)/profile/notifications",
-    SUBSCRIPTION: "/(user)/profile/subscription",
+    NOTIFICATION_SETTINGS: "/(user)/profile/notification-settings",
     CHANGE_PASSWORD: "/(user)/profile/change-password",
+    // Partners (moved from Social)
+    PARTNERS: "/(user)/profile/partners",
+    FIND_PARTNER: "/(user)/profile/find-partner",
+    PARTNER_DETAIL: (partnerUserId: string, partnershipId: string) =>
+      `/(user)/profile/partner/${partnerUserId}?partnershipId=${partnershipId}` as const,
+    // Activity (nudges from partners)
+    ACTIVITY: "/(user)/profile/activity",
+    // Weekly Recaps
+    WEEKLY_RECAPS: "/(user)/profile/weekly-recaps",
+    RECAP_DETAIL: (recapId: string) =>
+      `/(user)/profile/weekly-recaps/${recapId}` as const,
+    // Achievements (moved here for consistency)
+    ACHIEVEMENTS: "/(user)/profile/achievements",
+  },
+
+  // Achievements (deprecated - use PROFILE.ACHIEVEMENTS)
+  ACHIEVEMENTS: {
+    LIST: "/(user)/profile/achievements",
   },
 
   // Onboarding
@@ -359,15 +409,25 @@ export const MOBILE_ROUTES = {
     INVITES: "/(user)/challenges/invites",
     INVITE_USERS: (challengeId: string) =>
       `/(user)/challenges/invites?challengeId=${challengeId}` as const,
+    MEAL_HISTORY: (challengeId: string) =>
+      `/(user)/(goals)/meal-history?challengeId=${challengeId}` as const,
   },
 
   // Workout
   WORKOUT: {
+    // Goal-based workout routes
     PLAYER: (goalId: string) => `/workout/${goalId}` as const,
     PLAYER_RESUME: (goalId: string) =>
       `/workout/${goalId}?resume=true` as const,
     PLAYER_RESTART: (goalId: string) =>
       `/workout/${goalId}?restart=true` as const,
+    // Challenge-based workout routes (standalone challenges)
+    CHALLENGE_PLAYER: (challengeId: string) =>
+      `/workout/challenge/${challengeId}` as const,
+    CHALLENGE_PLAYER_RESUME: (challengeId: string) =>
+      `/workout/challenge/${challengeId}?resume=true` as const,
+    CHALLENGE_PLAYER_RESTART: (challengeId: string) =>
+      `/workout/challenge/${challengeId}?restart=true` as const,
   },
 } as const;
 
@@ -401,7 +461,7 @@ export const navigation = {
     goToSignup: () => MOBILE_ROUTES.AUTH.SIGNUP,
     goToHome: () => MOBILE_ROUTES.MAIN.HOME,
     goToGoals: () => MOBILE_ROUTES.MAIN.GOALS,
-    goToFeed: () => MOBILE_ROUTES.MAIN.FEED,
+    goToFeed: () => MOBILE_ROUTES.MAIN.SOCIAL,
     goToProfile: () => MOBILE_ROUTES.MAIN.PROFILE,
     goToCreateGoal: () => MOBILE_ROUTES.GOALS.CREATE,
     goToEditGoal: (id: string) => MOBILE_ROUTES.GOALS.EDIT,
@@ -412,7 +472,6 @@ export const navigation = {
     goToUserProfile: (id: string) => MOBILE_ROUTES.SOCIAL.USER_PROFILE,
     goToEditProfile: () => MOBILE_ROUTES.PROFILE.EDIT,
     goToSettings: () => MOBILE_ROUTES.PROFILE.SETTINGS,
-    goToSubscription: () => MOBILE_ROUTES.PROFILE.SUBSCRIPTION,
   },
 
   // Web navigation

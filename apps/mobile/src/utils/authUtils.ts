@@ -61,7 +61,7 @@ async function performLogout(reason: LogoutReason): Promise<string> {
   // Don't clear storage or trigger logout flow
   if (!wasAuthenticated) {
     console.log(
-      `[Auth] Skipping logout for unauthenticated user (reason: ${reason})`
+      `[Auth] Skipping logout for unauthenticated user (reason: ${reason})`,
     );
     return statusMessages[reason];
   }

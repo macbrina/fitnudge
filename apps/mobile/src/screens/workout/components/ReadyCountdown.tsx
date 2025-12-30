@@ -52,6 +52,9 @@ export function ReadyCountdown({
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const opacityAnim = useRef(new Animated.Value(1)).current;
 
+  // Track if we've already spoken to avoid repeating
+  const hasSpokenRef = useRef(false);
+
   // Pulse animation on each second
   useEffect(() => {
     Animated.sequence([
@@ -82,17 +85,22 @@ export function ReadyCountdown({
     ]).start();
   }, [timeRemaining]);
 
-  // Speak "Ready to go" and exercise name on mount
+  // Speak "Ready to go" and exercise name
+  // Depends on exerciseName so it speaks the correct name when resuming
   useEffect(() => {
-    if (coachVoiceEnabled) {
+    // Only speak once - when we have a valid exercise name and haven't spoken yet
+    if (coachVoiceEnabled && exerciseName && !hasSpokenRef.current) {
+      hasSpokenRef.current = true;
       Speech.speak(`Ready to go. ${exerciseName}`, {
         rate: 0.9,
         pitch: 1.0,
       });
     }
+  }, [coachVoiceEnabled, exerciseName]);
 
+  // Separate cleanup effect - only runs on unmount
+  useEffect(() => {
     return () => {
-      // Stop any ongoing speech when component unmounts
       Speech.stop();
     };
   }, []);
@@ -137,15 +145,10 @@ export function ReadyCountdown({
           })}
         </Text>
 
-        {/* Exercise name with help icon */}
-        <View style={styles.exerciseNameRow}>
-          <Text style={styles.exerciseName}>{exerciseName}</Text>
-          {onHelp && (
-            <TouchableOpacity onPress={onHelp} style={styles.helpButton}>
-              <Ionicons name="help-circle-outline" size={22} color="#FFFFFF" />
-            </TouchableOpacity>
-          )}
-        </View>
+        {/* Exercise name */}
+        <Text style={styles.exerciseName} numberOfLines={2}>
+          {exerciseName}
+        </Text>
       </View>
 
       {/* Start button */}
@@ -223,22 +226,16 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     marginTop: toRN(tokens.spacing[4]),
     marginBottom: toRN(tokens.spacing[2]),
   },
-  exerciseNameRow: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: toRN(tokens.spacing[1]),
-  },
   exerciseName: {
     fontSize: toRN(tokens.typography.fontSize.xl),
     fontFamily: fontFamily.groteskBold,
     color: "#FFFFFF",
     textTransform: "capitalize" as const,
+    textAlign: "center" as const,
+    paddingHorizontal: toRN(tokens.spacing[6]),
     textShadowColor: "rgba(0,0,0,0.3)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
-  },
-  helpButton: {
-    padding: toRN(tokens.spacing[1]),
   },
 
   // Start button

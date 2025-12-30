@@ -42,10 +42,10 @@ class HomeService extends BaseApiService {
    * Includes active items, pending check-ins, and stats
    */
   async getDashboard(
-    timezone: string = "UTC"
+    timezone: string = "UTC",
   ): Promise<ApiResponse<HomeDashboardResponse>> {
     return this.get<HomeDashboardResponse>(
-      `/home/dashboard?timezone=${encodeURIComponent(timezone)}`
+      `/home/dashboard?timezone=${encodeURIComponent(timezone)}`,
     );
   }
 }

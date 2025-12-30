@@ -238,7 +238,7 @@ def get_exercises_for_ai_prompt(
     Filters by difficulty level, equipment availability, and location preferences.
 
     Args:
-        user_profile: User fitness profile (fitness_level, preferred_location, etc.)
+        user_profile: User fitness profile (fitness_level, preferred_location, available_equipment, etc.)
         limit: Maximum exercises to return (default 100)
 
     Returns:
@@ -263,31 +263,37 @@ def get_exercises_for_ai_prompt(
                 query = query.in_("difficulty", ["beginner", "intermediate"])
             # Advanced: all difficulties (no filter)
 
-            # Filter by location/equipment availability
+            # Get equipment preferences
+            available_equipment = user_profile.get("available_equipment", [])
             preferred_location = user_profile.get("preferred_location", "")
-            if preferred_location in ["home", "Home", "HOME"]:
-                # Home: body weight, dumbbells, resistance bands (no gym equipment)
-                query = query.in_(
-                    "equipment",
-                    [
-                        "body weight",
-                        "dumbbell",
-                        "kettlebell",
-                        "resistance band",
-                        "medicine ball",
-                    ],
-                )
-            elif preferred_location in ["outdoor", "Outdoor", "OUTDOOR"]:
-                # Outdoor: body weight only
-                query = query.eq("equipment", "body weight")
-            # Gym: all equipment types (no filter)
+
+            # Build equipment filter based on user's available equipment AND location
+            equipment_filter = _build_equipment_filter(
+                available_equipment, preferred_location
+            )
+
+            if equipment_filter:
+                query = query.in_("equipment", equipment_filter)
 
         # Order by popularity (most used exercises first = better AI suggestions)
         result = query.order("usage_count", desc=True).limit(limit).execute()
 
         exercises = result.data or []
-        print(
-            f"Filtered {len(exercises)} exercises for AI prompt (profile: {user_profile.get('fitness_level') if user_profile else 'none'})"
+        logger.info(
+            f"Filtered {len(exercises)} exercises for AI prompt",
+            {
+                "fitness_level": (
+                    user_profile.get("fitness_level") if user_profile else "none"
+                ),
+                "equipment_count": (
+                    len(user_profile.get("available_equipment", []))
+                    if user_profile
+                    else 0
+                ),
+                "location": (
+                    user_profile.get("preferred_location") if user_profile else "none"
+                ),
+            },
         )
 
         return exercises
@@ -296,6 +302,74 @@ def get_exercises_for_ai_prompt(
         logger.error(f"Error filtering exercises for AI: {e}")
         # Fallback: return popular exercises
         return get_popular_exercises(limit)
+
+
+def _build_equipment_filter(
+    available_equipment: List[str], preferred_location: str
+) -> List[str]:
+    """
+    Build the equipment filter based on user's available equipment and location.
+
+    Logic:
+    - gym: All equipment (no filter needed, return empty list)
+    - outdoor: Body weight only
+    - home/mix: Use available_equipment if provided, else body weight only
+    - dont_know: Body weight + resistance band (safest default)
+
+    Args:
+        available_equipment: List of equipment user has (e.g., ["dumbbell", "resistance_band"])
+        preferred_location: Where user works out (gym, home, outdoor, mix, dont_know)
+
+    Returns:
+        List of equipment types to filter by, or empty list for no filter
+    """
+    # Gym users have access to everything - no filter needed
+    if preferred_location == "gym":
+        return []
+
+    # Outdoor is always body weight only
+    if preferred_location == "outdoor":
+        return ["body weight"]
+
+    # For home/mix/dont_know - check what equipment user has
+    if preferred_location in ["home", "mix", "dont_know", ""]:
+        # Always include body weight (everyone has their body!)
+        equipment_list = ["body weight"]
+
+        # If user specified their equipment, use it
+        if available_equipment and len(available_equipment) > 0:
+            # Map our equipment IDs to database equipment values
+            equipment_mapping = {
+                "none": [],  # No additional equipment
+                "resistance_band": ["resistance band"],
+                "dumbbell": ["dumbbell"],
+                "kettlebell": ["kettlebell"],
+                "pull_up_bar": [
+                    "body weight"
+                ],  # Pull-up bar uses body weight exercises
+                "yoga_mat": ["body weight"],  # Yoga mat uses body weight exercises
+                "barbell": ["barbell"],
+                "bench": ["dumbbell", "barbell"],  # Bench typically used with weights
+                "cable_machine": ["cable"],
+            }
+
+            for equip in available_equipment:
+                mapped = equipment_mapping.get(equip, [])
+                for item in mapped:
+                    if item not in equipment_list:
+                        equipment_list.append(item)
+
+        # If no equipment specified and location is home, default to body weight only
+        # This is the key fix - home users without equipment get body weight exercises
+        if not available_equipment or len(available_equipment) == 0:
+            if preferred_location == "dont_know":
+                # Be slightly generous for users who don't know
+                equipment_list.append("resistance band")
+
+        return equipment_list
+
+    # Default: no filter (allow all)
+    return []
 
 
 def enhance_exercise_with_demo(exercise_name: str) -> Dict[str, Any]:

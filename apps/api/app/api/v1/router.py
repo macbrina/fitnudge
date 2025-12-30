@@ -21,6 +21,7 @@ from app.api.v1.endpoints import (
     recaps,
     social_accountability,
     meals,
+    hydration,
     progress_reflections,
     system_health,
     webhooks,
@@ -29,6 +30,9 @@ from app.api.v1.endpoints import (
     home,
     workout_sessions,
     exercises,
+    workout_music,
+    audio_preferences,
+    tracking_stats,
 )
 
 # Create main API router
@@ -75,6 +79,9 @@ api_router.include_router(
 )
 api_router.include_router(meals.router, prefix="/meals", tags=["Meal Tracking"])
 api_router.include_router(
+    hydration.router, prefix="/hydration", tags=["Hydration Tracking"]
+)
+api_router.include_router(
     progress_reflections.router,
     prefix="/progress-reflections",
     tags=["AI Progress Reflections"],
@@ -113,4 +120,18 @@ api_router.include_router(
     exercises.router,
     prefix="/exercises",
     tags=["Exercises"],
+)
+api_router.include_router(
+    workout_music.router,
+    tags=["Workout Music"],
+)
+api_router.include_router(
+    audio_preferences.router,
+    prefix="/audio-preferences",
+    tags=["Audio Preferences"],
+)
+api_router.include_router(
+    tracking_stats.router,
+    prefix="/tracking-stats",
+    tags=["Tracking Stats"],
 )

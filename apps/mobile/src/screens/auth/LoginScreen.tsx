@@ -70,7 +70,7 @@ export default function LoginScreen() {
   const fetchSubscriptionData = async () => {
     try {
       const [{ useSubscriptionStore }, { usePricingStore }] = await Promise.all(
-        [import("@/stores/subscriptionStore"), import("@/stores/pricingStore")]
+        [import("@/stores/subscriptionStore"), import("@/stores/pricingStore")],
       );
 
       // Fetch subscription, features, and pricing plans in parallel
@@ -119,7 +119,7 @@ export default function LoginScreen() {
 
   const handleSocialSuccess = async (
     payload: LoginResponse,
-    provider: "google" | "apple"
+    provider: "google" | "apple",
   ) => {
     await login(payload.user, payload.access_token, payload.refresh_token);
 
@@ -241,7 +241,7 @@ export default function LoginScreen() {
             await login(
               response.data.user,
               response.data.access_token,
-              response.data.refresh_token
+              response.data.refresh_token,
             );
 
             // Handle remember me functionality
@@ -249,13 +249,13 @@ export default function LoginScreen() {
               // Store remember me preference for future logins
               await authService.setRememberMePreference(
                 response.data.user.email,
-                true
+                true,
               );
             } else {
               // Clear remember me preference if unchecked
               await authService.setRememberMePreference(
                 response.data.user.email,
-                false
+                false,
               );
             }
 
@@ -361,7 +361,7 @@ export default function LoginScreen() {
             });
           }
         },
-      }
+      },
     );
   };
 
@@ -369,7 +369,7 @@ export default function LoginScreen() {
     if (!showGoogle) {
       await handleSocialError(
         t("errors.authentication_error") ||
-          "Google Sign-In is not configured for this build."
+          "Google Sign-In is not configured for this build.",
       );
       return;
     }
@@ -384,7 +384,7 @@ export default function LoginScreen() {
         await handleSocialSuccess(response.data, "google");
       } else {
         await handleSocialError(
-          response.error || t("errors.authentication_error")
+          response.error || t("errors.authentication_error"),
         );
       }
     } catch (error) {
@@ -402,7 +402,7 @@ export default function LoginScreen() {
   const handleAppleSignIn = async () => {
     if (!showApple) {
       await handleSocialError(
-        "Sign in with Apple is not available on this device."
+        "Sign in with Apple is not available on this device.",
       );
       return;
     }
@@ -441,7 +441,7 @@ export default function LoginScreen() {
         await handleSocialSuccess(response.data, "apple");
       } else {
         await handleSocialError(
-          response.error || t("errors.authentication_error")
+          response.error || t("errors.authentication_error"),
         );
       }
     } catch (error: any) {
@@ -615,7 +615,7 @@ const makeLoginScreenStyles = (tokens: any, colors: any, brand: any) => {
       textAlign: "center" as const,
       lineHeight: lineHeight(
         tokens.typography.fontSize.base,
-        tokens.typography.lineHeight.relaxed
+        tokens.typography.lineHeight.relaxed,
       ),
       fontFamily: fontFamily.groteskRegular,
     },

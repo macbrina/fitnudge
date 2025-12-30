@@ -66,14 +66,14 @@ export const Checkbox: React.FC<CheckboxProps> = ({
   const styles = useStyles(makeCheckboxStyles);
 
   const getCheckboxStyle = () => {
-    let style = [styles.checkbox, { width: size, height: size }];
+    const style = [styles.checkbox, { width: size, height: size }];
     if (checked) style.push(styles.checkboxChecked);
     if (disabled) style.push(styles.checkboxDisabled);
     return style;
   };
 
   const getLabelStyle = () => {
-    let style = [styles.label];
+    const style = [styles.label];
     if (disabled) style.push(styles.labelDisabled);
     if (labelStyle) style.push(labelStyle);
     return style;

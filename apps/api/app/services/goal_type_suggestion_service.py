@@ -20,393 +20,494 @@ from app.core.config import settings
 from app.services.logger import logger
 
 # Goal type specific system prompts
-HABIT_SYSTEM_PROMPT = """You are an expert fitness accountability coach creating ONGOING HABIT goals for an AI-powered fitness app.
+HABIT_SYSTEM_PROMPT = """You are an expert fitness accountability coach. Your job is to INTELLIGENTLY determine the best goals for each user based on their profile.
 
-CRITICAL: These are HABITS - ongoing practices users maintain INDEFINITELY. NOT challenges with end dates or targets.
+BE INTELLIGENT - ANALYZE THE USER'S PROFILE:
+You must READ and UNDERSTAND the user's profile to make smart decisions:
 
-APP FEATURES YOU CAN MENTION:
-- Daily/weekly check-ins to track consistency
-- Streak tracking and habit chains to build momentum
-- AI coach sends personalized motivation messages
-- Progress visualization
-- Share progress with community
-- Earn badges and achievements for consistency
-- Gentle reminders at scheduled times
+1. PRIMARY GOAL determines intensity:
+   - "lose_weight" → Daily meal tracking is CRITICAL, daily hydration, consistent workouts
+   - "build_muscle" → Protein-focused meals, strength workouts 4-5x/week
+   - "stay_active" → Flexible scheduling, variety of activities
+   - "improve_endurance" → Cardio focus, progressive training
+   - "reduce_stress" → Daily mindfulness, sleep hygiene, gentle movement
 
-HABIT vs CHALLENGE - KEY DIFFERENCE:
-- HABIT: "Drink 8 glasses of water daily" (ongoing forever)
-- CHALLENGE: "Complete 30-day water challenge" (has an end) ❌ NOT THIS
+2. FITNESS LEVEL determines difficulty:
+   - "beginner" → Start with 2-3 days/week, shorter durations, simple habits
+   - "intermediate" → 3-4 days/week, moderate intensity
+   - "advanced" → 4-5 days/week, complex routines, higher targets
 
-DO NOT generate challenges disguised as habits. Examples of what NOT to do:
-- ❌ "Join the 8-session Saturday challenge" 
-- ❌ "Complete 30 workouts"
-- ❌ "Finish the 4-week program"
+3. BIGGEST CHALLENGE determines support style:
+   - "staying_consistent" → Daily habits with streak tracking
+   - "getting_started" → Easy wins, low barrier to entry
+   - "time" → Quick, efficient habits (under 15 mins)
+   - "lack_of_motivation" → Fun, varied, rewarding goals
+   - "lack_of_knowledge" → Guided, structured goals
 
-CRITICAL FREQUENCY RULES BY CATEGORY:
+4. AVAILABLE TIME determines duration:
+   - "less_30min" → Quick habits, efficient workouts
+   - "30-60min" → Standard workout lengths
+   - "1-2hrs" → Comprehensive routines
 
-⚠️ FITNESS CATEGORY - ALWAYS WEEKLY (NEVER DAILY!):
-- FITNESS goals MUST be frequency="weekly" with target_days=3-5
-- FITNESS goals MUST include days_of_week array (e.g., [1,3,5] for Mon/Wed/Fri)
-- REASON: Bodies need rest days to recover. Nobody works out 7 days a week!
-- NEVER set frequency="daily" for fitness goals!
+5. ⚠️ PREFERRED LOCATION IS A HARD CONSTRAINT (for FITNESS goals):
+   - "home" → ONLY home-based workouts. NO outdoor activities, NO gym machines, NO group sports
+     * MUST use their available_equipment (dumbbells, resistance bands, kettlebells, etc.)
+     * If no equipment: bodyweight exercises only (push-ups, squats, planks, lunges)
+     * Examples: "Dumbbell Strength Circuit", "Resistance Band Training", "Bodyweight HIIT"
+     * ❌ NEVER suggest: outdoor walks, hiking, cycling, team sports, gym machines, parks
+   - "gym" → Can suggest gym equipment, machines, barbells, cable exercises
+   - "outdoor" → Walking, running, cycling, hiking, outdoor activities
+   - "mix" → Can suggest a variety (home, gym, or outdoor) - be flexible
+   - "dont_know" → Default to home-friendly workouts that can be done anywhere
 
-OTHER CATEGORIES - FLEXIBLE SCHEDULING:
-- nutrition: Can be daily (target_days=7) OR weekly (target_days=3-5 for meal prep, cooking habits)
-- wellness: Can be daily (target_days=7) OR weekly (target_days=2-5 for specific routines)
-- mindfulness: Can be daily (target_days=7) OR weekly (target_days=3-5 for meditation practice)
-- sleep: Usually daily (target_days=7) but can be weekly for specific sleep goals
-- custom: Be flexible based on the goal nature
+6. AVAILABLE EQUIPMENT MUST BE USED (for FITNESS goals):
+   - If equipment includes "dumbbell" → Suggest dumbbell-based workouts
+   - If equipment includes "resistance_band" → Suggest band workouts
+   - If equipment includes "kettlebell" → Suggest kettlebell workouts
+   - If equipment includes "yoga_mat" → Suggest yoga, floor exercises, stretching
+   - If equipment includes "pull_up_bar" → Can include pull-ups, hanging exercises
+   - If NO equipment listed → Bodyweight only
 
-BE CREATIVE WITH SCHEDULING - not everything needs to be 7 days!
-- "Sunday Meal Prep" = target_days=1, frequency="weekly", days_of_week=[0]
-- "Weekend Meditation" = target_days=2, frequency="weekly", days_of_week=[0,6]
-- "Morning Journaling MWF" = target_days=3, frequency="weekly", days_of_week=[1,3,5]
-- "Daily Hydration" = target_days=7, frequency="daily", days_of_week=null
+7. ⚠️ FITNESS GOALS = REAL STRUCTURED WORKOUTS ONLY:
+   The plan generator creates ACTUAL workout routines with exercise demos.
+   
+   ✅ GOOD FITNESS GOALS (specific workout types):
+   - "Upper Body Dumbbell Strength" - dumbbells required
+   - "Full Body HIIT Circuit" - bodyweight or equipment
+   - "Core Strength Training" - floor exercises
+   - "Lower Body Resistance Band Workout" - bands required
+   - "Kettlebell Power Circuit" - kettlebell required
+   - "Bodyweight Strength Training" - no equipment
+   - "Push-Pull Strength Split" - compound movements
+   
+   ❌ NEVER SUGGEST (vague, unstructured, or not real workouts):
+   - "Dance party", "Dance breaks", "Dance sessions" - NOT A WORKOUT
+   - "Fun movement", "Movement sessions", "Active breaks" - TOO VAGUE
+   - "Sports with friends", "Team activities" - NOT STRUCTURED
+   - "Walking", "Hiking", "Cycling" - These are OUTDOOR (check location!)
+   - "Stretching only", "Yoga only" - Use category "wellness" instead
+   - Any activity that cannot map to our exercise database
 
-GENERAL RULES:
-- If frequency="weekly" → days_of_week is REQUIRED (array of specific days)
-- If frequency="daily" → days_of_week=null, target_days=7
-- days_of_week array length MUST EQUAL target_days
+FREQUENCY IS DYNAMIC - YOU DECIDE:
+Based on the user's primary_goal, determine the BEST frequency:
 
-DAY OF WEEK NUMBERING (JavaScript convention):
-- 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday
-- Valid values: 0-6 ONLY. Do NOT use 7!
+For NUTRITION (meal tracking):
+- Weight loss goal? → Daily meal logging is essential (7 days)
+- Building muscle? → Focus on protein-rich meals daily
+- General health? → Could be 5 days/week (weekdays only)
+- The AI should decide based on what makes sense for THIS user
 
-REMINDER TIMES - CRITICAL RULES:
-- ALWAYS generate AT LEAST 2 reminder times for each goal
-- Reminder times must be in HH:MM format (24-hour)
-- Consider the user's available_time preference when choosing times
-- Space reminders appropriately (morning + evening, or before/after typical workout times)
-- NEVER suggest reminder times that have already passed TODAY if suggesting today as a workout day
+For HYDRATION:
+- Use their ACTUAL daily_hydration_target_ml if provided
+- Weight loss? → Daily hydration tracking
+- General wellness? → Could be daily or weekdays
 
-TIME-AWARE SCHEDULING:
-- Consider the CURRENT DAY when suggesting days_of_week
-- If suggesting today as a workout day, ensure reminder times are IN THE FUTURE
-- Example: If it's Wednesday 2pm, don't suggest Wednesday with 8am reminder
+For FITNESS (workouts):
+- ALWAYS include rest days (never 7 days/week)
+- Beginner? → 2-3 days/week
+- Intermediate? → 3-4 days/week
+- Advanced? → 4-5 days/week
 
-REQUIRED JSON FORMAT:
+For WELLNESS/MINDFULNESS/SLEEP:
+- Stress reduction goal? → Daily practice
+- General wellness? → 3-5 days/week
+- You decide based on what makes sense
+
+HABIT = ongoing practices users maintain INDEFINITELY (no end dates).
+
+JSON FORMAT:
 {
   "goals": [
     {
-      "title": "Engaging habit title",
-      "description": "Compelling description highlighting benefits of this ONGOING practice.",
-      "category": "fitness|nutrition|wellness|mindfulness|sleep|custom",
-      "frequency": "weekly",  // FITNESS: always "weekly". Others: can be "daily"
-      "target_days": 4,  // FITNESS: 3-5 only. Others: 7 for daily habits
-      "days_of_week": [1, 2, 4, 5],  // REQUIRED for weekly! null only for daily
-      "reminder_times": ["07:00", "18:00"],  // MUST have at least 2 times!
+      "title": "Specific, engaging title",
+      "description": "Compelling description with measurable actions.",
+      "category": "fitness|nutrition|wellness|mindfulness|sleep",
+      "tracking_type": "workout|meal|hydration|checkin",
+      "frequency": "weekly|daily",
+      "target_days": 2-7,
+      "days_of_week": [array] or null,
+      "reminder_times": ["HH:MM", "HH:MM"],
       "goal_type": "habit",
-      "match_reason": "Specific explanation referencing their profile."
+      "match_reason": "Explain specifically why this frequency and schedule is right for THIS user."
     }
   ]
 }
 
-EXAMPLES BY CATEGORY:
-- Fitness (MUST be weekly): target_days=4, frequency="weekly", days_of_week=[1,2,4,5]
-- Fitness 3x week: target_days=3, frequency="weekly", days_of_week=[1,3,5]
-- Nutrition (can be daily): target_days=7, frequency="daily", days_of_week=null
-- Sleep habit (daily): target_days=7, frequency="daily", days_of_week=null
-- Sunday Meal Prep: target_days=1, frequency="weekly", days_of_week=[0]
+⚠️ CATEGORY vs TRACKING_TYPE - CRITICAL DISTINCTION:
+VALID CATEGORIES (only these 5): fitness, nutrition, wellness, mindfulness, sleep
+VALID TRACKING_TYPES (only these 4): workout, meal, hydration, checkin
 
-HABIT GUIDELINES:
-1. Focus on SUSTAINABLE practices - things users can do forever
-2. NO end dates, NO finish lines - just consistent daily/weekly practice
-3. Start small and buildable (e.g., "10 minutes daily" not "1 hour daily")
-4. Use language like "build a routine", "make it a habit", "daily practice"
-5. FITNESS GOALS: Use 3-5 days per week (realistic, allows rest days)
-6. NUTRITION/WELLNESS/SLEEP: 7 days is appropriate (daily habits)
-7. Address the user's BIGGEST CHALLENGE directly in the match_reason
-8. Match their motivation style (data-driven = mention streaks, accountability = mention check-ins)
+❌ "hydration" is NOT a category! It is a tracking_type.
+✅ Water/hydration goals MUST use: category="nutrition", tracking_type="hydration"
+
+TRACKING_TYPE RULES:
+- category="fitness" → tracking_type MUST be "workout"
+- category="nutrition" + water/hydration goal → tracking_type MUST be "hydration"
+- category="nutrition" + food/meal goal → tracking_type MUST be "meal"
+- category="wellness/mindfulness/sleep" → tracking_type MUST be "checkin"
+
+EXAMPLES:
+✅ CORRECT: {"category": "nutrition", "tracking_type": "hydration", "title": "Drink 8 glasses of water"}
+❌ WRONG: {"category": "hydration", "tracking_type": "hydration", "title": "Drink 8 glasses of water"}
+❌ WRONG: {"category": "wellness", "tracking_type": "hydration", "title": "Stay hydrated daily"}
+
+DAY NUMBERING: 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday
+
+RULES:
+- If frequency="weekly" → days_of_week REQUIRED, length must equal target_days
+- If frequency="daily" → days_of_week=null, target_days=7
+- Always include 2+ reminder times in HH:MM format
+- Reminder times must be AFTER current time if suggesting today
+- BE CREATIVE with titles - avoid clichés
+- Use THEIR actual hydration target, not "8 glasses"
+
+⚠️ REQUIRED CATEGORY DIVERSITY - MUST include ALL of these:
+- 2-3 FITNESS goals (tracking_type: workout)
+- 2-3 NUTRITION goals (1-2 meal tracking, 1 hydration)
+- 2-3 WELLNESS/MINDFULNESS/SLEEP goals (tracking_type: checkin)
+
+DO NOT generate only fitness goals! A complete habit plan needs nutrition, hydration, and wellness too.
 """
 
-TIME_CHALLENGE_SYSTEM_PROMPT = """You are an expert fitness coach creating TIME-BASED CHALLENGE goals for an AI-powered fitness app.
+TIME_CHALLENGE_SYSTEM_PROMPT = """You are an expert fitness coach. ANALYZE the user's profile to create INTELLIGENT time-based challenges.
 
-IMPORTANT: These are CHALLENGES with specific durations (30, 60, or 90 days).
-Users complete them when the time period ends - finite commitment with a clear finish line.
+BE INTELLIGENT - ANALYZE THE USER'S PROFILE:
 
-APP FEATURES YOU CAN MENTION:
-- Daily check-ins to track progress through the challenge
-- Day counter showing "Day X of Y"
-- AI coach sends motivation based on progress
-- Share progress with community
-- Earn badges when challenge is completed
-- Celebration when challenge is completed
-- Progress bar visualization
+1. PRIMARY GOAL determines challenge focus:
+   - "lose_weight" → 30-day calorie deficit challenge, daily meal tracking, cardio focus
+   - "build_muscle" → 60-day strength building, protein targets
+   - "stay_active" → 30-day movement challenge, variety of activities
+   - "reduce_stress" → 30-day mindfulness journey, sleep improvement
 
-CRITICAL FREQUENCY RULES BY CATEGORY:
+2. FITNESS LEVEL determines intensity:
+   - "beginner" → Shorter challenges (30 days), fewer days/week, achievable targets
+   - "intermediate" → Medium challenges (30-60 days), moderate frequency
+   - "advanced" → Longer challenges (60-90 days), higher frequency
 
-⚠️ FITNESS CATEGORY - ALWAYS WEEKLY (NEVER DAILY!):
-- FITNESS challenges MUST be frequency="weekly" with target_days=3-5
-- FITNESS challenges MUST include days_of_week array
-- REASON: Bodies need rest days! A "30-Day Workout Challenge" still needs rest days!
-- Example: "30-Day Strength Challenge" = 30 days duration, but workout 4x/week (not daily!)
+3. BIGGEST CHALLENGE determines structure:
+   - "staying_consistent" → Challenges with streak bonuses
+   - "time" → Quick daily challenges (under 15 mins)
+   - "lack_of_motivation" → Fun themed challenges with rewards
 
-OTHER CATEGORIES - FLEXIBLE SCHEDULING:
-- nutrition: Can be daily (target_days=7) OR weekly (target_days=1-5 for meal prep challenges)
-- wellness/mindfulness: Can be daily OR weekly (target_days=3-5 for practice-based challenges)
-- sleep: Usually daily but can be weekly for specific sleep improvement challenges
-- custom: Be flexible based on challenge nature
+4. ⚠️ PREFERRED LOCATION IS A HARD CONSTRAINT (for FITNESS challenges):
+   - "home" → ONLY home-based workouts using their equipment. NO outdoor, NO gym, NO group sports
+   - "gym" → Can suggest gym equipment and machines
+   - "outdoor" → Walking, running, cycling, outdoor activities
+   - "mix" → Flexible - can suggest variety
+   - "dont_know" → Default to home-friendly workouts
 
-VARIETY IS KEY - generate challenges with different scheduling patterns!
+5. AVAILABLE EQUIPMENT (for FITNESS challenges):
+   - Use their listed equipment for home workouts
+   - If no equipment: bodyweight exercises only
 
-GENERAL RULES:
-- If frequency="weekly" → days_of_week is REQUIRED (must return the array!)
-- If frequency="daily" → days_of_week=null, target_days=7
-- days_of_week array length MUST EQUAL target_days
+6. ⚠️ FITNESS CHALLENGES = REAL STRUCTURED WORKOUTS:
+   ✅ GOOD: "30-Day Strength Building", "60-Day HIIT Challenge", "Core Power Challenge"
+   ❌ BAD: "Dance party challenge", "Fun movement challenge", "Active breaks challenge"
 
-DAY OF WEEK NUMBERING (JavaScript convention):
-- 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday
-- Valid values: 0-6 ONLY. Do NOT use 7!
+FREQUENCY IS DYNAMIC - YOU DECIDE:
+- Workout challenges: 3-5 days/week (NEVER 7 - rest days required!)
+- Nutrition challenges: Daily for weight loss, or 5-6 days for general health
+- Mindfulness challenges: Daily for stress reduction, 3-5 days otherwise
+- The AI determines what's BEST for THIS user
 
-VARIETY IN CATEGORIES:
-Generate challenges for DIFFERENT categories based on user profile - not just fitness!
-Include: nutrition challenges, sleep challenges, wellness challenges, mindfulness challenges.
+TIME CHALLENGES = specific durations (30, 60, or 90 days) with clear finish line.
 
-REMINDER TIMES - CRITICAL RULES:
-- ALWAYS generate AT LEAST 2 reminder times for each goal
-- Reminder times must be in HH:MM format (24-hour)
-- Consider the user's available_time preference when choosing times
-- Space reminders appropriately (morning + evening, or before/after typical workout times)
-- NEVER suggest reminder times that have already passed TODAY if suggesting today as a workout day
-
-TIME-AWARE SCHEDULING:
-- Consider the CURRENT DAY when suggesting days_of_week
-- If suggesting today as a workout day, ensure reminder times are IN THE FUTURE
-- Example: If it's Wednesday 2pm, don't suggest Wednesday with 8am reminder
-
-REQUIRED JSON FORMAT:
+JSON FORMAT:
 {
   "goals": [
     {
-      "title": "Challenge title",
-      "description": "Compelling description with clear commitment and what they'll achieve.",
-      "category": "fitness|nutrition|wellness|mindfulness|sleep|custom",
-      "frequency": "weekly",  // FITNESS: always "weekly". Others: can be "daily"
-      "target_days": 4,  // FITNESS: 3-5 only! Others: 7 for daily
-      "days_of_week": [1, 3, 4, 6],  // REQUIRED for weekly frequency! null only for daily
-      "reminder_times": ["07:00", "18:00"],  // MUST have at least 2 times!
+      "title": "Specific, inspiring challenge title",
+      "description": "Clear commitment and what they'll achieve.",
+      "category": "fitness|nutrition|wellness|mindfulness|sleep",
+      "tracking_type": "workout|meal|hydration|checkin",
+      "frequency": "weekly|daily",
+      "target_days": 2-7,
+      "days_of_week": [array] or null,
+      "reminder_times": ["HH:MM", "HH:MM"],
       "goal_type": "time_challenge",
-      "duration_days": 30,  // 30, 60, or 90
+      "duration_days": 30|60|90,
       "is_challenge_candidate": true,
-      "sharing_recommendation": "great_for_friends",
-      "match_reason": "Specific explanation referencing their profile."
+      "sharing_recommendation": "great_for_friends|good_for_competition",
+      "match_reason": "Explain why this duration and frequency is optimal for THIS user."
     }
   ]
 }
 
-EXAMPLES BY CATEGORY:
-- 30-Day Fitness Challenge: category="fitness", target_days=4, frequency="weekly", days_of_week=[1,3,5,6]
-- 30-Day Meditation Challenge: category="mindfulness", target_days=7, frequency="daily", days_of_week=null
-- 60-Day Sleep Challenge: category="sleep", target_days=7, frequency="daily", days_of_week=null
-- 30-Day Hydration Challenge: category="nutrition", target_days=7, frequency="daily", days_of_week=null
-- 30-Day Yoga Challenge: category="wellness", target_days=5, frequency="weekly", days_of_week=[1,2,3,4,5]
+⚠️ CATEGORY vs TRACKING_TYPE:
+VALID CATEGORIES: fitness, nutrition, wellness, mindfulness, sleep
+❌ "hydration" is NOT a category! It is a tracking_type.
+✅ Water goals MUST use: category="nutrition", tracking_type="hydration"
 
-TIME CHALLENGE GUIDELINES:
-1. Clear duration: 30, 60, or 90 days
-2. VARY THE CATEGORIES based on user profile - not just fitness!
-3. FITNESS challenges: MUST be weekly with 3-5 days (rest days required!)
-4. NON-FITNESS challenges: Can be daily (7 days)
-5. Match difficulty to their fitness level
+TRACKING_TYPE:
+- category="fitness" → tracking_type="workout"
+- category="nutrition" + water goal → tracking_type="hydration"
+- category="nutrition" + food goal → tracking_type="meal"
+- category="wellness/mindfulness/sleep" → tracking_type="checkin"
+
+DAY NUMBERING: 0=Sunday through 6=Saturday
+RULES: weekly needs days_of_week array, daily uses null
+Always 2+ reminder times
+
+⚠️ REQUIRED CATEGORY DIVERSITY - MUST include variety:
+- 2-3 FITNESS challenges (tracking_type: workout)
+- 2-3 NUTRITION challenges (meal or hydration tracking)
+- 2-3 WELLNESS/MINDFULNESS challenges (tracking_type: checkin)
+
+DO NOT generate only fitness challenges!
 """
 
-TARGET_CHALLENGE_SYSTEM_PROMPT = """You are an expert fitness coach creating TARGET-BASED CHALLENGE goals for an AI-powered fitness app.
+TARGET_CHALLENGE_SYSTEM_PROMPT = """You are an expert fitness coach. ANALYZE the user's profile to create INTELLIGENT target-based challenges.
 
-IMPORTANT: These are CHALLENGES with specific check-in targets.
-Users complete them when they reach the target number of CHECK-INS - at their own pace, no time pressure.
-Each time the user checks in, it counts toward their target (e.g., "15/50 completed").
+BE INTELLIGENT - ANALYZE THE USER'S PROFILE:
 
-APP FEATURES YOU CAN MENTION:
-- Check-in counter showing "X of Y completed"
-- Progress bar towards the target
-- AI coach sends motivation based on progress
-- Share progress with community
-- Earn badges when target is reached
-- Celebration when target is reached
-- No time pressure - complete at your own pace
+1. PRIMARY GOAL determines target type:
+   - "lose_weight" → Daily meal logging targets, high-frequency hydration
+   - "build_muscle" → Workout session targets, protein meal counts
+   - "stay_active" → Activity variety targets, movement goals
+   - "reduce_stress" → Mindfulness session targets, sleep quality targets
 
-CRITICAL FREQUENCY RULES BY CATEGORY:
+2. FITNESS LEVEL determines target size:
+   - "beginner" → Lower targets (15-25), achievable to build confidence
+   - "intermediate" → Medium targets (30-50)
+   - "advanced" → Higher targets (50-75), more ambitious
 
-⚠️ FITNESS CATEGORY - ALWAYS WEEKLY (NEVER DAILY!):
-- FITNESS challenges MUST be frequency="weekly" with target_days=3-5
-- FITNESS challenges MUST include days_of_week array (REQUIRED!)
-- REASON: Bodies need rest days! "Complete 50 Workouts" still needs rest days between workouts!
+3. Calculate REALISTIC targets based on frequency:
+   - If frequency is 4 days/week over 30 days → max ~16 check-ins
+   - If frequency is 7 days/week over 30 days → max 30 check-ins
+   - Target should be 70-85% of max to be achievable
 
-OTHER CATEGORIES - FLEXIBLE SCHEDULING (BE CREATIVE!):
-- nutrition: Can be daily (target_days=7) OR weekly (meal prep, specific eating habits)
-- wellness: Can be daily OR weekly (target_days=2-5 for yoga, stretching, etc.)
-- mindfulness: Can be daily OR weekly (target_days=3-5 for meditation practice)
-- sleep: Usually daily but can vary based on specific sleep goals
+4. ⚠️ PREFERRED LOCATION IS A HARD CONSTRAINT (for FITNESS challenges):
+   - "home" → ONLY home-based workouts using their equipment. NO outdoor, NO gym, NO group sports
+   - "gym" → Can suggest gym equipment and machines
+   - "outdoor" → Walking, running, cycling, outdoor activities
+   - "mix" → Flexible - can suggest variety
+   - "dont_know" → Default to home-friendly workouts
 
-GENERAL RULES:
-- If frequency="weekly" → days_of_week is REQUIRED (you MUST return the array!)
-- If frequency="daily" → days_of_week=null, target_days=7
-- days_of_week array length MUST EQUAL target_days
+5. AVAILABLE EQUIPMENT (for FITNESS challenges):
+   - Use their listed equipment for home workouts
+   - If no equipment: bodyweight exercises only
 
-DAY OF WEEK NUMBERING (JavaScript convention):
-- 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday
-- Valid values: 0-6 ONLY. Do NOT use 7!
+6. ⚠️ FITNESS CHALLENGES = REAL STRUCTURED WORKOUTS:
+   ✅ GOOD: "Complete 50 Strength Workouts", "25 HIIT Sessions Challenge"
+   ❌ BAD: "Dance sessions target", "Fun movement goal", "Active minutes target"
 
-VARIETY IS KEY:
-- Generate challenges for DIFFERENT categories based on user profile - not just fitness!
-- Include: nutrition challenges, sleep challenges, wellness challenges, mindfulness challenges
-- Use DIFFERENT scheduling patterns - not everything should be 7 days!
-- Examples: Weekend cooking challenge (2 days), Weekday meditation (5 days), etc.
+FREQUENCY IS DYNAMIC - YOU DECIDE:
+- Workout targets: 3-5 days/week (rest days required!)
+- Meal logging for weight loss: Daily (7 days)
+- Hydration for weight loss: Daily (7 days)
+- Mindfulness: Daily for stress, 3-5 days otherwise
+- The AI determines what's BEST for THIS user's goal
 
-REMINDER TIMES - CRITICAL RULES:
-- ALWAYS generate AT LEAST 2 reminder times for each goal
-- Reminder times must be in HH:MM format (24-hour)
-- Consider the user's available_time preference when choosing times
-- Space reminders appropriately (morning + evening, or before/after typical workout times)
-- NEVER suggest reminder times that have already passed TODAY if suggesting today as a workout day
+TARGET CHALLENGES = specific check-in count (user progresses at own pace).
 
-TIME-AWARE SCHEDULING:
-- Consider the CURRENT DAY when suggesting days_of_week
-- If suggesting today as a workout day, ensure reminder times are IN THE FUTURE
-- Example: If it's Wednesday 2pm, don't suggest Wednesday with 8am reminder
-
-REQUIRED JSON FORMAT:
+JSON FORMAT:
 {
   "goals": [
     {
-      "title": "Target challenge title",
-      "description": "Compelling description. User checks in each time, counting toward their target.",
-      "category": "fitness|nutrition|wellness|mindfulness|sleep|custom",
-      "frequency": "weekly",  // FITNESS: always "weekly". Others: can be "daily"
-      "target_days": 4,  // FITNESS: 3-5 only! Others: 7 for daily
-      "days_of_week": [1, 3, 5, 6],  // REQUIRED for weekly frequency! null only for daily
-      "reminder_times": ["07:00", "18:00"],  // MUST have at least 2 times!
+      "title": "Specific, achievable target title",
+      "description": "What counts as a check-in and what they'll achieve.",
+      "category": "fitness|nutrition|wellness|mindfulness|sleep",
+      "tracking_type": "workout|meal|hydration|checkin",
+      "frequency": "weekly|daily",
+      "target_days": 2-7,
+      "days_of_week": [array] or null,
+      "reminder_times": ["HH:MM", "HH:MM"],
       "goal_type": "target_challenge",
-      "target_checkins": 20,  // Any reasonable number achievable within duration
+      "target_checkins": calculated_realistic_number,
       "is_challenge_candidate": true,
       "sharing_recommendation": "good_for_competition",
-      "match_reason": "Specific explanation referencing their profile."
+      "match_reason": "Explain why this target count is achievable for THIS user."
     }
   ]
 }
 
-EXAMPLES BY CATEGORY (with realistic targets based on achievable check-ins):
-- Complete 16 Workouts in 30 Days: category="fitness", target_days=4, frequency="weekly", days_of_week=[1,3,5,6], target_checkins=16
-- 60 Meditation Sessions in 60 Days: category="mindfulness", target_days=7, frequency="daily", days_of_week=null, target_checkins=60
-- Log 25 Healthy Meals in 30 Days: category="nutrition", target_days=7, frequency="daily", days_of_week=null, target_checkins=25
-- 40 Yoga Sessions in 60 Days: category="wellness", target_days=5, frequency="weekly", days_of_week=[1,2,3,4,5], target_checkins=40
+⚠️ CATEGORY vs TRACKING_TYPE:
+VALID CATEGORIES: fitness, nutrition, wellness, mindfulness, sleep
+❌ "hydration" is NOT a category! It is a tracking_type.
+✅ Water goals MUST use: category="nutrition", tracking_type="hydration"
 
-TARGET CHALLENGE GUIDELINES:
-1. Clear numeric target based on REALISTIC duration
-2. VARY THE CATEGORIES based on user profile - not just fitness!
-3. FITNESS challenges: MUST be weekly with 3-5 days and days_of_week array!
-4. NON-FITNESS challenges: Can be daily (7 days, days_of_week=null)
-5. Match target difficulty to their fitness level
+TRACKING_TYPE:
+- category="fitness" → tracking_type="workout"
+- category="nutrition" + water goal → tracking_type="hydration"
+- category="nutrition" + food goal → tracking_type="meal"
+- category="wellness/mindfulness/sleep" → tracking_type="checkin"
 
-CRITICAL: TARGET MUST BE ACHIEVABLE!
-- For target challenges, assume a duration (30, 60, or 90 days)
-- Calculate maximum possible check-ins: (workout_days_per_week × weeks) × reminder_times_per_day
-- Example: 4 days/week × 4 weeks × 1 reminder = 16 max check-ins in 30 days
-- Example: 4 days/week × 8 weeks × 1 reminder = 32 max check-ins in 60 days
-- Example: 5 days/week × 13 weeks × 1 reminder = 65 max check-ins in 90 days
-- NEVER suggest target_checkins higher than what's achievable!
-- For 30-day fitness: max target ~16-20 (4-5 days/week)
-- For 60-day fitness: max target ~32-40 (4-5 days/week)
-- For 90-day fitness: max target ~50-65 (4-5 days/week)
-- For daily (7 days/week): 30-day = 30 max, 60-day = 60 max, 90-day = 90 max
+DAY NUMBERING: 0=Sunday through 6=Saturday
+RULES: weekly needs days_of_week array, daily uses null
+Always 2+ reminder times
+
+⚠️ REQUIRED CATEGORY DIVERSITY - MUST include variety:
+- 2-3 FITNESS challenges (tracking_type: workout)
+- 2-3 NUTRITION challenges (meal or hydration tracking)
+- 2-3 WELLNESS challenges (tracking_type: checkin)
+
+DO NOT generate only fitness challenges!
 """
 
-MIXED_SYSTEM_PROMPT = """You are an expert fitness coach creating a MIX of goal types for an AI-powered fitness app.
+MIXED_SYSTEM_PROMPT = """You are an expert fitness coach. ANALYZE the user's profile to create an INTELLIGENT mix of goals.
 
-Generate a VARIETY of goals including:
-- 2 HABITS (ongoing practices, no end date - things they do forever)
-- 2 TIME CHALLENGES (30/60/90 day commitments with clear end)
-- 1 TARGET CHALLENGE (specific number of check-ins to achieve at their pace)
+BE INTELLIGENT - ANALYZE THE USER'S PROFILE:
 
-APP FEATURES YOU CAN MENTION:
-- Daily/weekly check-ins to track progress
-- Streak tracking for habits
-- Progress counters for challenges
-- AI coach sends personalized motivation
-- Share progress with community
-- Earn badges and achievements
-- Celebrations when goals are completed
+1. PRIMARY GOAL is your #1 guide:
+   - "lose_weight" → DAILY meal tracking, DAILY hydration, 4x/week cardio/strength
+   - "build_muscle" → Protein-focused meals, strength 4-5x/week, recovery days
+   - "stay_active" → Varied activities, flexible scheduling
+   - "improve_endurance" → Progressive cardio, consistent training
+   - "reduce_stress" → DAILY mindfulness, sleep hygiene, gentle movement
 
-CRITICAL FREQUENCY RULES BY CATEGORY (APPLIES TO ALL GOAL TYPES):
+2. FITNESS LEVEL determines intensity:
+   - "beginner" → Fewer days/week, shorter durations, achievable targets
+   - "intermediate" → Moderate frequency and intensity
+   - "advanced" → Higher frequency, longer durations, ambitious targets
 
-⚠️ FITNESS CATEGORY - ALWAYS WEEKLY (NEVER DAILY!):
-- ALL fitness goals (habit, time_challenge, target_challenge) MUST be frequency="weekly"
-- FITNESS goals MUST have target_days=3-5 and days_of_week array
-- REASON: Bodies need rest days! Nobody works out 7 days a week!
+3. BIGGEST CHALLENGE shapes approach:
+   - "staying_consistent" → Daily habits with streaks, visual progress
+   - "getting_started" → Easy wins, low barriers
+   - "time" → Quick, efficient habits (15 mins or less)
+   - "lack_of_motivation" → Fun, varied, gamified goals
 
-OTHER CATEGORIES - FLEXIBLE SCHEDULING (BE CREATIVE!):
-- nutrition: Can be daily (target_days=7) OR weekly (target_days=1-5 for meal prep, cooking habits)
-- wellness: Can be daily OR weekly (target_days=2-5 for yoga, stretching, self-care)
-- mindfulness: Can be daily OR weekly (target_days=3-5 for meditation, journaling)
-- sleep: Usually daily but can vary based on specific sleep goals
+4. ⚠️ PREFERRED LOCATION IS A HARD CONSTRAINT (for FITNESS goals):
+   - "home" → ONLY home-based workouts using their equipment. NO outdoor, NO gym, NO group sports
+     * Examples: "Dumbbell Strength Circuit", "Resistance Band Training", "Bodyweight HIIT"
+     * ❌ NEVER suggest: outdoor walks, hiking, cycling, team sports, gym machines
+   - "gym" → Can suggest gym equipment and machines
+   - "outdoor" → Walking, running, cycling, outdoor activities
+   - "mix" → Flexible - can suggest variety
+   - "dont_know" → Default to home-friendly workouts
 
-VARIETY IS KEY - generate goals with DIFFERENT scheduling patterns:
-- Not everything should be 7 days!
-- Include some 2-3 day/week goals (weekend routines, MWF patterns)
-- Include some daily habits where appropriate
-- Be creative with scheduling!
+5. AVAILABLE EQUIPMENT (for FITNESS goals):
+   - MUST use their listed equipment for home workouts
+   - If no equipment: bodyweight exercises only
 
-GENERAL RULES:
-- If frequency="weekly" → days_of_week is REQUIRED (you MUST return the array!)
-- If frequency="daily" → days_of_week=null, target_days=7
-- days_of_week array length MUST EQUAL target_days
+6. ⚠️ FITNESS GOALS = REAL STRUCTURED WORKOUTS ONLY:
+   The plan generator creates ACTUAL workout routines with exercise demos.
+   
+   ✅ GOOD FITNESS GOALS (specific workout types):
+   - "Upper Body Dumbbell Strength", "Full Body HIIT", "Core Strength Training"
+   - "Lower Body Resistance Band Workout", "Kettlebell Circuit", "Bodyweight Training"
+   
+   ❌ NEVER SUGGEST (vague or not real workouts):
+   - "Dance party", "Dance breaks", "Fun movement", "Active breaks" - NOT WORKOUTS
+   - "Sports with friends", "Team activities" - NOT STRUCTURED
+   - "Walking", "Hiking" - Check location constraint first!
 
-DAY OF WEEK NUMBERING (JavaScript convention):
-- 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday
-- Valid values: 0-6 ONLY. Do NOT use 7!
+FREQUENCY IS 100% DYNAMIC - YOU DECIDE BASED ON PROFILE:
+- Someone trying to lose weight needs DAILY meal and hydration tracking
+- Someone just staying active might only need 3-4 days of meal logging
+- Workouts: 3-5 days/week (NEVER 7 - rest days required!)
+- Mindfulness: Daily for stress goals, 3-5 days for general wellness
+- YOU determine what's optimal for THIS specific user
 
-KEY DISTINCTIONS:
-- HABIT: Ongoing forever - no end date
-- TIME CHALLENGE: Fixed duration (30/60/90 days) - has finish line
-- TARGET CHALLENGE: Specific check-in count (25/50/75/100) - at their own pace
+Generate a VARIETY:
+- 3-4 HABITS (ongoing forever)
+- 3-4 TIME CHALLENGES (30/60/90 days)
+- 2-3 TARGET CHALLENGES (specific counts)
 
-REMINDER TIMES - CRITICAL RULES:
-- ALWAYS generate AT LEAST 2 reminder times for each goal
-- Reminder times must be in HH:MM format (24-hour)
-- Consider the user's available_time preference when choosing times
-- Space reminders appropriately (morning + evening, or before/after typical workout times)
-- NEVER suggest reminder times that have already passed TODAY if suggesting today as a workout day
+GOAL TYPES:
+- HABIT: Ongoing forever, no end date
+- TIME_CHALLENGE: Fixed duration (30/60/90 days)
+- TARGET_CHALLENGE: Specific check-in count at own pace
 
-TIME-AWARE SCHEDULING:
-- Consider the CURRENT DAY when suggesting days_of_week
-- If suggesting today as a workout day, ensure reminder times are IN THE FUTURE
-- Example: If it's Wednesday 2pm, don't suggest Wednesday with 8am reminder
-
-REQUIRED JSON FORMAT - Include goal_type for each:
+JSON FORMAT:
 {
   "goals": [
     {
-      "title": "Goal title",
-      "description": "Description mentioning relevant tracking features",
-      "category": "fitness|nutrition|wellness|mindfulness|sleep|custom",
-      "frequency": "weekly",  // FITNESS: always "weekly". Others: can be "daily"
-      "target_days": 4,  // FITNESS: 3-5 only! Others: 7 for daily
-      "days_of_week": [1, 3, 5, 6],  // REQUIRED for weekly! null only for daily
-      "reminder_times": ["07:00", "18:00"],  // MUST have at least 2 times!
+      "title": "Specific, engaging title",
+      "description": "Personalized description",
+      "category": "fitness|nutrition|wellness|mindfulness|sleep",
+      "tracking_type": "workout|meal|hydration|checkin",
+      "frequency": "weekly|daily",
+      "target_days": 2-7,
+      "days_of_week": [array] or null,
+      "reminder_times": ["HH:MM", "HH:MM"],
       "goal_type": "habit|time_challenge|target_challenge",
-      "duration_days": 30,  // Only for time_challenge
-      "target_checkins": 50,  // Only for target_challenge
-      "is_challenge_candidate": false,  // true for time_challenge and target_challenge
-      "sharing_recommendation": null,  // "great_for_friends" or "good_for_competition" for challenges
-      "match_reason": "Specific explanation referencing their profile."
+      "duration_days": 30|60|90,  // Only for time_challenge
+      "target_checkins": number,  // Only for target_challenge
+      "is_challenge_candidate": true|false,
+      "sharing_recommendation": "great_for_friends|good_for_competition"|null,
+      "match_reason": "Explain why this frequency/schedule is optimal for THIS user's primary goal."
     }
   ]
 }
 
-MIXED GUIDELINES:
-1. VARY CATEGORIES - include fitness, nutrition, sleep, wellness, mindfulness goals!
-2. Label each with correct goal_type - be accurate!
-3. FITNESS GOALS: MUST be weekly with 3-5 days and days_of_week array!
-4. NON-FITNESS GOALS: Can be daily (7 days, days_of_week=null)
-5. Include duration_days ONLY for time_challenge (30, 60, or 90)
-6. Include target_checkins ONLY for target_challenge (25, 50, 75, or 100)
-7. Address the user's biggest challenge in match_reasons
+⚠️ CATEGORY vs TRACKING_TYPE:
+VALID CATEGORIES: fitness, nutrition, wellness, mindfulness, sleep
+❌ "hydration" is NOT a category! It is a tracking_type.
+✅ Water goals MUST use: category="nutrition", tracking_type="hydration"
+
+TRACKING_TYPE:
+- category="fitness" → tracking_type="workout"
+- category="nutrition" + water goal → tracking_type="hydration" (use THEIR target!)
+- category="nutrition" + food goal → tracking_type="meal"
+- category="wellness/mindfulness/sleep" → tracking_type="checkin"
+
+DAY NUMBERING: 0=Sunday through 6=Saturday
+RULES: weekly needs days_of_week array, daily uses null
+Always 2+ reminder times
+
+⚠️ REQUIRED CATEGORY DIVERSITY - Generate a BALANCED mix:
+HABITS (3-4 total):
+- 1-2 FITNESS habits (tracking_type: workout)
+- 1 NUTRITION habit (meal tracking)
+- 1 HYDRATION habit (tracking_type: hydration)
+- 1 WELLNESS/MINDFULNESS habit (tracking_type: checkin)
+
+TIME CHALLENGES (3-4 total):
+- 1-2 FITNESS challenges
+- 1 NUTRITION challenge
+- 1 WELLNESS challenge
+
+TARGET CHALLENGES (2-3 total):
+- 1 FITNESS challenge
+- 1 NUTRITION challenge
+- 1 WELLNESS challenge
+
+DO NOT generate only one category! Users need variety.
 """
+
+
+def _fetch_existing_goals(supabase, user_id: str) -> List[str]:
+    """Fetch titles of user's existing goals to avoid duplicates."""
+    try:
+        result = (
+            supabase.table("goals")
+            .select("title, category")
+            .eq("user_id", user_id)
+            .in_("status", ["active", "paused"])
+            .execute()
+        )
+        if result.data:
+            return [
+                f"{g.get('title', '')} ({g.get('category', '')})" for g in result.data
+            ]
+    except Exception as e:
+        logger.warning(f"Failed to fetch existing goals: {e}")
+    return []
+
+
+def _fetch_user_country(supabase, user_id: str) -> Optional[str]:
+    """Fetch user's country for culturally relevant suggestions."""
+    try:
+        result = (
+            supabase.table("users")
+            .select("country")
+            .eq("id", user_id)
+            .maybe_single()
+            .execute()
+        )
+        if result.data:
+            return result.data.get("country")
+    except Exception as e:
+        logger.warning(f"Failed to fetch user country: {e}")
+    return None
 
 
 def build_user_context(
     profile: Dict[str, Any],
     user_timezone: Optional[str] = None,
     current_time: Optional[datetime] = None,
+    existing_goals: Optional[List[str]] = None,
+    user_country: Optional[str] = None,
 ) -> str:
     """Build user context string from fitness profile with time awareness."""
     fitness_level = profile.get("fitness_level", "beginner")
@@ -416,6 +517,12 @@ def build_user_context(
     available_time = profile.get("available_time", "30-60min")
     motivation_style = profile.get("motivation_style", "gentle_encouragement")
     biggest_challenge = profile.get("biggest_challenge", "staying_consistent")
+
+    # Get additional profile data for personalization
+    biological_sex = profile.get("biological_sex")
+    hydration_target = profile.get("daily_hydration_target_ml")
+    equipment = profile.get("equipment", [])
+    interests = profile.get("interests", [])
 
     # Map challenge to actionable advice
     challenge_advice = {
@@ -494,6 +601,64 @@ CURRENT TIME CONTEXT (USER'S LOCAL TIME):
             "Suggest flexible morning (08:00) and evening (18:00) options."
         )
 
+    # Build existing goals context to avoid duplicates
+    existing_goals_context = ""
+    if existing_goals and len(existing_goals) > 0:
+        existing_goals_context = f"""
+⚠️ USER'S EXISTING GOALS (DO NOT DUPLICATE):
+{chr(10).join(f"- {g}" for g in existing_goals[:10])}
+
+DO NOT suggest goals similar to the above! Generate DIFFERENT goals."""
+
+    # Build personalization context
+    personalization_context = ""
+    if biological_sex:
+        personalization_context += f"\n- Biological Sex: {biological_sex}"
+    if hydration_target:
+        personalization_context += f"\n- Daily Hydration Target: {hydration_target}ml (use THIS number, not generic '8 glasses')"
+    if equipment and len(equipment) > 0:
+        personalization_context += f"\n- Available Equipment: {', '.join(equipment)}"
+    if interests and len(interests) > 0:
+        personalization_context += f"\n- Interests: {', '.join(interests)}"
+    if user_country:
+        personalization_context += f"\n- Country: {user_country} (suggest culturally relevant activities/foods)"
+
+    # Build location constraint reminder (critical for fitness goals)
+    location_constraint = ""
+    equipment_list = ", ".join(equipment) if equipment else "bodyweight only"
+    if preferred_location == "home":
+        location_constraint = f"""
+🚨 CRITICAL LOCATION CONSTRAINT: HOME ONLY
+This user ONLY works out at home. For ALL fitness goals:
+- ✅ ONLY suggest: home workouts using their equipment ({equipment_list})
+- ✅ Examples: "Dumbbell Full Body Workout", "Resistance Band Strength", "Bodyweight HIIT", "Kettlebell Circuit"
+- ❌ NEVER suggest: outdoor walks, hiking, cycling, running outside, parks, team sports, gym machines, group activities
+- The plan generator will create workout routines with video demos - suggest WORKOUT TYPES, not vague activities"""
+    elif preferred_location == "gym":
+        location_constraint = """
+🏋️ PREFERRED LOCATION: GYM
+This user prefers gym workouts. Can suggest:
+- Gym machines, barbells, cable exercises, bench press, squat rack
+- Structured gym routines"""
+    elif preferred_location == "outdoor":
+        location_constraint = """
+🌳 PREFERRED LOCATION: OUTDOOR
+This user prefers outdoor activities. Can suggest:
+- Walking, running, cycling, hiking, outdoor sports
+- Park workouts, trail activities"""
+    elif preferred_location == "mix":
+        location_constraint = f"""
+🔄 PREFERRED LOCATION: MIX
+This user is flexible with locations. Can suggest variety:
+- Home workouts (using: {equipment_list})
+- Outdoor activities
+- Gym workouts if applicable"""
+    else:  # dont_know or any other value
+        location_constraint = f"""
+❓ PREFERRED LOCATION: NOT SPECIFIED
+Default to home-friendly workouts that can be done anywhere.
+If suggesting fitness goals, use bodyweight or their equipment: {equipment_list}"""
+
     return f"""USER PROFILE:
 - Fitness Level: {fitness_level}
 - Primary Goal: {primary_goal}
@@ -501,8 +666,11 @@ CURRENT TIME CONTEXT (USER'S LOCAL TIME):
 - Preferred Workout Location: {preferred_location}
 - Available Time: {available_time}
 - Motivation Style: {motivation_style}
-- Biggest Challenge: {biggest_challenge}
+- Biggest Challenge: {biggest_challenge}{personalization_context}
 {time_context}
+{existing_goals_context}
+{location_constraint}
+
 REMINDER TIME SUGGESTIONS:
 {time_suggestions}
 Remember: Generate AT LEAST 2 reminder times per goal!
@@ -513,9 +681,16 @@ CRITICAL - ADDRESS THEIR CHALLENGE:
 MOTIVATION STYLE GUIDANCE:
 {motivation_tip}
 
-Generate goals that DIRECTLY address their "{biggest_challenge}" challenge.
-Each match_reason must explain specifically HOW the goal helps with this challenge.
-Consider their {fitness_level} level and {available_time} time availability."""
+🎯 PERSONALIZATION REQUIREMENTS:
+1. Generate goals that DIRECTLY address their "{biggest_challenge}" challenge
+2. Each match_reason must explain specifically HOW the goal helps THIS user
+3. Consider their {fitness_level} level and {available_time} time availability
+4. If they have a hydration target, use THAT number (not generic "8 glasses")
+5. Suggest activities/foods relevant to their country if provided
+6. DO NOT repeat any goals they already have
+7. BE CREATIVE - avoid cliché suggestions like "Morning stretching", "Gratitude journaling", "Sunday meal prep"
+8. Vary the days_of_week - not everything should be on the same days!
+9. FOR FITNESS GOALS: Respect the location constraint above - NO outdoor/gym if location is "home"!"""
 
 
 async def generate_goals_by_type(
@@ -525,6 +700,7 @@ async def generate_goals_by_type(
     target_range: Optional[str] = None,
     user_timezone: Optional[str] = None,
     current_time: Optional[datetime] = None,
+    user_id: Optional[str] = None,
 ) -> Optional[List[Dict[str, Any]]]:
     """
     Generate goal suggestions based on goal type.
@@ -536,14 +712,25 @@ async def generate_goals_by_type(
         target_range: For target_challenge - 'small', 'medium', 'ambitious'
         user_timezone: User's timezone (e.g., 'America/New_York')
         current_time: Current UTC time
+        user_id: User's ID for fetching existing goals
 
     Returns:
         List of goal suggestions with goal_type field
     """
     from openai import AsyncOpenAI
+    from app.core.database import get_supabase_client
 
     try:
         client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+
+        # Fetch existing goals and user data to avoid duplicates and personalize
+        existing_goals: List[str] = []
+        user_country: Optional[str] = None
+
+        if user_id:
+            supabase = get_supabase_client()
+            existing_goals = _fetch_existing_goals(supabase, user_id)
+            user_country = _fetch_user_country(supabase, user_id)
 
         # Use current UTC time if not provided
         if current_time is None:
@@ -566,11 +753,59 @@ async def generate_goals_by_type(
             system_prompt = MIXED_SYSTEM_PROMPT
             extra_context = ""
 
-        user_context = build_user_context(profile, user_timezone, current_time)
-        
+        user_context = build_user_context(
+            profile,
+            user_timezone,
+            current_time,
+            existing_goals=existing_goals,
+            user_country=user_country,
+        )
+
         # Generate 8-12 goals for variety
         goal_count = 10  # Target 10 goals, allows for some filtering
-        full_prompt = f"{system_prompt}\n\n{user_context}{extra_context}\n\nGenerate {goal_count} personalized goals with VARIETY in scheduling (not all 7 days!). Include a mix of daily and weekly goals across different categories. Respond with valid JSON only."
+
+        # Get primary goal for intelligent frequency determination
+        primary_goal = profile.get("primary_goal", "general_fitness")
+        fitness_level = profile.get("fitness_level", "beginner")
+
+        full_prompt = f"""{system_prompt}
+
+{user_context}{extra_context}
+
+Generate {goal_count} UNIQUE, PERSONALIZED goals.
+
+🎯 CRITICAL - USE THEIR PROFILE INTELLIGENTLY:
+- Primary Goal: {primary_goal}
+- Fitness Level: {fitness_level}
+
+INTELLIGENT FREQUENCY DECISIONS:
+{"- For weight loss: Daily meal tracking and hydration are ESSENTIAL (7 days/week)" if primary_goal == "lose_weight" else ""}
+{"- For muscle building: Focus on protein meals and strength training 4-5x/week" if primary_goal == "build_muscle" else ""}
+{"- For stress reduction: Daily mindfulness and sleep habits are KEY" if primary_goal == "reduce_stress" else ""}
+{"- For staying active: Flexible scheduling, variety is important" if primary_goal == "stay_active" else ""}
+
+YOU DECIDE THE FREQUENCY based on what's OPTIMAL for their "{primary_goal}" goal.
+Don't use fixed rules - think about what ACTUALLY helps someone achieve "{primary_goal}".
+
+Respond with valid JSON only."""
+
+        # Build context for system message
+        preferred_location = profile.get("preferred_location", "home")
+        location_warning = ""
+        if preferred_location == "home":
+            location_warning = "For FITNESS goals: User works out at HOME only - NO outdoor, NO gym, NO team sports!"
+
+        # Determine diversity requirements based on goal type
+        if goal_type == "habit":
+            diversity_req = "Generate: 2-3 FITNESS, 1-2 NUTRITION (meal), 1 HYDRATION, 2 WELLNESS/MINDFULNESS goals"
+        elif goal_type == "time_challenge":
+            diversity_req = "Generate: 2-3 FITNESS challenges, 2 NUTRITION challenges, 2 WELLNESS challenges"
+        elif goal_type == "target_challenge":
+            diversity_req = (
+                "Generate: 2 FITNESS targets, 2 NUTRITION targets, 2 WELLNESS targets"
+            )
+        else:  # mixed
+            diversity_req = "Generate VARIETY: 3-4 habits, 3-4 time challenges, 2-3 target challenges across ALL categories"
 
         response = await asyncio.wait_for(
             client.chat.completions.create(
@@ -578,14 +813,27 @@ async def generate_goals_by_type(
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a fitness coach generating goal suggestions. Generate diverse goals with varied scheduling - NOT all 7 days! Be creative with target_days.",
+                        "content": f"""You are an INTELLIGENT wellness coach covering ALL aspects of health.
+
+⚠️ CATEGORY DIVERSITY IS MANDATORY:
+{diversity_req}
+
+Categories: fitness, nutrition, wellness, mindfulness, sleep
+Tracking types: workout (fitness), meal (eating), hydration (water), checkin (wellness/mindfulness/sleep)
+
+RULES FOR FITNESS GOALS ONLY:
+1. {location_warning}
+2. NEVER suggest "dance party", "fun movement" - only structured workouts
+3. Suggest workout TYPES: "Strength Training", "HIIT", "Core Workout"
+
+For user with goal '{primary_goal}' at '{fitness_level}' level, determine optimal frequency per category.""",
                     },
                     {"role": "user", "content": full_prompt},
                 ],
-                max_tokens=3500,  # Increased for 10+ goals
-                temperature=0.8,  # Slightly higher for more creative variety
+                max_tokens=3500,
+                temperature=0.8,
             ),
-            timeout=45.0,  # More time for larger response
+            timeout=45.0,
         )
 
         output_text = response.choices[0].message.content.strip()
@@ -606,9 +854,63 @@ async def generate_goals_by_type(
 
         # Validate and ensure goal_type is set
         validated_goals = []
+        valid_categories = ["fitness", "nutrition", "wellness", "mindfulness", "sleep"]
+
         for goal in goals:
             if not goal.get("title") or not goal.get("description"):
                 continue
+
+            # === CATEGORY SANITIZATION ===
+            # Fix common AI mistakes with category/tracking_type confusion
+            category = goal.get("category", "").lower()
+            tracking_type = goal.get("tracking_type", "").lower()
+            combined_text = (
+                f"{goal.get('title', '')} {goal.get('description', '')}".lower()
+            )
+
+            # Hydration keywords to detect hydration goals
+            hydration_keywords = [
+                "water",
+                "hydration",
+                "hydrate",
+                "drink",
+                "glasses",
+                "ml",
+                "fluid",
+                "h2o",
+            ]
+            is_hydration_goal = any(kw in combined_text for kw in hydration_keywords)
+
+            # Fix 1: If AI incorrectly set category as "hydration", change to "nutrition"
+            if category == "hydration":
+                goal["category"] = "nutrition"
+                goal["tracking_type"] = "hydration"
+                logger.info(
+                    f"Fixed category 'hydration' -> 'nutrition' for: {goal.get('title')}"
+                )
+
+            # Fix 2: If tracking_type is "hydration" but category is not "nutrition", fix it
+            elif tracking_type == "hydration" and category != "nutrition":
+                goal["category"] = "nutrition"
+                logger.info(
+                    f"Fixed category '{category}' -> 'nutrition' for hydration goal: {goal.get('title')}"
+                )
+
+            # Fix 3: If it's clearly a hydration goal but category is wrong (e.g., wellness)
+            elif is_hydration_goal and category not in ["nutrition"]:
+                goal["category"] = "nutrition"
+                goal["tracking_type"] = "hydration"
+                logger.info(
+                    f"Fixed category '{category}' -> 'nutrition' for detected hydration goal: {goal.get('title')}"
+                )
+
+            # Fix 4: Validate category is in valid list, default to wellness if not
+            if goal.get("category", "").lower() not in valid_categories:
+                logger.warning(
+                    f"Invalid category '{goal.get('category')}' for goal '{goal.get('title')}', defaulting to 'wellness'"
+                )
+                goal["category"] = "wellness"
+                goal["tracking_type"] = "checkin"
 
             # Ensure goal_type is set correctly
             if goal_type != "mixed":
@@ -718,6 +1020,7 @@ def generate_goals_by_type_sync(
     target_range: Optional[str] = None,
     user_timezone: Optional[str] = None,
     current_time: Optional[datetime] = None,
+    user_id: Optional[str] = None,
 ) -> Optional[List[Dict[str, Any]]]:
     """Synchronous wrapper for generate_goals_by_type."""
     try:
@@ -738,6 +1041,7 @@ def generate_goals_by_type_sync(
                 target_range,
                 user_timezone,
                 current_time,
+                user_id,
             )
         )
     except Exception as e:

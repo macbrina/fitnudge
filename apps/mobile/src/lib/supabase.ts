@@ -38,10 +38,10 @@ if (supabaseUrl.includes("localhost")) {
 
 if (!supabaseUrl || !supabaseAnonKey) {
   console.warn(
-    "[Supabase] Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_ANON_KEY"
+    "[Supabase] Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_ANON_KEY",
   );
   console.warn(
-    "[Supabase] Realtime features will not work without valid credentials"
+    "[Supabase] Realtime features will not work without valid credentials",
   );
 }
 
@@ -92,7 +92,9 @@ if (supabaseUrl && supabaseAnonKey) {
         // Realtime-specific configuration
         params: {
           eventsPerSecond: 10, // Rate limit for events
-          apikey: supabaseAnonKey, // Explicitly pass API key for WebSocket
+          // NOTE: DO NOT hardcode apikey here - it overrides the user's JWT token
+          // After calling setSession(), Supabase uses the access_token for RLS
+          // Hardcoding apikey here breaks RLS-filtered realtime events
         },
         // Log WebSocket events for debugging
         log_level: __DEV__ ? "info" : "error",

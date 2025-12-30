@@ -115,6 +115,38 @@ def get_plan_from_product_id(product_id: str) -> str:
         return "free"
 
 
+def get_plan_from_entitlement_ids(
+    entitlement_ids: Optional[List[str]],
+) -> Optional[str]:
+    """
+    Derive plan from entitlement IDs.
+    Entitlement IDs are more reliable than product_id for determining the current plan,
+    especially during product changes.
+
+    Returns None if no valid entitlement found (caller should fallback to product_id).
+    """
+    if not entitlement_ids:
+        return None
+
+    # Priority order: elite > pro > starter
+    for eid in entitlement_ids:
+        eid_lower = eid.lower()
+        if "elite" in eid_lower:
+            return "elite"
+
+    for eid in entitlement_ids:
+        eid_lower = eid.lower()
+        if "pro" in eid_lower:
+            return "pro"
+
+    for eid in entitlement_ids:
+        eid_lower = eid.lower()
+        if "starter" in eid_lower:
+            return "starter"
+
+    return None
+
+
 def get_platform_from_store(store: str) -> str:
     """Map RevenueCat store to platform"""
     store_map = {
@@ -312,10 +344,54 @@ async def revenuecat_webhook(
     return {"status": "success", "event_type": event.type, "event_id": event_id}
 
 
+async def notify_partners_of_subscription_change(supabase, user_id: str):
+    """
+    Touch accountability_partners table to trigger realtime events for partners.
+
+    When a user's subscription changes, their partners need to be notified so their
+    PartnerDetailScreen can show updated premium access status.
+
+    This updates the updated_at field on all partnerships involving this user,
+    which triggers Supabase Realtime events to all partners.
+    """
+    try:
+        # Update all partnerships where this user is either user_id or partner_user_id
+        # This triggers realtime events to their partners
+        result = (
+            supabase.table("accountability_partners")
+            .update({"updated_at": datetime.utcnow().isoformat()})
+            .or_(f"user_id.eq.{user_id},partner_user_id.eq.{user_id}")
+            .eq("status", "accepted")
+            .execute()
+        )
+
+        partner_count = len(result.data) if result.data else 0
+        if partner_count > 0:
+            logger.info(
+                f"Notified {partner_count} partners of subscription change for user {user_id}"
+            )
+    except Exception as e:
+        # Don't fail the subscription update if partner notification fails
+        logger.warning(f"Failed to notify partners of subscription change: {e}")
+
+
 async def handle_subscription_active(supabase, event: RevenueCatEvent, user_id: str):
     """Handle active subscription (new purchase, renewal, uncancellation)"""
-    plan = get_plan_from_product_id(event.product_id)
+    # Prefer entitlement_ids over product_id for plan determination
+    # This is more reliable during product changes where RENEWAL may have stale product_id
+    plan_from_entitlements = get_plan_from_entitlement_ids(event.entitlement_ids)
+    plan_from_product = get_plan_from_product_id(event.product_id)
+
+    # Use entitlement-derived plan if available, otherwise fall back to product_id
+    plan = plan_from_entitlements or plan_from_product
     platform = get_platform_from_store(event.store or "")
+
+    logger.info(
+        f"Processing {event.type} for user {user_id}: "
+        f"product_id={event.product_id}, plan_from_product={plan_from_product}, "
+        f"entitlement_ids={event.entitlement_ids}, plan_from_entitlements={plan_from_entitlements}, "
+        f"final_plan={plan}"
+    )
 
     expires_at = None
     if event.expiration_at_ms:
@@ -325,10 +401,33 @@ async def handle_subscription_active(supabase, event: RevenueCatEvent, user_id: 
     if event.purchased_at_ms:
         purchased_at = datetime.fromtimestamp(event.purchased_at_ms / 1000).isoformat()
 
-    # Check if subscription exists
+    # Check if subscription exists and get current plan
     existing = (
-        supabase.table("subscriptions").select("id").eq("user_id", user_id).execute()
+        supabase.table("subscriptions")
+        .select("id, plan, updated_at")
+        .eq("user_id", user_id)
+        .execute()
     )
+
+    # For RENEWAL events, check if there was a recent PRODUCT_CHANGE that set a higher plan
+    # This prevents RENEWAL from overwriting a plan upgrade with stale product_id
+    if event.type == "RENEWAL" and existing.data:
+        current_sub = existing.data[0]
+        current_plan = current_sub.get("plan", "free")
+
+        plan_tiers = {"free": 0, "starter": 1, "pro": 2, "elite": 3}
+        current_tier = plan_tiers.get(current_plan, 0)
+        new_tier = plan_tiers.get(plan, 0)
+
+        if new_tier < current_tier:
+            # RENEWAL is trying to set a lower plan than what's in DB
+            # This likely means PRODUCT_CHANGE already upgraded the user
+            # Keep the higher plan
+            logger.warning(
+                f"RENEWAL for user {user_id} has lower plan ({plan}) than current ({current_plan}). "
+                f"Keeping current plan to avoid overwriting recent PRODUCT_CHANGE."
+            )
+            plan = current_plan
 
     # auto_renew is True for active subscription events
     # INITIAL_PURCHASE, RENEWAL, UNCANCELLATION all indicate user intends to keep subscription
@@ -361,6 +460,9 @@ async def handle_subscription_active(supabase, event: RevenueCatEvent, user_id: 
 
     # Update user's plan
     supabase.table("users").update({"plan": plan}).eq("id", user_id).execute()
+
+    # Notify partners so their PartnerDetailScreen shows updated premium status
+    await notify_partners_of_subscription_change(supabase, user_id)
 
 
 async def handle_subscription_cancelled(supabase, event: RevenueCatEvent, user_id: str):
@@ -460,6 +562,9 @@ async def handle_subscription_expired(supabase, event: RevenueCatEvent, user_id:
         )
         # Don't re-raise - subscription status is already updated
 
+    # Notify partners so their PartnerDetailScreen shows updated premium status
+    await notify_partners_of_subscription_change(supabase, user_id)
+
 
 async def handle_billing_issue(supabase, event: RevenueCatEvent, user_id: str):
     """
@@ -524,7 +629,17 @@ async def handle_product_change(supabase, event: RevenueCatEvent, user_id: str):
         handle_subscription_expiry_deactivation,
     )
 
-    new_plan = get_plan_from_product_id(event.product_id)
+    # Prefer entitlement_ids over product_id for plan determination
+    plan_from_entitlements = get_plan_from_entitlement_ids(event.entitlement_ids)
+    plan_from_product = get_plan_from_product_id(event.product_id)
+    new_plan = plan_from_entitlements or plan_from_product
+
+    logger.info(
+        f"Processing PRODUCT_CHANGE for user {user_id}: "
+        f"product_id={event.product_id}, plan_from_product={plan_from_product}, "
+        f"entitlement_ids={event.entitlement_ids}, plan_from_entitlements={plan_from_entitlements}, "
+        f"final_new_plan={new_plan}"
+    )
 
     # Get current plan
     user_result = (
@@ -563,6 +678,9 @@ async def handle_product_change(supabase, event: RevenueCatEvent, user_id: str):
             logger.info(f"Downgrade deactivation for user {user_id}: {summary}")
         except Exception as e:
             logger.error(f"Error handling downgrade deactivation for {user_id}: {e}")
+
+    # Notify partners so their PartnerDetailScreen shows updated premium status
+    await notify_partners_of_subscription_change(supabase, user_id)
 
 
 async def handle_subscription_transfer(supabase, event: RevenueCatEvent, user_id: str):

@@ -5,6 +5,7 @@ import {
   getCachedDeviceInfo,
   DeviceInfo,
 } from "@/utils/deviceInfo";
+import { getLocales } from "expo-localization";
 
 // Auth Types
 export interface LoginRequest {
@@ -22,6 +23,7 @@ export interface LoginResponse {
     username: string;
     plan: string;
     timezone: string;
+    country?: string; // ISO 3166-1 alpha-2 code
     email_verified: boolean;
     auth_provider: string;
     created_at: string;
@@ -36,6 +38,7 @@ export interface SignupRequest {
   email: string;
   password: string;
   timezone?: string; // Optional IANA timezone string (e.g., 'America/New_York'), defaults to device timezone if not provided
+  country?: string; // Optional ISO 3166-1 alpha-2 code (e.g., 'US', 'NG'), defaults to device locale region
   referral_code?: string; // Optional referral code of the user who referred them
   device_info?: DeviceInfo;
 }
@@ -78,7 +81,7 @@ export class AuthService extends BaseApiService {
       const { TokenManager } = await import("./base");
       await TokenManager.setTokens(
         response.data.access_token,
-        response.data.refresh_token
+        response.data.refresh_token,
       );
     }
 
@@ -90,6 +93,11 @@ export class AuthService extends BaseApiService {
     const timezone =
       userData.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
 
+    // Use device locale region for country if not provided
+    // getLocales() returns array of locale objects with regionCode (ISO 3166-1 alpha-2)
+    const locales = getLocales();
+    const country = userData.country || locales[0]?.regionCode || undefined;
+
     // Get device info for session tracking
     const deviceInfo = getCachedDeviceInfo() || (await getDeviceInfo());
 
@@ -98,6 +106,7 @@ export class AuthService extends BaseApiService {
       // Backend requires 'name'; use username as display name if not collected separately
       name: userData.username,
       timezone: timezone,
+      country: country,
       // Include referral code if provided
       referral_code: userData.referral_code || undefined,
       // Include device info for session tracking
@@ -108,7 +117,7 @@ export class AuthService extends BaseApiService {
       const { TokenManager } = await import("./base");
       await TokenManager.setTokens(
         response.data.access_token,
-        response.data.refresh_token
+        response.data.refresh_token,
       );
     }
 
@@ -143,7 +152,7 @@ export class AuthService extends BaseApiService {
       ROUTES.AUTH.REFRESH,
       {
         refresh_token: refreshToken,
-      }
+      },
     );
 
     if (response.data) {
@@ -171,7 +180,7 @@ export class AuthService extends BaseApiService {
         // AuthStore might not be available in some contexts, ignore
         console.warn(
           "[Auth] Could not update authStore during token refresh:",
-          error
+          error,
         );
       }
     }
@@ -185,7 +194,7 @@ export class AuthService extends BaseApiService {
 
   async resetPassword(
     token: string,
-    newPassword: string
+    newPassword: string,
   ): Promise<ApiResponse> {
     return this.post(ROUTES.AUTH.RESET_PASSWORD, {
       token,
@@ -194,14 +203,14 @@ export class AuthService extends BaseApiService {
   }
 
   async validateResetToken(
-    token: string
+    token: string,
   ): Promise<ApiResponse<{ valid: boolean }>> {
     return this.post(ROUTES.AUTH.VALIDATE_RESET_TOKEN, { token });
   }
 
   async loginWithGoogle(
     idToken: string,
-    referralCode?: string
+    referralCode?: string,
   ): Promise<ApiResponse<LoginResponse>> {
     // Get device info for session tracking
     const deviceInfo = getCachedDeviceInfo() || (await getDeviceInfo());
@@ -216,7 +225,7 @@ export class AuthService extends BaseApiService {
       const { TokenManager } = await import("./base");
       await TokenManager.setTokens(
         response.data.access_token,
-        response.data.refresh_token
+        response.data.refresh_token,
       );
     }
 
@@ -225,7 +234,7 @@ export class AuthService extends BaseApiService {
 
   async loginWithApple(
     payload: AppleLoginPayload,
-    referralCode?: string
+    referralCode?: string,
   ): Promise<ApiResponse<LoginResponse>> {
     // Get device info for session tracking
     const deviceInfo = getCachedDeviceInfo() || (await getDeviceInfo());
@@ -243,7 +252,7 @@ export class AuthService extends BaseApiService {
       const { TokenManager } = await import("./base");
       await TokenManager.setTokens(
         response.data.access_token,
-        response.data.refresh_token
+        response.data.refresh_token,
       );
     }
 
@@ -252,7 +261,7 @@ export class AuthService extends BaseApiService {
 
   async changePassword(
     currentPassword: string,
-    newPassword: string
+    newPassword: string,
   ): Promise<ApiResponse> {
     return this.post(ROUTES.USERS.CHANGE_PASSWORD, {
       current_password: currentPassword,
@@ -278,7 +287,7 @@ export class AuthService extends BaseApiService {
 
   async setRememberMePreference(
     email: string,
-    remember: boolean
+    remember: boolean,
   ): Promise<void> {
     const { TokenManager } = await import("./base");
     if (remember) {

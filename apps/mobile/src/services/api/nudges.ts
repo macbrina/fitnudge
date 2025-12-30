@@ -50,7 +50,7 @@ class NudgesService extends BaseApiService {
   async getNudges(
     unreadOnly: boolean = false,
     limit: number = 50,
-    offset: number = 0
+    offset: number = 0,
   ): Promise<ApiResponse<Nudge[]>> {
     const params = new URLSearchParams();
     if (unreadOnly) params.append("unread_only", "true");
@@ -65,7 +65,7 @@ class NudgesService extends BaseApiService {
    */
   async getSentNudges(
     limit: number = 50,
-    offset: number = 0
+    offset: number = 0,
   ): Promise<ApiResponse<Nudge[]>> {
     const params = new URLSearchParams();
     params.append("limit", limit.toString());
@@ -94,7 +94,7 @@ class NudgesService extends BaseApiService {
   async markAsRead(nudgeId: string): Promise<ApiResponse<{ message: string }>> {
     return this.patch<{ message: string }>(
       ROUTES.NUDGES.MARK_READ(nudgeId),
-      {}
+      {},
     );
   }
 
@@ -106,7 +106,7 @@ class NudgesService extends BaseApiService {
   > {
     return this.patch<{ message: string; count: number }>(
       ROUTES.NUDGES.MARK_ALL_READ,
-      {}
+      {},
     );
   }
 
@@ -114,7 +114,7 @@ class NudgesService extends BaseApiService {
    * Delete a nudge (only allowed by sender)
    */
   async deleteNudge(
-    nudgeId: string
+    nudgeId: string,
   ): Promise<ApiResponse<{ message: string }>> {
     return this.delete<{ message: string }>(ROUTES.NUDGES.DELETE(nudgeId));
   }

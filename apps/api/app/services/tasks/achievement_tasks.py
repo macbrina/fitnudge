@@ -17,7 +17,10 @@ from app.services.tasks.base import celery_app, get_supabase_client, logger
     retry_backoff=True,
 )
 def check_achievements_task(
-    self, user_id: str, goal_id: Optional[str] = None
+    self,
+    user_id: str,
+    source_type: Optional[str] = None,
+    source_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Celery task to check and unlock achievements for a user.
@@ -25,7 +28,8 @@ def check_achievements_task(
     Args:
         self: Celery task instance
         user_id: User ID
-        goal_id: Optional goal ID
+        source_type: Optional source type ("goal" or "challenge") for metadata
+        source_id: Optional source ID for metadata
 
     Returns:
         Dict with newly unlocked achievements
@@ -45,7 +49,11 @@ def check_achievements_task(
             asyncio.set_event_loop(loop)
 
         newly_unlocked = loop.run_until_complete(
-            achievement_service.check_and_unlock_achievements(user_id, goal_id)
+            achievement_service.check_and_unlock_achievements(
+                user_id=user_id,
+                source_type=source_type,
+                source_id=source_id,
+            )
         )
 
         # Send push notifications for each newly unlocked achievement
@@ -54,22 +62,30 @@ def check_achievements_task(
                 from app.services.expo_push_service import send_push_to_user
 
                 for achievement in newly_unlocked:
-                    achievement_title = achievement.get("title", "New Achievement")
-                    achievement_description = achievement.get(
-                        "description", "You've unlocked a new achievement!"
+                    # Use correct field names from _unlock_achievement
+                    badge_name = achievement.get("badge_name", "New Achievement")
+                    badge_description = achievement.get(
+                        "badge_description", "You've unlocked a new achievement!"
                     )
+                    badge_key = achievement.get("badge_key", "")
 
                     try:
                         achievement_id = achievement.get("id")
                         notification_result = loop.run_until_complete(
                             send_push_to_user(
                                 user_id=user_id,
-                                title="🎉 Achievement Unlocked!",
-                                body=f"{achievement_title}: {achievement_description}",
+                                title="🏆 Achievement Unlocked!",
+                                body=f"{badge_name}"
+                                + (
+                                    f": {badge_description}"
+                                    if badge_description
+                                    else ""
+                                ),
                                 data={
                                     "type": "achievement",
                                     "achievementId": achievement_id,
-                                    "deepLink": "/achievements",
+                                    "badgeKey": badge_key,
+                                    "deepLink": "/(user)/profile/achievements",
                                 },
                                 notification_type="achievement",
                                 entity_type="achievement",
@@ -79,7 +95,7 @@ def check_achievements_task(
 
                         if notification_result.get("notification_id"):
                             print(
-                                f"📬 Sent achievement push for '{achievement_title}' to user {user_id}"
+                                f"📬 Sent achievement push for '{badge_name}' to user {user_id}"
                             )
                     except Exception as push_error:
                         # Don't fail achievement unlock if push fails
@@ -87,7 +103,7 @@ def check_achievements_task(
                             f"Failed to send achievement push for user {user_id}",
                             {
                                 "error": str(push_error),
-                                "achievement": achievement_title,
+                                "badge_name": badge_name,
                                 "user_id": user_id,
                             },
                         )
@@ -110,7 +126,8 @@ def check_achievements_task(
             {
                 "error": str(e),
                 "user_id": user_id,
-                "goal_id": goal_id,
+                "source_type": source_type,
+                "source_id": source_id,
                 "retry_count": self.request.retries,
             },
         )
@@ -135,10 +152,13 @@ def update_challenge_progress_task(
     """
     Celery task to update challenge progress for a user.
 
+    Note: goal_id is kept for backward compatibility but not used.
+    Challenge progress is updated for all challenges the user participates in.
+
     Args:
         self: Celery task instance
         user_id: User ID
-        goal_id: Optional goal ID
+        goal_id: Optional goal ID (not used, kept for compatibility)
 
     Returns:
         Dict with updated challenge data
@@ -200,7 +220,6 @@ def update_challenge_progress_task(
             {
                 "error": str(e),
                 "user_id": user_id,
-                "goal_id": goal_id,
                 "retry_count": self.request.retries,
             },
         )

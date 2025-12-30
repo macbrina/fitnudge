@@ -10,9 +10,8 @@ This document explains how social accountability and challenges work in FitNudge
 2. [Feature Summary](#feature-summary)
 3. [Accountability Partners](#1-accountability-partners)
 4. [Challenges](#2-challenges-competitive)
-   - [Private Challenges](#21-private-challenges-solo)
-   - [Shared Challenges](#22-shared-challenges-social)
-   - [Challenge Lifecycle](#23-challenge-lifecycle)
+   - [Standalone Challenges](#21-standalone-challenges)
+   - [Challenge Lifecycle](#22-challenge-lifecycle)
 5. [Check-In Systems](#3-check-in-systems)
 6. [Feature Access by Plan](#4-feature-access-by-plan)
 7. [GoalCard Menu Items](#5-goalcard-menu-items)
@@ -115,89 +114,31 @@ John's App:
 
 ## 2. Challenges (Competitive)
 
-### 2.1 Private Challenges (Solo)
+### 2.1 Standalone Challenges
 
 #### What It Is
 
-A personal challenge that is NOT shared with others. It's just a goal with challenge properties.
+Challenges are **standalone competitive entities** separate from goals. Users create challenges directly with all necessary properties.
 
 #### How It Works
 
-1. User creates a goal with `goal_type = 'time_challenge'` or `'target_challenge'`
-2. User tracks it alone
-3. No entry in `challenges` table
-4. It's essentially a personal goal with a deadline/target
-
-#### Goal Types
-
-| Type               | Description                          | Example                    |
-| ------------------ | ------------------------------------ | -------------------------- |
-| `time_challenge`   | Complete within a time period        | "30 Day Workout Challenge" |
-| `target_challenge` | Reach a specific number of check-ins | "Complete 50 Workouts"     |
-
-#### Check-Ins
-
-- User checks into their **goal** via `check_ins` table
-- Standard goal check-in flow
-
----
-
-### 2.2 Shared Challenges (Social)
-
-#### What It Is
-
-A competitive challenge where multiple users work toward the same goal and compete on a leaderboard.
-
-#### How It Works
-
-**Step 1: User Creates Challenge Goal**
+**Step 1: User Creates Challenge Directly**
 
 ```
-User creates goal:
+User creates challenge:
 - Title: "30 Day Fitness Challenge"
-- goal_type: 'time_challenge'
-- challenge_start_date: Dec 1
-- challenge_end_date: Dec 30
+- challenge_type: 'streak' or 'checkin_count'
+- category: 'fitness', 'nutrition', etc.
+- tracking_type: 'workout', 'meal', 'hydration', 'checkin'
+- duration_days: 30
+- start_date, end_date
 ```
 
-**Step 2: User Shares as Challenge**
+**Step 2: AI Generates Plan**
 
-User clicks "Share as Challenge" and sees a modal:
-
-```
-┌─────────────────────────────────────────────────────┐
-│ 🏆 Share "30 Day Fitness Challenge"                 │
-│                                                      │
-│ ⚠️ IMPORTANT:                                       │
-│ • Challenge starts fresh for everyone (Day 1)       │
-│ • Your current progress won't transfer              │
-│                                                      │
-│ What would you like to do with your current goal?   │
-│                                                      │
-│ ○ Archive goal (recommended)                        │
-│   Only track progress in the challenge              │
-│                                                      │
-│ ○ Keep goal active                                  │
-│   Track both separately (counts as 2 toward limit)  │
-│                                                      │
-│ [ Cancel ]                    [ Create Challenge ]  │
-└─────────────────────────────────────────────────────┘
-```
-
-What happens:
-
-1. Challenge is created **self-contained** in `challenges` table
-2. `goal_template` includes full goal data AND actionable plan
-3. If user chose "Archive": goal is archived with `archived_reason = 'converted_to_challenge'`
-4. If user chose "Keep active": both goal and challenge count toward active limit
-5. User becomes first participant
-
-**Key Design Decision:** The challenge is **completely independent** of the original goal:
-
-- No foreign key to goal_id
-- Actionable plan is copied into `goal_template`
-- User can delete their archived goal without breaking the challenge
-- All participants see the same plan
+- Challenge gets its own actionable plan
+- Plan is generated based on challenge properties
+- Stored directly in `actionable_plans` table with `challenge_id`
 
 **Step 3: Others Join**
 
@@ -212,15 +153,30 @@ Friends see challenge:
 ```
 All participants (including creator):
 - Check into challenge_check_ins table
-- NOT into the original goal
 - Leaderboard updates automatically
 ```
+
+#### Challenge Types
+
+| Type            | Description                          | Example                    |
+| --------------- | ------------------------------------ | -------------------------- |
+| `streak`        | Complete within a time period        | "30 Day Workout Challenge" |
+| `checkin_count` | Reach a specific number of check-ins | "Complete 50 Workouts"     |
+
+#### Tracking Types
+
+| Type       | Description            | Check-in UI         |
+| ---------- | ---------------------- | ------------------- |
+| `workout`  | Fitness activities     | Workout player      |
+| `meal`     | Nutrition tracking     | Meal logging modal  |
+| `hydration`| Water intake tracking  | Hydration modal     |
+| `checkin`  | General habit tracking | Simple check-in     |
 
 #### Check-Ins
 
 - **All participants check into `challenge_check_ins`**
-- NOT the original goal
-- Creator's existing check-ins can be migrated or shown as "head start"
+- Tracking type determines the check-in UI/experience
+- Leaderboard is calculated from check-ins
 
 #### Database Tables
 
@@ -228,14 +184,15 @@ All participants (including creator):
 challenges
 - id
 - title, description
-- challenge_type: 'streak' | 'checkin_count' | 'community' | 'custom'
+- category (fitness, nutrition, mindfulness, etc.)
+- tracking_type (workout, meal, hydration, checkin)
+- challenge_type: 'streak' | 'checkin_count'
 - duration_days
 - start_date, end_date
 - join_deadline (when joining closes)
 - is_public, is_active
 - max_participants
 - created_by
-- goal_template (JSONB - stores original goal properties)
 
 challenge_participants
 - challenge_id
@@ -244,7 +201,7 @@ challenge_participants
 - points, rank
 - progress_data (JSONB)
 
-challenge_check_ins (NEW)
+challenge_check_ins
 - challenge_id
 - user_id
 - check_in_date
@@ -254,7 +211,7 @@ challenge_check_ins (NEW)
 
 ---
 
-### 2.3 Challenge Lifecycle
+### 2.2 Challenge Lifecycle
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -321,7 +278,6 @@ challenge_check_ins (NEW)
 - Permanently removes the challenge and all associated data
 - Only allowed if no one else has joined
 - If others joined, must use Cancel instead
-- If challenge came from a goal, clears the goal's `converted_to_challenge_id`
 
 **Leave Challenge:**
 
@@ -431,6 +387,7 @@ const canCreateChallenge = subscriptionStore.hasFeature("challenge_create");
 ```
 • Activate Goal     (if goal is inactive)
 • Deactivate Goal   (if goal is active)
+• Archive Goal
 • Delete Goal
 ```
 
@@ -438,7 +395,6 @@ const canCreateChallenge = subscriptionStore.hasFeature("challenge_create");
 
 - Check `active_goal_limit` from subscription features (includes both goals + challenges)
 - If user is at limit → Show alert: "You can only have X active goals/challenges. Deactivate one first."
-- Goals with `archived_reason = 'converted_to_challenge'` **cannot be reactivated**
 
 **Deletion Logic:**
 
@@ -449,36 +405,23 @@ Users can delete any goal, including those with check-ins. However, the frontend
 | No check-ins  | ✅ Yes      | No warning needed                                                        |
 | Has check-ins | ✅ Yes      | "Your progress will be permanently deleted. Consider archiving instead." |
 
-**Note:** Goals with `archived_reason = 'converted_to_challenge'` can also be deleted since challenges are self-contained.
-
-### For Challenges (`goal_type = 'time_challenge'` or `'target_challenge'`)
-
-```
-• Share as Challenge    (requires challenge_create feature)
-                        (only if NOT already converted)
-• View Challenge        (if converted_to_challenge_id exists)
-• Make Private          (if shared, removes from challenges)
-```
-
 ### Menu Visibility Logic
 
 ```typescript
 const menuOptions = [];
 
 // Always available
-if (goal.is_active) {
+if (goal.status === "active") {
   menuOptions.push({ id: "deactivate", label: "Deactivate Goal" });
-} else {
+} else if (goal.status === "paused") {
   menuOptions.push({ id: "activate", label: "Activate Goal" });
 }
 
-// Challenge sharing (for challenge types only)
-if (
-  hasFeature("challenge_create") &&
-  ["time_challenge", "target_challenge"].includes(goal.goal_type) &&
-  !goal.converted_to_challenge_id
-) {
-  menuOptions.push({ id: "share_challenge", label: "Share as Challenge" });
+// Archive option
+if (goal.status !== "archived") {
+  menuOptions.push({ id: "archive", label: "Archive Goal" });
+} else {
+  menuOptions.push({ id: "unarchive", label: "Unarchive Goal" });
 }
 
 // Delete (always last)
@@ -1075,13 +1018,13 @@ Future updates should include:
 
 ## Help Center FAQs
 
-### Can I convert a private challenge to a shared challenge?
+### How do I create a challenge?
 
-Yes! Go to your goal, tap the menu (•••), and select "Share as Challenge." Your friends can then join via the invite link or by accepting your partner request.
+Navigate to the Challenges tab and tap "Create Challenge." Fill in the details like title, category, tracking type, and duration. Your challenge will be created and you can invite friends to join!
 
 ### What happens when a challenge ends?
 
-The leaderboard is frozen, no more check-ins are accepted, and a winner is declared based on total check-ins.
+The leaderboard is frozen, no more check-ins are accepted, and a winner is declared based on total check-ins or streak.
 
 ### Can people join a challenge after it starts?
 

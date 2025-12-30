@@ -5,24 +5,23 @@ import {
 } from "@/services/api";
 import { useAuthStore } from "@/stores/authStore";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  cancelProgressQueries,
+  optimisticallyUpdateProgress,
+  ProgressOptimisticContext,
+  rollbackProgressData,
+  snapshotProgressData,
+} from "./progressOptimisticUpdates";
 import { homeDashboardQueryKeys } from "./useHomeDashboard";
+import { trackingStatsQueryKeys } from "./useTrackingStats";
+// Import from shared queryKeys to avoid circular dependency
+import { checkInsQueryKeys } from "./queryKeys";
 
-// Query Keys
-export const checkInsQueryKeys = {
-  all: ["checkIns"] as const,
-  list: (goalId?: string) =>
-    [...checkInsQueryKeys.all, "list", goalId] as const,
-  detail: (id: string) => [...checkInsQueryKeys.all, "detail", id] as const,
-  stats: (goalId?: string) =>
-    [...checkInsQueryKeys.all, "stats", goalId] as const,
-  calendar: (year: number, month: number, goalId?: string) =>
-    [...checkInsQueryKeys.all, "calendar", year, month, goalId] as const,
-  today: () => [...checkInsQueryKeys.all, "today"] as const,
-  streak: (goalId?: string) =>
-    [...checkInsQueryKeys.all, "streak", goalId] as const,
-  moodTrends: (goalId?: string, days?: number) =>
-    [...checkInsQueryKeys.all, "moodTrends", goalId, days] as const,
-} as const;
+// Re-export for backward compatibility
+export { checkInsQueryKeys };
+
+// Empty placeholders to prevent loading spinners
+const EMPTY_CHECKINS_RESPONSE = { data: [], status: 200 };
 
 // Check-ins Hooks
 export const useCheckIns = (goalId?: string) => {
@@ -30,6 +29,8 @@ export const useCheckIns = (goalId?: string) => {
     queryKey: checkInsQueryKeys.list(goalId),
     queryFn: () => checkInsService.getCheckIns(goalId),
     staleTime: 0, // Refetch immediately when invalidated (realtime updates)
+    refetchOnMount: false,
+    placeholderData: EMPTY_CHECKINS_RESPONSE,
   });
 };
 
@@ -50,6 +51,10 @@ export const useCreateCheckIn = () => {
       checkInsService.createCheckIn(checkIn),
     // Optimistic update for instant UI feedback
     onMutate: async (newCheckIn) => {
+      // Use LOCAL date to match progressOptimisticUpdates which uses formatLocalDate
+      const now = new Date();
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
       // Cancel outgoing refetches
       await queryClient.cancelQueries({ queryKey: checkInsQueryKeys.all });
       await queryClient.cancelQueries({ queryKey: checkInsQueryKeys.today() });
@@ -60,16 +65,32 @@ export const useCreateCheckIn = () => {
         queryKey: homeDashboardQueryKeys.dashboard(),
       });
 
+      // Cancel progress queries for optimistic updates
+      if (newCheckIn.goal_id) {
+        await cancelProgressQueries(queryClient, newCheckIn.goal_id, "goal");
+      }
+
       // Snapshot previous data
       const previousTodayCheckIns = queryClient.getQueryData(
-        checkInsQueryKeys.today()
+        checkInsQueryKeys.today(),
       );
       const previousGoalCheckIns = queryClient.getQueryData(
-        checkInsQueryKeys.list(newCheckIn.goal_id)
+        checkInsQueryKeys.list(newCheckIn.goal_id),
       );
       const previousDashboard = queryClient.getQueryData(
-        homeDashboardQueryKeys.dashboard()
+        homeDashboardQueryKeys.dashboard(),
       );
+
+      // Snapshot progress data for rollback
+      let previousProgressData: ProgressOptimisticContext | undefined;
+      if (newCheckIn.goal_id) {
+        previousProgressData = snapshotProgressData(
+          queryClient,
+          newCheckIn.goal_id,
+          today,
+          "goal",
+        );
+      }
 
       // Create optimistic check-in
       const optimisticCheckIn = {
@@ -92,7 +113,7 @@ export const useCreateCheckIn = () => {
         (old: any) => {
           if (!old?.data) return old;
           return { ...old, data: [...old.data, optimisticCheckIn] };
-        }
+        },
       );
 
       // Optimistically update home dashboard
@@ -105,7 +126,7 @@ export const useCreateCheckIn = () => {
             // Remove this goal from pending check-ins
             today_pending_checkins: (old.today_pending_checkins || []).filter(
               (c: any) =>
-                !(c.type === "goal" && c.data?.goal_id === newCheckIn.goal_id)
+                !(c.type === "goal" && c.data?.goal_id === newCheckIn.goal_id),
             ),
             // Optimistically update stats
             stats: old.stats
@@ -115,13 +136,19 @@ export const useCreateCheckIn = () => {
                 }
               : old.stats,
           };
-        }
+        },
       );
+
+      // Optimistically update progress data (streak, week, chain)
+      if (newCheckIn.goal_id) {
+        optimisticallyUpdateProgress(queryClient, newCheckIn.goal_id, today);
+      }
 
       return {
         previousTodayCheckIns,
         previousGoalCheckIns,
         previousDashboard,
+        previousProgressData,
         goalId: newCheckIn.goal_id,
       };
     },
@@ -130,20 +157,24 @@ export const useCreateCheckIn = () => {
       if (context?.previousTodayCheckIns) {
         queryClient.setQueryData(
           checkInsQueryKeys.today(),
-          context.previousTodayCheckIns
+          context.previousTodayCheckIns,
         );
       }
       if (context?.previousGoalCheckIns) {
         queryClient.setQueryData(
           checkInsQueryKeys.list(newCheckIn.goal_id),
-          context.previousGoalCheckIns
+          context.previousGoalCheckIns,
         );
       }
       if (context?.previousDashboard) {
         queryClient.setQueryData(
           homeDashboardQueryKeys.dashboard(),
-          context.previousDashboard
+          context.previousDashboard,
         );
+      }
+      // Rollback progress data
+      if (context?.previousProgressData) {
+        rollbackProgressData(queryClient, context.previousProgressData);
       }
     },
     onSuccess: (response, variables) => {
@@ -153,7 +184,7 @@ export const useCreateCheckIn = () => {
         queryClient.setQueryData(checkInsQueryKeys.today(), (old: any) => {
           if (!old?.data) return old;
           const filtered = old.data.filter(
-            (c: any) => !c.id?.startsWith?.("temp-")
+            (c: any) => !c.id?.startsWith?.("temp-"),
           );
           return { ...old, data: [...filtered, realCheckIn] };
         });
@@ -163,10 +194,10 @@ export const useCreateCheckIn = () => {
           (old: any) => {
             if (!old?.data) return old;
             const filtered = old.data.filter(
-              (c: any) => !c.id?.startsWith?.("temp-")
+              (c: any) => !c.id?.startsWith?.("temp-"),
             );
             return { ...old, data: [...filtered, realCheckIn] };
-          }
+          },
         );
       }
 
@@ -196,12 +227,33 @@ export const useUpdateCheckIn = () => {
       await queryClient.cancelQueries({ queryKey: checkInsQueryKeys.today() });
 
       // Snapshot previous data
-      const previousTodayCheckIns = queryClient.getQueryData(
-        checkInsQueryKeys.today()
+      const previousTodayCheckIns = queryClient.getQueryData<any>(
+        checkInsQueryKeys.today(),
       );
       const previousDetail = queryClient.getQueryData(
-        checkInsQueryKeys.detail(checkInId)
+        checkInsQueryKeys.detail(checkInId),
       );
+
+      // Find the goal_id from the cached check-in
+      const existingCheckIn = previousTodayCheckIns?.data?.find(
+        (c: any) => c.id === checkInId,
+      );
+      const goalId = existingCheckIn?.goal_id;
+      // Use LOCAL date to match progressOptimisticUpdates which uses formatLocalDate
+      const now = new Date();
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
+      // Cancel and snapshot progress queries for optimistic updates
+      let previousProgressData: ProgressOptimisticContext | undefined;
+      if (goalId) {
+        await cancelProgressQueries(queryClient, goalId, "goal");
+        previousProgressData = snapshotProgressData(
+          queryClient,
+          goalId,
+          today,
+          "goal",
+        );
+      }
 
       // Optimistically update today's check-ins
       queryClient.setQueryData(checkInsQueryKeys.today(), (old: any) => {
@@ -216,7 +268,7 @@ export const useUpdateCheckIn = () => {
                   is_checked_in: true,
                   updated_at: new Date().toISOString(),
                 }
-              : c
+              : c,
           ),
         };
       });
@@ -235,24 +287,39 @@ export const useUpdateCheckIn = () => {
               updated_at: new Date().toISOString(),
             },
           };
-        }
+        },
       );
 
-      return { previousTodayCheckIns, previousDetail, checkInId };
+      // Optimistically update progress data (streak, week, chain)
+      if (goalId) {
+        optimisticallyUpdateProgress(queryClient, goalId, today);
+      }
+
+      return {
+        previousTodayCheckIns,
+        previousDetail,
+        previousProgressData,
+        checkInId,
+        goalId,
+      };
     },
     onError: (err, { checkInId }, context) => {
       // Rollback on error
       if (context?.previousTodayCheckIns) {
         queryClient.setQueryData(
           checkInsQueryKeys.today(),
-          context.previousTodayCheckIns
+          context.previousTodayCheckIns,
         );
       }
       if (context?.previousDetail) {
         queryClient.setQueryData(
           checkInsQueryKeys.detail(checkInId),
-          context.previousDetail
+          context.previousDetail,
         );
+      }
+      // Rollback progress data
+      if (context?.previousProgressData) {
+        rollbackProgressData(queryClient, context.previousProgressData);
       }
     },
     onSuccess: (response, { checkInId }) => {
@@ -264,7 +331,7 @@ export const useUpdateCheckIn = () => {
           return {
             ...old,
             data: old.data.map((c: any) =>
-              c.id === checkInId ? updatedCheckIn : c
+              c.id === checkInId ? updatedCheckIn : c,
             ),
           };
         });
@@ -274,7 +341,7 @@ export const useUpdateCheckIn = () => {
           (old: any) => ({
             ...old,
             data: updatedCheckIn,
-          })
+          }),
         );
       }
 
@@ -285,6 +352,10 @@ export const useUpdateCheckIn = () => {
       // Invalidate home dashboard (shows both goals and challenges)
       queryClient.invalidateQueries({
         queryKey: homeDashboardQueryKeys.dashboard(),
+      });
+      // Invalidate tracking stats for checkin progress display
+      queryClient.invalidateQueries({
+        queryKey: trackingStatsQueryKeys.all,
       });
     },
   });
@@ -303,7 +374,7 @@ export const useDeleteCheckIn = () => {
 
       // Snapshot previous data
       const previousTodayCheckIns = queryClient.getQueryData(
-        checkInsQueryKeys.today()
+        checkInsQueryKeys.today(),
       );
 
       // Optimistically remove from today's check-ins
@@ -322,7 +393,7 @@ export const useDeleteCheckIn = () => {
       if (context?.previousTodayCheckIns) {
         queryClient.setQueryData(
           checkInsQueryKeys.today(),
-          context.previousTodayCheckIns
+          context.previousTodayCheckIns,
         );
       }
     },
@@ -345,15 +416,28 @@ export const useCheckInStats = (goalId?: string) => {
   return useQuery({
     queryKey: checkInsQueryKeys.stats(goalId),
     queryFn: () => checkInsService.getCheckInStats(goalId),
-    enabled: isAuthenticated, // Only fetch when authenticated
+    enabled: isAuthenticated,
     staleTime: 0, // Refetch immediately when invalidated (realtime updates)
+    refetchOnMount: false,
+    placeholderData: {
+      data: {
+        total_check_ins: 0,
+        completed_check_ins: 0,
+        current_streak: 0,
+        longest_streak: 0,
+        completion_rate: 0,
+        most_productive_day: "",
+        most_productive_time: "",
+      },
+      status: 200,
+    },
   });
 };
 
 export const useCheckInCalendar = (
   year: number,
   month: number,
-  goalId?: string
+  goalId?: string,
 ) => {
   return useQuery({
     queryKey: checkInsQueryKeys.calendar(year, month, goalId),
@@ -365,7 +449,7 @@ export const useCheckInCalendar = (
 export const useCheckInsByDateRange = (
   startDate: string,
   endDate: string,
-  goalId?: string
+  goalId?: string,
 ) => {
   return useQuery({
     queryKey: [
@@ -388,9 +472,11 @@ export const useTodayCheckIns = () => {
   return useQuery({
     queryKey: checkInsQueryKeys.today(),
     queryFn: () => checkInsService.getTodayCheckIns(),
-    enabled: isAuthenticated, // Only fetch when authenticated
+    enabled: isAuthenticated,
     staleTime: 0, // Refetch immediately when invalidated (realtime updates)
-    refetchInterval: isAuthenticated ? 60 * 1000 : false, // Only refetch when authenticated
+    refetchInterval: isAuthenticated ? 60 * 1000 : false,
+    refetchOnMount: false,
+    placeholderData: EMPTY_CHECKINS_RESPONSE,
   });
 };
 

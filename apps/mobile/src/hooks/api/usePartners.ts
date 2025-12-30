@@ -8,12 +8,15 @@ import {
   partnersService,
   Partner,
   PartnerRequest,
-  SearchUserResult,
 } from "@/services/api/partners";
+import { useSubscriptionStore } from "@/stores/subscriptionStore";
 import { partnersQueryKeys } from "./queryKeys";
 
 // Re-export query keys for external use
 export { partnersQueryKeys } from "./queryKeys";
+
+// Empty placeholder to prevent loading spinners
+const EMPTY_PARTNERS_RESPONSE = { data: [], status: 200 };
 
 /**
  * Get accepted accountability partners
@@ -23,6 +26,8 @@ export const usePartners = () => {
     queryKey: partnersQueryKeys.list(),
     queryFn: () => partnersService.getPartners(),
     staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnMount: false,
+    placeholderData: EMPTY_PARTNERS_RESPONSE,
   });
 };
 
@@ -34,6 +39,8 @@ export const usePendingPartnerRequests = () => {
     queryKey: partnersQueryKeys.pending(),
     queryFn: () => partnersService.getPendingRequests(),
     staleTime: 60 * 1000, // 1 minute
+    refetchOnMount: false,
+    placeholderData: EMPTY_PARTNERS_RESPONSE,
   });
 };
 
@@ -45,6 +52,8 @@ export const useSentPartnerRequests = () => {
     queryKey: partnersQueryKeys.sent(),
     queryFn: () => partnersService.getSentRequests(),
     staleTime: 60 * 1000, // 1 minute
+    refetchOnMount: false,
+    placeholderData: EMPTY_PARTNERS_RESPONSE,
   });
 };
 
@@ -72,7 +81,7 @@ export const useSearchPartners = (query: string) => {
  */
 export const useSearchPartnersInfinite = (
   query: string,
-  limit: number = 20
+  limit: number = 20,
 ) => {
   return useInfiniteQuery({
     queryKey: partnersQueryKeys.searchInfinite(query),
@@ -80,7 +89,7 @@ export const useSearchPartnersInfinite = (
       const response = await partnersService.searchUsers(
         query,
         pageParam,
-        limit
+        limit,
       );
       if (response.status !== 200 || !response.data) {
         throw new Error(response.error || "Failed to search users");
@@ -108,7 +117,7 @@ export const useSuggestedPartnersInfinite = (limit: number = 20) => {
     queryFn: async ({ pageParam = 1 }) => {
       const response = await partnersService.getSuggestedUsers(
         pageParam,
-        limit
+        limit,
       );
       if (response.status !== 200 || !response.data) {
         throw new Error(response.error || "Failed to get suggested users");
@@ -138,7 +147,7 @@ const updateUserInInfiniteQuery = (
     partnership_id?: string | null;
     is_partner?: boolean;
     has_pending_request?: boolean;
-  }
+  },
 ) => {
   queryClient.setQueryData(queryKey, (old: any) => {
     if (!old?.pages) return old;
@@ -147,7 +156,7 @@ const updateUserInInfiniteQuery = (
       pages: old.pages.map((page: any) => ({
         ...page,
         users: page.users.map((user: any) =>
-          user.id === userId ? { ...user, ...updates } : user
+          user.id === userId ? { ...user, ...updates } : user,
         ),
       })),
     };
@@ -165,9 +174,7 @@ export const useSendPartnerRequest = () => {
     // Optimistic update
     onMutate: async (data) => {
       // Cancel only specific queries we're about to update
-      await queryClient.cancelQueries({
-        queryKey: partnersQueryKeys.pending(),
-      });
+      // Note: We do NOT update pending list - that's for requests RECEIVED from others
       await queryClient.cancelQueries({
         queryKey: partnersQueryKeys.sent(),
       });
@@ -180,9 +187,6 @@ export const useSendPartnerRequest = () => {
       });
 
       // Snapshot previous data for rollback
-      const previousPending = queryClient.getQueryData(
-        partnersQueryKeys.pending()
-      );
       const previousSent = queryClient.getQueryData(partnersQueryKeys.sent());
 
       // Get all search infinite query keys and snapshot them
@@ -196,7 +200,7 @@ export const useSendPartnerRequest = () => {
         queryKey: partnersQueryKeys.suggestedInfinite(),
       });
 
-      // Create optimistic pending request
+      // Create optimistic sent request
       const optimisticRequest: Partner = {
         id: `temp-${Date.now()}`,
         user_id: "",
@@ -206,18 +210,7 @@ export const useSendPartnerRequest = () => {
         created_at: new Date().toISOString(),
       };
 
-      // Add to pending list
-      queryClient.setQueryData(partnersQueryKeys.pending(), (old: any) => {
-        if (!old?.data) {
-          return { data: [optimisticRequest] };
-        }
-        return {
-          ...old,
-          data: [...old.data, optimisticRequest],
-        };
-      });
-
-      // Add to sent list
+      // Add to sent list only (NOT pending - that's for received requests)
       queryClient.setQueryData(partnersQueryKeys.sent(), (old: any) => {
         if (!old?.data) {
           return { data: [optimisticRequest] };
@@ -239,7 +232,7 @@ export const useSendPartnerRequest = () => {
             request_status: "sent",
             partnership_id: optimisticRequest.id,
             has_pending_request: true,
-          }
+          },
         );
       });
 
@@ -252,29 +245,21 @@ export const useSendPartnerRequest = () => {
           request_status: "sent",
           partnership_id: optimisticRequest.id,
           has_pending_request: true,
-        }
+        },
       );
 
       return {
-        previousPending,
         previousSent,
         searchQueryState,
         suggestedQueryState,
       };
     },
     onError: (err, data, context) => {
-      // Rollback pending list
-      if (context?.previousPending) {
-        queryClient.setQueryData(
-          partnersQueryKeys.pending(),
-          context.previousPending
-        );
-      }
       // Rollback sent list
       if (context?.previousSent) {
         queryClient.setQueryData(
           partnersQueryKeys.sent(),
-          context.previousSent
+          context.previousSent,
         );
       }
       // Rollback search queries
@@ -287,22 +272,16 @@ export const useSendPartnerRequest = () => {
       });
     },
     onSuccess: (response, data) => {
-      // Replace temp with real data in pending list
+      // Replace temp with real data in sent list only
+      // Also check if real item already exists (from realtime refetch race condition)
       const realPartnership = response?.data;
       if (realPartnership) {
-        queryClient.setQueryData(partnersQueryKeys.pending(), (old: any) => {
-          if (!old?.data) return { data: [realPartnership] };
-          const filtered = old.data.filter(
-            (p: Partner) => !p.id.startsWith("temp-")
-          );
-          return { ...old, data: [...filtered, realPartnership] };
-        });
-
-        // Replace temp with real data in sent list
         queryClient.setQueryData(partnersQueryKeys.sent(), (old: any) => {
           if (!old?.data) return { data: [realPartnership] };
+          // Filter out temp items AND duplicates of the real item
           const filtered = old.data.filter(
-            (p: Partner) => !p.id.startsWith("temp-")
+            (p: Partner) =>
+              !p.id.startsWith("temp-") && p.id !== realPartnership.id,
           );
           return { ...old, data: [realPartnership, ...filtered] };
         });
@@ -322,7 +301,7 @@ export const useSendPartnerRequest = () => {
               request_status: "sent",
               partnership_id: realPartnership.id,
               has_pending_request: true,
-            }
+            },
           );
         });
 
@@ -334,7 +313,7 @@ export const useSendPartnerRequest = () => {
             request_status: "sent",
             partnership_id: realPartnership.id,
             has_pending_request: true,
-          }
+          },
         );
       }
     },
@@ -367,7 +346,7 @@ export const useAcceptPartnerRequest = () => {
       });
 
       const previousPending = queryClient.getQueryData(
-        partnersQueryKeys.pending()
+        partnersQueryKeys.pending(),
       );
       const previousList = queryClient.getQueryData(partnersQueryKeys.list());
 
@@ -393,15 +372,29 @@ export const useAcceptPartnerRequest = () => {
         };
       });
 
-      // Add to list with accepted status
+      // Add to list with accepted status (check for duplicates)
       if (acceptedPartner) {
         queryClient.setQueryData(partnersQueryKeys.list(), (old: any) => {
+          const newPartner = { ...acceptedPartner, status: "accepted" };
           if (!old?.data) {
-            return { data: [{ ...acceptedPartner, status: "accepted" }] };
+            return { data: [newPartner] };
+          }
+          // Check if already exists (from realtime race condition)
+          const exists = old.data.some(
+            (p: Partner) => p.id === acceptedPartner?.id,
+          );
+          if (exists) {
+            // Update existing instead of adding duplicate
+            return {
+              ...old,
+              data: old.data.map((p: Partner) =>
+                p.id === acceptedPartner?.id ? newPartner : p,
+              ),
+            };
           }
           return {
             ...old,
-            data: [...old.data, { ...acceptedPartner, status: "accepted" }],
+            data: [...old.data, newPartner],
           };
         });
       }
@@ -417,7 +410,7 @@ export const useAcceptPartnerRequest = () => {
             partnership_id: partnershipId,
             is_partner: true,
             has_pending_request: false,
-          }
+          },
         );
       });
 
@@ -430,7 +423,7 @@ export const useAcceptPartnerRequest = () => {
           partnership_id: partnershipId,
           is_partner: true,
           has_pending_request: false,
-        }
+        },
       );
 
       return {
@@ -444,13 +437,13 @@ export const useAcceptPartnerRequest = () => {
       if (context?.previousPending) {
         queryClient.setQueryData(
           partnersQueryKeys.pending(),
-          context.previousPending
+          context.previousPending,
         );
       }
       if (context?.previousList) {
         queryClient.setQueryData(
           partnersQueryKeys.list(),
-          context.previousList
+          context.previousList,
         );
       }
       // Rollback search queries
@@ -488,7 +481,7 @@ export const useRejectPartnerRequest = () => {
       });
 
       const previousPending = queryClient.getQueryData(
-        partnersQueryKeys.pending()
+        partnersQueryKeys.pending(),
       );
 
       // Remove from pending
@@ -506,7 +499,7 @@ export const useRejectPartnerRequest = () => {
       if (context?.previousPending) {
         queryClient.setQueryData(
           partnersQueryKeys.pending(),
-          context.previousPending
+          context.previousPending,
         );
       }
     },
@@ -542,7 +535,7 @@ export const useCancelPartnerRequest = () => {
 
       // Snapshot previous data for rollback
       const previousPending = queryClient.getQueryData(
-        partnersQueryKeys.pending()
+        partnersQueryKeys.pending(),
       );
       const previousSent = queryClient.getQueryData(partnersQueryKeys.sent());
 
@@ -583,7 +576,7 @@ export const useCancelPartnerRequest = () => {
             request_status: "none",
             partnership_id: null,
             has_pending_request: false,
-          }
+          },
         );
       });
 
@@ -595,7 +588,7 @@ export const useCancelPartnerRequest = () => {
           request_status: "none",
           partnership_id: null,
           has_pending_request: false,
-        }
+        },
       );
 
       return {
@@ -610,14 +603,14 @@ export const useCancelPartnerRequest = () => {
       if (context?.previousPending) {
         queryClient.setQueryData(
           partnersQueryKeys.pending(),
-          context.previousPending
+          context.previousPending,
         );
       }
       // Rollback sent list
       if (context?.previousSent) {
         queryClient.setQueryData(
           partnersQueryKeys.sent(),
-          context.previousSent
+          context.previousSent,
         );
       }
       // Rollback search queries
@@ -662,9 +655,116 @@ export const useRemovePartner = () => {
       if (context?.previousList) {
         queryClient.setQueryData(
           partnersQueryKeys.list(),
-          context.previousList
+          context.previousList,
         );
       }
     },
   });
+};
+
+/**
+ * Get partner's accountability dashboard (goals, challenges, progress)
+ *
+ * NOTE: Realtime updates for partner data work via the accountability_partners table.
+ * When a user updates their goals/challenges, the backend touches the partnership
+ * record's updated_at, which triggers a realtime event to the partner.
+ * The realtimeService then invalidates this dashboard query.
+ */
+export const usePartnerDashboard = (partnerUserId: string | undefined) => {
+  return useQuery({
+    queryKey: partnersQueryKeys.dashboard(partnerUserId || ""),
+    queryFn: async () => {
+      const response = await partnersService.getPartnerDashboard(
+        partnerUserId!,
+      );
+      if (response.status !== 200 || !response.data) {
+        throw new Error(response.error || "Failed to get partner dashboard");
+      }
+      return response.data;
+    },
+    enabled: !!partnerUserId,
+    staleTime: 30 * 1000, // 30 seconds
+    refetchOnMount: "always", // Always refetch when screen mounts
+    refetchOnWindowFocus: true, // Refetch when app comes to foreground
+  });
+};
+
+/**
+ * Get current user's partner limits (accepted count, pending sent count, limit)
+ */
+export const usePartnerLimits = () => {
+  return useQuery({
+    queryKey: partnersQueryKeys.limits(),
+    queryFn: async () => {
+      const response = await partnersService.getPartnerLimits();
+      if (response.status !== 200 || !response.data) {
+        throw new Error(response.error || "Failed to get partner limits");
+      }
+      return response.data;
+    },
+    staleTime: 60 * 1000, // 1 minute
+  });
+};
+
+/**
+ * Combined hook for checking partner access with immediate subscription store updates
+ *
+ * Uses subscriptionStore for hasFeature (updates immediately after purchase)
+ * Uses usePartnerLimits for counts (accepted_count, pending_sent_count)
+ *
+ * This ensures:
+ * 1. Feature access updates immediately after purchase (via subscriptionStore)
+ * 2. Counts come from cached backend data (accurate accepted + pending counts)
+ */
+export const usePartnerAccess = () => {
+  const { hasPartnerFeature, getPartnerLimit } = useSubscriptionStore();
+  const { data: limits, isLoading, refetch } = usePartnerLimits();
+
+  // Use subscription store for feature (immediate after purchase)
+  const hasFeature = hasPartnerFeature();
+  const limit = getPartnerLimit();
+
+  // Use cached limits for counts (from backend)
+  const acceptedCount = limits?.accepted_count ?? 0;
+  const pendingSentCount = limits?.pending_sent_count ?? 0;
+
+  // Calculate if user can send a request
+  // Uses store for feature + limit (immediate), cache for counts (accurate)
+  const canSendRequest = (): boolean => {
+    // No feature = no access
+    if (!hasFeature) return false;
+
+    // null limit = unlimited
+    if (limit === null) return true;
+
+    // 0 limit = disabled
+    if (limit === 0) return false;
+
+    // Check against counts from cache
+    return acceptedCount + pendingSentCount < limit;
+  };
+
+  // Remaining slots (if limit is not unlimited)
+  const remainingSlots =
+    limit === null
+      ? null
+      : Math.max(0, limit - acceptedCount - pendingSentCount);
+
+  return {
+    // Feature access (immediate via subscriptionStore)
+    hasFeature,
+    limit,
+
+    // Counts (from cached backend data)
+    acceptedCount,
+    pendingSentCount,
+    isLoading,
+
+    // Computed helpers
+    canSendRequest: canSendRequest(),
+    remainingSlots,
+
+    // Actions
+    refetch, // Refetch limits from backend
+  };
 };

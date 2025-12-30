@@ -107,7 +107,7 @@ export const resolveBaseUrl = (): string => {
           const dynamicUrl = `http://${ip}:8000/api/v1`;
           if (__DEV__) {
             console.log(
-              `[API] Using dynamic IP from Metro connection: ${dynamicUrl}`
+              `[API] Using dynamic IP from Metro connection: ${dynamicUrl}`,
             );
           }
           return dynamicUrl;
@@ -232,7 +232,7 @@ class TokenManager {
 
   static async setTokens(
     accessToken: string,
-    refreshToken: string
+    refreshToken: string,
   ): Promise<void> {
     // Update cache immediately
     global.accessToken = accessToken;
@@ -282,7 +282,7 @@ class TokenManager {
   static async setRememberMeEnabled(enabled: boolean): Promise<void> {
     await storageUtil.setSecureItem(
       this.REMEMBER_ME_ENABLED_KEY,
-      enabled.toString()
+      enabled.toString(),
     );
   }
 
@@ -312,7 +312,7 @@ export abstract class BaseApiService {
   // Generic HTTP methods
   protected async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
   ): Promise<ApiResponse<T>> {
     // Skip all API requests if logout is in progress
     if (isLoggingOut && !isPublicEndpoint(endpoint)) {
@@ -342,7 +342,7 @@ export abstract class BaseApiService {
     };
 
     if (token) {
-      defaultHeaders["Authorization"] = `Bearer ${token}`;
+      defaultHeaders.Authorization = `Bearer ${token}`;
     }
 
     // Ensure headers are properly merged - convert to plain object
@@ -418,7 +418,7 @@ export abstract class BaseApiService {
             // After refresh completes, retry with new token
             const newToken = global.accessToken;
             if (newToken) {
-              headersObj["Authorization"] = `Bearer ${newToken}`;
+              headersObj.Authorization = `Bearer ${newToken}`;
               const retryResponse = await fetch(url, {
                 ...config,
                 headers: headersObj,
@@ -450,14 +450,14 @@ export abstract class BaseApiService {
 
             if (refreshResponse.data && refreshResponse.data.access_token) {
               console.log(
-                `[API] Token refreshed successfully, retrying original request...`
+                `[API] Token refreshed successfully, retrying original request...`,
               );
 
               // Update headers with new token from global cache
               // TokenManager.setTokens() already updated global.accessToken
               const newToken =
                 global.accessToken || refreshResponse.data.access_token;
-              headersObj["Authorization"] = `Bearer ${newToken}`;
+              headersObj.Authorization = `Bearer ${newToken}`;
 
               // Retry the request with the new token
               const retryResponse = await fetch(url, {
@@ -491,7 +491,7 @@ export abstract class BaseApiService {
                 throw new ApiError(
                   retryResponse.status,
                   retryData,
-                  `Request failed with status ${retryResponse.status}`
+                  `Request failed with status ${retryResponse.status}`,
                 );
               }
 
@@ -507,7 +507,7 @@ export abstract class BaseApiService {
 
               console.log(
                 `[API] Token refresh failed, returning ${refreshResponse.status}`,
-                refreshResponse
+                refreshResponse,
               );
               // Logout if refresh returns 404 (user not found) or 500 (Internal Server Error - user likely deleted)
               // Check error message to determine if it's a user-related issue
@@ -547,7 +547,7 @@ export abstract class BaseApiService {
 
           if (userStatus === "disabled" || userStatus === "suspended") {
             console.log(
-              `[API] User status: ${userStatus}, triggering auto-logout`
+              `[API] User status: ${userStatus}, triggering auto-logout`,
             );
             try {
               const { handleAutoLogout } = await import("@/utils/authUtils");
@@ -579,7 +579,7 @@ export abstract class BaseApiService {
         // Even though refresh is a "public" endpoint, 404 means user doesn't exist
         if (response.status === 404 && endpoint.includes("/auth/refresh")) {
           console.log(
-            `[API] User not found during refresh, triggering auto-logout`
+            `[API] User not found during refresh, triggering auto-logout`,
           );
           try {
             const { handleAutoLogout } = await import("@/utils/authUtils");
@@ -609,13 +609,13 @@ export abstract class BaseApiService {
             .setBackendStatus(
               "offline",
               (data && (data.detail || data.message || data.error)) ||
-                "Service temporarily unavailable"
+                "Service temporarily unavailable",
             );
         }
         throw new ApiError(
           response.status,
           errorPayload,
-          `Request failed with status ${response.status}`
+          `Request failed with status ${response.status}`,
         );
       }
 
@@ -632,7 +632,7 @@ export abstract class BaseApiService {
       if (__DEV__) {
         console.warn(
           `[API] Request to ${url} failed. Is the backend running?`,
-          error
+          error,
         );
       }
       console.log("error", error);
@@ -644,7 +644,7 @@ export abstract class BaseApiService {
           .getState()
           .setBackendStatus(
             "offline",
-            error instanceof Error ? error.message : "Network error"
+            error instanceof Error ? error.message : "Network error",
           );
       }
       if (error instanceof Error) {
@@ -669,7 +669,7 @@ export abstract class BaseApiService {
 
   protected async post<T>(
     endpoint: string,
-    data?: any
+    data?: any,
   ): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, {
       method: "POST",
@@ -679,7 +679,7 @@ export abstract class BaseApiService {
 
   protected async put<T>(
     endpoint: string,
-    data?: any
+    data?: any,
   ): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, {
       method: "PUT",
@@ -693,7 +693,7 @@ export abstract class BaseApiService {
 
   protected async patch<T>(
     endpoint: string,
-    data?: any
+    data?: any,
   ): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, {
       method: "PATCH",

@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React from "react";
 import { View, Text, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { Card } from "@/components/ui/Card";
 import { useStyles } from "@/themes";
 import { useTheme } from "@/themes";
@@ -10,56 +11,53 @@ import { fontFamily } from "@/lib/fonts";
 import { useTranslation } from "@/lib/i18n";
 import { EmptyState } from "./EmptyState";
 import { SkeletonBox } from "@/components/ui/SkeletonBox";
-import { CheckInModal } from "./CheckInModal";
-import { ChallengeCheckInModal } from "@/screens/tabs/challenges/components/ChallengeCheckInModal";
 import { CheckIn } from "@/services/api/checkins";
 import { PendingCheckIn } from "@/services/api/home";
-import type { Challenge } from "@/services/api/challenges";
-import { useQueryClient } from "@tanstack/react-query";
-import { homeDashboardQueryKeys } from "@/hooks/api/useHomeDashboard";
+import type { Challenge, TrackingType } from "@/services/api/challenges";
+import type { Goal } from "@/services/api/goals";
+import { MOBILE_ROUTES } from "@/lib/routes";
 
 interface TodaysActionsCardProps {
-  /** Combined pending check-ins (goals + challenges) */
-  pendingCheckIns?: PendingCheckIn[];
-  /** Legacy: Today's goal check-ins only */
-  todayCheckIns?: any[];
+  /** Combined pending check-ins (goals + challenges) from today_pending_checkins */
+  pendingCheckIns: PendingCheckIn[];
   isLoading: boolean;
+  /** Callback when a check-in item is selected (for checkin tracking_type) */
+  onCheckInPress?: (
+    checkIn: CheckIn,
+    isChallenge: boolean,
+    entityId: string,
+  ) => void;
+  /** Callback when a meal log item is selected */
+  onMealLogPress?: (entityId: string, isChallenge: boolean) => void;
+  /** Callback when a hydration item is selected */
+  onHydrationPress?: (entityId: string, isChallenge: boolean) => void;
 }
 
 export function TodaysActionsCard({
-  pendingCheckIns: combinedPendingCheckIns,
-  todayCheckIns,
+  pendingCheckIns,
   isLoading,
+  onCheckInPress,
+  onMealLogPress,
+  onHydrationPress,
 }: TodaysActionsCardProps) {
   const styles = useStyles(makeTodaysActionsCardStyles);
   const { colors, brandColors } = useTheme();
   const { t } = useTranslation();
-  const queryClient = useQueryClient();
+  const router = useRouter();
 
-  // State for modals
-  const [selectedGoalCheckIn, setSelectedGoalCheckIn] =
-    useState<CheckIn | null>(null);
-  const [selectedChallengeId, setSelectedChallengeId] = useState<string | null>(
-    null
-  );
-
-  // Use combined data if available, fallback to legacy todayCheckIns
-  const pendingItems: PendingCheckIn[] =
-    combinedPendingCheckIns ||
-    todayCheckIns
-      ?.filter((c: any) => !c.is_checked_in)
-      .map((c: any) => ({
-        type: "goal" as const,
-        data: c,
-        item: c.goal,
-      })) ||
-    [];
+  // The backend already filters to only include pending check-ins from active entities
+  // This is a safety filter in case any slip through
+  const pendingItems = pendingCheckIns.filter((item) => {
+    const status = (item.item as any)?.status;
+    // Goals: only "active", Challenges: "active" or "upcoming"
+    if (item.type === "goal") {
+      return status === "active";
+    } else {
+      return status === "active" || status === "upcoming";
+    }
+  });
 
   const totalPending = pendingItems.length;
-  const goalPending = pendingItems.filter((i) => i.type === "goal").length;
-  const challengePending = pendingItems.filter(
-    (i) => i.type === "challenge"
-  ).length;
 
   if (isLoading) {
     return (
@@ -86,27 +84,13 @@ export function TodaysActionsCard({
   }
 
   if (totalPending === 0) {
-    // Check if there are any check-ins at all (completed ones)
-    const hasAnyCheckIns = todayCheckIns && todayCheckIns.length > 0;
-
-    if (hasAnyCheckIns) {
-      return (
-        <Card shadow="md" style={styles.card}>
-          <Text style={styles.title}>{t("home.today_actions")}</Text>
-          <EmptyState
-            icon="✅"
-            title={t("home.all_done_title")}
-            message={t("home.all_done_message")}
-          />
-        </Card>
-      );
-    }
-
+    // Check if there were any check-ins scheduled today (but all completed)
+    // Since we only get pending check-ins, we show "no check-ins today" for empty
     return (
       <Card shadow="md" style={styles.card}>
         <Text style={styles.title}>{t("home.today_actions")}</Text>
         <EmptyState
-          icon="🎯"
+          icon="checkmark-done-outline"
           title={t("home.no_checkins_today")}
           message={t("home.no_checkins_message")}
         />
@@ -115,21 +99,48 @@ export function TodaysActionsCard({
   }
 
   const handleItemPress = (item: PendingCheckIn) => {
-    if (item.type === "goal") {
-      // For goal check-ins, the data contains the check-in record
-      setSelectedGoalCheckIn(item.data as unknown as CheckIn);
-    } else if (item.type === "challenge") {
-      // For challenge check-ins, we need to open the modal with the challenge ID
-      const challenge = item.item as Challenge;
-      setSelectedChallengeId(challenge.id);
-    }
-  };
+    // Get tracking_type from the goal or challenge
+    const trackingType: TrackingType =
+      (item.item as any)?.tracking_type || "checkin";
+    const isChallenge = item.type === "challenge";
 
-  const handleCheckInComplete = () => {
-    // Invalidate the dashboard query to refresh data
-    queryClient.invalidateQueries({
-      queryKey: homeDashboardQueryKeys.dashboard(),
-    });
+    if (item.type === "goal") {
+      const goal = item.item as Goal;
+
+      switch (trackingType) {
+        case "workout":
+          router.push(MOBILE_ROUTES.WORKOUT.PLAYER(goal.id));
+          break;
+        case "meal":
+          onMealLogPress?.(goal.id, false);
+          break;
+        case "hydration":
+          onHydrationPress?.(goal.id, false);
+          break;
+        case "checkin":
+        default:
+          onCheckInPress?.(item.data as unknown as CheckIn, false, goal.id);
+          break;
+      }
+    } else if (item.type === "challenge") {
+      const challenge = item.item as Challenge;
+
+      switch (trackingType) {
+        case "workout":
+          router.push(MOBILE_ROUTES.WORKOUT.CHALLENGE_PLAYER(challenge.id));
+          break;
+        case "meal":
+          onMealLogPress?.(challenge.id, true);
+          break;
+        case "hydration":
+          onHydrationPress?.(challenge.id, true);
+          break;
+        case "checkin":
+        default:
+          onCheckInPress?.(item.data as unknown as CheckIn, true, challenge.id);
+          break;
+      }
+    }
   };
 
   const getItemTitle = (item: PendingCheckIn): string => {
@@ -143,7 +154,7 @@ export function TodaysActionsCard({
   };
 
   const getItemIcon = (
-    item: PendingCheckIn
+    item: PendingCheckIn,
   ): keyof typeof Ionicons.glyphMap => {
     if (item.type === "goal") {
       return "flag-outline";
@@ -222,26 +233,6 @@ export function TodaysActionsCard({
           </Text>
         )}
       </View>
-
-      {/* Goal Check-in Modal */}
-      {selectedGoalCheckIn && (
-        <CheckInModal
-          visible={!!selectedGoalCheckIn}
-          checkIn={selectedGoalCheckIn}
-          onClose={() => setSelectedGoalCheckIn(null)}
-          onComplete={handleCheckInComplete}
-        />
-      )}
-
-      {/* Challenge Check-in Modal */}
-      {selectedChallengeId && (
-        <ChallengeCheckInModal
-          visible={!!selectedChallengeId}
-          challengeId={selectedChallengeId}
-          onClose={() => setSelectedChallengeId(null)}
-          onComplete={handleCheckInComplete}
-        />
-      )}
     </Card>
   );
 }

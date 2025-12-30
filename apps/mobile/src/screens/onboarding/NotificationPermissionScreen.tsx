@@ -66,7 +66,7 @@ export default function NotificationPermissionScreen() {
       // Mark step as seen
       await storageUtil.setItem(
         STORAGE_KEYS.HAS_SEEN_NOTIFICATION_PERMISSION,
-        true
+        true,
       );
 
       // Navigate to personalization flow regardless of permission result
@@ -174,7 +174,7 @@ export default function NotificationPermissionScreen() {
 const makeNotificationPermissionScreenStyles = (
   tokens: any,
   colors: any,
-  brand: any
+  brand: any,
 ) => {
   return {
     container: {

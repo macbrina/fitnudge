@@ -108,68 +108,85 @@ class TaskQueue:
             )
             return False
 
-    async def get_plan_status(self, goal_id: str) -> Optional[Dict[str, Any]]:
+    async def get_plan_status(
+        self, goal_id: Optional[str] = None, challenge_id: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
         """
-        Get the status of a plan generation for a goal.
+        Get the status of a plan generation for a goal or challenge.
 
         Args:
-            goal_id: The goal ID
+            goal_id: The goal ID (mutually exclusive with challenge_id)
+            challenge_id: The challenge ID (mutually exclusive with goal_id)
 
         Returns:
             Plan status dictionary or None if not found
         """
+        if not goal_id and not challenge_id:
+            return None
+
         try:
             supabase = get_supabase_client()
 
-            result = (
-                supabase.table("actionable_plans")
-                .select("*")
-                .eq("goal_id", goal_id)
-                .maybe_single()
-                .execute()
-            )
+            query = supabase.table("actionable_plans").select("*")
+
+            if goal_id:
+                query = query.eq("goal_id", goal_id)
+            else:
+                query = query.eq("challenge_id", challenge_id)
+
+            result = query.maybe_single().execute()
 
             if result and result.data:
                 return result.data
             return None
 
         except Exception as e:
+            entity_id = goal_id or challenge_id
+            entity_type = "goal" if goal_id else "challenge"
             logger.error(
-                f"Failed to get plan status for goal {goal_id}",
-                {"error": str(e), "goal_id": goal_id},
+                f"Failed to get plan status for {entity_type} {entity_id}",
+                {"error": str(e), f"{entity_type}_id": entity_id},
             )
             return None
 
-    async def get_plan(self, goal_id: str) -> Optional[Dict[str, Any]]:
+    async def get_plan(
+        self, goal_id: Optional[str] = None, challenge_id: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
         """
-        Get the generated plan for a goal (only if status is 'completed').
+        Get the generated plan for a goal or challenge (only if status is 'completed').
 
         Args:
-            goal_id: The goal ID
+            goal_id: The goal ID (mutually exclusive with challenge_id)
+            challenge_id: The challenge ID (mutually exclusive with goal_id)
 
         Returns:
             Plan dictionary with structured_data or None if not found/completed
         """
+        if not goal_id and not challenge_id:
+            return None
+
         try:
             supabase = get_supabase_client()
 
-            result = (
-                supabase.table("actionable_plans")
-                .select("*")
-                .eq("goal_id", goal_id)
-                .eq("status", "completed")
-                .maybe_single()
-                .execute()
-            )
+            query = supabase.table("actionable_plans").select("*")
+
+            if goal_id:
+                query = query.eq("goal_id", goal_id)
+            else:
+                query = query.eq("challenge_id", challenge_id)
+
+            result = query.eq("status", "completed").maybe_single().execute()
 
             if result and result.data:
                 return result.data
             return None
 
         except Exception as e:
+            entity_id = goal_id or challenge_id
+            entity_type = "goal" if goal_id else "challenge"
             logger.error(
-                f"Failed to get plan for goal {goal_id}",
-                {"error": str(e), "goal_id": goal_id},
+                f"Failed to get plan for {entity_type} {entity_id}",
+                {"error": str(e), f"{entity_type}_id": entity_id},
             )
             return None
 

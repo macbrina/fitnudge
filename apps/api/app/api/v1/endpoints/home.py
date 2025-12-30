@@ -89,7 +89,7 @@ async def get_home_dashboard(
             supabase.table("goals")
             .select("*")
             .eq("user_id", user_id)
-            .eq("is_active", True)
+            .eq("status", "active")
             .order("created_at", desc=True)
             .execute()
         )
@@ -113,25 +113,10 @@ async def get_home_dashboard(
 
         for participation in participant_result.data or []:
             challenge = participation.get("challenges")
-            if not challenge or not challenge.get("is_active"):
+            if not challenge or challenge.get("status") not in ("upcoming", "active"):
                 continue
 
-            # Compute status from dates
-            start_date = (
-                date.fromisoformat(challenge["start_date"])
-                if challenge.get("start_date")
-                else None
-            )
-            end_date = (
-                date.fromisoformat(challenge["end_date"])
-                if challenge.get("end_date")
-                else None
-            )
-
-            if end_date and user_today > end_date:
-                challenge["status"] = "completed"
-            elif start_date and user_today < start_date:
-                challenge["status"] = "upcoming"
+            # Status is stored in the database, no need to compute
             else:
                 challenge["status"] = "active"
 
@@ -183,18 +168,23 @@ async def get_home_dashboard(
     # 3. Fetch Today's Pending Goal Check-ins
     # =========================================
     try:
-        # Get check-ins for today
+        # Get check-ins for today with full goal details
         goal_checkins_result = (
             supabase.table("check_ins")
-            .select("*, goals(id, title, goal_type)")
+            .select(
+                "*, goals(id, title, status, tracking_type, category, frequency, days_of_week)"
+            )
             .eq("user_id", user_id)
-            .eq("date", today_str)
+            .eq("check_in_date", today_str)
             .execute()
         )
 
         for checkin in goal_checkins_result.data or []:
             if not checkin.get("is_checked_in"):
                 goal = checkin.get("goals", {})
+                # Skip if goal is not active
+                if not goal or goal.get("status") != "active":
+                    continue
                 pending_checkins.append(
                     PendingCheckInResponse(type="goal", data=checkin, item=goal)
                 )
@@ -209,7 +199,7 @@ async def get_home_dashboard(
         challenge_checkins_result = (
             supabase.table("challenge_check_ins")
             .select(
-                "*, challenges(id, title, description, is_active, start_date, end_date, goal_template)"
+                "*, challenges(id, title, description, status, tracking_type, start_date, end_date, category, frequency, days_of_week)"
             )
             .eq("user_id", user_id)
             .eq("check_in_date", today_str)
@@ -220,7 +210,7 @@ async def get_home_dashboard(
         for checkin in challenge_checkins_result.data or []:
             challenge = checkin.get("challenges", {})
             # Skip if challenge is not active
-            if not challenge or not challenge.get("is_active"):
+            if not challenge or challenge.get("status") not in ("upcoming", "active"):
                 continue
             pending_checkins.append(
                 PendingCheckInResponse(type="challenge", data=checkin, item=challenge)
@@ -229,109 +219,60 @@ async def get_home_dashboard(
         logger.error(f"Error fetching pending challenge check-ins: {e}")
 
     # =========================================
-    # 5. Calculate Combined Stats (from fetched data)
+    # 5. Get Combined Stats from user_stats_cache (optimized)
     # =========================================
+    # The user_stats_cache table is maintained by triggers and provides
+    # pre-calculated stats, eliminating expensive queries on every dashboard load.
+
     active_count = len(items)
     current_streak = 0
     total_check_ins = 0
-    total_goal_checkins = 0
-    total_challenge_checkins = 0
     completion_rate = 0.0
 
-    # Collect all check-in dates from both goals and challenges
-    all_checkin_dates: set[str] = set()
-
-    # Get completed goal check-ins
     try:
-        goal_checkins_result = (
-            supabase.table("check_ins")
-            .select("id, date, completed")
+        # Single query to get all pre-calculated stats
+        stats_result = (
+            supabase.table("user_stats_cache")
+            .select(
+                "current_streak, total_checkins, completion_rate_30d, longest_streak"
+            )
             .eq("user_id", user_id)
-            .eq("completed", True)
+            .limit(1)
             .execute()
         )
-        goal_checkins = goal_checkins_result.data or []
-        total_goal_checkins = len(goal_checkins)
 
-        # Add goal check-in dates to combined set
-        for checkin in goal_checkins:
-            all_checkin_dates.add(checkin["date"])
+        if stats_result.data and len(stats_result.data) > 0:
+            cached_stats = stats_result.data[0]
+            current_streak = cached_stats.get("current_streak", 0) or 0
+            total_check_ins = cached_stats.get("total_checkins", 0) or 0
+            completion_rate = float(cached_stats.get("completion_rate_30d", 0) or 0)
+        else:
+            # Fallback: Create cache entry if it doesn't exist
+            # This handles new users or users created before the migration
+            logger.info(f"No stats cache for user {user_id}, triggering refresh")
+            try:
+                supabase.rpc(
+                    "refresh_user_stats_cache", {"p_user_id": user_id}
+                ).execute()
+                # Retry fetch
+                retry_result = (
+                    supabase.table("user_stats_cache")
+                    .select("current_streak, total_checkins, completion_rate_30d")
+                    .eq("user_id", user_id)
+                    .limit(1)
+                    .execute()
+                )
+                if retry_result.data and len(retry_result.data) > 0:
+                    cached_stats = retry_result.data[0]
+                    current_streak = cached_stats.get("current_streak", 0) or 0
+                    total_check_ins = cached_stats.get("total_checkins", 0) or 0
+                    completion_rate = float(
+                        cached_stats.get("completion_rate_30d", 0) or 0
+                    )
+            except Exception as rpc_err:
+                logger.warning(f"Failed to refresh stats cache: {rpc_err}")
     except Exception as e:
-        logger.error(f"Error fetching goal check-ins: {e}")
-        goal_checkins = []
-
-    # Get challenge check-ins (completed only)
-    try:
-        challenge_checkins_result = (
-            supabase.table("challenge_check_ins")
-            .select("id, check_in_date")
-            .eq("user_id", user_id)
-            .eq("completed", True)
-            .execute()
-        )
-        challenge_checkins = challenge_checkins_result.data or []
-        total_challenge_checkins = len(challenge_checkins)
-
-        # Add challenge check-in dates to combined set
-        for checkin in challenge_checkins:
-            all_checkin_dates.add(checkin["check_in_date"])
-    except Exception as e:
-        logger.error(f"Error fetching challenge check-ins: {e}")
-
-    # Combined total check-ins
-    total_check_ins = total_goal_checkins + total_challenge_checkins
-
-    # Calculate current streak from combined check-in dates
-    # Streak = consecutive days with at least one check-in (goal OR challenge)
-    if all_checkin_dates:
-        streak = 0
-        check_date = user_today
-
-        # Count consecutive days backwards from today
-        while check_date.isoformat() in all_checkin_dates:
-            streak += 1
-            check_date = check_date - timedelta(days=1)
-
-        # If today not checked, check if yesterday was (streak continues)
-        if streak == 0:
-            yesterday = user_today - timedelta(days=1)
-            if yesterday.isoformat() in all_checkin_dates:
-                check_date = yesterday
-                while check_date.isoformat() in all_checkin_dates:
-                    streak += 1
-                    check_date = check_date - timedelta(days=1)
-
-        current_streak = streak
-
-    # Calculate completion rate (last 30 days)
-    try:
-        thirty_days_ago = user_today - timedelta(days=30)
-
-        # Scheduled check-ins in last 30 days
-        scheduled_result = (
-            supabase.table("check_ins")
-            .select("id")
-            .eq("user_id", user_id)
-            .gte("date", thirty_days_ago.isoformat())
-            .execute()
-        )
-        scheduled_count = len(scheduled_result.data) if scheduled_result.data else 0
-
-        # Completed check-ins in last 30 days (completed=true)
-        completed_result = (
-            supabase.table("check_ins")
-            .select("id")
-            .eq("user_id", user_id)
-            .eq("completed", True)
-            .gte("date", thirty_days_ago.isoformat())
-            .execute()
-        )
-        completed_count = len(completed_result.data) if completed_result.data else 0
-
-        if scheduled_count > 0:
-            completion_rate = round((completed_count / scheduled_count) * 100, 1)
-    except Exception as e:
-        logger.error(f"Error calculating completion rate: {e}")
+        logger.error(f"Error fetching user stats cache: {e}")
 
     return HomeDashboardResponse(
         items=items,

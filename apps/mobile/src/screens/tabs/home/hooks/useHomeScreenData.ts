@@ -9,22 +9,12 @@ import {
 } from "@/services/api/home";
 
 export interface HomeScreenData {
-  // New combined data
+  /** Combined list of active goals, challenges, and group goals */
   activeItems: ActiveItem[];
+  /** Check-ins (goals + challenges) that need to be completed today */
   todayPendingCheckIns: PendingCheckIn[];
+  /** Combined stats (active count, streak, completion rate, etc.) */
   dashboardStats: DashboardStats | null;
-
-  // Legacy fields for backward compatibility
-  activeGoals: any[];
-  todayCheckIns: any[];
-  userStats: {
-    total_goals: number;
-    active_goals: number;
-    total_check_ins: number;
-    current_streak: number;
-    longest_streak: number;
-    completion_rate: number;
-  } | null;
 
   isLoading: boolean;
   hasError: boolean;
@@ -37,7 +27,7 @@ export interface HomeScreenData {
  *
  * Returns:
  * - activeItems: Combined list of goals, challenges, and group goals
- * - todayPendingCheckIns: Check-ins that need to be completed today
+ * - todayPendingCheckIns: Check-ins (goals + challenges) that need to be completed today
  * - dashboardStats: Combined stats (active count, streak, etc.)
  */
 export function useHomeScreenData(): HomeScreenData {
@@ -50,12 +40,12 @@ export function useHomeScreenData(): HomeScreenData {
     refetch: refetchDashboard,
   } = useHomeDashboard();
 
-  // Extract active items from response
+  // Extract active items from response (goals + challenges)
   const activeItems = useMemo(() => {
     return dashboardData?.items || [];
   }, [dashboardData]);
 
-  // Extract today's pending check-ins
+  // Extract today's pending check-ins (goals + challenges)
   const todayPendingCheckIns = useMemo(() => {
     return dashboardData?.today_pending_checkins || [];
   }, [dashboardData]);
@@ -64,36 +54,6 @@ export function useHomeScreenData(): HomeScreenData {
   const dashboardStats = useMemo(() => {
     return dashboardData?.stats || null;
   }, [dashboardData]);
-
-  // Legacy: Extract just goals for backward compatibility
-  const activeGoals = useMemo(() => {
-    return activeItems
-      .filter((item) => item.type === "goal")
-      .map((item) => item.data);
-  }, [activeItems]);
-
-  // Legacy: Extract just goal check-ins for backward compatibility
-  const todayCheckIns = useMemo(() => {
-    return todayPendingCheckIns
-      .filter((item) => item.type === "goal")
-      .map((item) => ({
-        ...item.data,
-        goal: item.item,
-      }));
-  }, [todayPendingCheckIns]);
-
-  // Legacy: Convert dashboard stats to old format
-  const userStats = useMemo(() => {
-    if (!dashboardStats) return null;
-    return {
-      total_goals: dashboardStats.active_count,
-      active_goals: dashboardStats.active_count,
-      total_check_ins: dashboardStats.total_check_ins,
-      current_streak: dashboardStats.current_streak,
-      longest_streak: dashboardStats.current_streak, // Not tracked in new API
-      completion_rate: dashboardStats.completion_rate,
-    };
-  }, [dashboardStats]);
 
   // Refetch dashboard data
   const refetch = useCallback(async () => {
@@ -105,16 +65,9 @@ export function useHomeScreenData(): HomeScreenData {
   }, [refetchDashboard, queryClient]);
 
   return {
-    // New combined data
     activeItems,
     todayPendingCheckIns,
     dashboardStats,
-
-    // Legacy fields
-    activeGoals,
-    todayCheckIns,
-    userStats,
-
     isLoading,
     hasError: isError,
     refetch,

@@ -18,6 +18,10 @@ router = APIRouter(
 
 # Pydantic models
 class FitnessProfileRequest(BaseModel):
+    biological_sex: Optional[str] = Field(
+        default=None,
+        description="Biological sex for calorie/nutrition calculations: male, female, or prefer_not_to_say",
+    )
     fitness_level: str = Field(..., description="User's fitness level")
     primary_goal: str = Field(..., description="User's primary fitness goal")
     current_frequency: str = Field(
@@ -27,11 +31,16 @@ class FitnessProfileRequest(BaseModel):
     available_time: str = Field(..., description="How much time user has for workouts")
     motivation_style: str = Field(..., description="What type of motivation works best")
     biggest_challenge: str = Field(..., description="User's biggest fitness challenge")
+    available_equipment: Optional[List[str]] = Field(
+        default=[],
+        description="List of equipment user has access to: none, resistance_band, dumbbell, kettlebell, pull_up_bar, yoga_mat, barbell, bench",
+    )
 
 
 class FitnessProfileResponse(BaseModel):
     id: str
     user_id: str
+    biological_sex: Optional[str] = None
     fitness_level: str
     primary_goal: str
     current_frequency: str
@@ -39,6 +48,7 @@ class FitnessProfileResponse(BaseModel):
     available_time: str
     motivation_style: str
     biggest_challenge: str
+    available_equipment: Optional[List[str]] = []
     completed_at: str
 
 
@@ -69,41 +79,34 @@ async def save_fitness_profile(
             .execute()
         )
 
+        # Build profile data dict, only include biological_sex if provided
+        profile_dict = {
+            "fitness_level": profile_data.fitness_level,
+            "primary_goal": profile_data.primary_goal,
+            "current_frequency": profile_data.current_frequency,
+            "preferred_location": profile_data.preferred_location,
+            "available_time": profile_data.available_time,
+            "motivation_style": profile_data.motivation_style,
+            "biggest_challenge": profile_data.biggest_challenge,
+            "available_equipment": profile_data.available_equipment or [],
+        }
+        # Only include biological_sex if provided (it's optional)
+        if profile_data.biological_sex:
+            profile_dict["biological_sex"] = profile_data.biological_sex
+
         if existing_profile.data:
             # Update existing profile
             result = (
                 supabase.table("user_fitness_profiles")
-                .update(
-                    {
-                        "fitness_level": profile_data.fitness_level,
-                        "primary_goal": profile_data.primary_goal,
-                        "current_frequency": profile_data.current_frequency,
-                        "preferred_location": profile_data.preferred_location,
-                        "available_time": profile_data.available_time,
-                        "motivation_style": profile_data.motivation_style,
-                        "biggest_challenge": profile_data.biggest_challenge,
-                    }
-                )
+                .update(profile_dict)
                 .eq("user_id", user_id)
                 .execute()
             )
         else:
             # Create new profile
+            profile_dict["user_id"] = user_id
             result = (
-                supabase.table("user_fitness_profiles")
-                .insert(
-                    {
-                        "user_id": user_id,
-                        "fitness_level": profile_data.fitness_level,
-                        "primary_goal": profile_data.primary_goal,
-                        "current_frequency": profile_data.current_frequency,
-                        "preferred_location": profile_data.preferred_location,
-                        "available_time": profile_data.available_time,
-                        "motivation_style": profile_data.motivation_style,
-                        "biggest_challenge": profile_data.biggest_challenge,
-                    }
-                )
-                .execute()
+                supabase.table("user_fitness_profiles").insert(profile_dict).execute()
             )
 
         if result.data:

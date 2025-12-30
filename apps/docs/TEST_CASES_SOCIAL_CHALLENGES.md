@@ -10,7 +10,7 @@ This document contains test cases for verifying the social and challenge feature
 2. [Social Nudges & Cheers](#2-social-nudges--cheers)
 3. [Challenges](#3-challenges)
 4. [Goal Activation & Deactivation](#4-goal-activation--deactivation)
-5. [Share Goal as Challenge](#5-share-goal-as-challenge)
+5. [Challenge Creation](#5-challenge-creation)
 6. [Feature Access & Limits](#6-feature-access--limits)
 7. [Challenge Lifecycle (Celery Tasks)](#7-challenge-lifecycle-celery-tasks)
 
@@ -127,7 +127,6 @@ This document contains test cases for verifying the social and challenge feature
 | ------- | ------------------------------------- | --------------------------------------------------------- | -------------------------------------------------------- |
 | CH-030  | Delete challenge with no participants | 1. Create challenge (no one joined)<br>2. Delete          | Challenge permanently removed                            |
 | CH-031  | Cannot delete with participants       | 1. Create challenge with participants<br>2. Try to delete | Error: "Cannot delete challenge with other participants" |
-| CH-032  | Delete updates source goal            | 1. Delete challenge from goal<br>2. Check goal            | converted_to_challenge_id cleared                        |
 
 ### 3.5 Challenge Check-ins
 
@@ -151,12 +150,11 @@ This document contains test cases for verifying the social and challenge feature
 
 ### 4.1 Activate Goal
 
-| Test ID | Test Case                        | Steps                                                       | Expected Result                                                           |
-| ------- | -------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------- |
-| GA-001  | Activate inactive goal           | 1. View inactive goal<br>2. Tap Activate                    | Goal becomes active                                                       |
-| GA-002  | Activate respects combined limit | 1. Have max active goals + challenges<br>2. Try to activate | Error with limit message                                                  |
-| GA-003  | Cannot reactivate converted goal | 1. Convert goal to challenge<br>2. Try to activate original | Error: "This goal was converted to a challenge and cannot be reactivated" |
-| GA-004  | Activate unarchives goal         | 1. Activate archived goal                                   | Goal unarchived and activated                                             |
+| Test ID | Test Case                        | Steps                                                       | Expected Result                |
+| ------- | -------------------------------- | ----------------------------------------------------------- | ------------------------------ |
+| GA-001  | Activate inactive goal           | 1. View inactive goal<br>2. Tap Activate                    | Goal becomes active            |
+| GA-002  | Activate respects combined limit | 1. Have max active goals + challenges<br>2. Try to activate | Error with limit message       |
+| GA-003  | Activate unarchives goal         | 1. Activate archived goal                                   | Goal unarchived and activated  |
 
 ### 4.2 Deactivate Goal
 
@@ -176,25 +174,23 @@ This document contains test cases for verifying the social and challenge feature
 
 ---
 
-## 5. Share Goal as Challenge
+## 5. Challenge Creation
 
-### 5.1 Convert Goal to Challenge
+### 5.1 Create Challenge
 
-| Test ID | Test Case                                  | Steps                                                                      | Expected Result                            |
-| ------- | ------------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------ |
-| SC-001  | Share goal as challenge (archive original) | 1. View eligible goal<br>2. Share as Challenge<br>3. Choose "Archive goal" | Challenge created, original goal archived  |
-| SC-002  | Share goal as challenge (keep active)      | 1. View goal<br>2. Share as Challenge<br>3. Choose "Keep active"           | Challenge created, goal remains active     |
-| SC-003  | Keep active respects limits                | 1. At max active limit<br>2. Try to share without archiving                | Error: Must archive or deactivate first    |
-| SC-004  | Challenge is self-contained                | 1. Convert goal<br>2. Check challenge data                                 | actionable_plan copied into challenge      |
-| SC-005  | Original goal marked correctly             | 1. Archive during conversion<br>2. Check goal                              | archived_reason = "converted_to_challenge" |
-| SC-006  | Only time/target challenges eligible       | 1. View non-challenge goal type                                            | "Share as Challenge" option not available  |
+| Test ID | Test Case                          | Steps                                                            | Expected Result                          |
+| ------- | ---------------------------------- | ---------------------------------------------------------------- | ---------------------------------------- |
+| CC-001  | Create challenge successfully      | 1. Navigate to Challenges<br>2. Tap Create<br>3. Fill in details | Challenge created, user is first member  |
+| CC-002  | Challenge requires all fields      | 1. Try to create without title                                   | Validation error shown                   |
+| CC-003  | Challenge respects active limit    | 1. At max active limit<br>2. Try to create challenge             | Error: Active limit reached              |
+| CC-004  | AI generates plan for challenge    | 1. Create challenge<br>2. Check actionable_plans                 | Plan created with challenge_id           |
 
 ### 5.2 Feature Access
 
-| Test ID | Test Case                          | Steps                         | Expected Result                          |
-| ------- | ---------------------------------- | ----------------------------- | ---------------------------------------- |
-| SC-010  | Free user cannot create challenges | 1. As Free user, try to share | Option not visible or feature gate error |
-| SC-011  | Starter can create challenges      | 1. As Starter, share goal     | Challenge created successfully           |
+| Test ID | Test Case                          | Steps                                  | Expected Result                          |
+| ------- | ---------------------------------- | -------------------------------------- | ---------------------------------------- |
+| CC-010  | Free user cannot create challenges | 1. As Free user, try to create         | Option not visible or feature gate error |
+| CC-011  | Starter can create challenges      | 1. As Starter, create challenge        | Challenge created successfully           |
 
 ---
 
@@ -291,18 +287,23 @@ This document contains test cases for verifying the social and challenge feature
 | POST   | `/challenges/{id}/join`        | CH-001 to CH-008 |
 | POST   | `/challenges/{id}/leave`       | CH-010, CH-011   |
 | POST   | `/challenges/{id}/cancel`      | CH-020 to CH-022 |
-| DELETE | `/challenges/{id}`             | CH-030 to CH-032 |
+| DELETE | `/challenges/{id}`             | CH-030, CH-031   |
 | POST   | `/challenges/{id}/check-in`    | CH-040 to CH-042 |
 | GET    | `/challenges/{id}/leaderboard` | CH-050 to CH-052 |
 
 ### Goals API (`/goals`)
 
-| Method | Endpoint                         | Test IDs         |
-| ------ | -------------------------------- | ---------------- |
-| POST   | `/goals/{id}/activate`           | GA-001 to GA-004 |
-| POST   | `/goals/{id}/deactivate`         | GA-010, GA-011   |
-| DELETE | `/goals/{id}`                    | GA-020 to GA-023 |
-| POST   | `/goals/{id}/share-as-challenge` | SC-001 to SC-006 |
+| Method | Endpoint                 | Test IDs         |
+| ------ | ------------------------ | ---------------- |
+| POST   | `/goals/{id}/activate`   | GA-001 to GA-003 |
+| POST   | `/goals/{id}/deactivate` | GA-010, GA-011   |
+| DELETE | `/goals/{id}`            | GA-020 to GA-023 |
+
+### Challenges API (Creation)
+
+| Method | Endpoint      | Test IDs         |
+| ------ | ------------- | ---------------- |
+| POST   | `/challenges` | CC-001 to CC-011 |
 
 ---
 

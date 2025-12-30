@@ -7,6 +7,7 @@ import { toRN } from "@/lib/units";
 import { fontFamily } from "@/lib/fonts";
 import { useTranslation } from "@/lib/i18n";
 import { SkeletonBox } from "@/components/ui/SkeletonBox";
+import { MoodIcon, type MoodType } from "@/components/icons/MoodIcons";
 
 interface MoodData {
   date: string;
@@ -19,7 +20,15 @@ interface MoodTrendMiniProps {
   isLoading?: boolean;
 }
 
-const MOOD_EMOJIS = ["😞", "😐", "😊", "😄", "🤩"];
+// Map numeric mood (1-5) to MoodType
+const MOOD_MAP: MoodType[] = ["terrible", "bad", "okay", "good", "great"];
+
+const getMoodType = (moodNumber: number): MoodType => {
+  if (moodNumber >= 1 && moodNumber <= 5) {
+    return MOOD_MAP[moodNumber - 1];
+  }
+  return "okay"; // default
+};
 
 export function MoodTrendMini({
   data = [],
@@ -38,8 +47,7 @@ export function MoodTrendMini({
       : 0;
 
   const avgMoodRounded = Math.round(avgMood);
-  const avgMoodEmoji =
-    avgMoodRounded > 0 ? MOOD_EMOJIS[avgMoodRounded - 1] : "😐";
+  const avgMoodType = avgMoodRounded > 0 ? getMoodType(avgMoodRounded) : "okay";
 
   // Determine trend
   let trendIcon = "→";
@@ -91,8 +99,24 @@ export function MoodTrendMini({
     );
   }
 
+  // Empty state when no mood data
   if (validMoods.length === 0) {
-    return null; // Don't show if no mood data
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.title}>{t("home.progress.mood_trend")}</Text>
+        </View>
+        <View style={styles.emptyState}>
+          <View style={styles.emptyIconContainer}>
+            <MoodIcon mood="okay" size={32} />
+          </View>
+          <Text style={styles.emptyText}>
+            {t("home.progress.no_mood_data") ||
+              "No mood data yet. Add your mood when checking in!"}
+          </Text>
+        </View>
+      </View>
+    );
   }
 
   return (
@@ -100,7 +124,10 @@ export function MoodTrendMini({
       <View style={styles.header}>
         <Text style={styles.title}>{t("home.progress.mood_trend")}</Text>
         <View style={styles.avgContainer}>
-          <Text style={styles.avgEmoji}>{avgMoodEmoji}</Text>
+          <MoodIcon
+            mood={avgMoodType}
+            size={toRN(tokens.typography.fontSize.xl)}
+          />
           <Text style={styles.avgText}>
             {Number.isInteger(avgMood) ? avgMood : avgMood.toFixed(1)}/5
           </Text>
@@ -111,7 +138,10 @@ export function MoodTrendMini({
         {data.slice(-7).map((day, index) => (
           <View key={index} style={styles.moodCell}>
             {day.mood ? (
-              <Text style={styles.moodEmoji}>{MOOD_EMOJIS[day.mood - 1]}</Text>
+              <MoodIcon
+                mood={getMoodType(day.mood)}
+                size={toRN(tokens.typography.fontSize.xl)}
+              />
             ) : (
               <View style={styles.emptyMood} />
             )}
@@ -151,9 +181,6 @@ const makeMoodTrendMiniStyles = (tokens: any, colors: any, brand: any) => ({
     alignItems: "center" as const,
     gap: toRN(tokens.spacing[1]),
   },
-  avgEmoji: {
-    fontSize: toRN(tokens.typography.fontSize.lg),
-  },
   avgText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.groteskBold,
@@ -171,9 +198,6 @@ const makeMoodTrendMiniStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: colors.bg.muted,
     alignItems: "center" as const,
     justifyContent: "center" as const,
-  },
-  moodEmoji: {
-    fontSize: toRN(tokens.typography.fontSize.lg),
   },
   emptyMood: {
     width: toRN(tokens.spacing[2]),
@@ -197,5 +221,23 @@ const makeMoodTrendMiniStyles = (tokens: any, colors: any, brand: any) => ({
   trendText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.groteskMedium,
+  },
+  // Empty state styles
+  emptyState: {
+    alignItems: "center" as const,
+    paddingVertical: toRN(tokens.spacing[4]),
+    paddingHorizontal: toRN(tokens.spacing[3]),
+    backgroundColor: colors.bg.muted,
+    borderRadius: toRN(tokens.borderRadius.lg),
+  },
+  emptyIconContainer: {
+    marginBottom: toRN(tokens.spacing[2]),
+    opacity: 0.5,
+  },
+  emptyText: {
+    fontSize: toRN(tokens.typography.fontSize.sm),
+    fontFamily: fontFamily.regular,
+    color: colors.text.tertiary,
+    textAlign: "center" as const,
   },
 });

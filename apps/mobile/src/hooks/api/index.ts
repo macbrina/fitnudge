@@ -9,6 +9,7 @@ export * from "./useAchievements";
 export * from "./useNudges";
 export * from "./useChallenges";
 export * from "./usePartners";
+export * from "./useUserStatsCache";
 
 // Re-export services for direct usage
 export * from "../../services/api";

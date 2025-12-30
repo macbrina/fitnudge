@@ -87,7 +87,7 @@ export const useCreatePost = () => {
         queryClient.setQueryData(socialQueryKeys.feed, (old: any) => {
           if (!old?.data) return old;
           const filtered = old.data.filter(
-            (p: any) => !p.id?.startsWith?.("temp-")
+            (p: any) => !p.id?.startsWith?.("temp-"),
           );
           return { ...old, data: [realPost, ...filtered] };
         });
@@ -136,7 +136,7 @@ export const useLikePost = () => {
 
       const previousFeed = queryClient.getQueryData(socialQueryKeys.feed);
       const previousPost = queryClient.getQueryData(
-        socialQueryKeys.posts.detail(postId)
+        socialQueryKeys.posts.detail(postId),
       );
 
       // Update in feed
@@ -147,7 +147,7 @@ export const useLikePost = () => {
           data: old.data.map((p: any) =>
             p.id === postId
               ? { ...p, is_liked: true, likes_count: (p.likes_count || 0) + 1 }
-              : p
+              : p,
           ),
         };
       });
@@ -165,7 +165,7 @@ export const useLikePost = () => {
               likes_count: (old.data.likes_count || 0) + 1,
             },
           };
-        }
+        },
       );
 
       return { previousFeed, previousPost };
@@ -177,7 +177,7 @@ export const useLikePost = () => {
       if (context?.previousPost) {
         queryClient.setQueryData(
           socialQueryKeys.posts.detail(postId),
-          context.previousPost
+          context.previousPost,
         );
       }
     },
@@ -198,7 +198,7 @@ export const useUnlikePost = () => {
 
       const previousFeed = queryClient.getQueryData(socialQueryKeys.feed);
       const previousPost = queryClient.getQueryData(
-        socialQueryKeys.posts.detail(postId)
+        socialQueryKeys.posts.detail(postId),
       );
 
       // Update in feed
@@ -213,7 +213,7 @@ export const useUnlikePost = () => {
                   is_liked: false,
                   likes_count: Math.max(0, (p.likes_count || 0) - 1),
                 }
-              : p
+              : p,
           ),
         };
       });
@@ -231,7 +231,7 @@ export const useUnlikePost = () => {
               likes_count: Math.max(0, (old.data.likes_count || 0) - 1),
             },
           };
-        }
+        },
       );
 
       return { previousFeed, previousPost };
@@ -243,7 +243,7 @@ export const useUnlikePost = () => {
       if (context?.previousPost) {
         queryClient.setQueryData(
           socialQueryKeys.posts.detail(postId),
-          context.previousPost
+          context.previousPost,
         );
       }
     },
@@ -253,7 +253,7 @@ export const useUnlikePost = () => {
 export const useComments = (
   postId: string,
   page: number = 1,
-  limit: number = 20
+  limit: number = 20,
 ) => {
   return useQuery({
     queryKey: [...socialQueryKeys.comments(postId), page, limit],
@@ -276,7 +276,7 @@ export const useCreateComment = () => {
       });
 
       const previousComments = queryClient.getQueryData(
-        socialQueryKeys.comments(newComment.post_id)
+        socialQueryKeys.comments(newComment.post_id),
       );
 
       // Create optimistic comment
@@ -292,7 +292,7 @@ export const useCreateComment = () => {
         (old: any) => {
           if (!old?.data) return old;
           return { ...old, data: [...old.data, optimisticComment] };
-        }
+        },
       );
 
       // Increment comment count on post
@@ -307,7 +307,7 @@ export const useCreateComment = () => {
               comments_count: (old.data.comments_count || 0) + 1,
             },
           };
-        }
+        },
       );
 
       return { previousComments, postId: newComment.post_id };
@@ -316,7 +316,7 @@ export const useCreateComment = () => {
       if (context?.previousComments) {
         queryClient.setQueryData(
           socialQueryKeys.comments(newComment.post_id),
-          context.previousComments
+          context.previousComments,
         );
       }
     },
@@ -328,10 +328,10 @@ export const useCreateComment = () => {
           (old: any) => {
             if (!old?.data) return old;
             const filtered = old.data.filter(
-              (c: any) => !c.id?.startsWith?.("temp-")
+              (c: any) => !c.id?.startsWith?.("temp-"),
             );
             return { ...old, data: [...filtered, realComment] };
-          }
+          },
         );
       }
     },
@@ -356,7 +356,7 @@ export const useDeleteComment = () => {
       });
 
       const previousComments = queryClient.getQueryData(
-        socialQueryKeys.comments(postId)
+        socialQueryKeys.comments(postId),
       );
 
       // Remove from comments
@@ -380,7 +380,7 @@ export const useDeleteComment = () => {
               comments_count: Math.max(0, (old.data.comments_count || 0) - 1),
             },
           };
-        }
+        },
       );
 
       return { previousComments, postId };
@@ -389,7 +389,7 @@ export const useDeleteComment = () => {
       if (context?.previousComments) {
         queryClient.setQueryData(
           socialQueryKeys.comments(postId),
-          context.previousComments
+          context.previousComments,
         );
       }
     },
@@ -408,7 +408,7 @@ export const useFollowUser = () => {
       });
 
       const previousProfile = queryClient.getQueryData(
-        socialQueryKeys.users.profile(userId)
+        socialQueryKeys.users.profile(userId),
       );
 
       // Update profile
@@ -424,7 +424,7 @@ export const useFollowUser = () => {
               followers_count: (old.data.followers_count || 0) + 1,
             },
           };
-        }
+        },
       );
 
       return { previousProfile };
@@ -433,7 +433,7 @@ export const useFollowUser = () => {
       if (context?.previousProfile) {
         queryClient.setQueryData(
           socialQueryKeys.users.profile(userId),
-          context.previousProfile
+          context.previousProfile,
         );
       }
     },
@@ -452,7 +452,7 @@ export const useUnfollowUser = () => {
       });
 
       const previousProfile = queryClient.getQueryData(
-        socialQueryKeys.users.profile(userId)
+        socialQueryKeys.users.profile(userId),
       );
 
       // Update profile
@@ -468,7 +468,7 @@ export const useUnfollowUser = () => {
               followers_count: Math.max(0, (old.data.followers_count || 0) - 1),
             },
           };
-        }
+        },
       );
 
       return { previousProfile };
@@ -477,7 +477,7 @@ export const useUnfollowUser = () => {
       if (context?.previousProfile) {
         queryClient.setQueryData(
           socialQueryKeys.users.profile(userId),
-          context.previousProfile
+          context.previousProfile,
         );
       }
     },
@@ -496,7 +496,7 @@ export const useUserProfile = (userId: string) => {
 export const useUserPosts = (
   userId: string,
   page: number = 1,
-  limit: number = 20
+  limit: number = 20,
 ) => {
   return useQuery({
     queryKey: [...socialQueryKeys.posts.byUser(userId), page, limit],
@@ -509,7 +509,7 @@ export const useUserPosts = (
 export const useFollowers = (
   userId: string,
   page: number = 1,
-  limit: number = 20
+  limit: number = 20,
 ) => {
   return useQuery({
     queryKey: [...socialQueryKeys.users.followers(userId), page, limit],
@@ -522,7 +522,7 @@ export const useFollowers = (
 export const useFollowing = (
   userId: string,
   page: number = 1,
-  limit: number = 20
+  limit: number = 20,
 ) => {
   return useQuery({
     queryKey: [...socialQueryKeys.users.following(userId), page, limit],
@@ -535,7 +535,7 @@ export const useFollowing = (
 export const useSearchUsers = (
   query: string,
   page: number = 1,
-  limit: number = 20
+  limit: number = 20,
 ) => {
   return useQuery({
     queryKey: [...socialQueryKeys.users.search(query), page, limit],
@@ -548,7 +548,7 @@ export const useSearchUsers = (
 export const useSearchPosts = (
   query: string,
   page: number = 1,
-  limit: number = 20
+  limit: number = 20,
 ) => {
   return useQuery({
     queryKey: [...socialQueryKeys.posts.search(query), page, limit],

@@ -165,17 +165,17 @@ export function UpgradePrompt({
         return {
           title: t("onboarding.subscription.upgrade_prompt.goal_limit_title"),
           subtitle: t(
-            "onboarding.subscription.upgrade_prompt.goal_limit_subtitle"
+            "onboarding.subscription.upgrade_prompt.goal_limit_subtitle",
           ),
         };
       case "feature_locked":
         return {
           title: t(
-            "onboarding.subscription.upgrade_prompt.feature_locked_title"
+            "onboarding.subscription.upgrade_prompt.feature_locked_title",
           ),
           subtitle: t(
             "onboarding.subscription.upgrade_prompt.feature_locked_subtitle",
-            { feature: featureName || "this feature" }
+            { feature: featureName || "this feature" },
           ),
         };
       default:

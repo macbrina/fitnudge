@@ -1,6 +1,6 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
-import { useVideoPlayer, VideoView } from "expo-video";
+import Video, { ResizeMode } from "react-native-video";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useStyles, useTheme } from "@/themes";
@@ -53,24 +53,6 @@ export function LandscapeWorkoutView({
   const { colors, brandColors } = useTheme();
   const insets = useSafeAreaInsets();
 
-  // Video player for landscape view
-  const player = useVideoPlayer(mp4Url || "", (player) => {
-    player.loop = true;
-    player.playbackRate = 0.5;
-    player.muted = true;
-  });
-
-  // Sync video playback with workout pause state
-  useEffect(() => {
-    if (player && mp4Url) {
-      if (isPaused) {
-        player.pause();
-      } else {
-        player.play();
-      }
-    }
-  }, [isPaused, mp4Url, player]);
-
   // Format time as MM:SS
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -82,11 +64,15 @@ export function LandscapeWorkoutView({
     <View style={styles.container}>
       {/* Full-screen Video background */}
       {mp4Url ? (
-        <VideoView
-          player={player}
-          style={[styles.backgroundVideo, isPaused && styles.videoPaused]}
-          contentFit="contain"
-          nativeControls={false}
+        <Video
+          source={{ uri: mp4Url }}
+          style={styles.backgroundVideo}
+          resizeMode={ResizeMode.CONTAIN}
+          repeat={true}
+          rate={0.75}
+          muted={true}
+          paused={isPaused}
+          controls={false}
         />
       ) : (
         <View style={styles.videoPlaceholder}>
@@ -94,9 +80,9 @@ export function LandscapeWorkoutView({
         </View>
       )}
 
-      {/* Paused overlay */}
+      {/* Paused icon (no overlay) */}
       {isPaused && (
-        <View style={styles.pausedOverlay}>
+        <View style={styles.pauseIconContainer}>
           <Ionicons name="pause" size={60} color="white" />
         </View>
       )}
@@ -214,20 +200,17 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     width: "100%",
     height: "100%",
   },
-  videoPaused: {
-    opacity: 0.5,
-  },
   videoPlaceholder: {
     ...StyleSheet.absoluteFillObject,
     alignItems: "center" as const,
     justifyContent: "center" as const,
     backgroundColor: colors.bg.muted,
   },
-  pausedOverlay: {
+  pauseIconContainer: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.3)",
     alignItems: "center" as const,
     justifyContent: "center" as const,
+    backgroundColor: "transparent",
   },
 
   // Progress bar

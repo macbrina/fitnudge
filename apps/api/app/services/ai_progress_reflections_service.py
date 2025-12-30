@@ -59,14 +59,14 @@ class AIProgressReflectionsService:
                 """
                 )
                 .eq("user_id", user_id)
-                .gte("date", start_date.isoformat())
-                .lte("date", end_date.isoformat())
+                .gte("check_in_date", start_date.isoformat())
+                .lte("check_in_date", end_date.isoformat())
             )
 
             if goal_id:
                 query = query.eq("goal_id", goal_id)
 
-            result = query.order("date", desc=True).execute()
+            result = query.order("check_in_date", desc=True).execute()
             goal_check_ins = result.data if result.data else []
 
             # =========================================
@@ -96,7 +96,7 @@ class AIProgressReflectionsService:
                     supabase.table("goals")
                     .select("id, title, category, description")
                     .eq("user_id", user_id)
-                    .eq("is_active", True)
+                    .eq("status", "active")
                     .execute()
                 )
                 personal_goals = goals_result.data or []
@@ -145,7 +145,7 @@ class AIProgressReflectionsService:
             all_checkin_dates: set[str] = set()
             for c in goal_check_ins:
                 if c.get("completed"):
-                    all_checkin_dates.add(c["date"])
+                    all_checkin_dates.add(c["check_in_date"])
             for c in challenge_check_ins:
                 all_checkin_dates.add(c["check_in_date"])
 
@@ -263,63 +263,8 @@ class AIProgressReflectionsService:
         }
 
         try:
-            # Check if user is in a challenge related to this goal
-            if goal_id:
-                # Check if goal was converted to a challenge
-                goal_result = (
-                    supabase.table("goals")
-                    .select("converted_to_challenge_id")
-                    .eq("id", goal_id)
-                    .maybe_single()
-                    .execute()
-                )
-
-                challenge_id = (
-                    goal_result.data.get("converted_to_challenge_id")
-                    if goal_result.data
-                    else None
-                )
-
-                if challenge_id:
-                    # Get challenge info
-                    challenge_result = (
-                        supabase.table("challenges")
-                        .select("id, title")
-                        .eq("id", challenge_id)
-                        .maybe_single()
-                        .execute()
-                    )
-
-                    if challenge_result.data:
-                        social_context["is_challenge"] = True
-                        social_context["challenge_title"] = challenge_result.data.get(
-                            "title"
-                        )
-
-                        # Get participant count
-                        participants = (
-                            supabase.table("challenge_participants")
-                            .select("id", count="exact")
-                            .eq("challenge_id", challenge_id)
-                            .execute()
-                        )
-                        social_context["challenge_participants"] = (
-                            participants.count if hasattr(participants, "count") else 0
-                        )
-
-                        # Get user's rank from leaderboard
-                        rank_result = (
-                            supabase.table("challenge_leaderboard")
-                            .select("rank")
-                            .eq("challenge_id", challenge_id)
-                            .eq("user_id", user_id)
-                            .maybe_single()
-                            .execute()
-                        )
-                        if rank_result.data:
-                            social_context["challenge_rank"] = rank_result.data.get(
-                                "rank"
-                            )
+            # Goals are now habits only - challenges are separate entities
+            # Social context for goals focuses on accountability partners
 
             # Check for accountability partner
             partner_result = (
@@ -372,7 +317,7 @@ class AIProgressReflectionsService:
 
         # Calculate streaks
         sorted_checkins = sorted(
-            check_ins, key=lambda x: x.get("date", ""), reverse=True
+            check_ins, key=lambda x: x.get("check_in_date", ""), reverse=True
         )
         current_streak = 0
         for checkin in sorted_checkins:

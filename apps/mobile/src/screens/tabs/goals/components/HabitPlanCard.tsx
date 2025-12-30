@@ -26,7 +26,11 @@ export function HabitPlanCard({ plan }: HabitPlanCardProps) {
     <Card shadow="lg" style={styles.card}>
       <View style={styles.header}>
         <View style={styles.iconContainer}>
-          <Ionicons name="checkmark-done" size={28} color={brandColors.primary} />
+          <Ionicons
+            name="checkmark-done"
+            size={28}
+            color={brandColors.primary}
+          />
         </View>
         <Text style={styles.cardTitle}>{t("goals.plan.habit_title")}</Text>
       </View>
@@ -155,4 +159,3 @@ const makeHabitPlanCardStyles = (tokens: any, colors: any, brand: any) => ({
     color: brand.primary,
   },
 });
-
