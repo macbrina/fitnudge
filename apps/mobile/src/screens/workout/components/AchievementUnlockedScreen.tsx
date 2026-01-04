@@ -1,13 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import {
-  View,
-  Text,
-  Animated,
-  Pressable,
-  Share,
-  StyleSheet,
-  Image,
-} from "react-native";
+import { View, Text, Animated, Pressable, Share, StyleSheet, Image } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useStyles, useTheme } from "@/themes";
 import { tokens } from "@/themes/tokens";
@@ -15,12 +7,7 @@ import { toRN } from "@/lib/units";
 import { fontFamily } from "@/lib/fonts";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "@/lib/i18n";
-import Svg, {
-  Defs,
-  LinearGradient as SvgLinearGradient,
-  Stop,
-  Rect,
-} from "react-native-svg";
+import Svg, { Defs, LinearGradient as SvgLinearGradient, Stop, Rect } from "react-native-svg";
 
 interface Achievement {
   id: string;
@@ -44,7 +31,7 @@ const rarityColors: Record<string, { primary: string; secondary: string }> = {
   common: { primary: "#6B7280", secondary: "#9CA3AF" },
   rare: { primary: "#3B82F6", secondary: "#60A5FA" },
   epic: { primary: "#8B5CF6", secondary: "#A78BFA" },
-  legendary: { primary: "#F59E0B", secondary: "#FBBF24" },
+  legendary: { primary: "#F59E0B", secondary: "#FBBF24" }
 };
 
 // Badge icons based on badge_key prefix (fallback for when CDN image fails to load)
@@ -54,8 +41,7 @@ const getBadgeIcon = (badgeKey: string): keyof typeof Ionicons.glyphMap => {
   if (badgeKey.includes("perfect")) return "star";
   if (badgeKey.includes("early")) return "sunny";
   if (badgeKey.includes("night")) return "moon";
-  if (badgeKey.includes("marathon") || badgeKey.includes("endurance"))
-    return "timer";
+  if (badgeKey.includes("marathon") || badgeKey.includes("endurance")) return "timer";
   if (badgeKey.includes("weekly")) return "calendar";
   if (badgeKey.includes("program")) return "trophy";
   return "ribbon";
@@ -64,7 +50,7 @@ const getBadgeIcon = (badgeKey: string): keyof typeof Ionicons.glyphMap => {
 export function AchievementUnlockedScreen({
   achievement,
   onContinue,
-  onShare,
+  onShare
 }: AchievementUnlockedScreenProps) {
   const styles = useStyles(makeStyles);
   const { colors, brandColors } = useTheme();
@@ -90,7 +76,7 @@ export function AchievementUnlockedScreen({
       Animated.timing(fadeAnim, {
         toValue: 1,
         duration: 300,
-        useNativeDriver: true,
+        useNativeDriver: true
       }),
       // Pop in badge with bounce
       Animated.parallel([
@@ -98,27 +84,27 @@ export function AchievementUnlockedScreen({
           toValue: 1,
           friction: 4,
           tension: 100,
-          useNativeDriver: true,
+          useNativeDriver: true
         }),
         // Subtle rotation on appear
         Animated.timing(badgeRotate, {
           toValue: 1,
           duration: 600,
-          useNativeDriver: true,
-        }),
+          useNativeDriver: true
+        })
       ]),
       // Glow effect
       Animated.timing(glowAnim, {
         toValue: 1,
         duration: 400,
-        useNativeDriver: true,
+        useNativeDriver: true
       }),
       // Stars animate in
       Animated.timing(starsAnim, {
         toValue: 1,
         duration: 300,
-        useNativeDriver: true,
-      }),
+        useNativeDriver: true
+      })
     ]).start();
 
     // Continuous subtle glow pulse
@@ -127,14 +113,14 @@ export function AchievementUnlockedScreen({
         Animated.timing(glowAnim, {
           toValue: 0.7,
           duration: 1500,
-          useNativeDriver: true,
+          useNativeDriver: true
         }),
         Animated.timing(glowAnim, {
           toValue: 1,
           duration: 1500,
-          useNativeDriver: true,
-        }),
-      ]),
+          useNativeDriver: true
+        })
+      ])
     ).start();
   }, []);
 
@@ -148,8 +134,8 @@ export function AchievementUnlockedScreen({
       await Share.share({
         message: t("completion.achievement.share_message", {
           name: achievement.badge_name,
-          description: achievement.badge_description,
-        }),
+          description: achievement.badge_description
+        })
       });
     } catch (error) {
       console.error("Share error:", error);
@@ -158,19 +144,19 @@ export function AchievementUnlockedScreen({
 
   const rotateInterpolate = badgeRotate.interpolate({
     inputRange: [0, 1],
-    outputRange: ["-10deg", "0deg"],
+    outputRange: ["-10deg", "0deg"]
   });
 
   const formattedDate = achievement.unlocked_at
     ? new Date(achievement.unlocked_at).toLocaleDateString("en-US", {
         month: "short",
         day: "numeric",
-        year: "numeric",
+        year: "numeric"
       })
     : new Date().toLocaleDateString("en-US", {
         month: "short",
         day: "numeric",
-        year: "numeric",
+        year: "numeric"
       });
 
   return (
@@ -180,38 +166,23 @@ export function AchievementUnlockedScreen({
         <Svg height="100%" width="100%">
           <Defs>
             <SvgLinearGradient id="bgGradient" x1="0" y1="0" x2="0" y2="1">
-              <Stop
-                offset="0"
-                stopColor={colors_rarity.primary}
-                stopOpacity="0.3"
-              />
+              <Stop offset="0" stopColor={colors_rarity.primary} stopOpacity="0.3" />
               <Stop offset="0.5" stopColor={colors.bg.canvas} stopOpacity="1" />
               <Stop offset="1" stopColor={colors.bg.canvas} stopOpacity="1" />
             </SvgLinearGradient>
           </Defs>
-          <Rect
-            x="0"
-            y="0"
-            width="100%"
-            height="100%"
-            fill="url(#bgGradient)"
-          />
+          <Rect x="0" y="0" width="100%" height="100%" fill="url(#bgGradient)" />
         </Svg>
       </View>
 
       {/* Close button */}
-      <Pressable
-        style={[styles.closeButton, { top: insets.top + toRN(16) }]}
-        onPress={onContinue}
-      >
+      <Pressable style={[styles.closeButton, { top: insets.top + toRN(16) }]} onPress={onContinue}>
         <Ionicons name="close" size={24} color={colors.text.secondary} />
       </Pressable>
 
       <View style={styles.content}>
         {/* Award label */}
-        <Text style={styles.awardLabel}>
-          {t("completion.achievement.awards")}
-        </Text>
+        <Text style={styles.awardLabel}>{t("completion.achievement.awards")}</Text>
 
         {/* Badge name */}
         <Text style={styles.badgeName}>{achievement.badge_name}</Text>
@@ -224,8 +195,8 @@ export function AchievementUnlockedScreen({
           style={[
             styles.badgeContainer,
             {
-              transform: [{ scale: scaleAnim }, { rotate: rotateInterpolate }],
-            },
+              transform: [{ scale: scaleAnim }, { rotate: rotateInterpolate }]
+            }
           ]}
         >
           {/* Glow effect */}
@@ -234,25 +205,20 @@ export function AchievementUnlockedScreen({
               styles.glow,
               {
                 backgroundColor: colors_rarity.primary,
-                opacity: Animated.multiply(glowAnim, 0.3),
-              },
+                opacity: Animated.multiply(glowAnim, 0.3)
+              }
             ]}
           />
 
           {/* Badge circle */}
-          <View
-            style={[
-              styles.badgeCircle,
-              { backgroundColor: colors_rarity.primary + "20" },
-            ]}
-          >
+          <View style={[styles.badgeCircle, { backgroundColor: colors_rarity.primary + "20" }]}>
             <View
               style={[
                 styles.badgeInner,
                 {
                   borderColor: colors_rarity.primary,
-                  backgroundColor: colors_rarity.primary + "30",
-                },
+                  backgroundColor: colors_rarity.primary + "30"
+                }
               ]}
             >
               {achievement.badge_icon && !imageError ? (
@@ -273,39 +239,25 @@ export function AchievementUnlockedScreen({
           </View>
 
           {/* Decorative stars */}
-          <Animated.View
-            style={[styles.starsContainer, { opacity: starsAnim }]}
-          >
+          <Animated.View style={[styles.starsContainer, { opacity: starsAnim }]}>
             {[0, 1, 2, 3, 4, 5].map((i) => (
               <View
                 key={i}
                 style={[
                   styles.star,
                   {
-                    transform: [
-                      { rotate: `${i * 60}deg` },
-                      { translateY: -100 },
-                    ],
-                  },
+                    transform: [{ rotate: `${i * 60}deg` }, { translateY: -100 }]
+                  }
                 ]}
               >
-                <Ionicons
-                  name="sparkles"
-                  size={16}
-                  color={colors_rarity.secondary}
-                />
+                <Ionicons name="sparkles" size={16} color={colors_rarity.secondary} />
               </View>
             ))}
           </Animated.View>
         </Animated.View>
 
         {/* Rarity badge */}
-        <View
-          style={[
-            styles.rarityBadge,
-            { backgroundColor: colors_rarity.primary + "20" },
-          ]}
-        >
+        <View style={[styles.rarityBadge, { backgroundColor: colors_rarity.primary + "20" }]}>
           <Text style={[styles.rarityText, { color: colors_rarity.primary }]}>
             {achievement.rarity.toUpperCase()}
           </Text>
@@ -324,12 +276,7 @@ export function AchievementUnlockedScreen({
       </View>
 
       {/* Share button */}
-      <View
-        style={[
-          styles.buttonContainer,
-          { paddingBottom: insets.bottom + toRN(16) },
-        ]}
-      >
+      <View style={[styles.buttonContainer, { paddingBottom: insets.bottom + toRN(16) }]}>
         <Pressable style={styles.shareButton} onPress={handleShare}>
           <Ionicons name="share-social" size={20} color={colors.text.primary} />
           <Text style={styles.shareButtonText}>{t("common.share")}</Text>
@@ -346,7 +293,7 @@ export function AchievementUnlockedScreen({
 const makeStyles = (tokens: any, colors: any, brand: any) => ({
   container: {
     flex: 1,
-    backgroundColor: colors.bg.canvas,
+    backgroundColor: colors.bg.canvas
   },
   closeButton: {
     position: "absolute" as const,
@@ -357,51 +304,51 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     borderRadius: toRN(20),
     backgroundColor: colors.bg.secondary,
     alignItems: "center" as const,
-    justifyContent: "center" as const,
+    justifyContent: "center" as const
   },
   content: {
     flex: 1,
     alignItems: "center" as const,
     justifyContent: "center" as const,
-    paddingHorizontal: toRN(tokens.spacing[6]),
+    paddingHorizontal: toRN(tokens.spacing[6])
   },
   awardLabel: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.semiBold,
     color: colors.text.tertiary,
     letterSpacing: 2,
-    marginBottom: toRN(tokens.spacing[2]),
+    marginBottom: toRN(tokens.spacing[2])
   },
   badgeName: {
     fontSize: toRN(tokens.typography.fontSize["3xl"]),
     fontFamily: fontFamily.groteskBold,
     color: colors.text.primary,
     textAlign: "center" as const,
-    marginBottom: toRN(tokens.spacing[2]),
+    marginBottom: toRN(tokens.spacing[2])
   },
   dateText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
     color: colors.text.tertiary,
-    marginBottom: toRN(tokens.spacing[8]),
+    marginBottom: toRN(tokens.spacing[8])
   },
   badgeContainer: {
     alignItems: "center" as const,
     justifyContent: "center" as const,
-    marginBottom: toRN(tokens.spacing[6]),
+    marginBottom: toRN(tokens.spacing[6])
   },
   glow: {
     position: "absolute" as const,
     width: toRN(200),
     height: toRN(200),
-    borderRadius: toRN(100),
+    borderRadius: toRN(100)
   },
   badgeCircle: {
     width: toRN(160),
     height: toRN(160),
     borderRadius: toRN(80),
     alignItems: "center" as const,
-    justifyContent: "center" as const,
+    justifyContent: "center" as const
   },
   badgeInner: {
     width: toRN(120),
@@ -410,32 +357,32 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     borderWidth: 3,
     alignItems: "center" as const,
     justifyContent: "center" as const,
-    overflow: "hidden" as const,
+    overflow: "hidden" as const
   },
   badgeImage: {
     width: toRN(80),
-    height: toRN(80),
+    height: toRN(80)
   },
   starsContainer: {
     position: "absolute" as const,
     width: toRN(200),
     height: toRN(200),
     alignItems: "center" as const,
-    justifyContent: "center" as const,
+    justifyContent: "center" as const
   },
   star: {
-    position: "absolute" as const,
+    position: "absolute" as const
   },
   rarityBadge: {
     paddingVertical: toRN(tokens.spacing[1]),
     paddingHorizontal: toRN(tokens.spacing[3]),
     borderRadius: toRN(tokens.borderRadius.full),
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   rarityText: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.bold,
-    letterSpacing: 1,
+    letterSpacing: 1
   },
   description: {
     fontSize: toRN(tokens.typography.fontSize.base),
@@ -443,23 +390,23 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     color: colors.text.secondary,
     textAlign: "center" as const,
     marginBottom: toRN(tokens.spacing[4]),
-    paddingHorizontal: toRN(tokens.spacing[4]),
+    paddingHorizontal: toRN(tokens.spacing[4])
   },
   pointsContainer: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    gap: toRN(tokens.spacing[1]),
+    gap: toRN(tokens.spacing[1])
   },
   pointsText: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.semiBold,
-    color: "#FFD700",
+    color: "#FFD700"
   },
   buttonContainer: {
     flexDirection: "row" as const,
     gap: toRN(tokens.spacing[3]),
     paddingHorizontal: toRN(tokens.spacing[4]),
-    paddingTop: toRN(tokens.spacing[4]),
+    paddingTop: toRN(tokens.spacing[4])
   },
   shareButton: {
     flex: 1,
@@ -469,12 +416,12 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     gap: toRN(tokens.spacing[2]),
     paddingVertical: toRN(tokens.spacing[4]),
     borderRadius: toRN(tokens.borderRadius.xl),
-    backgroundColor: colors.bg.secondary,
+    backgroundColor: colors.bg.secondary
   },
   shareButtonText: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.semiBold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   continueButton: {
     flex: 1,
@@ -482,11 +429,11 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     justifyContent: "center" as const,
     paddingVertical: toRN(tokens.spacing[4]),
     borderRadius: toRN(tokens.borderRadius.xl),
-    backgroundColor: brand.primary,
+    backgroundColor: brand.primary
   },
   continueButtonText: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.semiBold,
-    color: "#FFFFFF",
-  },
+    color: "#FFFFFF"
+  }
 });

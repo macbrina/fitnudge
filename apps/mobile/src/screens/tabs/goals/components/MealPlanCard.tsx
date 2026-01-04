@@ -60,7 +60,7 @@ export function MealPlanCard({ plan, goalId, challengeId }: MealPlanCardProps) {
     balanced_eating: t("goals.plan.focus_balanced") || "Balanced Eating",
     calorie_deficit: t("goals.plan.focus_calorie_deficit") || "Calorie Deficit",
     calorie_surplus: t("goals.plan.focus_calorie_surplus") || "Calorie Surplus",
-    meal_timing: t("goals.plan.focus_meal_timing") || "Meal Timing",
+    meal_timing: t("goals.plan.focus_meal_timing") || "Meal Timing"
   };
 
   const toggleSection = (section: string) => {
@@ -74,12 +74,8 @@ export function MealPlanCard({ plan, goalId, challengeId }: MealPlanCardProps) {
           <Ionicons name="nutrition" size={28} color={brandColors.primary} />
         </View>
         <View style={styles.headerText}>
-          <Text style={styles.cardTitle}>
-            {t("goals.plan.meal_title") || "Meal Plan"}
-          </Text>
-          <Text style={styles.cardSubtitle}>
-            {focusAreaLabels[focusArea] || focusArea}
-          </Text>
+          <Text style={styles.cardTitle}>{t("goals.plan.meal_title") || "Meal Plan"}</Text>
+          <Text style={styles.cardSubtitle}>{focusAreaLabels[focusArea] || focusArea}</Text>
         </View>
       </View>
 
@@ -95,24 +91,16 @@ export function MealPlanCard({ plan, goalId, challengeId }: MealPlanCardProps) {
                 <Ionicons name="flame-outline" size={24} color="#F59E0B" />
                 <View style={styles.targetInfo}>
                   <Text style={styles.targetValue}>{calories}</Text>
-                  <Text style={styles.targetLabel}>
-                    {t("goals.plan.calories") || "calories"}
-                  </Text>
+                  <Text style={styles.targetLabel}>{t("goals.plan.calories") || "calories"}</Text>
                 </View>
               </View>
             )}
             {proteinGrams && (
               <View style={styles.targetCard}>
-                <Ionicons
-                  name="flask-outline"
-                  size={24}
-                  color={brandColors.primary}
-                />
+                <Ionicons name="flask-outline" size={24} color={brandColors.primary} />
                 <View style={styles.targetInfo}>
                   <Text style={styles.targetValue}>{proteinGrams}g</Text>
-                  <Text style={styles.targetLabel}>
-                    {t("goals.plan.protein") || "protein"}
-                  </Text>
+                  <Text style={styles.targetLabel}>{t("goals.plan.protein") || "protein"}</Text>
                 </View>
               </View>
             )}
@@ -129,46 +117,29 @@ export function MealPlanCard({ plan, goalId, challengeId }: MealPlanCardProps) {
           <View style={styles.scheduleInfo}>
             <Text style={styles.scheduleText}>
               {mealsPerDay} {t("goals.plan.meals_day") || "meals per day"}
-              {mealSchedule.include_snacks &&
-                ` + ${t("goals.plan.snacks") || "snacks"}`}
+              {mealSchedule.include_snacks && ` + ${t("goals.plan.snacks") || "snacks"}`}
             </Text>
           </View>
           <View style={styles.mealSchedule}>
             {mealSchedule.suggested_times.breakfast && (
               <View style={styles.mealRow}>
                 <Ionicons name="sunny-outline" size={18} color="#F59E0B" />
-                <Text style={styles.mealName}>
-                  {t("goals.plan.breakfast") || "Breakfast"}
-                </Text>
-                <Text style={styles.mealTime}>
-                  {mealSchedule.suggested_times.breakfast}
-                </Text>
+                <Text style={styles.mealName}>{t("goals.plan.breakfast") || "Breakfast"}</Text>
+                <Text style={styles.mealTime}>{mealSchedule.suggested_times.breakfast}</Text>
               </View>
             )}
             {mealSchedule.suggested_times.lunch && (
               <View style={styles.mealRow}>
-                <Ionicons
-                  name="partly-sunny-outline"
-                  size={18}
-                  color="#F97316"
-                />
-                <Text style={styles.mealName}>
-                  {t("goals.plan.lunch") || "Lunch"}
-                </Text>
-                <Text style={styles.mealTime}>
-                  {mealSchedule.suggested_times.lunch}
-                </Text>
+                <Ionicons name="partly-sunny-outline" size={18} color="#F97316" />
+                <Text style={styles.mealName}>{t("goals.plan.lunch") || "Lunch"}</Text>
+                <Text style={styles.mealTime}>{mealSchedule.suggested_times.lunch}</Text>
               </View>
             )}
             {mealSchedule.suggested_times.dinner && (
               <View style={styles.mealRow}>
                 <Ionicons name="moon-outline" size={18} color="#6366F1" />
-                <Text style={styles.mealName}>
-                  {t("goals.plan.dinner") || "Dinner"}
-                </Text>
-                <Text style={styles.mealTime}>
-                  {mealSchedule.suggested_times.dinner}
-                </Text>
+                <Text style={styles.mealName}>{t("goals.plan.dinner") || "Dinner"}</Text>
+                <Text style={styles.mealTime}>{mealSchedule.suggested_times.dinner}</Text>
               </View>
             )}
           </View>
@@ -178,9 +149,7 @@ export function MealPlanCard({ plan, goalId, challengeId }: MealPlanCardProps) {
       {/* Meal Suggestions */}
       {hasMealSuggestions && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            {t("goals.plan.meal_ideas") || "Meal Ideas"}
-          </Text>
+          <Text style={styles.sectionTitle}>{t("goals.plan.meal_ideas") || "Meal Ideas"}</Text>
 
           {/* Breakfast Ideas */}
           {mealSuggestions.breakfast_ideas?.length > 0 && (
@@ -196,29 +165,22 @@ export function MealPlanCard({ plan, goalId, challengeId }: MealPlanCardProps) {
                 </Text>
               </View>
               <Ionicons
-                name={
-                  expandedSection === "breakfast"
-                    ? "chevron-up"
-                    : "chevron-down"
-                }
+                name={expandedSection === "breakfast" ? "chevron-up" : "chevron-down"}
                 size={18}
                 color={colors.text.tertiary}
               />
             </TouchableOpacity>
           )}
-          {expandedSection === "breakfast" &&
-            mealSuggestions.breakfast_ideas && (
-              <View style={styles.suggestionsList}>
-                {mealSuggestions.breakfast_ideas.map(
-                  (idea: string, index: number) => (
-                    <View key={index} style={styles.suggestionItem}>
-                      <Text style={styles.suggestionBullet}>•</Text>
-                      <Text style={styles.suggestionText}>{idea}</Text>
-                    </View>
-                  ),
-                )}
-              </View>
-            )}
+          {expandedSection === "breakfast" && mealSuggestions.breakfast_ideas && (
+            <View style={styles.suggestionsList}>
+              {mealSuggestions.breakfast_ideas.map((idea: string, index: number) => (
+                <View key={index} style={styles.suggestionItem}>
+                  <Text style={styles.suggestionBullet}>•</Text>
+                  <Text style={styles.suggestionText}>{idea}</Text>
+                </View>
+              ))}
+            </View>
+          )}
 
           {/* Lunch Ideas */}
           {mealSuggestions.lunch_ideas?.length > 0 && (
@@ -228,19 +190,11 @@ export function MealPlanCard({ plan, goalId, challengeId }: MealPlanCardProps) {
               activeOpacity={0.7}
             >
               <View style={styles.collapsibleLeft}>
-                <Ionicons
-                  name="partly-sunny-outline"
-                  size={18}
-                  color="#F97316"
-                />
-                <Text style={styles.collapsibleTitle}>
-                  {t("goals.plan.lunch") || "Lunch"}
-                </Text>
+                <Ionicons name="partly-sunny-outline" size={18} color="#F97316" />
+                <Text style={styles.collapsibleTitle}>{t("goals.plan.lunch") || "Lunch"}</Text>
               </View>
               <Ionicons
-                name={
-                  expandedSection === "lunch" ? "chevron-up" : "chevron-down"
-                }
+                name={expandedSection === "lunch" ? "chevron-up" : "chevron-down"}
                 size={18}
                 color={colors.text.tertiary}
               />
@@ -248,14 +202,12 @@ export function MealPlanCard({ plan, goalId, challengeId }: MealPlanCardProps) {
           )}
           {expandedSection === "lunch" && mealSuggestions.lunch_ideas && (
             <View style={styles.suggestionsList}>
-              {mealSuggestions.lunch_ideas.map(
-                (idea: string, index: number) => (
-                  <View key={index} style={styles.suggestionItem}>
-                    <Text style={styles.suggestionBullet}>•</Text>
-                    <Text style={styles.suggestionText}>{idea}</Text>
-                  </View>
-                ),
-              )}
+              {mealSuggestions.lunch_ideas.map((idea: string, index: number) => (
+                <View key={index} style={styles.suggestionItem}>
+                  <Text style={styles.suggestionBullet}>•</Text>
+                  <Text style={styles.suggestionText}>{idea}</Text>
+                </View>
+              ))}
             </View>
           )}
 
@@ -268,14 +220,10 @@ export function MealPlanCard({ plan, goalId, challengeId }: MealPlanCardProps) {
             >
               <View style={styles.collapsibleLeft}>
                 <Ionicons name="moon-outline" size={18} color="#6366F1" />
-                <Text style={styles.collapsibleTitle}>
-                  {t("goals.plan.dinner") || "Dinner"}
-                </Text>
+                <Text style={styles.collapsibleTitle}>{t("goals.plan.dinner") || "Dinner"}</Text>
               </View>
               <Ionicons
-                name={
-                  expandedSection === "dinner" ? "chevron-up" : "chevron-down"
-                }
+                name={expandedSection === "dinner" ? "chevron-up" : "chevron-down"}
                 size={18}
                 color={colors.text.tertiary}
               />
@@ -283,14 +231,12 @@ export function MealPlanCard({ plan, goalId, challengeId }: MealPlanCardProps) {
           )}
           {expandedSection === "dinner" && mealSuggestions.dinner_ideas && (
             <View style={styles.suggestionsList}>
-              {mealSuggestions.dinner_ideas.map(
-                (idea: string, index: number) => (
-                  <View key={index} style={styles.suggestionItem}>
-                    <Text style={styles.suggestionBullet}>•</Text>
-                    <Text style={styles.suggestionText}>{idea}</Text>
-                  </View>
-                ),
-              )}
+              {mealSuggestions.dinner_ideas.map((idea: string, index: number) => (
+                <View key={index} style={styles.suggestionItem}>
+                  <Text style={styles.suggestionBullet}>•</Text>
+                  <Text style={styles.suggestionText}>{idea}</Text>
+                </View>
+              ))}
             </View>
           )}
 
@@ -303,14 +249,10 @@ export function MealPlanCard({ plan, goalId, challengeId }: MealPlanCardProps) {
             >
               <View style={styles.collapsibleLeft}>
                 <Ionicons name="cafe-outline" size={18} color="#10B981" />
-                <Text style={styles.collapsibleTitle}>
-                  {t("goals.plan.snacks") || "Snacks"}
-                </Text>
+                <Text style={styles.collapsibleTitle}>{t("goals.plan.snacks") || "Snacks"}</Text>
               </View>
               <Ionicons
-                name={
-                  expandedSection === "snacks" ? "chevron-up" : "chevron-down"
-                }
+                name={expandedSection === "snacks" ? "chevron-up" : "chevron-down"}
                 size={18}
                 color={colors.text.tertiary}
               />
@@ -318,14 +260,12 @@ export function MealPlanCard({ plan, goalId, challengeId }: MealPlanCardProps) {
           )}
           {expandedSection === "snacks" && mealSuggestions.snack_ideas && (
             <View style={styles.suggestionsList}>
-              {mealSuggestions.snack_ideas.map(
-                (idea: string, index: number) => (
-                  <View key={index} style={styles.suggestionItem}>
-                    <Text style={styles.suggestionBullet}>•</Text>
-                    <Text style={styles.suggestionText}>{idea}</Text>
-                  </View>
-                ),
-              )}
+              {mealSuggestions.snack_ideas.map((idea: string, index: number) => (
+                <View key={index} style={styles.suggestionItem}>
+                  <Text style={styles.suggestionBullet}>•</Text>
+                  <Text style={styles.suggestionText}>{idea}</Text>
+                </View>
+              ))}
             </View>
           )}
         </View>
@@ -342,11 +282,7 @@ export function MealPlanCard({ plan, goalId, challengeId }: MealPlanCardProps) {
           <Text style={styles.historyLinkText}>
             {t("meals.view_history") || "View Meal History"}
           </Text>
-          <Ionicons
-            name="chevron-forward"
-            size={16}
-            color={brandColors.primary}
-          />
+          <Ionicons name="chevron-forward" size={16} color={brandColors.primary} />
         </TouchableOpacity>
       )}
     </Card>
@@ -355,7 +291,7 @@ export function MealPlanCard({ plan, goalId, challengeId }: MealPlanCardProps) {
 
 const makeMealPlanCardStyles = (tokens: any, colors: any, brand: any) => ({
   card: {
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   header: {
     flexDirection: "row" as const,
@@ -363,7 +299,7 @@ const makeMealPlanCardStyles = (tokens: any, colors: any, brand: any) => ({
     marginBottom: toRN(tokens.spacing[4]),
     paddingBottom: toRN(tokens.spacing[3]),
     borderBottomWidth: 1,
-    borderBottomColor: colors.border.default,
+    borderBottomColor: colors.border.default
   },
   iconContainer: {
     width: toRN(tokens.spacing[10]),
@@ -372,36 +308,36 @@ const makeMealPlanCardStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: brand.primary + "1A",
     alignItems: "center" as const,
     justifyContent: "center" as const,
-    marginRight: toRN(tokens.spacing[3]),
+    marginRight: toRN(tokens.spacing[3])
   },
   headerText: {
-    flex: 1,
+    flex: 1
   },
   cardTitle: {
     fontSize: toRN(tokens.typography.fontSize.xl),
     fontFamily: fontFamily.groteskBold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   cardSubtitle: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.groteskMedium,
     color: brand.primary,
-    marginTop: toRN(tokens.spacing[0.5]),
+    marginTop: toRN(tokens.spacing[0.5])
   },
   section: {
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   sectionTitle: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.groteskSemiBold,
     color: colors.text.primary,
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
 
   // Targets
   targetsRow: {
     flexDirection: "row" as const,
-    gap: toRN(tokens.spacing[3]),
+    gap: toRN(tokens.spacing[3])
   },
   targetCard: {
     flex: 1,
@@ -410,34 +346,34 @@ const makeMealPlanCardStyles = (tokens: any, colors: any, brand: any) => ({
     gap: toRN(tokens.spacing[3]),
     padding: toRN(tokens.spacing[3]),
     backgroundColor: colors.bg.muted,
-    borderRadius: toRN(tokens.borderRadius.lg),
+    borderRadius: toRN(tokens.borderRadius.lg)
   },
   targetInfo: {
-    flex: 1,
+    flex: 1
   },
   targetValue: {
     fontSize: toRN(tokens.typography.fontSize["2xl"]),
     fontFamily: fontFamily.groteskBold,
     color: colors.text.primary,
-    marginBottom: toRN(tokens.spacing[0.5]),
+    marginBottom: toRN(tokens.spacing[0.5])
   },
   targetLabel: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.groteskMedium,
-    color: colors.text.secondary,
+    color: colors.text.secondary
   },
 
   // Schedule
   scheduleInfo: {
-    marginBottom: toRN(tokens.spacing[2]),
+    marginBottom: toRN(tokens.spacing[2])
   },
   scheduleText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.groteskMedium,
-    color: colors.text.secondary,
+    color: colors.text.secondary
   },
   mealSchedule: {
-    gap: toRN(tokens.spacing[2]),
+    gap: toRN(tokens.spacing[2])
   },
   mealRow: {
     flexDirection: "row" as const,
@@ -446,19 +382,19 @@ const makeMealPlanCardStyles = (tokens: any, colors: any, brand: any) => ({
     paddingVertical: toRN(tokens.spacing[2]),
     paddingHorizontal: toRN(tokens.spacing[3]),
     backgroundColor: colors.bg.muted,
-    borderRadius: toRN(tokens.borderRadius.md),
+    borderRadius: toRN(tokens.borderRadius.md)
   },
   mealName: {
     flex: 1,
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.groteskMedium,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   mealTime: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.groteskSemiBold,
     color: brand.primary,
-    textTransform: "capitalize" as const,
+    textTransform: "capitalize" as const
   },
 
   // Collapsible Meal Ideas
@@ -470,18 +406,18 @@ const makeMealPlanCardStyles = (tokens: any, colors: any, brand: any) => ({
     paddingHorizontal: toRN(tokens.spacing[3]),
     backgroundColor: colors.bg.muted,
     borderRadius: toRN(tokens.borderRadius.md),
-    marginBottom: toRN(tokens.spacing[2]),
+    marginBottom: toRN(tokens.spacing[2])
   },
   collapsibleLeft: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    gap: toRN(tokens.spacing[2]),
+    gap: toRN(tokens.spacing[2])
   },
   collapsibleTitle: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.semiBold,
     color: colors.text.primary,
-    textTransform: "capitalize" as const,
+    textTransform: "capitalize" as const
   },
   suggestionsList: {
     paddingHorizontal: toRN(tokens.spacing[3]),
@@ -489,24 +425,24 @@ const makeMealPlanCardStyles = (tokens: any, colors: any, brand: any) => ({
     marginBottom: toRN(tokens.spacing[2]),
     backgroundColor: colors.bg.secondary,
     borderRadius: toRN(tokens.borderRadius.md),
-    marginTop: -toRN(tokens.spacing[2]),
+    marginTop: -toRN(tokens.spacing[2])
   },
   suggestionItem: {
     flexDirection: "row" as const,
     alignItems: "flex-start" as const,
     gap: toRN(tokens.spacing[2]),
-    paddingVertical: toRN(tokens.spacing[1.5]),
+    paddingVertical: toRN(tokens.spacing[1.5])
   },
   suggestionBullet: {
     fontSize: toRN(tokens.typography.fontSize.base),
-    color: brand.primary,
+    color: brand.primary
   },
   suggestionText: {
     flex: 1,
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.groteskRegular,
     color: colors.text.secondary,
-    lineHeight: toRN(tokens.typography.fontSize.sm) * 1.4,
+    lineHeight: toRN(tokens.typography.fontSize.sm) * 1.4
   },
   historyLink: {
     flexDirection: "row" as const,
@@ -516,11 +452,11 @@ const makeMealPlanCardStyles = (tokens: any, colors: any, brand: any) => ({
     marginTop: toRN(tokens.spacing[4]),
     paddingTop: toRN(tokens.spacing[4]),
     borderTopWidth: 1,
-    borderTopColor: colors.border.subtle,
+    borderTopColor: colors.border.subtle
   },
   historyLinkText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
-    color: brand.primary,
-  },
+    color: brand.primary
+  }
 });

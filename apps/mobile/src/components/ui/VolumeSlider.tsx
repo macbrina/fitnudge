@@ -6,7 +6,7 @@ import {
   LayoutChangeEvent,
   GestureResponderEvent,
   ViewStyle,
-  Animated,
+  Animated
 } from "react-native";
 
 interface VolumeSliderProps {
@@ -24,7 +24,7 @@ export function VolumeSlider({
   minimumTrackTintColor = "#007AFF",
   maximumTrackTintColor = "#E0E0E0",
   thumbTintColor = "#FFFFFF",
-  style,
+  style
 }: VolumeSliderProps) {
   const trackWidth = useRef(0);
   const trackOffsetX = useRef(0);
@@ -70,9 +70,9 @@ export function VolumeSlider({
         },
         onPanResponderTerminate: () => {
           isDraggingRef.current = false;
-        },
+        }
       }),
-    [calculateValue, onValueChange],
+    [calculateValue, onValueChange]
   );
 
   const handleLayout = useCallback((event: LayoutChangeEvent) => {
@@ -89,19 +89,15 @@ export function VolumeSlider({
   const thumbPosition = trackWidth.current * clampedValue;
 
   return (
-    <View
-      style={[styles.container, style]}
-      onLayout={handleLayout}
-      {...panResponder.panHandlers}
-    >
+    <View style={[styles.container, style]} onLayout={handleLayout} {...panResponder.panHandlers}>
       <View style={[styles.track, { backgroundColor: colors.border.default }]}>
         <View
           style={[
             styles.filledTrack,
             {
               backgroundColor: colors.bg.primary,
-              width: `${clampedValue * 100}%`,
-            },
+              width: `${clampedValue * 100}%`
+            }
           ]}
         />
       </View>
@@ -109,9 +105,9 @@ export function VolumeSlider({
         style={[
           styles.thumb,
           {
-            backgroundColor: colors.bg.secondary,
-            left: `${clampedValue * 100}%`,
-          },
+            backgroundColor: "#ffffff",
+            left: `${clampedValue * 100}%`
+          }
         ]}
       />
     </View>
@@ -122,15 +118,15 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
   container: {
     height: 44,
     justifyContent: "center",
-    flex: 1,
+    flex: 1
   },
   track: {
     height: 4,
-    borderRadius: 2,
+    borderRadius: 2
   },
   filledTrack: {
     height: 4,
-    borderRadius: 2,
+    borderRadius: 2
   },
   thumb: {
     position: "absolute",
@@ -142,8 +138,8 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
-    elevation: 4,
-  },
+    elevation: 4
+  }
 });
 
 export default VolumeSlider;

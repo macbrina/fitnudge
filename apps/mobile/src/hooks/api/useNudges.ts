@@ -1,10 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  nudgesService,
-  Nudge,
-  SendNudgeRequest,
-  NudgeType,
-} from "@/services/api/nudges";
+import { nudgesService, Nudge, SendNudgeRequest, NudgeType } from "@/services/api/nudges";
 import { nudgesQueryKeys } from "./queryKeys";
 
 // Re-export query keys for external use
@@ -18,7 +13,7 @@ export const useNudges = (unreadOnly: boolean = false) => {
     queryKey: nudgesQueryKeys.listFiltered(unreadOnly),
     queryFn: () => nudgesService.getNudges(unreadOnly),
     staleTime: 30 * 1000, // 30 seconds - nudges should refresh often
-    placeholderData: { data: [] as Nudge[], status: 200 },
+    placeholderData: { data: [] as Nudge[], status: 200 }
   });
 };
 
@@ -30,7 +25,7 @@ export const useSentNudges = () => {
     queryKey: nudgesQueryKeys.sent(),
     queryFn: () => nudgesService.getSentNudges(),
     staleTime: 60 * 1000, // 1 minute
-    placeholderData: { data: [] as Nudge[], status: 200 },
+    placeholderData: { data: [] as Nudge[], status: 200 }
   });
 };
 
@@ -43,7 +38,7 @@ export const useUnreadNudgesCount = () => {
     queryFn: () => nudgesService.getUnreadCount(),
     staleTime: 30 * 1000, // 30 seconds
     refetchInterval: 60 * 1000, // Poll every minute
-    placeholderData: { data: { unread_count: 0 }, status: 200 },
+    placeholderData: { data: { unread_count: 0 }, status: 200 }
   });
 };
 
@@ -58,7 +53,7 @@ export const useSendNudge = () => {
     onSuccess: () => {
       // Invalidate sent nudges
       queryClient.invalidateQueries({ queryKey: nudgesQueryKeys.sent() });
-    },
+    }
   });
 };
 
@@ -75,7 +70,7 @@ export const useSendQuickNudge = () => {
       message,
       goalId,
       challengeId,
-      partnershipId,
+      partnershipId
     }: {
       recipientId: string;
       type?: NudgeType;
@@ -90,11 +85,11 @@ export const useSendQuickNudge = () => {
         message,
         goal_id: goalId,
         challenge_id: challengeId,
-        partnership_id: partnershipId,
+        partnership_id: partnershipId
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: nudgesQueryKeys.sent() });
-    },
+    }
   });
 };
 
@@ -109,7 +104,7 @@ export const useSendCheer = () => {
       recipientId,
       goalId,
       challengeId,
-      emoji = "🎉",
+      emoji = "🎉"
     }: {
       recipientId: string;
       goalId?: string;
@@ -121,11 +116,11 @@ export const useSendCheer = () => {
         nudge_type: "cheer",
         emoji,
         goal_id: goalId,
-        challenge_id: challengeId,
+        challenge_id: challengeId
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: nudgesQueryKeys.sent() });
-    },
+    }
   });
 };
 
@@ -141,38 +136,29 @@ export const useMarkNudgeRead = () => {
     onMutate: async (nudgeId) => {
       await queryClient.cancelQueries({ queryKey: nudgesQueryKeys.list() });
       await queryClient.cancelQueries({
-        queryKey: nudgesQueryKeys.unreadCount(),
+        queryKey: nudgesQueryKeys.unreadCount()
       });
 
       const previousList = queryClient.getQueryData(nudgesQueryKeys.list());
-      const previousCount = queryClient.getQueryData(
-        nudgesQueryKeys.unreadCount(),
-      );
+      const previousCount = queryClient.getQueryData(nudgesQueryKeys.unreadCount());
 
       // Update list
       queryClient.setQueryData(nudgesQueryKeys.list(), (old: any) => {
         if (!old?.data) return old;
         return {
           ...old,
-          data: old.data.map((n: Nudge) =>
-            n.id === nudgeId ? { ...n, is_read: true } : n,
-          ),
+          data: old.data.map((n: Nudge) => (n.id === nudgeId ? { ...n, is_read: true } : n))
         };
       });
 
       // Update filtered lists too
-      queryClient.setQueryData(
-        nudgesQueryKeys.listFiltered(false),
-        (old: any) => {
-          if (!old?.data) return old;
-          return {
-            ...old,
-            data: old.data.map((n: Nudge) =>
-              n.id === nudgeId ? { ...n, is_read: true } : n,
-            ),
-          };
-        },
-      );
+      queryClient.setQueryData(nudgesQueryKeys.listFiltered(false), (old: any) => {
+        if (!old?.data) return old;
+        return {
+          ...old,
+          data: old.data.map((n: Nudge) => (n.id === nudgeId ? { ...n, is_read: true } : n))
+        };
+      });
 
       // Decrement count
       queryClient.setQueryData(nudgesQueryKeys.unreadCount(), (old: any) => {
@@ -180,8 +166,8 @@ export const useMarkNudgeRead = () => {
         return {
           ...old,
           data: {
-            unread_count: Math.max(0, (old.data.unread_count || 0) - 1),
-          },
+            unread_count: Math.max(0, (old.data.unread_count || 0) - 1)
+          }
         };
       });
 
@@ -192,12 +178,9 @@ export const useMarkNudgeRead = () => {
         queryClient.setQueryData(nudgesQueryKeys.list(), context.previousList);
       }
       if (context?.previousCount) {
-        queryClient.setQueryData(
-          nudgesQueryKeys.unreadCount(),
-          context.previousCount,
-        );
+        queryClient.setQueryData(nudgesQueryKeys.unreadCount(), context.previousCount);
       }
-    },
+    }
   });
 };
 
@@ -213,20 +196,18 @@ export const useMarkAllNudgesRead = () => {
     onMutate: async () => {
       await queryClient.cancelQueries({ queryKey: nudgesQueryKeys.list() });
       await queryClient.cancelQueries({
-        queryKey: nudgesQueryKeys.unreadCount(),
+        queryKey: nudgesQueryKeys.unreadCount()
       });
 
       const previousList = queryClient.getQueryData(nudgesQueryKeys.list());
-      const previousCount = queryClient.getQueryData(
-        nudgesQueryKeys.unreadCount(),
-      );
+      const previousCount = queryClient.getQueryData(nudgesQueryKeys.unreadCount());
 
       // Mark all as read in cache
       queryClient.setQueryData(nudgesQueryKeys.list(), (old: any) => {
         if (!old?.data) return old;
         return {
           ...old,
-          data: old.data.map((n: Nudge) => ({ ...n, is_read: true })),
+          data: old.data.map((n: Nudge) => ({ ...n, is_read: true }))
         };
       });
 
@@ -243,12 +224,9 @@ export const useMarkAllNudgesRead = () => {
         queryClient.setQueryData(nudgesQueryKeys.list(), context.previousList);
       }
       if (context?.previousCount) {
-        queryClient.setQueryData(
-          nudgesQueryKeys.unreadCount(),
-          context.previousCount,
-        );
+        queryClient.setQueryData(nudgesQueryKeys.unreadCount(), context.previousCount);
       }
-    },
+    }
   });
 };
 
@@ -271,7 +249,7 @@ export const useDeleteNudge = () => {
         if (!old?.data) return old;
         return {
           ...old,
-          data: old.data.filter((n: Nudge) => n.id !== nudgeId),
+          data: old.data.filter((n: Nudge) => n.id !== nudgeId)
         };
       });
 
@@ -281,6 +259,6 @@ export const useDeleteNudge = () => {
       if (context?.previousSent) {
         queryClient.setQueryData(nudgesQueryKeys.sent(), context.previousSent);
       }
-    },
+    }
   });
 };

@@ -3,7 +3,7 @@ import Constants from "expo-constants";
 import {
   GoogleSignin,
   statusCodes,
-  isErrorWithCode,
+  isErrorWithCode
 } from "@react-native-google-signin/google-signin";
 
 type GoogleSignInResult = {
@@ -21,19 +21,13 @@ type ExpoGoogleConfig = {
 };
 
 const getExpoGoogleConfig = (): ExpoGoogleConfig => {
-  const extra = Constants.expoConfig?.extra as
-    | { [key: string]: any }
-    | undefined;
+  const extra = Constants.expoConfig?.extra as { [key: string]: any } | undefined;
   return (extra?.googleSignIn ?? {}) as ExpoGoogleConfig;
 };
 
 export const hasGoogleSignInConfiguration = (): boolean => {
   const googleConfig = getExpoGoogleConfig();
-  return (
-    !!googleConfig.iosClientId ||
-    !!googleConfig.androidClientId ||
-    !!googleConfig.webClientId
-  );
+  return !!googleConfig.iosClientId || !!googleConfig.androidClientId || !!googleConfig.webClientId;
 };
 
 const configureGoogleSignin = () => {
@@ -44,7 +38,7 @@ const configureGoogleSignin = () => {
   GoogleSignin.configure({
     iosClientId: googleConfig.iosClientId,
     webClientId: googleConfig.webClientId,
-    forceCodeForRefreshToken: false,
+    forceCodeForRefreshToken: false
   });
 
   isConfigured = true;
@@ -52,10 +46,7 @@ const configureGoogleSignin = () => {
 
 export const isGoogleCancelledError = (error: unknown): boolean => {
   if (!isErrorWithCode(error)) return false;
-  return (
-    error.code === statusCodes.SIGN_IN_CANCELLED ||
-    error.code === statusCodes.IN_PROGRESS
-  );
+  return error.code === statusCodes.SIGN_IN_CANCELLED || error.code === statusCodes.IN_PROGRESS;
 };
 
 export const getFriendlyGoogleError = (error: unknown): string => {
@@ -75,30 +66,29 @@ export const getFriendlyGoogleError = (error: unknown): string => {
   }
 };
 
-export const performNativeGoogleSignIn =
-  async (): Promise<GoogleSignInResult> => {
-    configureGoogleSignin();
+export const performNativeGoogleSignIn = async (): Promise<GoogleSignInResult> => {
+  configureGoogleSignin();
 
-    if (Platform.OS === "android") {
-      await GoogleSignin.hasPlayServices({
-        showPlayServicesUpdateDialog: true,
-      });
-    }
+  if (Platform.OS === "android") {
+    await GoogleSignin.hasPlayServices({
+      showPlayServicesUpdateDialog: true
+    });
+  }
 
-    const userInfo = await GoogleSignin.signIn();
-    const { idToken, serverAuthCode } =
-      userInfo?.data ??
-      ({} as {
-        idToken?: string | null;
-        serverAuthCode?: string | null;
-      });
+  const userInfo = await GoogleSignin.signIn();
+  const { idToken, serverAuthCode } =
+    userInfo?.data ??
+    ({} as {
+      idToken?: string | null;
+      serverAuthCode?: string | null;
+    });
 
-    if (!idToken) {
-      throw new Error("Google Sign-In did not return an ID token.");
-    }
+  if (!idToken) {
+    throw new Error("Google Sign-In did not return an ID token.");
+  }
 
-    return {
-      idToken,
-      serverAuthCode,
-    };
+  return {
+    idToken,
+    serverAuthCode
   };
+};

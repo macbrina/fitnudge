@@ -2,7 +2,8 @@ import Button from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import LinkText from "@/components/ui/LinkText";
 import { LoadingOverlay } from "@/components/ui/LoadingOverlay";
-import { SkeletonCard } from "@/components/ui/SkeletonBox";
+import { SkeletonBox } from "@/components/ui/SkeletonBox";
+import { EXTERNAL_URLS } from "@/constants/general";
 import { AlertOverlay, useAlertModal } from "@/contexts/AlertModalContext";
 import { useRevenueCat } from "@/contexts/RevenueCatContext";
 import { usePostHog } from "@/hooks/usePostHog";
@@ -22,15 +23,44 @@ import { STORAGE_KEYS, storageUtil } from "@/utils/storageUtil";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  Linking,
-  Modal,
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { Linking, Modal, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+// Feature icon mapping based on feature key/name patterns
+const getFeatureIcon = (featureKey: string): keyof typeof Ionicons.glyphMap => {
+  const key = featureKey.toLowerCase();
+
+  // Goals & Limits
+  if (key.includes("goal")) return "flag";
+  if (key.includes("challenge")) return "trophy";
+  if (key.includes("partner") || key.includes("accountability")) return "people";
+
+  // AI Features
+  if (key.includes("ai") || key.includes("motivation") || key.includes("chat")) return "sparkles";
+  if (key.includes("memory") || key.includes("personalization")) return "bulb";
+  if (key.includes("voice")) return "mic";
+  if (key.includes("reflection")) return "journal";
+
+  // Analytics & Tracking
+  if (key.includes("analytics") || key.includes("insight")) return "stats-chart";
+  if (key.includes("meal") || key.includes("nutrition") || key.includes("food"))
+    return "restaurant";
+  if (key.includes("recap") || key.includes("weekly")) return "calendar";
+  if (key.includes("progress")) return "trending-up";
+
+  // Social
+  if (key.includes("community") || key.includes("social")) return "globe";
+  if (key.includes("create")) return "add-circle";
+
+  // Premium Perks
+  if (key.includes("priority")) return "flash";
+  if (key.includes("support")) return "headset";
+  if (key.includes("api") || key.includes("integration")) return "extension-puzzle";
+  if (key.includes("ad") && key.includes("free")) return "shield-checkmark";
+
+  // Default
+  return "checkmark-circle";
+};
 
 type BillingPeriod = "monthly" | "annual";
 
@@ -41,7 +71,7 @@ interface SubscriptionScreenProps {
 
 export default function SubscriptionScreen({
   visible: visibleProp = true,
-  onClose,
+  onClose
 }: SubscriptionScreenProps = {}) {
   // When used as a standalone screen (no onClose), manage visibility internally
   const [internalVisible, setInternalVisible] = useState(true);
@@ -51,12 +81,9 @@ export default function SubscriptionScreen({
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
-  const [planCardHeight, setPlanCardHeight] = useState<number | null>(null);
   const [showAllFeatures, setShowAllFeatures] = useState(false);
   const [canShowExitOffer, setCanShowExitOffer] = useState(false);
-  const [trialEligibility, setTrialEligibility] = useState<
-    Record<string, boolean>
-  >({});
+  const [trialEligibility, setTrialEligibility] = useState<Record<string, boolean>>({});
 
   const { t } = useTranslation();
   const styles = useStyles(makeSubscriptionScreenStyles);
@@ -68,31 +95,25 @@ export default function SubscriptionScreen({
   const { getPlan } = useSubscriptionStore();
   const currentPlan = getPlan();
 
-  // Plan tier hierarchy: free=0, starter=1, pro=2, elite=3
-  type PlanId = "free" | "starter" | "pro" | "elite";
+  // Plan tier hierarchy: 2-tier system (free=0, premium=1)
+  type PlanId = "free" | "premium";
   const PLAN_TIERS: Record<PlanId, number> = {
     free: 0,
-    starter: 1,
-    pro: 2,
-    elite: 3,
+    premium: 1
   };
 
   const currentTier = PLAN_TIERS[currentPlan as PlanId] || 0;
-  const isOnHighestPlan = currentPlan === "elite";
+  const isOnHighestPlan = currentPlan === "premium";
   const hasActiveSubscription = currentPlan !== "free";
-  const {
-    setExitOffer,
-    markAsSubscribed,
-    showExitIntentModal,
-    openExitIntentModal,
-  } = useExitOfferStore();
+  const { setExitOffer, markAsSubscribed, showExitIntentModal, openExitIntentModal } =
+    useExitOfferStore();
   const {
     purchase,
     purchasePackage,
     restorePurchases,
     offerings,
     currentOffering,
-    checkTrialEligibility: checkTrialEligibilityApi,
+    checkTrialEligibility: checkTrialEligibilityApi
   } = useRevenueCat();
 
   // Exit Offer Configuration
@@ -111,9 +132,7 @@ export default function SubscriptionScreen({
 
       try {
         // Get show count - read raw value first
-        const rawShowCount = await storageUtil.getItem<number>(
-          STORAGE_KEYS.EXIT_OFFER_SHOW_COUNT,
-        );
+        const rawShowCount = await storageUtil.getItem<number>(STORAGE_KEYS.EXIT_OFFER_SHOW_COUNT);
         const showCount = rawShowCount || 0;
 
         // SubscriptionScreen only triggers exit offer if it has NEVER been shown
@@ -136,7 +155,7 @@ export default function SubscriptionScreen({
   useEffect(() => {
     capture("subscription_screen_shown", {
       billing_period: billingPeriod,
-      source: "onboarding",
+      source: "onboarding"
     });
   }, []);
 
@@ -169,40 +188,13 @@ export default function SubscriptionScreen({
 
   const selectedPlan = useMemo(
     () => activePlans.find((plan) => plan.id === selectedPlanId) ?? null,
-    [activePlans, selectedPlanId],
+    [activePlans, selectedPlanId]
   );
-
-  const selectedPlanIndex = useMemo(() => {
-    if (!selectedPlan) return -1;
-    return activePlans.findIndex((plan) => plan.id === selectedPlan.id);
-  }, [activePlans, selectedPlan]);
-
-  const previousPlanName =
-    selectedPlanIndex > 0
-      ? (activePlans[selectedPlanIndex - 1]?.name ?? null)
-      : null;
 
   const getNumericPrice = (value: any) => {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : 0;
   };
-
-  const maxAnnualSavingsPercent = useMemo(() => {
-    if (!activePlans.length || billingPeriod !== "annual") return 0;
-    return activePlans.reduce((max, plan) => {
-      const monthly = getNumericPrice(plan.monthly_price);
-      const annual = getNumericPrice(plan.annual_price);
-      if (monthly > 0 && annual > 0) {
-        const monthlyTotal = monthly * 12;
-        const pct = Math.max(
-          0,
-          Math.round(((monthlyTotal - annual) / monthlyTotal) * 100),
-        );
-        return Math.max(max, pct);
-      }
-      return max;
-    }, 0);
-  }, [activePlans, billingPeriod]);
 
   // Check trial eligibility using RevenueCat context API
   useEffect(() => {
@@ -236,9 +228,7 @@ export default function SubscriptionScreen({
 
         // Map product eligibility back to plan IDs
         const newEligibility: Record<string, boolean> = {};
-        for (const [productId, isEligible] of Object.entries(
-          eligibilityResult,
-        )) {
+        for (const [productId, isEligible] of Object.entries(eligibilityResult)) {
           const planId = productToPlanMap[productId];
           if (planId) {
             newEligibility[planId] = isEligible;
@@ -265,7 +255,7 @@ export default function SubscriptionScreen({
       if (!plan) return false;
       return trialEligibility[plan.id] ?? false;
     },
-    [trialEligibility],
+    [trialEligibility]
   );
 
   // Memoized eligibility check for the currently selected plan
@@ -277,7 +267,7 @@ export default function SubscriptionScreen({
     setBillingPeriod(period);
     capture("subscription_billing_period_changed", {
       billing_period: period,
-      source: "onboarding",
+      source: "onboarding"
     });
   };
 
@@ -286,7 +276,7 @@ export default function SubscriptionScreen({
     capture("subscription_plan_selected", {
       plan: planId,
       billing_period: billingPeriod,
-      source: "onboarding",
+      source: "onboarding"
     });
   };
 
@@ -306,7 +296,7 @@ export default function SubscriptionScreen({
     if (!selectedPlan) {
       await showAlert({
         title: t("onboarding.subscription.no_plan_title"),
-        variant: "warning",
+        variant: "warning"
       });
       return;
     }
@@ -316,7 +306,7 @@ export default function SubscriptionScreen({
       plan: selectedPlan.id,
       billing_period: billingPeriod,
       has_trial: selectedPlan.has_trial,
-      trial_days: selectedPlan.trial_days,
+      trial_days: selectedPlan.trial_days
     });
 
     try {
@@ -330,9 +320,7 @@ export default function SubscriptionScreen({
           : selectedPlan.product_id_android_monthly;
 
       if (!productId) {
-        throw new Error(
-          `No product ID found for ${selectedPlan.id} ${billingPeriod}`,
-        );
+        throw new Error(`No product ID found for ${selectedPlan.id} ${billingPeriod}`);
       }
 
       // Find the package in offerings that matches this product ID
@@ -340,17 +328,12 @@ export default function SubscriptionScreen({
 
       // Search through all offerings to find the matching package
       const allOfferings = currentOffering
-        ? [
-            currentOffering,
-            ...offerings.filter(
-              (o) => o.identifier !== currentOffering.identifier,
-            ),
-          ]
+        ? [currentOffering, ...offerings.filter((o) => o.identifier !== currentOffering.identifier)]
         : offerings;
 
       for (const offering of allOfferings) {
         const pkg = offering.packages.find(
-          (p) => p.identifier === productId || p.identifier.includes(productId),
+          (p) => p.identifier === productId || p.identifier.includes(productId)
         );
         if (pkg) {
           targetPackage = pkg;
@@ -365,7 +348,7 @@ export default function SubscriptionScreen({
           await markAsSubscribed();
           capture("subscription_purchase_success", {
             plan: selectedPlan.id,
-            billing_period: billingPeriod,
+            billing_period: billingPeriod
           });
           handleClose();
         }
@@ -381,7 +364,7 @@ export default function SubscriptionScreen({
 
         capture("subscription_purchase_success", {
           plan: selectedPlan.id,
-          billing_period: billingPeriod,
+          billing_period: billingPeriod
         });
 
         // Close the subscription screen
@@ -391,17 +374,17 @@ export default function SubscriptionScreen({
       }
     } catch (error) {
       logger.error("Failed to complete subscription purchase", {
-        error: error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? error.message : String(error)
       });
       capture("subscription_purchase_error", {
         plan: selectedPlan.id,
         billing_period: billingPeriod,
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: error instanceof Error ? error.message : "Unknown error"
       });
       await showAlert({
         title: t("onboarding.subscription.error_title"),
         message: t("onboarding.subscription.error_message"),
-        variant: "error",
+        variant: "error"
       });
     } finally {
       setIsProcessing(false);
@@ -411,28 +394,32 @@ export default function SubscriptionScreen({
   const handleClose = useCallback(async () => {
     // Check eligibility at the moment of close (not from cached state)
     // This avoids race conditions with resetForTesting
-    const rawShowCount = await storageUtil.getItem<number>(
-      STORAGE_KEYS.EXIT_OFFER_SHOW_COUNT,
-    );
+    const rawShowCount = await storageUtil.getItem<number>(STORAGE_KEYS.EXIT_OFFER_SHOW_COUNT);
     const currentCount = rawShowCount || 0;
-    const canShowNow = currentCount === 0 && !showExitIntentModal;
+
+    // Check if user has EVER subscribed from the backend (survives app reinstall)
+    // Users who subscribed before (even if expired) should pay full price
+    const { useSubscriptionStore } = await import("@/stores/subscriptionStore");
+    const hasEverSubscribedBackend = useSubscriptionStore.getState().hasEverSubscribed();
+
+    // Also check local storage as fallback (in case backend hasn't loaded yet)
+    const localHasSubscribed = await storageUtil.getItem(STORAGE_KEYS.HAS_EVER_SUBSCRIBED);
+    const neverSubscribed = !hasEverSubscribedBackend && localHasSubscribed !== "true";
+
+    // Only show exit offer if:
+    // 1. First time (count === 0)
+    // 2. Not already showing
+    // 3. User has NEVER subscribed before (expired users pay full price)
+    const canShowNow = currentCount === 0 && !showExitIntentModal && neverSubscribed;
 
     // Show exit intent if eligible and not already showing
     // Check BOTH cached state AND fresh storage value
     if (canShowNow) {
-      await storageUtil.setItem(
-        STORAGE_KEYS.EXIT_OFFER_SHOW_COUNT,
-        currentCount + 1,
-      );
-      await storageUtil.setItem(
-        STORAGE_KEYS.EXIT_OFFER_LAST_SHOWN,
-        new Date().toISOString(),
-      );
+      await storageUtil.setItem(STORAGE_KEYS.EXIT_OFFER_SHOW_COUNT, currentCount + 1);
+      await storageUtil.setItem(STORAGE_KEYS.EXIT_OFFER_LAST_SHOWN, new Date().toISOString());
 
       // Set expiry time for countdown
-      const expiry = new Date(
-        Date.now() + EXIT_OFFER_COUNTDOWN_MINUTES * 60 * 1000,
-      );
+      const expiry = new Date(Date.now() + EXIT_OFFER_COUNTDOWN_MINUTES * 60 * 1000);
 
       // Also set in global store for floating button on other screens
       setExitOffer(expiry);
@@ -446,7 +433,7 @@ export default function SubscriptionScreen({
       } else {
         setInternalVisible(false);
       }
-      openExitIntentModal();
+      await openExitIntentModal();
       return;
     }
 
@@ -469,7 +456,7 @@ export default function SubscriptionScreen({
     selectedPlanId,
     capture,
     setExitOffer,
-    openExitIntentModal,
+    openExitIntentModal
   ]);
 
   // Open platform subscription management (iOS/Android)
@@ -482,16 +469,14 @@ export default function SubscriptionScreen({
         await Linking.openURL("https://apps.apple.com/account/subscriptions");
       } else {
         // Android: Opens Google Play subscription management
-        await Linking.openURL(
-          "https://play.google.com/store/account/subscriptions",
-        );
+        await Linking.openURL("https://play.google.com/store/account/subscriptions");
       }
     } catch (error) {
       logger.error("Failed to open subscription management", { error });
       await showAlert({
         title: t("onboarding.subscription.manage_error_title"),
         message: t("onboarding.subscription.manage_error_message"),
-        variant: "error",
+        variant: "error"
       });
     }
   }, [capture, currentPlan, showAlert, t]);
@@ -515,7 +500,7 @@ export default function SubscriptionScreen({
       }
     } catch (error) {
       capture("subscription_restore_error", {
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: error instanceof Error ? error.message : "Unknown error"
       });
     } finally {
       setIsRestoring(false);
@@ -523,108 +508,28 @@ export default function SubscriptionScreen({
   }, [capture, restorePurchases, markAsSubscribed, handleClose]);
 
   const ctaLabel =
-    selectedPlan && selectedPlan.has_trial && isUserEligibleForTrial
+    selectedPlan && selectedPlan.has_trial && isUserEligibleForTrial && billingPeriod === "annual"
       ? t("onboarding.subscription.cta_trial", {
-          days: selectedPlan.trial_days ?? 0,
+          days: selectedPlan.trial_days ?? 0
         })
       : t("onboarding.subscription.cta_subscribe");
 
-  const planCardWidth =
-    (styles.planCard && "width" in styles.planCard && styles.planCard.width) ||
-    toRN(tokens.spacing[64]) + toRN(tokens.spacing[1]); // 16.25rem = 260px
-  const defaultPlanCardHeight = toRN(tokens.spacing[12]) * 5; // 15rem = 240px
-  const skeletonCardHeight = planCardHeight ?? defaultPlanCardHeight;
-
-  const handlePlanCardLayout = useCallback((event: any) => {
-    const { height } = event.nativeEvent.layout;
-    setPlanCardHeight((prev) => {
-      if (prev === null || Math.abs(prev - height) > 1) {
-        return height;
-      }
-      return prev;
-    });
-  }, []);
-
-  const renderPlanCard = (plan: any, index?: number) => {
-    const price = getDisplayedPrice(plan);
-    const comparePrice = getComparePrice(plan);
-    const isSelected = selectedPlanId === plan.id;
-    const isPlanEligibleForTrial = checkTrialEligibility(plan);
-
-    const isLast =
-      typeof index === "number" ? index === activePlans.length - 1 : false;
-
-    return (
-      <TouchableOpacity
-        key={plan.id}
-        onPress={() => handlePlanSelect(plan.id)}
-        onLayout={index === 0 ? handlePlanCardLayout : undefined}
-        style={styles.planCardTouchable}
-        accessibilityRole="button"
-        accessibilityLabel={`${plan.name}, ${price.toFixed(2)} ${
-          billingPeriod === "annual"
-            ? t("onboarding.subscription.toggle_annual")
-            : t("onboarding.subscription.toggle_monthly")
-        }`}
-      >
-        <Card
-          padded={false}
-          shadow="xl"
-          style={[
-            styles.planCard,
-            isSelected && styles.planCardSelected,
-            !isLast && styles.planCardSpacing,
-          ]}
-        >
-          <View style={styles.planHeader}>
-            <Text
-              style={[styles.planName, isSelected && styles.planNameSelected]}
-            >
-              {plan.name}
-            </Text>
-            {plan.is_popular && (
-              <View style={styles.popularBadge}>
-                <Text style={styles.popularText}>
-                  {t("onboarding.subscription.popular_badge")}
-                </Text>
-              </View>
-            )}
-          </View>
-
-          <View>
-            <View style={styles.priceContainer}>
-              <Text style={[styles.price, isSelected && styles.priceSelected]}>
-                ${price.toFixed(2)}
-                {billingPeriod === "annual" ? "/year" : "/month"}
-              </Text>
-              {plan.has_trial && plan.trial_days && isPlanEligibleForTrial ? (
-                <Text style={styles.trialPillText}>
-                  {t("onboarding.subscription.trial_pill", {
-                    days: plan.trial_days,
-                  })}
-                </Text>
-              ) : null}
-            </View>
-            {comparePrice !== null && (
-              <Text style={styles.priceCompare}>
-                {t("onboarding.subscription.price_compare", {
-                  value: comparePrice.toFixed(2),
-                })}
-              </Text>
-            )}
-          </View>
-        </Card>
-      </TouchableOpacity>
-    );
-  };
+  // Calculate savings percentage for display
+  const savingsPercent = useMemo(() => {
+    if (!selectedPlan) return 0;
+    const monthly = getNumericPrice(selectedPlan.monthly_price);
+    const annual = getNumericPrice(selectedPlan.annual_price);
+    if (monthly > 0 && annual > 0) {
+      const monthlyTotal = monthly * 12;
+      return Math.max(0, Math.round(((monthlyTotal - annual) / monthlyTotal) * 100));
+    }
+    return 0;
+  }, [selectedPlan]);
 
   const modalContent = (
     <View style={styles.modalContent}>
       <TouchableOpacity
-        style={[
-          styles.closeButton,
-          { top: insets.top + toRN(tokens.spacing[4]) },
-        ]}
+        style={[styles.closeButton, { top: insets.top + toRN(tokens.spacing[4]) }]}
         onPress={handleClose}
         accessibilityLabel={t("common.close")}
         accessibilityRole="button"
@@ -663,7 +568,7 @@ export default function SubscriptionScreen({
               ? t("onboarding.subscription.on_highest_plan_subtitle")
               : hasActiveSubscription
                 ? t("onboarding.subscription.upgrade_subtitle", {
-                    plan: currentPlan,
+                    plan: currentPlan
                   })
                 : t("onboarding.subscription.hero_subtitle")}
           </Text>
@@ -671,11 +576,7 @@ export default function SubscriptionScreen({
           {/* Trust badges */}
           <View style={styles.trustBadges}>
             <View style={styles.trustBadge}>
-              <Ionicons
-                name="lock-closed"
-                size={14}
-                color={brandColors.primary}
-              />
+              <Ionicons name="lock-closed" size={14} color={brandColors.primary} />
               <Text style={styles.trustBadgeText}>
                 {t("onboarding.subscription.cancel_anytime")}
               </Text>
@@ -683,28 +584,27 @@ export default function SubscriptionScreen({
             <View style={styles.trustBadgeDivider} />
             <View style={styles.trustBadge}>
               <Ionicons name="star" size={14} color="#F59E0B" />
-              <Text style={styles.trustBadgeText}>
-                {t("onboarding.subscription.rating_badge")}
-              </Text>
+              <Text style={styles.trustBadgeText}>{t("onboarding.subscription.rating_badge")}</Text>
             </View>
           </View>
         </View>
 
-        {/* Only show billing toggle and plans if not on highest plan */}
+        {/* Only show billing toggle and pricing if not on highest plan */}
         {!isOnHighestPlan && (
           <>
+            {/* Billing Toggle */}
             <View style={styles.billingToggle}>
               <TouchableOpacity
                 onPress={() => handleBillingToggle("monthly")}
                 style={[
                   styles.toggleOption,
-                  billingPeriod === "monthly" && styles.toggleOptionSelected,
+                  billingPeriod === "monthly" && styles.toggleOptionSelected
                 ]}
               >
                 <Text
                   style={[
                     styles.toggleText,
-                    billingPeriod === "monthly" && styles.toggleTextSelected,
+                    billingPeriod === "monthly" && styles.toggleTextSelected
                   ]}
                 >
                   {t("onboarding.subscription.toggle_monthly")}
@@ -714,45 +614,97 @@ export default function SubscriptionScreen({
                 onPress={() => handleBillingToggle("annual")}
                 style={[
                   styles.toggleOption,
-                  billingPeriod === "annual" && styles.toggleOptionSelected,
+                  billingPeriod === "annual" && styles.toggleOptionSelected
                 ]}
               >
-                <Text
-                  style={[
-                    styles.toggleText,
-                    billingPeriod === "annual" && styles.toggleTextSelected,
-                  ]}
-                >
-                  {maxAnnualSavingsPercent > 0
-                    ? t("onboarding.subscription.toggle_annual_savings", {
-                        percent: maxAnnualSavingsPercent,
-                      })
-                    : t("onboarding.subscription.toggle_annual")}
-                </Text>
+                <View style={styles.toggleContent}>
+                  <Text
+                    style={[
+                      styles.toggleText,
+                      billingPeriod === "annual" && styles.toggleTextSelected
+                    ]}
+                  >
+                    {t("onboarding.subscription.toggle_annual")}
+                  </Text>
+                  {savingsPercent > 0 && (
+                    <View
+                      style={[
+                        styles.savingsBadge,
+                        billingPeriod === "annual" && styles.savingsBadgeSelected
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.savingsBadgeText,
+                          billingPeriod === "annual" && styles.savingsBadgeTextSelected
+                        ]}
+                      >
+                        -{savingsPercent}%
+                      </Text>
+                    </View>
+                  )}
+                </View>
               </TouchableOpacity>
             </View>
 
-            <View style={styles.planCarousel}>
+            {/* Full-Width Pricing Display */}
+            <View style={styles.pricingSection}>
               {plansLoading ? (
-                <View style={styles.skeletonContainer}>
-                  {Array.from({ length: 2 }).map((_, index) => (
-                    <View key={index} style={styles.skeletonCardWrapper}>
-                      <SkeletonCard
-                        width={planCardWidth}
-                        height={skeletonCardHeight}
-                      />
-                    </View>
-                  ))}
+                <View style={styles.pricingSkeletonContainer}>
+                  <SkeletonBox width="100%" height={120} />
                 </View>
-              ) : (
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.planList}
-                >
-                  {activePlans.map(renderPlanCard)}
-                </ScrollView>
-              )}
+              ) : selectedPlan ? (
+                <Card shadow="xl" style={styles.pricingCard}>
+                  {/* Plan Name with Trial Badge inline */}
+                  <View style={styles.planHeaderRow}>
+                    <Text style={styles.planName}>{selectedPlan.name}</Text>
+                    {selectedPlan.has_trial &&
+                      selectedPlan.trial_days &&
+                      isUserEligibleForTrial &&
+                      billingPeriod === "annual" && (
+                        <View style={styles.trialBadgeInline}>
+                          <Ionicons name="gift" size={12} color={brandColors.primary} />
+                          <Text style={styles.trialBadgeTextInline}>
+                            {selectedPlan.trial_days}-day free trial
+                          </Text>
+                        </View>
+                      )}
+                  </View>
+
+                  {/* Price Display */}
+                  <View style={styles.priceRow}>
+                    {billingPeriod === "annual" ? (
+                      <>
+                        {/* Show monthly equivalent prominently for annual */}
+                        <View style={styles.priceDisplay}>
+                          <Text style={styles.priceMain}>
+                            ${(getNumericPrice(selectedPlan.annual_price) / 12).toFixed(2)}
+                          </Text>
+                          <Text style={styles.pricePeriod}>/month</Text>
+                        </View>
+                        <View style={styles.billedAnnuallyRow}>
+                          <Text style={styles.strikethroughPrice}>
+                            ${getNumericPrice(selectedPlan.monthly_price).toFixed(2)}/mo
+                          </Text>
+                          <Text style={styles.billedAnnuallyText}>
+                            Billed ${getNumericPrice(selectedPlan.annual_price).toFixed(2)}/year
+                          </Text>
+                        </View>
+                      </>
+                    ) : (
+                      <>
+                        <View style={styles.priceDisplay}>
+                          <Text style={styles.priceMain}>
+                            ${getDisplayedPrice(selectedPlan).toFixed(2)}
+                          </Text>
+                          <Text style={styles.pricePeriod}>/month</Text>
+                        </View>
+                        <Text style={styles.billedMonthlyText}>Billed monthly</Text>
+                      </>
+                    )}
+                  </View>
+                </Card>
+              ) : null}
             </View>
           </>
         )}
@@ -760,81 +712,56 @@ export default function SubscriptionScreen({
         {selectedPlan && !isOnHighestPlan && (
           <View style={styles.selectedFeaturesWrapper}>
             <Card shadow="xl" style={styles.selectedFeaturesCard}>
-              {previousPlanName ? (
-                <Text style={styles.sectionHeading}>
-                  {t("onboarding.subscription.features_title", {
-                    plan: previousPlanName,
-                  })}
-                </Text>
-              ) : (
-                <Text style={styles.sectionHeading}>
-                  {t("onboarding.subscription.premium_features")}
-                </Text>
-              )}
+              <Text style={styles.sectionHeading}>
+                {t("onboarding.subscription.premium_features")}
+              </Text>
               {(() => {
                 // Filter features to only show NEW features for this tier
-                // minimum_tier is a number: 0=free, 1=starter, 2=pro, 3=elite
-                // - Starter (tier 1): show all features
-                // - Pro (tier 2): only show features with minimum_tier >= 2
-                // - Elite (tier 3): only show features with minimum_tier >= 3
+                // minimum_tier is a number: 0=free, 1=premium
                 const planId = selectedPlan.id.toLowerCase();
                 const filteredFeatures = selectedPlan.features
                   .filter((feature: any) => {
                     const minTier =
-                      typeof feature.minimum_tier === "number"
-                        ? feature.minimum_tier
-                        : 0;
-                    if (planId === "starter" || planId === "free") {
-                      return true; // Show all features for starter
+                      typeof feature.minimum_tier === "number" ? feature.minimum_tier : 0;
+                    if (planId === "free") {
+                      return true; // Show all features for free tier comparison
                     }
-                    if (planId === "pro") {
-                      // Only show pro+ features (minimum_tier >= 2)
-                      return minTier >= 2;
-                    }
-                    if (planId === "elite") {
-                      // Only show elite-exclusive features (minimum_tier >= 3)
-                      return minTier >= 3;
+                    if (planId === "premium") {
+                      // Show premium features (minimum_tier >= 1)
+                      return minTier >= 1;
                     }
                     return true;
                   })
                   .sort((a: any, b: any) => {
-                    const sortA =
-                      typeof a.sort_order === "number" ? a.sort_order : 999;
-                    const sortB =
-                      typeof b.sort_order === "number" ? b.sort_order : 999;
+                    const sortA = typeof a.sort_order === "number" ? a.sort_order : 999;
+                    const sortB = typeof b.sort_order === "number" ? b.sort_order : 999;
                     return sortA - sortB;
                   });
 
                 const displayedFeatures = showAllFeatures
                   ? filteredFeatures
-                  : filteredFeatures.slice(0, 4);
+                  : filteredFeatures.slice(0, 5);
 
                 return (
                   <>
                     {displayedFeatures.map((feature: any, index: number) => {
                       let title = feature.feature_name;
                       const featureValue = feature.feature_value;
+                      const featureKey = feature.feature_key || feature.feature_name || "";
 
                       // If feature_value is a positive number, prepend it to the name
                       // e.g., "3 Challenges Limit" instead of just "Challenges Limit"
-                      if (
-                        typeof featureValue === "number" &&
-                        featureValue > 0
-                      ) {
+                      if (typeof featureValue === "number" && featureValue > 0) {
                         title = `${featureValue} ${feature.feature_name}`;
                       }
 
+                      // Get contextual icon based on feature type
+                      const iconName = getFeatureIcon(featureKey);
+
                       return (
-                        <View
-                          key={feature.id || index}
-                          style={styles.detailItem}
-                        >
+                        <View key={feature.id || index} style={styles.detailItem}>
                           <View style={styles.detailIconWrapper}>
-                            <Ionicons
-                              name="checkmark-circle"
-                              size={18}
-                              color={brandColors.primary}
-                            />
+                            <Ionicons name={iconName} size={20} color={brandColors.primary} />
                           </View>
                           <View style={styles.detailCopy}>
                             <Text style={styles.detailTitle}>{title}</Text>
@@ -847,7 +774,7 @@ export default function SubscriptionScreen({
                         </View>
                       );
                     })}
-                    {filteredFeatures.length > 4 && (
+                    {filteredFeatures.length > 5 && (
                       <TouchableOpacity
                         onPress={() => setShowAllFeatures((prev) => !prev)}
                         style={styles.featuresToggle}
@@ -856,7 +783,7 @@ export default function SubscriptionScreen({
                           {showAllFeatures
                             ? t("onboarding.subscription.view_less")
                             : t("onboarding.subscription.view_all", {
-                                count: filteredFeatures.length - 4,
+                                count: filteredFeatures.length - 5
                               })}
                         </Text>
                       </TouchableOpacity>
@@ -872,10 +799,7 @@ export default function SubscriptionScreen({
           <Card shadow="xl" style={styles.linksSection}>
             {/* Show Manage Subscription for existing subscribers */}
             {hasActiveSubscription && (
-              <TouchableOpacity
-                style={styles.linkRow}
-                onPress={handleManageSubscription}
-              >
+              <TouchableOpacity style={styles.linkRow} onPress={handleManageSubscription}>
                 <Text style={styles.linkText}>
                   {t("onboarding.subscription.manage_subscription")}
                 </Text>
@@ -886,17 +810,13 @@ export default function SubscriptionScreen({
               onPress={handleRestorePurchases}
               disabled={isRestoring || isProcessing}
             >
-              <Text style={styles.linkText}>
-                {t("onboarding.subscription.restore_purchase")}
-              </Text>
+              <Text style={styles.linkText}>{t("onboarding.subscription.restore_purchase")}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.linkRow}>
-              <Text style={styles.linkText}>
-                {t("onboarding.subscription.faq")}
-              </Text>
+              <Text style={styles.linkText}>{t("onboarding.subscription.faq")}</Text>
             </TouchableOpacity>
             <LinkText
-              url="https://fitnudge.app/terms-of-service"
+              url={EXTERNAL_URLS.TERMS_OF_SERVICE}
               title={t("onboarding.subscription.terms")}
               style={[styles.linkText, styles.linkPadding]}
               underline={false}
@@ -904,7 +824,7 @@ export default function SubscriptionScreen({
               {t("onboarding.subscription.terms")}
             </LinkText>
             <LinkText
-              url="https://fitnudge.app/privacy-policy"
+              url={EXTERNAL_URLS.PRIVACY_POLICY}
               title={t("onboarding.subscription.privacy")}
               style={[styles.linkText, styles.linkPadding]}
               underline={false}
@@ -916,9 +836,7 @@ export default function SubscriptionScreen({
 
         <View style={styles.disclaimerWrapper}>
           <Card shadow="xl" style={styles.disclaimerCard}>
-            <Text style={styles.disclaimerText}>
-              {t("onboarding.subscription.legal_copy")}
-            </Text>
+            <Text style={styles.disclaimerText}>{t("onboarding.subscription.legal_copy")}</Text>
           </Card>
         </View>
       </ScrollView>
@@ -981,11 +899,11 @@ const makeSubscriptionScreenStyles = (tokens: any, colors: any, brand: any) => {
   return {
     modalContainer: {
       flex: 1,
-      backgroundColor: colors.bg.canvas,
+      backgroundColor: colors.bg.canvas
     },
     modalContent: {
       flex: 1,
-      backgroundColor: colors.bg.canvas,
+      backgroundColor: colors.bg.canvas
     },
     closeButton: {
       position: "absolute" as const,
@@ -1001,25 +919,25 @@ const makeSubscriptionScreenStyles = (tokens: any, colors: any, brand: any) => {
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.1,
       shadowRadius: 4,
-      elevation: 3,
+      elevation: 3
     },
     container: {
       flex: 1,
-      backgroundColor: colors.bg.canvas,
+      backgroundColor: colors.bg.canvas
     },
     scrollView: {
       flexGrow: 1,
-      flexShrink: 1,
+      flexShrink: 1
     },
     scrollContent: {
-      paddingBottom: toRN(tokens.spacing[6]),
+      paddingBottom: toRN(tokens.spacing[6])
     },
     hero: {
       alignItems: "center" as const,
       paddingHorizontal: toRN(tokens.spacing[6]),
       paddingTop: toRN(tokens.spacing[16]), // Space for close button
       paddingBottom: toRN(tokens.spacing[5]),
-      backgroundColor: brand.primary + "12", // ~7% opacity - subtle
+      backgroundColor: brand.primary + "12" // ~7% opacity - subtle
     },
     heroIconContainer: {
       width: 64,
@@ -1034,7 +952,7 @@ const makeSubscriptionScreenStyles = (tokens: any, colors: any, brand: any) => {
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.15,
       shadowRadius: 8,
-      elevation: 4,
+      elevation: 4
     },
     heroTitle: {
       fontSize: toRN(tokens.typography.fontSize["2xl"]),
@@ -1043,14 +961,14 @@ const makeSubscriptionScreenStyles = (tokens: any, colors: any, brand: any) => {
       color: colors.text.primary,
       marginBottom: toRN(tokens.spacing[1]),
       letterSpacing: -0.5,
-      textAlign: "center" as const,
+      textAlign: "center" as const
     },
     heroSubtitle: {
       fontSize: toRN(tokens.typography.fontSize.sm),
       color: colors.text.secondary,
       fontFamily: fontFamily.groteskRegular,
       textAlign: "center" as const,
-      marginBottom: toRN(tokens.spacing[4]),
+      marginBottom: toRN(tokens.spacing[4])
     },
     trustBadges: {
       flexDirection: "row" as const,
@@ -1063,23 +981,23 @@ const makeSubscriptionScreenStyles = (tokens: any, colors: any, brand: any) => {
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.08,
       shadowRadius: 4,
-      elevation: 2,
+      elevation: 2
     },
     trustBadge: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
-      gap: toRN(tokens.spacing[1.5]),
+      gap: toRN(tokens.spacing[1.5])
     },
     trustBadgeDivider: {
       width: 1,
       height: 16,
       backgroundColor: colors.border.default,
-      marginHorizontal: toRN(tokens.spacing[3]),
+      marginHorizontal: toRN(tokens.spacing[3])
     },
     trustBadgeText: {
       fontSize: toRN(tokens.typography.fontSize.xs),
       color: colors.text.secondary,
-      fontFamily: fontFamily.groteskMedium,
+      fontFamily: fontFamily.groteskMedium
     },
     billingToggle: {
       flexDirection: "row" as const,
@@ -1093,208 +1011,233 @@ const makeSubscriptionScreenStyles = (tokens: any, colors: any, brand: any) => {
       shadowOffset: { width: 0, height: toRN(tokens.spacing[3]) },
       shadowOpacity: 0.18,
       shadowRadius: toRN(tokens.spacing[6]),
-      elevation: 8,
+      elevation: 8
     },
     toggleOption: {
       flex: 1,
       paddingVertical: toRN(tokens.spacing[3]),
       alignItems: "center" as const,
-      borderRadius: toRN(tokens.borderRadius.md),
+      borderRadius: toRN(tokens.borderRadius.md)
     },
     toggleOptionSelected: {
       backgroundColor: brand.primary,
       shadowColor: brand.primary,
       shadowOffset: { width: 0, height: toRN(tokens.spacing[1]) },
       shadowOpacity: 0.25,
-      shadowRadius: toRN(tokens.spacing[2]),
+      shadowRadius: toRN(tokens.spacing[2])
     },
     toggleText: {
       fontSize: toRN(tokens.typography.fontSize.sm),
       fontWeight: tokens.typography.fontWeight.medium,
       color: colors.text.secondary,
-      fontFamily: fontFamily.groteskMedium,
+      fontFamily: fontFamily.groteskMedium
     },
     toggleTextSelected: {
-      color: brand.onPrimary,
+      color: brand.onPrimary
     },
-    planList: {
-      paddingHorizontal: toRN(tokens.spacing[6]),
-      paddingRight: toRN(tokens.spacing[5]),
+    toggleContent: {
       flexDirection: "row" as const,
-      alignItems: "stretch" as const,
+      alignItems: "center" as const,
+      gap: toRN(tokens.spacing[2])
     },
-    planCarousel: {
-      marginBottom: toRN(tokens.spacing[6]),
+    savingsBadge: {
+      backgroundColor: brand.primary + "20",
+      borderRadius: toRN(tokens.borderRadius.sm),
+      paddingHorizontal: toRN(tokens.spacing[1.5]),
+      paddingVertical: toRN(tokens.spacing[0.5])
     },
-    planCardTouchable: {
-      flexShrink: 0,
+    savingsBadgeSelected: {
+      backgroundColor: brand.onPrimary + "30"
     },
-    planCard: {
-      backgroundColor: colors.bg.card,
-      borderRadius: toRN(tokens.borderRadius.lg),
-      padding: toRN(tokens.spacing[4]),
-      borderWidth: toRN(tokens.spacing[0.5]),
-      borderColor: "transparent",
-      position: "relative" as const,
-      width: toRN(tokens.spacing[64]) + toRN(tokens.spacing[1]), // 16.25rem = 260px
-    },
-    planCardSelected: {
-      borderColor: brand.primary,
-      backgroundColor: brand.primary + "1A", // ~10% opacity in hex
-    },
-    planCardSpacing: {
-      marginRight: toRN(tokens.spacing[4]),
-    },
-    popularBadge: {
-      backgroundColor: brand.primary + "33", // ~20% opacity in hex
-      borderRadius: toRN(tokens.borderRadius.full),
-      paddingHorizontal: toRN(tokens.spacing[2]),
-      paddingVertical: toRN(tokens.spacing[0.5]),
-    },
-    popularText: {
+    savingsBadgeText: {
       fontSize: toRN(tokens.typography.fontSize.xs),
+      fontWeight: tokens.typography.fontWeight.bold,
       color: brand.primary,
-      fontFamily: fontFamily.groteskBold,
+      fontFamily: fontFamily.groteskBold
     },
-    planHeader: {
+    savingsBadgeTextSelected: {
+      color: brand.onPrimary
+    },
+    // Full-width Pricing Section
+    pricingSection: {
+      paddingHorizontal: toRN(tokens.spacing[6]),
+      marginBottom: toRN(tokens.spacing[4])
+    },
+    pricingSkeletonContainer: {
+      width: "100%"
+    },
+    pricingCard: {
+      paddingVertical: toRN(tokens.spacing[5]),
+      paddingHorizontal: toRN(tokens.spacing[5]),
+      borderWidth: 2,
+      borderColor: brand.primary,
+      backgroundColor: brand.primary + "06"
+    },
+    planHeaderRow: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
       justifyContent: "space-between" as const,
-      marginBottom: toRN(tokens.spacing[2]),
+      marginBottom: toRN(tokens.spacing[3])
     },
     planName: {
-      fontSize: toRN(tokens.typography.fontSize.xl),
-      fontWeight: tokens.typography.fontWeight.bold,
-      color: colors.text.primary,
-      fontFamily: fontFamily.groteskBold,
-    },
-    planNameSelected: {
-      color: brand.primary,
-    },
-    trialPillText: {
-      fontSize: toRN(tokens.typography.fontSize.xs),
+      fontSize: toRN(tokens.typography.fontSize.base),
       fontWeight: tokens.typography.fontWeight.semibold,
       color: brand.primary,
       fontFamily: fontFamily.groteskSemiBold,
+      textTransform: "uppercase" as const,
+      letterSpacing: 1
     },
-    price: {
-      fontSize: toRN(tokens.typography.fontSize.lg),
+    trialBadgeInline: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: toRN(tokens.spacing[1]),
+      backgroundColor: brand.primary + "15",
+      paddingHorizontal: toRN(tokens.spacing[2]),
+      paddingVertical: toRN(tokens.spacing[1]),
+      borderRadius: toRN(tokens.borderRadius.full)
+    },
+    trialBadgeTextInline: {
+      fontSize: toRN(tokens.typography.fontSize.xs),
+      fontWeight: tokens.typography.fontWeight.medium,
+      color: brand.primary,
+      fontFamily: fontFamily.groteskMedium
+    },
+    priceRow: {
+      alignItems: "flex-start" as const
+    },
+    priceDisplay: {
+      flexDirection: "row" as const,
+      alignItems: "baseline" as const
+    },
+    priceMain: {
+      fontSize: toRN(tokens.typography.fontSize["3xl"]),
       fontWeight: tokens.typography.fontWeight.bold,
       color: colors.text.primary,
       fontFamily: fontFamily.groteskBold,
+      letterSpacing: -0.5
     },
-    priceSelected: {
-      color: brand.primary,
+    pricePeriod: {
+      fontSize: toRN(tokens.typography.fontSize.base),
+      color: colors.text.secondary,
+      fontFamily: fontFamily.groteskMedium,
+      marginLeft: toRN(tokens.spacing[0.5])
     },
-    priceCompare: {
-      fontSize: toRN(tokens.typography.fontSize.xs),
-      color: colors.text.tertiary,
-      marginTop: toRN(tokens.spacing[1]),
-      fontFamily: fontFamily.groteskRegular,
-    },
-    priceContainer: {
+    billedAnnuallyRow: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
-      justifyContent: "space-between" as const,
+      gap: toRN(tokens.spacing[2]),
+      marginTop: toRN(tokens.spacing[1])
+    },
+    strikethroughPrice: {
+      fontSize: toRN(tokens.typography.fontSize.sm),
+      color: colors.text.tertiary,
+      fontFamily: fontFamily.groteskRegular,
+      textDecorationLine: "line-through" as const
+    },
+    billedAnnuallyText: {
+      fontSize: toRN(tokens.typography.fontSize.sm),
+      color: colors.text.secondary,
+      fontFamily: fontFamily.groteskRegular
+    },
+    billedMonthlyText: {
+      fontSize: toRN(tokens.typography.fontSize.sm),
+      color: colors.text.secondary,
+      fontFamily: fontFamily.groteskRegular,
+      marginTop: toRN(tokens.spacing[1])
     },
     selectedFeaturesWrapper: {
       marginTop: toRN(tokens.spacing[2]),
-      paddingHorizontal: toRN(tokens.spacing[6]),
+      paddingHorizontal: toRN(tokens.spacing[6])
     },
     selectedFeaturesCard: {
       paddingVertical: toRN(tokens.spacing[5]),
-      paddingHorizontal: toRN(tokens.spacing[5]),
+      paddingHorizontal: toRN(tokens.spacing[5])
     },
     sectionHeading: {
       fontSize: toRN(tokens.typography.fontSize.lg),
       fontWeight: tokens.typography.fontWeight.semibold,
       fontFamily: fontFamily.groteskSemiBold,
       color: colors.text.primary,
-      marginBottom: toRN(tokens.spacing[3]),
+      marginBottom: toRN(tokens.spacing[3])
     },
     detailItem: {
       flexDirection: "row" as const,
-      alignItems: "flex-start" as const,
-      marginBottom: toRN(tokens.spacing[3]),
+      alignItems: "center" as const,
+      marginBottom: toRN(tokens.spacing[4])
     },
     detailIconWrapper: {
-      width: toRN(tokens.spacing[5]),
+      width: toRN(tokens.spacing[8]),
+      height: toRN(tokens.spacing[8]),
+      borderRadius: toRN(tokens.spacing[4]),
+      backgroundColor: brand.primary + "15",
       alignItems: "center" as const,
-      paddingTop: toRN(tokens.spacing[0.5]),
+      justifyContent: "center" as const
     },
     detailCopy: {
       flex: 1,
-      marginLeft: toRN(tokens.spacing[2]),
+      marginLeft: toRN(tokens.spacing[3]),
+      justifyContent: "center" as const
     },
     detailTitle: {
       fontSize: toRN(tokens.typography.fontSize.sm),
       color: colors.text.primary,
-      fontFamily: fontFamily.groteskMedium,
+      fontFamily: fontFamily.groteskMedium
     },
     detailSubtitle: {
       marginTop: toRN(tokens.spacing[1]),
       fontSize: toRN(tokens.typography.fontSize.xs),
       color: colors.text.secondary,
       fontFamily: fontFamily.groteskRegular,
-      lineHeight: toRN(tokens.typography.fontSize.xs * 1.4),
+      lineHeight: toRN(tokens.typography.fontSize.xs * 1.4)
     },
     lowerTierNote: {
       fontSize: toRN(tokens.typography.fontSize.sm),
       color: colors.text.secondary,
       fontFamily: fontFamily.groteskRegular,
-      marginBottom: toRN(tokens.spacing[2]),
+      marginBottom: toRN(tokens.spacing[2])
     },
     featuresToggle: {
       marginTop: toRN(tokens.spacing[2]),
-      alignSelf: "flex-start" as const,
+      alignSelf: "flex-start" as const
     },
     featuresToggleText: {
       fontSize: toRN(tokens.typography.fontSize.sm),
       color: brand.primary,
-      fontFamily: fontFamily.groteskMedium,
+      fontFamily: fontFamily.groteskMedium
     },
     linksSectionWrapper: {
       marginTop: toRN(tokens.spacing[6]),
-      paddingHorizontal: toRN(tokens.spacing[6]),
+      paddingHorizontal: toRN(tokens.spacing[6])
     },
     linksSection: {
       paddingHorizontal: toRN(tokens.spacing[5]),
       paddingVertical: toRN(tokens.spacing[4]),
-      gap: toRN(tokens.spacing[1]),
+      gap: toRN(tokens.spacing[1])
     },
     linkRow: {
-      paddingVertical: toRN(tokens.spacing[2]),
+      paddingVertical: toRN(tokens.spacing[2])
     },
     linkPadding: {
-      paddingVertical: toRN(tokens.spacing[2]),
+      paddingVertical: toRN(tokens.spacing[2])
     },
     linkText: {
       fontSize: toRN(tokens.typography.fontSize.sm),
       color: colors.text.primary,
-      fontFamily: fontFamily.groteskMedium,
+      fontFamily: fontFamily.groteskMedium
     },
     disclaimerWrapper: {
       marginTop: toRN(tokens.spacing[6]),
-      paddingHorizontal: toRN(tokens.spacing[6]),
+      paddingHorizontal: toRN(tokens.spacing[6])
     },
     disclaimerCard: {
       paddingHorizontal: toRN(tokens.spacing[5]),
-      paddingVertical: toRN(tokens.spacing[4]),
+      paddingVertical: toRN(tokens.spacing[4])
     },
     disclaimerText: {
       fontSize: toRN(tokens.typography.fontSize.xs),
       color: colors.text.tertiary,
       fontFamily: fontFamily.groteskRegular,
-      lineHeight: toRN(tokens.typography.fontSize.xs * 1.4),
-    },
-    skeletonContainer: {
-      paddingHorizontal: toRN(tokens.spacing[6]),
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: toRN(tokens.spacing[4]),
-    },
-    skeletonCardWrapper: {
-      marginBottom: toRN(tokens.spacing[4]),
+      lineHeight: toRN(tokens.typography.fontSize.xs * 1.4)
     },
     ctaBar: {
       paddingHorizontal: toRN(tokens.spacing[6]),
@@ -1302,7 +1245,7 @@ const makeSubscriptionScreenStyles = (tokens: any, colors: any, brand: any) => {
       paddingBottom: toRN(tokens.spacing[4]),
       backgroundColor: colors.bg.canvas,
       borderTopWidth: toRN(tokens.spacing[0.25]),
-      borderTopColor: colors.border.default,
+      borderTopColor: colors.border.default
     },
 
     offerPill: {
@@ -1311,12 +1254,12 @@ const makeSubscriptionScreenStyles = (tokens: any, colors: any, brand: any) => {
       backgroundColor: brand.primary + "1F", // ~12% opacity in hex
       borderRadius: toRN(tokens.borderRadius.full),
       paddingHorizontal: toRN(tokens.spacing[3]),
-      paddingVertical: toRN(tokens.spacing[1.5]),
+      paddingVertical: toRN(tokens.spacing[1.5])
     },
     offerText: {
       fontSize: toRN(tokens.typography.fontSize.xs),
       color: brand.primary,
-      fontFamily: fontFamily.groteskMedium,
-    },
+      fontFamily: fontFamily.groteskMedium
+    }
   };
 };

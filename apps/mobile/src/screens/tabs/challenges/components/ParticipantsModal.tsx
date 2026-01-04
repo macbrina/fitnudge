@@ -12,7 +12,7 @@ import {
   TextInput,
   Image,
   KeyboardAvoidingView,
-  Platform,
+  Platform
 } from "react-native";
 import { useStyles } from "@/themes";
 import { useTheme } from "@/themes";
@@ -32,11 +32,7 @@ interface ParticipantsModalProps {
   onClose: () => void;
 }
 
-export function ParticipantsModal({
-  visible,
-  challengeId,
-  onClose,
-}: ParticipantsModalProps) {
+export function ParticipantsModal({ visible, challengeId, onClose }: ParticipantsModalProps) {
   const styles = useStyles(makeParticipantsModalStyles);
   const { colors, brandColors } = useTheme();
   const { t } = useTranslation();
@@ -46,8 +42,7 @@ export function ParticipantsModal({
   const [searchQuery, setSearchQuery] = useState("");
 
   // Fetch all participants with user info
-  const { data: participantsResponse, isLoading } =
-    useChallengeParticipants(challengeId);
+  const { data: participantsResponse, isLoading } = useChallengeParticipants(challengeId);
 
   const participants = participantsResponse?.data || [];
 
@@ -61,7 +56,7 @@ export function ParticipantsModal({
       result = participants.filter(
         (p) =>
           p.user?.name?.toLowerCase().includes(query) ||
-          p.user?.username?.toLowerCase().includes(query),
+          p.user?.username?.toLowerCase().includes(query)
       );
     }
 
@@ -95,14 +90,14 @@ export function ParticipantsModal({
         damping: 20,
         mass: 1,
         stiffness: 120,
-        useNativeDriver: true,
+        useNativeDriver: true
       }).start();
     } else if (internalVisible) {
       Animated.timing(translateY, {
         toValue: screenHeight,
         duration: 300,
         easing: Easing.in(Easing.ease),
-        useNativeDriver: true,
+        useNativeDriver: true
       }).start(() => {
         setInternalVisible(false);
       });
@@ -135,10 +130,7 @@ export function ParticipantsModal({
         {/* Avatar */}
         <View style={styles.avatarContainer}>
           {item.user?.profile_picture_url ? (
-            <Image
-              source={{ uri: item.user.profile_picture_url }}
-              style={styles.avatar}
-            />
+            <Image source={{ uri: item.user.profile_picture_url }} style={styles.avatar} />
           ) : (
             <View style={styles.avatarPlaceholder}>
               <Text style={styles.avatarInitial}>
@@ -165,9 +157,7 @@ export function ParticipantsModal({
         {/* Points */}
         <View style={styles.pointsContainer}>
           <Text style={styles.pointsValue}>{item.points}</Text>
-          <Text style={styles.pointsLabel}>
-            {t("challenges.points") || "pts"}
-          </Text>
+          <Text style={styles.pointsLabel}>{t("challenges.points") || "pts"}</Text>
         </View>
       </View>
     );
@@ -221,8 +211,8 @@ export function ParticipantsModal({
           style={[
             styles.modalContainer,
             {
-              transform: [{ translateY }],
-            },
+              transform: [{ translateY }]
+            }
           ]}
         >
           <View
@@ -230,18 +220,15 @@ export function ParticipantsModal({
               styles.contentContainer,
               {
                 paddingTop: insets.top + toRN(tokens.spacing[4]),
-                paddingBottom: insets.bottom + toRN(tokens.spacing[4]),
-              },
+                paddingBottom: insets.bottom + toRN(tokens.spacing[4])
+              }
             ]}
           >
             {/* Header */}
             <View style={styles.header}>
-              <Text style={styles.title}>
-                {t("challenges.participants") || "Participants"}
-              </Text>
+              <Text style={styles.title}>{t("challenges.participants") || "Participants"}</Text>
               <Text style={styles.subtitle}>
-                {participants.length}{" "}
-                {t("challenges.participants_joined") || "joined"}
+                {participants.length} {t("challenges.participants_joined") || "joined"}
               </Text>
               <TouchableOpacity
                 style={styles.closeButton}
@@ -259,17 +246,10 @@ export function ParticipantsModal({
 
             {/* Search */}
             <View style={styles.searchContainer}>
-              <Ionicons
-                name="search-outline"
-                size={20}
-                color={colors.text.tertiary}
-              />
+              <Ionicons name="search-outline" size={20} color={colors.text.tertiary} />
               <TextInput
                 style={styles.searchInput}
-                placeholder={
-                  t("challenges.search_participants") ||
-                  "Search participants..."
-                }
+                placeholder={t("challenges.search_participants") || "Search participants..."}
                 placeholderTextColor={colors.text.tertiary}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
@@ -278,11 +258,7 @@ export function ParticipantsModal({
               />
               {searchQuery.length > 0 && (
                 <TouchableOpacity onPress={() => setSearchQuery("")}>
-                  <Ionicons
-                    name="close-circle"
-                    size={20}
-                    color={colors.text.tertiary}
-                  />
+                  <Ionicons name="close-circle" size={20} color={colors.text.tertiary} />
                 </TouchableOpacity>
               )}
             </View>
@@ -310,7 +286,7 @@ export function ParticipantsModal({
 
 const makeParticipantsModalStyles = (tokens: any, colors: any, brand: any) => ({
   keyboardView: {
-    flex: 1,
+    flex: 1
   },
   modalContainer: {
     flex: 1,
@@ -321,28 +297,28 @@ const makeParticipantsModalStyles = (tokens: any, colors: any, brand: any) => ({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: colors.bg.canvas,
+    backgroundColor: colors.bg.canvas
   },
   contentContainer: {
     flex: 1,
-    width: "100%",
+    width: "100%"
   },
   header: {
     paddingHorizontal: toRN(tokens.spacing[4]),
     paddingBottom: toRN(tokens.spacing[4]),
     borderBottomWidth: 1,
-    borderBottomColor: colors.border.default,
+    borderBottomColor: colors.border.default
   },
   title: {
     fontSize: toRN(tokens.typography.fontSize["2xl"]),
     fontFamily: fontFamily.bold,
     color: colors.text.primary,
-    marginBottom: toRN(tokens.spacing[1]),
+    marginBottom: toRN(tokens.spacing[1])
   },
   subtitle: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.regular,
-    color: colors.text.secondary,
+    color: colors.text.secondary
   },
   closeButton: {
     position: "absolute" as const,
@@ -353,7 +329,7 @@ const makeParticipantsModalStyles = (tokens: any, colors: any, brand: any) => ({
     borderRadius: toRN(tokens.borderRadius.full),
     backgroundColor: colors.bg.muted,
     justifyContent: "center" as const,
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   searchContainer: {
     flexDirection: "row" as const,
@@ -364,19 +340,19 @@ const makeParticipantsModalStyles = (tokens: any, colors: any, brand: any) => ({
     marginVertical: toRN(tokens.spacing[4]),
     paddingHorizontal: toRN(tokens.spacing[4]),
     paddingVertical: toRN(tokens.spacing[3]),
-    gap: toRN(tokens.spacing[2]),
+    gap: toRN(tokens.spacing[2])
   },
   searchInput: {
     flex: 1,
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.regular,
     color: colors.text.primary,
-    padding: 0,
+    padding: 0
   },
   listContent: {
     paddingHorizontal: toRN(tokens.spacing[4]),
     paddingBottom: toRN(tokens.spacing[6]),
-    gap: toRN(tokens.spacing[3]),
+    gap: toRN(tokens.spacing[3])
   },
   participantCard: {
     flexDirection: "row" as const,
@@ -386,29 +362,29 @@ const makeParticipantsModalStyles = (tokens: any, colors: any, brand: any) => ({
     padding: toRN(tokens.spacing[3]),
     gap: toRN(tokens.spacing[3]),
     borderWidth: 1,
-    borderColor: colors.border.subtle,
+    borderColor: colors.border.subtle
   },
   rankContainer: {
     width: 32,
     alignItems: "center" as const,
-    justifyContent: "center" as const,
+    justifyContent: "center" as const
   },
   rankEmoji: {
-    fontSize: 20,
+    fontSize: 20
   },
   rankNumber: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.bold,
-    color: colors.text.secondary,
+    color: colors.text.secondary
   },
   avatarContainer: {
     width: 48,
-    height: 48,
+    height: 48
   },
   avatar: {
     width: 48,
     height: 48,
-    borderRadius: 24,
+    borderRadius: 24
   },
   avatarPlaceholder: {
     width: 48,
@@ -416,57 +392,57 @@ const makeParticipantsModalStyles = (tokens: any, colors: any, brand: any) => ({
     borderRadius: 24,
     backgroundColor: brand.primary + "20",
     justifyContent: "center" as const,
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   avatarInitial: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.bold,
-    color: brand.primary,
+    color: brand.primary
   },
   userInfo: {
     flex: 1,
-    gap: toRN(tokens.spacing[0.5]),
+    gap: toRN(tokens.spacing[0.5])
   },
   userName: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.semiBold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   userUsername: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   pointsContainer: {
     alignItems: "center" as const,
-    paddingHorizontal: toRN(tokens.spacing[2]),
+    paddingHorizontal: toRN(tokens.spacing[2])
   },
   pointsValue: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.bold,
-    color: brand.primary,
+    color: brand.primary
   },
   pointsLabel: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.regular,
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   emptyState: {
     flex: 1,
     alignItems: "center" as const,
     justifyContent: "center" as const,
     paddingVertical: toRN(tokens.spacing[12]),
-    gap: toRN(tokens.spacing[3]),
+    gap: toRN(tokens.spacing[3])
   },
   emptyStateText: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.regular,
     color: colors.text.secondary,
-    textAlign: "center" as const,
+    textAlign: "center" as const
   },
   loadingContainer: {
     paddingHorizontal: toRN(tokens.spacing[4]),
-    gap: toRN(tokens.spacing[3]),
+    gap: toRN(tokens.spacing[3])
   },
   skeletonCard: {
     flexDirection: "row" as const,
@@ -474,6 +450,6 @@ const makeParticipantsModalStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: colors.bg.card,
     borderRadius: toRN(tokens.borderRadius.xl),
     padding: toRN(tokens.spacing[3]),
-    gap: toRN(tokens.spacing[3]),
-  },
+    gap: toRN(tokens.spacing[3])
+  }
 });

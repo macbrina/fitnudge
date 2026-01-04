@@ -6,7 +6,7 @@ import {
   useRegenerateSuggestedGoals,
   useRequestSuggestedGoals,
   useSuggestedGoalsStatus,
-  type GoalTypeOption,
+  type GoalTypeOption
 } from "@/hooks/api/useSuggestedGoals";
 import { fontFamily } from "@/lib/fonts";
 import { useTranslation } from "@/lib/i18n";
@@ -30,7 +30,7 @@ const GOAL_TYPE_OPTIONS: {
   { id: "mixed", icon: "color-palette-outline" },
   { id: "habit", icon: "refresh-outline" },
   { id: "time_challenge", icon: "calendar-outline" },
-  { id: "target_challenge", icon: "flag-outline" },
+  { id: "target_challenge", icon: "flag-outline" }
 ];
 
 // Goal types that require premium (challenges)
@@ -49,7 +49,7 @@ export function AISuggestionsView({
   onUseSuggestion,
   onUseAsChallenge,
   onSwitchToCustom,
-  goalType = "habit",
+  goalType = "habit"
 }: AISuggestionsViewProps) {
   const { t } = useTranslation();
   const styles = useStyles(makeAISuggestionsViewStyles);
@@ -57,22 +57,19 @@ export function AISuggestionsView({
   const { showAlert, showConfirm } = useAlertModal();
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
   const [showGoalTypeSelector, setShowGoalTypeSelector] = useState(false);
-  const [showCreateTypeActionSheet, setShowCreateTypeActionSheet] =
-    useState(false);
-  const [pendingSuggestion, setPendingSuggestion] =
-    useState<SuggestedGoal | null>(null);
+  const [showCreateTypeActionSheet, setShowCreateTypeActionSheet] = useState(false);
+  const [pendingSuggestion, setPendingSuggestion] = useState<SuggestedGoal | null>(null);
 
   // Get subscription store for feature checks
   const subscriptionStoreInstance = useSubscriptionStore();
 
   // Check if user has premium access based on their features (fetched by minimum_tier)
   // challenge_create = Starter+ - grants access to non-habit goal types
-  const hasPremiumAccess =
-    subscriptionStoreInstance.hasFeature("challenge_create");
+  const hasPremiumAccess = subscriptionStoreInstance.hasFeature("challenge_create");
 
   // Default to "mixed" for all users during testing
   const [selectedGoalType, setSelectedGoalType] = useState<GoalTypeOption>(
-    hasPremiumAccess ? "mixed" : "habit",
+    hasPremiumAccess ? "mixed" : "habit"
   );
 
   const statusQuery = useSuggestedGoalsStatus(true);
@@ -84,9 +81,7 @@ export function AISuggestionsView({
   // Get generation limit from subscription store
   // Free users: feature_value = 2 (2 total generations)
   // Starter+: feature_value = null (unlimited)
-  const generationLimit = subscriptionStoreInstance.getFeatureValue(
-    "ai_goal_generations",
-  );
+  const generationLimit = subscriptionStoreInstance.getFeatureValue("ai_goal_generations");
 
   const statusData = statusQuery.data;
   const status = statusData?.status ?? "not_started";
@@ -102,11 +97,7 @@ export function AISuggestionsView({
       return;
     }
 
-    if (
-      status === "not_started" &&
-      !hasRequestedRef.current &&
-      !requestSuggestedGoals.isPending
-    ) {
+    if (status === "not_started" && !hasRequestedRef.current && !requestSuggestedGoals.isPending) {
       hasRequestedRef.current = true;
       // Use the goalType prop for initial request (defaults to "habit")
       requestSuggestedGoals.mutate(goalType as GoalTypeOption);
@@ -149,7 +140,7 @@ export function AISuggestionsView({
           confirmLabel: t("goals.create.suggestions.upgrade_now"),
           cancelLabel: t("common.cancel"),
           variant: "info",
-          showCloseIcon: true,
+          showCloseIcon: true
         });
 
         if (confirmed) {
@@ -165,8 +156,7 @@ export function AISuggestionsView({
       await regenerateSuggestedGoals.mutateAsync(selectedGoalType);
     } catch (error) {
       // Check if it's a 403 error (limit reached from backend)
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
 
       if (errorMessage.includes("403") || errorMessage.includes("Upgrade")) {
         // Backend rejected due to limit, show upgrade prompt
@@ -176,7 +166,7 @@ export function AISuggestionsView({
           confirmLabel: t("goals.create.suggestions.upgrade_now"),
           cancelLabel: t("common.cancel"),
           variant: "info",
-          showCloseIcon: true,
+          showCloseIcon: true
         });
 
         if (confirmed) {
@@ -188,13 +178,13 @@ export function AISuggestionsView({
 
       // Only log actual errors (not expected limit-reached scenarios)
       logger.error("Failed to regenerate suggestions", {
-        error: errorMessage,
+        error: errorMessage
       });
       await showAlert({
         title: t("common.error"),
         message: t("goals.create.suggestions.regenerate_error"),
         variant: "error",
-        confirmLabel: t("common.ok"),
+        confirmLabel: t("common.ok")
       });
       // Reset ref on error so user can retry
       hasRequestedRef.current = false;
@@ -220,8 +210,7 @@ export function AISuggestionsView({
           onPress={(e) => e.stopPropagation()}
         >
           <Text style={styles.modalTitle}>
-            {t("goals.create.suggestions.select_type_title") ||
-              "What kind of goals?"}
+            {t("goals.create.suggestions.select_type_title") || "What kind of goals?"}
           </Text>
           <Text style={styles.modalSubtitle}>
             {t("goals.create.suggestions.select_type_subtitle") ||
@@ -236,25 +225,17 @@ export function AISuggestionsView({
               return (
                 <TouchableOpacity
                   key={option.id}
-                  style={[
-                    styles.typeOption,
-                    isSelected && styles.typeOptionSelected,
-                  ]}
+                  style={[styles.typeOption, isSelected && styles.typeOptionSelected]}
                   onPress={() => handleGoalTypeSelect(option.id)}
                   activeOpacity={0.7}
                 >
                   <Ionicons
                     name={option.icon}
                     size={24}
-                    color={
-                      isSelected ? brandColors.primary : colors.text.secondary
-                    }
+                    color={isSelected ? brandColors.primary : colors.text.secondary}
                   />
                   <Text
-                    style={[
-                      styles.typeOptionLabel,
-                      isSelected && styles.typeOptionLabelSelected,
-                    ]}
+                    style={[styles.typeOptionLabel, isSelected && styles.typeOptionLabelSelected]}
                   >
                     {t(`goals.types.${option.id}.title`) || option.id}
                   </Text>
@@ -307,28 +288,21 @@ export function AISuggestionsView({
 
   const isInitialLoading = statusQuery.isLoading && !statusData;
   const isPendingGeneration =
-    status === "pending" ||
-    requestSuggestedGoals.isPending ||
-    regenerateSuggestedGoals.isPending;
+    status === "pending" || requestSuggestedGoals.isPending || regenerateSuggestedGoals.isPending;
   const showLoadingState = isInitialLoading || isPendingGeneration;
   const showErrorState = status === "failed";
 
   // CRITICAL: Never show ready state if status is pending, even if old goals exist in cache
   // Only show ready state when status is explicitly "ready" and we have goals
   const showReadyState =
-    status === "ready" &&
-    currentGoals &&
-    currentGoals.length > 0 &&
-    !showLoadingState;
+    status === "ready" && currentGoals && currentGoals.length > 0 && !showLoadingState;
 
   // Loading State - Contained within parent, no full-screen background
   if (showLoadingState) {
     return (
       <View style={styles.loadingContainer}>
         <AILoadingAnimation />
-        <Text style={styles.loadingTitle}>
-          {t("goals.create.suggestions.generating_title")}
-        </Text>
+        <Text style={styles.loadingTitle}>{t("goals.create.suggestions.generating_title")}</Text>
         <Text style={styles.loadingMessage}>
           {t("goals.create.suggestions.generating_message")}
         </Text>
@@ -347,9 +321,7 @@ export function AISuggestionsView({
             color={colors.feedback.error}
             style={styles.errorIcon}
           />
-          <Text style={styles.errorTitle}>
-            {t("goals.create.suggestions.error_title")}
-          </Text>
+          <Text style={styles.errorTitle}>{t("goals.create.suggestions.error_title")}</Text>
           <Text style={styles.errorMessage}>
             {statusData?.error || t("goals.create.suggestions.error_message")}
           </Text>
@@ -388,12 +360,10 @@ export function AISuggestionsView({
           {/* Header with Regenerate */}
           <View style={styles.header}>
             <View style={styles.headerContent}>
-              <Text style={styles.headerTitle}>
-                {t("goals.create.suggestions.title")}
-              </Text>
+              <Text style={styles.headerTitle}>{t("goals.create.suggestions.title")}</Text>
               <Text style={styles.headerSubtitle}>
                 {t("goals.create.suggestions.subtitle", {
-                  count: currentGoals.length,
+                  count: currentGoals.length
                 })}
               </Text>
             </View>
@@ -446,7 +416,7 @@ export function AISuggestionsView({
                 }
                 setShowCreateTypeActionSheet(false);
                 setPendingSuggestion(null);
-              },
+              }
             },
             {
               id: "challenge",
@@ -465,8 +435,8 @@ export function AISuggestionsView({
                 }
                 setShowCreateTypeActionSheet(false);
                 setPendingSuggestion(null);
-              },
-            },
+              }
+            }
           ]}
           onClose={() => {
             setShowCreateTypeActionSheet(false);
@@ -492,12 +462,8 @@ export function AISuggestionsView({
         color={colors.text.secondary}
         style={styles.emptyIcon}
       />
-      <Text style={styles.emptyTitle}>
-        {t("goals.create.suggestions.empty_title")}
-      </Text>
-      <Text style={styles.emptyMessage}>
-        {t("goals.create.suggestions.empty_message")}
-      </Text>
+      <Text style={styles.emptyTitle}>{t("goals.create.suggestions.empty_title")}</Text>
+      <Text style={styles.emptyMessage}>{t("goals.create.suggestions.empty_message")}</Text>
       <Button
         title={t("goals.create.suggestions.generate")}
         onPress={() => {
@@ -523,14 +489,14 @@ export function AISuggestionsView({
 
 const makeAISuggestionsViewStyles = (tokens: any, colors: any, brand: any) => ({
   container: {
-    flex: 1,
+    flex: 1
   },
   scrollView: {
-    flex: 1,
+    flex: 1
   },
   scrollContent: {
     paddingHorizontal: toRN(tokens.spacing[6]),
-    paddingBottom: toRN(tokens.spacing[6]),
+    paddingBottom: toRN(tokens.spacing[6])
   },
   header: {
     flexDirection: "row" as const,
@@ -540,11 +506,11 @@ const makeAISuggestionsViewStyles = (tokens: any, colors: any, brand: any) => ({
     marginTop: toRN(tokens.spacing[3]),
     paddingBottom: toRN(tokens.spacing[4]),
     borderBottomWidth: 1,
-    borderBottomColor: colors.border.default,
+    borderBottomColor: colors.border.default
   },
   headerContent: {
     flex: 1,
-    marginRight: toRN(tokens.spacing[3]),
+    marginRight: toRN(tokens.spacing[3])
   },
   headerTitle: {
     fontSize: toRN(tokens.typography.fontSize.xl),
@@ -552,23 +518,23 @@ const makeAISuggestionsViewStyles = (tokens: any, colors: any, brand: any) => ({
     color: colors.text.primary,
     fontFamily: fontFamily.groteskBold,
     marginBottom: toRN(tokens.spacing[1]),
-    letterSpacing: -0.3,
+    letterSpacing: -0.3
   },
   headerSubtitle: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     color: colors.text.tertiary,
     fontFamily: fontFamily.groteskRegular,
-    lineHeight: toRN(tokens.typography.fontSize.sm * 1.4),
+    lineHeight: toRN(tokens.typography.fontSize.sm * 1.4)
   },
   regenerateButton: {
-    alignSelf: "center" as const,
+    alignSelf: "center" as const
   },
   loadingContainer: {
     flex: 1,
     alignItems: "center" as const,
     justifyContent: "center" as const,
     paddingHorizontal: toRN(tokens.spacing[6]),
-    paddingVertical: toRN(tokens.spacing[8]),
+    paddingVertical: toRN(tokens.spacing[8])
   },
   loadingTitle: {
     marginTop: toRN(tokens.spacing[4]),
@@ -576,7 +542,7 @@ const makeAISuggestionsViewStyles = (tokens: any, colors: any, brand: any) => ({
     fontWeight: tokens.typography.fontWeight.bold,
     color: colors.text.primary,
     textAlign: "center" as const,
-    fontFamily: fontFamily.groteskBold,
+    fontFamily: fontFamily.groteskBold
   },
   loadingMessage: {
     marginTop: toRN(tokens.spacing[3]),
@@ -584,22 +550,22 @@ const makeAISuggestionsViewStyles = (tokens: any, colors: any, brand: any) => ({
     color: colors.text.secondary,
     textAlign: "center" as const,
     lineHeight: toRN(tokens.typography.fontSize.base * 1.5),
-    fontFamily: fontFamily.groteskRegular,
+    fontFamily: fontFamily.groteskRegular
   },
   errorContainer: {
     flex: 1,
     alignItems: "center" as const,
     justifyContent: "center" as const,
-    paddingHorizontal: toRN(tokens.spacing[6]),
+    paddingHorizontal: toRN(tokens.spacing[6])
   },
   errorContent: {
     alignItems: "center" as const,
     justifyContent: "center" as const,
     maxWidth: 400,
-    width: "100%",
+    width: "100%"
   },
   errorIcon: {
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   errorTitle: {
     fontSize: toRN(tokens.typography.fontSize["2xl"]),
@@ -607,7 +573,7 @@ const makeAISuggestionsViewStyles = (tokens: any, colors: any, brand: any) => ({
     color: colors.text.primary,
     textAlign: "center" as const,
     marginBottom: toRN(tokens.spacing[3]),
-    fontFamily: fontFamily.groteskBold,
+    fontFamily: fontFamily.groteskBold
   },
   errorMessage: {
     fontSize: toRN(tokens.typography.fontSize.base),
@@ -615,21 +581,21 @@ const makeAISuggestionsViewStyles = (tokens: any, colors: any, brand: any) => ({
     textAlign: "center" as const,
     marginBottom: toRN(tokens.spacing[6]),
     fontFamily: fontFamily.groteskRegular,
-    lineHeight: toRN(tokens.spacing[6]),
+    lineHeight: toRN(tokens.spacing[6])
   },
   errorRetryButton: {
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   errorCustomButton: {},
   emptyContainer: {
     flex: 1,
     alignItems: "center" as const,
     justifyContent: "center" as const,
-    paddingHorizontal: toRN(tokens.spacing[6]),
+    paddingHorizontal: toRN(tokens.spacing[6])
   },
   emptyIcon: {
     marginBottom: toRN(tokens.spacing[4]),
-    opacity: 0.5,
+    opacity: 0.5
   },
   emptyTitle: {
     fontSize: toRN(tokens.typography.fontSize["2xl"]),
@@ -637,7 +603,7 @@ const makeAISuggestionsViewStyles = (tokens: any, colors: any, brand: any) => ({
     color: colors.text.primary,
     textAlign: "center" as const,
     marginBottom: toRN(tokens.spacing[3]),
-    fontFamily: fontFamily.groteskBold,
+    fontFamily: fontFamily.groteskBold
   },
   emptyMessage: {
     fontSize: toRN(tokens.typography.fontSize.base),
@@ -645,10 +611,10 @@ const makeAISuggestionsViewStyles = (tokens: any, colors: any, brand: any) => ({
     textAlign: "center" as const,
     marginBottom: toRN(tokens.spacing[6]),
     fontFamily: fontFamily.groteskRegular,
-    lineHeight: toRN(tokens.typography.fontSize.base * 1.5),
+    lineHeight: toRN(tokens.typography.fontSize.base * 1.5)
   },
   generateButton: {
-    maxWidth: 300,
+    maxWidth: 300
   },
   // Goal Type Selector Modal styles
   modalOverlay: {
@@ -656,32 +622,32 @@ const makeAISuggestionsViewStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: "rgba(0, 0, 0, 0.5)",
     justifyContent: "center" as const,
     alignItems: "center" as const,
-    padding: toRN(tokens.spacing[4]),
+    padding: toRN(tokens.spacing[4])
   },
   modalContent: {
     backgroundColor: colors.bg.surface,
     borderRadius: toRN(tokens.borderRadius.xl),
     padding: toRN(tokens.spacing[6]),
     width: "100%",
-    maxWidth: 400,
+    maxWidth: 400
   },
   modalTitle: {
     fontSize: toRN(tokens.typography.fontSize.xl),
     fontFamily: fontFamily.groteskBold,
     color: colors.text.primary,
     textAlign: "center" as const,
-    marginBottom: toRN(tokens.spacing[2]),
+    marginBottom: toRN(tokens.spacing[2])
   },
   modalSubtitle: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.groteskRegular,
     color: colors.text.secondary,
     textAlign: "center" as const,
-    marginBottom: toRN(tokens.spacing[5]),
+    marginBottom: toRN(tokens.spacing[5])
   },
   typeOptionsContainer: {
     gap: toRN(tokens.spacing[3]),
-    marginBottom: toRN(tokens.spacing[5]),
+    marginBottom: toRN(tokens.spacing[5])
   },
   typeOption: {
     flexDirection: "row" as const,
@@ -691,53 +657,53 @@ const makeAISuggestionsViewStyles = (tokens: any, colors: any, brand: any) => ({
     borderWidth: 2,
     borderColor: colors.border.default,
     backgroundColor: colors.bg.canvas,
-    gap: toRN(tokens.spacing[3]),
+    gap: toRN(tokens.spacing[3])
   },
   typeOptionSelected: {
     borderColor: brand.primary,
-    backgroundColor: brand.primary + "08",
+    backgroundColor: brand.primary + "08"
   },
   typeOptionLocked: {
-    opacity: 0.6,
+    opacity: 0.6
   },
   typeOptionLabel: {
     flex: 1,
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.groteskMedium,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   typeOptionLabelSelected: {
-    color: brand.primary,
+    color: brand.primary
   },
   typeOptionLabelLocked: {
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   lockIcon: {
-    marginLeft: "auto" as const,
+    marginLeft: "auto" as const
   },
   proBadge: {
     backgroundColor: brand.gradient?.start || "#8B5CF6",
     paddingHorizontal: toRN(tokens.spacing[2]),
     paddingVertical: toRN(2),
     borderRadius: toRN(tokens.borderRadius.sm),
-    marginLeft: "auto" as const,
+    marginLeft: "auto" as const
   },
   proBadgeText: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.bold,
-    color: "#FFFFFF",
+    color: "#FFFFFF"
   },
   checkIcon: {
-    marginLeft: "auto" as const,
+    marginLeft: "auto" as const
   },
   modalActions: {
     flexDirection: "row" as const,
-    gap: toRN(tokens.spacing[3]),
+    gap: toRN(tokens.spacing[3])
   },
   modalCancelButton: {
-    flex: 1,
+    flex: 1
   },
   modalConfirmButton: {
-    flex: 1,
-  },
+    flex: 1
+  }
 });

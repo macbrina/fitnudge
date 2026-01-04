@@ -54,7 +54,7 @@ export default function PersonalizationFlow() {
     setBiggestChallenge,
     setMotivationStyle,
     loadProfile,
-    submitProfile,
+    submitProfile
   } = useOnboardingStore();
 
   // Calculate steps dynamically based on whether equipment selection is needed
@@ -65,7 +65,7 @@ export default function PersonalizationFlow() {
       "fitness_level",
       "primary_goal",
       "current_habits",
-      "workout_setting",
+      "workout_setting"
     ];
 
     // Only show equipment step for home/mix locations
@@ -91,7 +91,7 @@ export default function PersonalizationFlow() {
         setCurrentStepIndex(0);
       } catch (error) {
         logger.error("Error loading fitness profile", {
-          error: error instanceof Error ? error.message : String(error),
+          error: error instanceof Error ? error.message : String(error)
         });
       } finally {
         setIsLoadingProfile(false);
@@ -174,19 +174,17 @@ export default function PersonalizationFlow() {
       // Submit profile to backend
       await submitProfile();
 
-      // Track completion
-      capture("personalization_completed", {
-        step: "motivation_style",
-        total_steps: totalSteps,
-      });
-
-      try {
-        // Default to "habit" for onboarding - users can regenerate with different types later
-        await onboardingApi.requestSuggestedGoals("habit");
-      } catch (error) {
-        logger.warn("Failed to queue suggested goals generation", {
-          error: error instanceof Error ? error.message : String(error),
-        });
+      // Only request suggested goals for new users (first-time onboarding)
+      // Skip for users who already have a profile (updating their preferences)
+      if (!hasExistingProfile) {
+        try {
+          // Default to "habit" for onboarding - users can regenerate with different types later
+          await onboardingApi.requestSuggestedGoals("habit");
+        } catch (error) {
+          logger.warn("Failed to queue suggested goals generation", {
+            error: error instanceof Error ? error.message : String(error)
+          });
+        }
       }
 
       // Personalization completed - tracked via PostHog above
@@ -199,7 +197,7 @@ export default function PersonalizationFlow() {
     } catch (error) {
       logger.error("Error submitting personalization profile", {
         error: error instanceof Error ? error.message : String(error),
-        step: "motivation_style",
+        step: "motivation_style"
       });
 
       // Still continue to next step even if submission fails
@@ -218,18 +216,13 @@ export default function PersonalizationFlow() {
   // Common step props for all screens
   const stepProps = {
     currentStep: currentStepIndex + 1,
-    totalSteps,
+    totalSteps
   };
 
   const renderCurrentStep = () => {
     switch (currentStep) {
       case "welcome":
-        return (
-          <PersonalizationWelcomeScreen
-            onContinue={handleWelcomeContinue}
-            {...stepProps}
-          />
-        );
+        return <PersonalizationWelcomeScreen onContinue={handleWelcomeContinue} {...stepProps} />;
       case "biological_sex":
         return (
           <BiologicalSexScreen

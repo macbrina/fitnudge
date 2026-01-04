@@ -7,8 +7,7 @@ export const dailyMotivationsQueryKeys = {
   today: () => [...dailyMotivationsQueryKeys.all, "today"] as const,
   list: (limit?: number, offset?: number) =>
     [...dailyMotivationsQueryKeys.all, "list", limit, offset] as const,
-  detail: (id: string) =>
-    [...dailyMotivationsQueryKeys.all, "detail", id] as const,
+  detail: (id: string) => [...dailyMotivationsQueryKeys.all, "detail", id] as const
 } as const;
 
 // Daily Motivations Hooks
@@ -23,7 +22,7 @@ export const useTodayDailyMotivation = () => {
       return response.data;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes - refresh every 5 minutes
-    gcTime: 30 * 60 * 1000, // 30 minutes - keep in cache for 30 minutes
+    gcTime: 30 * 60 * 1000 // 30 minutes - keep in cache for 30 minutes
   });
 };
 
@@ -38,7 +37,7 @@ export const useDailyMotivations = (limit: number = 30, offset: number = 0) => {
       return response.data;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
-    placeholderData: [],
+    placeholderData: []
   });
 };
 
@@ -53,7 +52,7 @@ export const useDailyMotivation = (motivationId: string) => {
       return response.data;
     },
     enabled: !!motivationId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000 // 5 minutes
   });
 };
 
@@ -61,37 +60,28 @@ export const useShareDailyMotivation = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (motivationId: string) =>
-      dailyMotivationService.share(motivationId),
+    mutationFn: (motivationId: string) => dailyMotivationService.share(motivationId),
     // Optimistic update - increment share count instantly
     onMutate: async (motivationId) => {
       await queryClient.cancelQueries({
-        queryKey: dailyMotivationsQueryKeys.today(),
+        queryKey: dailyMotivationsQueryKeys.today()
       });
 
-      const previousToday = queryClient.getQueryData(
-        dailyMotivationsQueryKeys.today(),
-      );
+      const previousToday = queryClient.getQueryData(dailyMotivationsQueryKeys.today());
 
       // Optimistically increment share count
-      queryClient.setQueryData(
-        dailyMotivationsQueryKeys.today(),
-        (old: any) => {
-          if (!old) return old;
-          return { ...old, share_count: (old.share_count || 0) + 1 };
-        },
-      );
+      queryClient.setQueryData(dailyMotivationsQueryKeys.today(), (old: any) => {
+        if (!old) return old;
+        return { ...old, share_count: (old.share_count || 0) + 1 };
+      });
 
       return { previousToday };
     },
     onError: (err, motivationId, context) => {
       if (context?.previousToday) {
-        queryClient.setQueryData(
-          dailyMotivationsQueryKeys.today(),
-          context.previousToday,
-        );
+        queryClient.setQueryData(dailyMotivationsQueryKeys.today(), context.previousToday);
       }
-    },
+    }
   });
 };
 
@@ -102,25 +92,20 @@ export const useRegenerateDailyMotivation = () => {
     mutationFn: async () => {
       const response = await dailyMotivationService.regenerate();
       if (response.status !== 200 || !response.data) {
-        throw new Error(
-          response.error || "Failed to regenerate daily motivation",
-        );
+        throw new Error(response.error || "Failed to regenerate daily motivation");
       }
       return response.data;
     },
     onSuccess: (newMotivation) => {
       // Update the cache directly with the new motivation
-      queryClient.setQueryData(
-        dailyMotivationsQueryKeys.today(),
-        newMotivation,
-      );
+      queryClient.setQueryData(dailyMotivationsQueryKeys.today(), newMotivation);
       // Also invalidate to ensure fresh data
       queryClient.invalidateQueries({
-        queryKey: dailyMotivationsQueryKeys.today(),
+        queryKey: dailyMotivationsQueryKeys.today()
       });
       queryClient.invalidateQueries({
-        queryKey: dailyMotivationsQueryKeys.all,
+        queryKey: dailyMotivationsQueryKeys.all
       });
-    },
+    }
   });
 };

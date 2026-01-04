@@ -14,14 +14,9 @@ import {
   StyleSheet,
   Animated,
   Easing,
-  Dimensions,
+  Dimensions
 } from "react-native";
-import Svg, {
-  Defs,
-  LinearGradient as SvgLinearGradient,
-  Stop,
-  Rect,
-} from "react-native-svg";
+import Svg, { Defs, LinearGradient as SvgLinearGradient, Stop, Rect } from "react-native-svg";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "@/lib/i18n";
@@ -44,18 +39,12 @@ function CircleGradient({ colors, size, children }: CircleGradientProps) {
         width: size,
         height: size,
         justifyContent: "center",
-        alignItems: "center",
+        alignItems: "center"
       }}
     >
       <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
         <Defs>
-          <SvgLinearGradient
-            id="circleGrad"
-            x1="0%"
-            y1="0%"
-            x2="100%"
-            y2="100%"
-          >
+          <SvgLinearGradient id="circleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
             <Stop offset="0%" stopColor={colors[0]} />
             <Stop offset="100%" stopColor={colors[1] || colors[0]} />
           </SvgLinearGradient>
@@ -98,7 +87,7 @@ const BENEFITS = [
   { icon: "infinite-outline" as const, text: "Unlimited active goals" },
   { icon: "sparkles" as const, text: "AI-powered coaching" },
   { icon: "analytics-outline" as const, text: "Advanced analytics" },
-  { icon: "trophy-outline" as const, text: "Weekly progress recaps" },
+  { icon: "trophy-outline" as const, text: "Weekly progress recaps" }
 ];
 
 export function UpgradePrompt({
@@ -108,7 +97,7 @@ export function UpgradePrompt({
   type = "generic",
   featureName,
   title: customTitle,
-  subtitle: customSubtitle,
+  subtitle: customSubtitle
 }: UpgradePromptProps) {
   const { t } = useTranslation();
   const { brandColors, colors } = useTheme();
@@ -126,15 +115,15 @@ export function UpgradePrompt({
           toValue: 1,
           duration: 200,
           easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
+          useNativeDriver: true
         }),
         Animated.spring(translateY, {
           toValue: 0,
           damping: 20,
           mass: 0.8,
           stiffness: 200,
-          useNativeDriver: true,
-        }),
+          useNativeDriver: true
+        })
       ]).start();
     } else {
       Animated.parallel([
@@ -142,14 +131,14 @@ export function UpgradePrompt({
           toValue: 0,
           duration: 150,
           easing: Easing.in(Easing.cubic),
-          useNativeDriver: true,
+          useNativeDriver: true
         }),
         Animated.timing(translateY, {
           toValue: screenHeight,
           duration: 200,
           easing: Easing.in(Easing.ease),
-          useNativeDriver: true,
-        }),
+          useNativeDriver: true
+        })
       ]).start();
     }
   }, [visible, opacity, translateY, screenHeight]);
@@ -164,24 +153,19 @@ export function UpgradePrompt({
       case "goal_limit":
         return {
           title: t("onboarding.subscription.upgrade_prompt.goal_limit_title"),
-          subtitle: t(
-            "onboarding.subscription.upgrade_prompt.goal_limit_subtitle",
-          ),
+          subtitle: t("onboarding.subscription.upgrade_prompt.goal_limit_subtitle")
         };
       case "feature_locked":
         return {
-          title: t(
-            "onboarding.subscription.upgrade_prompt.feature_locked_title",
-          ),
-          subtitle: t(
-            "onboarding.subscription.upgrade_prompt.feature_locked_subtitle",
-            { feature: featureName || "this feature" },
-          ),
+          title: t("onboarding.subscription.upgrade_prompt.feature_locked_title"),
+          subtitle: t("onboarding.subscription.upgrade_prompt.feature_locked_subtitle", {
+            feature: featureName || "this feature"
+          })
         };
       default:
         return {
           title: t("onboarding.subscription.upgrade_prompt.title"),
-          subtitle: t("onboarding.subscription.upgrade_prompt.subtitle"),
+          subtitle: t("onboarding.subscription.upgrade_prompt.subtitle")
         };
     }
   };
@@ -199,16 +183,9 @@ export function UpgradePrompt({
       <View style={styles.overlay}>
         {/* Backdrop */}
         <Animated.View
-          style={[
-            StyleSheet.absoluteFill,
-            { backgroundColor: "rgba(0,0,0,0.5)", opacity },
-          ]}
+          style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.5)", opacity }]}
         >
-          <TouchableOpacity
-            style={StyleSheet.absoluteFill}
-            activeOpacity={1}
-            onPress={onClose}
-          />
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
         </Animated.View>
 
         {/* Modal Content */}
@@ -217,8 +194,8 @@ export function UpgradePrompt({
             styles.modalContainer,
             {
               paddingBottom: insets.bottom + toRN(tokens.spacing[4]),
-              transform: [{ translateY }],
-            },
+              transform: [{ translateY }]
+            }
           ]}
         >
           {/* Close button */}
@@ -245,32 +222,17 @@ export function UpgradePrompt({
           </View>
 
           {/* Title & Subtitle */}
-          <Text style={[styles.title, { color: colors.text.primary }]}>
-            {title}
-          </Text>
-          <Text style={[styles.subtitle, { color: colors.text.secondary }]}>
-            {subtitle}
-          </Text>
+          <Text style={[styles.title, { color: colors.text.primary }]}>{title}</Text>
+          <Text style={[styles.subtitle, { color: colors.text.secondary }]}>{subtitle}</Text>
 
           {/* Benefits list */}
           <View style={styles.benefitsList}>
             {BENEFITS.map((benefit, index) => (
               <View key={index} style={styles.benefitItem}>
-                <View
-                  style={[
-                    styles.benefitIcon,
-                    { backgroundColor: brandColors.primary + "20" },
-                  ]}
-                >
-                  <Ionicons
-                    name={benefit.icon}
-                    size={18}
-                    color={brandColors.primary}
-                  />
+                <View style={[styles.benefitIcon, { backgroundColor: brandColors.primary + "20" }]}>
+                  <Ionicons name={benefit.icon} size={18} color={brandColors.primary} />
                 </View>
-                <Text
-                  style={[styles.benefitText, { color: colors.text.primary }]}
-                >
+                <Text style={[styles.benefitText, { color: colors.text.primary }]}>
                   {benefit.text}
                 </Text>
               </View>
@@ -279,22 +241,14 @@ export function UpgradePrompt({
 
           {/* CTA Buttons */}
           <TouchableOpacity
-            style={[
-              styles.upgradeButton,
-              { backgroundColor: brandColors.primary },
-            ]}
+            style={[styles.upgradeButton, { backgroundColor: brandColors.primary }]}
             onPress={onUpgrade}
             activeOpacity={0.8}
           >
             <Text style={styles.upgradeButtonText}>
               {t("onboarding.subscription.upgrade_prompt.upgrade_cta")}
             </Text>
-            <Ionicons
-              name="arrow-forward"
-              size={20}
-              color="white"
-              style={styles.upgradeIcon}
-            />
+            <Ionicons name="arrow-forward" size={20} color="white" style={styles.upgradeIcon} />
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.laterButton} onPress={onClose}>
@@ -311,7 +265,7 @@ export function UpgradePrompt({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    justifyContent: "flex-end",
+    justifyContent: "flex-end"
   },
   modalContainer: {
     backgroundColor: "white",
@@ -319,24 +273,24 @@ const styles = StyleSheet.create({
     borderTopRightRadius: toRN(tokens.borderRadius["2xl"]),
     paddingHorizontal: toRN(tokens.spacing[6]),
     paddingTop: toRN(tokens.spacing[6]),
-    alignItems: "center",
+    alignItems: "center"
   },
   closeButton: {
     position: "absolute",
     top: toRN(tokens.spacing[4]),
     right: toRN(tokens.spacing[4]),
     zIndex: 1,
-    padding: toRN(tokens.spacing[1]),
+    padding: toRN(tokens.spacing[1])
   },
   iconContainer: {
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   title: {
     fontSize: toRN(tokens.typography.fontSize.xl),
     fontWeight: "700",
     fontFamily: fontFamily.groteskBold,
     textAlign: "center",
-    marginBottom: toRN(tokens.spacing[2]),
+    marginBottom: toRN(tokens.spacing[2])
   },
   subtitle: {
     fontSize: toRN(tokens.typography.fontSize.sm),
@@ -344,16 +298,16 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: toRN(tokens.typography.fontSize.sm) * 1.5,
     marginBottom: toRN(tokens.spacing[5]),
-    paddingHorizontal: toRN(tokens.spacing[4]),
+    paddingHorizontal: toRN(tokens.spacing[4])
   },
   benefitsList: {
     width: "100%",
-    marginBottom: toRN(tokens.spacing[5]),
+    marginBottom: toRN(tokens.spacing[5])
   },
   benefitItem: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   benefitIcon: {
     width: toRN(tokens.spacing[8]),
@@ -361,12 +315,12 @@ const styles = StyleSheet.create({
     borderRadius: toRN(tokens.borderRadius.lg),
     justifyContent: "center",
     alignItems: "center",
-    marginRight: toRN(tokens.spacing[3]),
+    marginRight: toRN(tokens.spacing[3])
   },
   benefitText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.groteskMedium,
-    flex: 1,
+    flex: 1
   },
   upgradeButton: {
     flexDirection: "row",
@@ -375,24 +329,24 @@ const styles = StyleSheet.create({
     width: "100%",
     paddingVertical: toRN(tokens.spacing[4]),
     borderRadius: toRN(tokens.borderRadius.xl),
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   upgradeButtonText: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontWeight: "600",
     fontFamily: fontFamily.groteskSemiBold,
-    color: "white",
+    color: "white"
   },
   upgradeIcon: {
-    marginLeft: toRN(tokens.spacing[2]),
+    marginLeft: toRN(tokens.spacing[2])
   },
   laterButton: {
-    paddingVertical: toRN(tokens.spacing[3]),
+    paddingVertical: toRN(tokens.spacing[3])
   },
   laterText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
-    fontFamily: fontFamily.groteskMedium,
-  },
+    fontFamily: fontFamily.groteskMedium
+  }
 });
 
 export default UpgradePrompt;

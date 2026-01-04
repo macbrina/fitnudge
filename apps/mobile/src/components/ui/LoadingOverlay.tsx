@@ -48,7 +48,7 @@ const makeLoadingOverlayStyles = (tokens: any, colors: any, brand: any) => ({
     justifyContent: "center" as const,
     alignItems: "center" as const,
     zIndex: 999,
-    elevation: 999, // For Android
+    elevation: 999 // For Android
   },
   container: {
     backgroundColor: colors.bg.canvas,
@@ -60,13 +60,13 @@ const makeLoadingOverlayStyles = (tokens: any, colors: any, brand: any) => ({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
-    elevation: 8,
+    elevation: 8
   },
   message: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.groteskMedium,
-    color: colors.text.primary,
-  },
+    color: colors.text.primary
+  }
 });
 
 export default LoadingOverlay;

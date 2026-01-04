@@ -18,7 +18,7 @@ const makeCheckboxStyles = (tokens: any, colors: any, brandColors: any) => {
   return {
     container: {
       flexDirection: "row" as const,
-      alignItems: "center" as const,
+      alignItems: "center" as const
     },
     checkbox: {
       width: 20,
@@ -28,29 +28,29 @@ const makeCheckboxStyles = (tokens: any, colors: any, brandColors: any) => {
       borderRadius: 4,
       justifyContent: "center" as const,
       alignItems: "center" as const,
-      marginRight: toRN(tokens.spacing[2]),
+      marginRight: toRN(tokens.spacing[2])
     },
     checkboxChecked: {
       backgroundColor: brandColors.primary,
-      borderColor: brandColors.primary,
+      borderColor: brandColors.primary
     },
     checkboxDisabled: {
-      opacity: 0.5,
+      opacity: 0.5
     },
     checkmark: {
       color: "#ffffff",
       fontSize: 12,
-      fontWeight: "bold" as const,
+      fontWeight: "bold" as const
     },
     label: {
       fontSize: toRN(tokens.typography.fontSize.sm),
       color: colors.text.primary,
       fontFamily: fontFamily.groteskRegular,
-      flex: 1,
+      flex: 1
     },
     labelDisabled: {
-      color: colors.text.muted,
-    },
+      color: colors.text.muted
+    }
   };
 };
 
@@ -61,7 +61,7 @@ export const Checkbox: React.FC<CheckboxProps> = ({
   disabled = false,
   size = 20,
   containerStyle,
-  labelStyle,
+  labelStyle
 }) => {
   const styles = useStyles(makeCheckboxStyles);
 
@@ -86,9 +86,7 @@ export const Checkbox: React.FC<CheckboxProps> = ({
       disabled={disabled}
       activeOpacity={0.7}
     >
-      <View style={getCheckboxStyle()}>
-        {checked && <Text style={styles.checkmark}>✓</Text>}
-      </View>
+      <View style={getCheckboxStyle()}>{checked && <Text style={styles.checkmark}>✓</Text>}</View>
       {label && <Text style={getLabelStyle()}>{label}</Text>}
     </TouchableOpacity>
   );

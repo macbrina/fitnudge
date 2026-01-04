@@ -5,7 +5,7 @@ import {
   FlatList,
   TouchableOpacity,
   RefreshControl,
-  ActivityIndicator,
+  ActivityIndicator
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -28,7 +28,7 @@ const useWeeklyRecaps = () => {
   return {
     data: { data: [] as WeeklyRecap[] },
     isLoading: false,
-    refetch: async () => {},
+    refetch: async () => {}
   };
 };
 
@@ -77,57 +77,38 @@ export default function WeeklyRecapsScreen() {
   };
 
   const renderRecapCard = ({ item }: { item: WeeklyRecap }) => (
-    <TouchableOpacity
-      onPress={() => handleRecapPress(item)}
-      activeOpacity={0.7}
-    >
+    <TouchableOpacity onPress={() => handleRecapPress(item)} activeOpacity={0.7}>
       <Card style={styles.recapCard}>
         <View style={styles.recapHeader}>
           <View style={styles.weekBadge}>
-            <Ionicons
-              name="calendar-outline"
-              size={14}
-              color={brandColors.primary}
-            />
+            <Ionicons name="calendar-outline" size={14} color={brandColors.primary} />
             <Text style={styles.weekBadgeText}>
               {formatRecapWeekRange(item.week_start_date, item.week_end_date)}
             </Text>
           </View>
-          <Ionicons
-            name="chevron-forward"
-            size={20}
-            color={colors.text.tertiary}
-          />
+          <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
         </View>
 
         {/* Stats Grid */}
         <View style={styles.statsGrid}>
           <View style={styles.statItem}>
             <Text style={styles.statValue}>{item.total_check_ins}</Text>
-            <Text style={styles.statLabel}>
-              {t("recaps.check_ins") || "Check-ins"}
-            </Text>
+            <Text style={styles.statLabel}>{t("recaps.check_ins") || "Check-ins"}</Text>
           </View>
           <View style={styles.statItem}>
             <Text style={styles.statValue}>{item.goals_completed}</Text>
-            <Text style={styles.statLabel}>
-              {t("recaps.goals_completed") || "Goals"}
-            </Text>
+            <Text style={styles.statLabel}>{t("recaps.goals_completed") || "Goals"}</Text>
           </View>
           <View style={styles.statItem}>
             <View style={styles.streakValue}>
               <Ionicons
                 name={item.streak_maintained ? "flame" : "flame-outline"}
                 size={16}
-                color={
-                  item.streak_maintained ? "#EF4444" : colors.text.tertiary
-                }
+                color={item.streak_maintained ? "#EF4444" : colors.text.tertiary}
               />
               <Text style={styles.statValue}>{item.current_streak}</Text>
             </View>
-            <Text style={styles.statLabel}>
-              {t("recaps.streak") || "Streak"}
-            </Text>
+            <Text style={styles.statLabel}>{t("recaps.streak") || "Streak"}</Text>
           </View>
         </View>
 
@@ -147,9 +128,7 @@ export default function WeeklyRecapsScreen() {
       <View style={styles.premiumIconContainer}>
         <Ionicons name="analytics" size={48} color={brandColors.primary} />
       </View>
-      <Text style={styles.premiumTitle}>
-        {t("recaps.premium_title") || "Weekly Recaps"}
-      </Text>
+      <Text style={styles.premiumTitle}>{t("recaps.premium_title") || "Weekly Recaps"}</Text>
       <Text style={styles.premiumDescription}>
         {t("recaps.premium_description") ||
           "Get AI-powered weekly summaries of your progress, achievements, and personalized insights to help you stay on track."}
@@ -165,14 +144,8 @@ export default function WeeklyRecapsScreen() {
   // Empty state
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
-      <Ionicons
-        name="document-text-outline"
-        size={64}
-        color={colors.text.tertiary}
-      />
-      <Text style={styles.emptyTitle}>
-        {t("recaps.empty_title") || "No recaps yet"}
-      </Text>
+      <Ionicons name="document-text-outline" size={64} color={colors.text.tertiary} />
+      <Text style={styles.emptyTitle}>{t("recaps.empty_title") || "No recaps yet"}</Text>
       <Text style={styles.emptyDescription}>
         {t("recaps.empty_description") ||
           "Your weekly recaps will appear here once you've completed your first week of activity."}
@@ -183,10 +156,7 @@ export default function WeeklyRecapsScreen() {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <BackButton
-        title={t("recaps.title") || "Weekly Recaps"}
-        onPress={() => router.back()}
-      />
+      <BackButton title={t("recaps.title") || "Weekly Recaps"} onPress={() => router.back()} />
 
       {/* Content */}
       {!hasWeeklyRecapFeature ? (
@@ -219,27 +189,27 @@ export default function WeeklyRecapsScreen() {
 const makeStyles = (tokens: any, colors: any, brand: any) => ({
   container: {
     flex: 1,
-    backgroundColor: colors.bg.canvas,
+    backgroundColor: colors.bg.canvas
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center" as const,
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   listContent: {
     padding: toRN(tokens.spacing[4]),
-    flexGrow: 1,
+    flexGrow: 1
   },
   // Recap Card
   recapCard: {
     marginBottom: toRN(tokens.spacing[3]),
-    padding: toRN(tokens.spacing[4]),
+    padding: toRN(tokens.spacing[4])
   },
   recapHeader: {
     flexDirection: "row" as const,
     justifyContent: "space-between" as const,
     alignItems: "center" as const,
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   weekBadge: {
     flexDirection: "row" as const,
@@ -248,12 +218,12 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     paddingVertical: toRN(tokens.spacing[1]),
     paddingHorizontal: toRN(tokens.spacing[2]),
     backgroundColor: `${brand.primary}15`,
-    borderRadius: toRN(tokens.borderRadius.full),
+    borderRadius: toRN(tokens.borderRadius.full)
   },
   weekBadgeText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.semiBold,
-    color: brand.primary,
+    color: brand.primary
   },
   statsGrid: {
     flexDirection: "row" as const,
@@ -261,40 +231,40 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     paddingVertical: toRN(tokens.spacing[3]),
     borderTopWidth: 1,
     borderBottomWidth: 1,
-    borderColor: colors.border.subtle,
+    borderColor: colors.border.subtle
   },
   statItem: {
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   statValue: {
     fontSize: toRN(tokens.typography.fontSize.xl),
     fontFamily: fontFamily.bold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   statLabel: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.regular,
     color: colors.text.tertiary,
-    marginTop: toRN(tokens.spacing[1]),
+    marginTop: toRN(tokens.spacing[1])
   },
   streakValue: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    gap: toRN(tokens.spacing[1]),
+    gap: toRN(tokens.spacing[1])
   },
   summaryPreview: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
     color: colors.text.secondary,
     marginTop: toRN(tokens.spacing[3]),
-    lineHeight: toRN(tokens.typography.fontSize.sm) * 1.5,
+    lineHeight: toRN(tokens.typography.fontSize.sm) * 1.5
   },
   // Premium Gate
   premiumGate: {
     flex: 1,
     justifyContent: "center" as const,
     alignItems: "center" as const,
-    paddingHorizontal: toRN(tokens.spacing[8]),
+    paddingHorizontal: toRN(tokens.spacing[8])
   },
   premiumIconContainer: {
     width: 96,
@@ -303,14 +273,14 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: `${brand.primary}15`,
     justifyContent: "center" as const,
     alignItems: "center" as const,
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   premiumTitle: {
     fontSize: toRN(tokens.typography.fontSize["2xl"]),
     fontFamily: fontFamily.bold,
     color: colors.text.primary,
     marginBottom: toRN(tokens.spacing[2]),
-    textAlign: "center" as const,
+    textAlign: "center" as const
   },
   premiumDescription: {
     fontSize: toRN(tokens.typography.fontSize.base),
@@ -318,30 +288,30 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     color: colors.text.secondary,
     textAlign: "center" as const,
     lineHeight: toRN(tokens.typography.fontSize.base) * 1.5,
-    marginBottom: toRN(tokens.spacing[6]),
+    marginBottom: toRN(tokens.spacing[6])
   },
   upgradeButton: {
-    minWidth: 200,
+    minWidth: 200
   },
   // Empty State
   emptyState: {
     flex: 1,
     justifyContent: "center" as const,
     alignItems: "center" as const,
-    paddingHorizontal: toRN(tokens.spacing[8]),
+    paddingHorizontal: toRN(tokens.spacing[8])
   },
   emptyTitle: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.semiBold,
     color: colors.text.primary,
     marginTop: toRN(tokens.spacing[4]),
-    marginBottom: toRN(tokens.spacing[2]),
+    marginBottom: toRN(tokens.spacing[2])
   },
   emptyDescription: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
     color: colors.text.tertiary,
     textAlign: "center" as const,
-    maxWidth: 280,
-  },
+    maxWidth: 280
+  }
 });

@@ -1,11 +1,5 @@
 import React from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StatusBar,
-  StyleSheet,
-} from "react-native";
+import { View, Text, TouchableOpacity, StatusBar, StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStyles, useTheme } from "@/themes";
 import { tokens } from "@/themes/tokens";
@@ -34,7 +28,7 @@ export function ExitConfirmationModal({
   exercisesRemaining,
   onResume,
   onRestart,
-  onQuit,
+  onQuit
 }: ExitConfirmationModalProps) {
   const insets = useSafeAreaInsets();
   const styles = useStyles(makeStyles);
@@ -52,10 +46,7 @@ export function ExitConfirmationModal({
 
       {/* Bottom content panel */}
       <View
-        style={[
-          styles.contentPanel,
-          { paddingBottom: insets.bottom + toRN(tokens.spacing[6]) },
-        ]}
+        style={[styles.contentPanel, { paddingBottom: insets.bottom + toRN(tokens.spacing[6]) }]}
       >
         {/* Motivational heading */}
         <Text style={styles.heading}>{t("workout.hold_on")}</Text>
@@ -65,15 +56,12 @@ export function ExitConfirmationModal({
         <View style={styles.progressContainer}>
           <Text style={styles.progressText}>
             {t("workout.you_have_finished")}{" "}
-            <Text style={styles.progressHighlight}>
-              {Math.round(completionPercentage)}%
-            </Text>
+            <Text style={styles.progressHighlight}>{Math.round(completionPercentage)}%</Text>
           </Text>
           <Text style={styles.remainingText}>
             Only{" "}
             <Text style={styles.remainingHighlight}>
-              {exercisesRemaining}{" "}
-              {exercisesRemaining === 1 ? "round" : "rounds"}
+              {exercisesRemaining} {exercisesRemaining === 1 ? "round" : "rounds"}
             </Text>{" "}
             left
           </Text>
@@ -88,9 +76,7 @@ export function ExitConfirmationModal({
 
           {/* Restart button - secondary */}
           <TouchableOpacity style={styles.restartButton} onPress={onRestart}>
-            <Text style={styles.restartButtonText}>
-              {t("workout.restart_exercise")}
-            </Text>
+            <Text style={styles.restartButtonText}>{t("workout.restart_exercise")}</Text>
           </TouchableOpacity>
 
           {/* Quit link */}
@@ -107,13 +93,13 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
   // Full screen absolute overlay
   fullScreenOverlay: {
     ...StyleSheet.absoluteFillObject,
-    zIndex: 200,
+    zIndex: 200
   },
 
   // Semi-transparent dim layer
   dimOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(245, 245, 245, 0.85)",
+    backgroundColor: "rgba(245, 245, 245, 0.85)"
   },
 
   // Bottom content panel
@@ -132,81 +118,81 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.1,
     shadowRadius: 12,
-    elevation: 10,
+    elevation: 10
   },
 
   heading: {
     fontSize: toRN(tokens.typography.fontSize["3xl"]),
     fontFamily: fontFamily.groteskBold,
     color: colors.text.primary,
-    textAlign: "center" as const,
+    textAlign: "center" as const
   },
   subheading: {
     fontSize: toRN(tokens.typography.fontSize["2xl"]),
     fontFamily: fontFamily.groteskBold,
     color: colors.text.primary,
     textAlign: "center" as const,
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
 
   progressContainer: {
     alignItems: "center" as const,
-    marginBottom: toRN(tokens.spacing[6]),
+    marginBottom: toRN(tokens.spacing[6])
   },
   progressText: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.regular,
     color: colors.text.primary,
-    textAlign: "center" as const,
+    textAlign: "center" as const
   },
   progressHighlight: {
     fontFamily: fontFamily.bold,
-    color: brand.primary,
+    color: brand.primary
   },
   remainingText: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.regular,
     color: colors.text.primary,
-    textAlign: "center" as const,
+    textAlign: "center" as const
   },
   remainingHighlight: {
     fontFamily: fontFamily.bold,
-    color: brand.primary,
+    color: brand.primary
   },
 
   buttonContainer: {
     width: "100%",
-    gap: toRN(tokens.spacing[3]),
+    gap: toRN(tokens.spacing[3])
   },
   resumeButton: {
     backgroundColor: brand.primary,
     paddingVertical: toRN(tokens.spacing[4]),
     borderRadius: toRN(tokens.borderRadius.full),
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   resumeButtonText: {
     color: "#FFFFFF",
     fontSize: toRN(tokens.typography.fontSize.lg),
-    fontFamily: fontFamily.semiBold,
+    fontFamily: fontFamily.semiBold
   },
   restartButton: {
     backgroundColor: colors.bg.muted,
     paddingVertical: toRN(tokens.spacing[4]),
     borderRadius: toRN(tokens.borderRadius.full),
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   restartButtonText: {
     color: colors.text.primary,
     fontSize: toRN(tokens.typography.fontSize.lg),
-    fontFamily: fontFamily.semiBold,
+    fontFamily: fontFamily.semiBold
   },
   quitButton: {
     paddingVertical: toRN(tokens.spacing[3]),
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   quitButtonText: {
     color: colors.text.tertiary,
     fontSize: toRN(tokens.typography.fontSize.base),
-    fontFamily: fontFamily.medium,
-  },
+    fontFamily: fontFamily.medium
+  }
 });

@@ -15,14 +15,7 @@ import { useStyles } from "@/themes/makeStyles";
 import { lineHeight } from "@/themes/tokens";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import {
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  Text,
-  View,
-} from "react-native";
+import { Image, KeyboardAvoidingView, Platform, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getRedirection } from "@/utils/getRedirection";
 import { useAlertModal } from "@/contexts/AlertModalContext";
@@ -30,14 +23,15 @@ import {
   performNativeGoogleSignIn,
   getFriendlyGoogleError,
   hasGoogleSignInConfiguration,
-  isGoogleCancelledError,
+  isGoogleCancelledError
 } from "@/lib/auth/google";
 import {
   performNativeAppleSignIn,
   isAppleSigninAvailable,
-  isAppleCancelledError,
+  isAppleCancelledError
 } from "@/lib/auth/apple";
 import type { LoginResponse } from "@/services/api/auth";
+import { ApiError } from "@/services/api/base";
 import { logger } from "@/services/logger";
 
 export default function LoginScreen() {
@@ -69,15 +63,16 @@ export default function LoginScreen() {
   // Fetch subscription data after login (non-blocking)
   const fetchSubscriptionData = async () => {
     try {
-      const [{ useSubscriptionStore }, { usePricingStore }] = await Promise.all(
-        [import("@/stores/subscriptionStore"), import("@/stores/pricingStore")],
-      );
+      const [{ useSubscriptionStore }, { usePricingStore }] = await Promise.all([
+        import("@/stores/subscriptionStore"),
+        import("@/stores/pricingStore")
+      ]);
 
       // Fetch subscription, features, and pricing plans in parallel
       await Promise.all([
         useSubscriptionStore.getState().fetchSubscription(),
         useSubscriptionStore.getState().fetchFeatures(),
-        usePricingStore.getState().fetchPlans(),
+        usePricingStore.getState().fetchPlans()
       ]);
     } catch (error) {
       console.warn("[Login] Failed to fetch subscription data:", error);
@@ -117,15 +112,12 @@ export default function LoginScreen() {
     };
   }, []);
 
-  const handleSocialSuccess = async (
-    payload: LoginResponse,
-    provider: "google" | "apple",
-  ) => {
+  const handleSocialSuccess = async (payload: LoginResponse, provider: "google" | "apple") => {
     await login(payload.user, payload.access_token, payload.refresh_token);
 
     capture("user_logged_in", {
       method: provider,
-      user_id: payload.user.id,
+      user_id: payload.user.id
     });
 
     // Fetch subscription data immediately after login (non-blocking for navigation)
@@ -146,7 +138,7 @@ export default function LoginScreen() {
     await showAlert({
       title: t("common.error"),
       message,
-      variant: "error",
+      variant: "error"
     });
   };
   // Use the login mutation hook
@@ -180,7 +172,7 @@ export default function LoginScreen() {
         await showAlert({
           title: t("common.error"),
           message: alertMessage,
-          variant: "error",
+          variant: "error"
         });
         if (!isMounted) {
           return;
@@ -232,7 +224,7 @@ export default function LoginScreen() {
       {
         email: email.trim().toLowerCase(),
         password,
-        remember_me: rememberMe,
+        remember_me: rememberMe
       },
       {
         onSuccess: async (response) => {
@@ -241,29 +233,23 @@ export default function LoginScreen() {
             await login(
               response.data.user,
               response.data.access_token,
-              response.data.refresh_token,
+              response.data.refresh_token
             );
 
             // Handle remember me functionality
             if (rememberMe) {
               // Store remember me preference for future logins
-              await authService.setRememberMePreference(
-                response.data.user.email,
-                true,
-              );
+              await authService.setRememberMePreference(response.data.user.email, true);
             } else {
               // Clear remember me preference if unchecked
-              await authService.setRememberMePreference(
-                response.data.user.email,
-                false,
-              );
+              await authService.setRememberMePreference(response.data.user.email, false);
             }
 
             // Track successful login
             capture("user_logged_in", {
               method: "email",
               remember_me: rememberMe,
-              user_id: response.data.user.id,
+              user_id: response.data.user.id
             });
 
             // Fetch subscription data immediately after login (non-blocking for navigation)
@@ -281,7 +267,6 @@ export default function LoginScreen() {
           }
         },
         onError: async (error: unknown) => {
-          console.error("Login error:", error);
           setManualLoginAttempt(false);
 
           const {
@@ -289,7 +274,7 @@ export default function LoginScreen() {
             dataRecord,
             detailRecord,
             detailString,
-            backendMessage,
+            backendMessage
           } = getApiErrorDetails(error);
 
           const userStatus =
@@ -305,16 +290,14 @@ export default function LoginScreen() {
                 : errorStatus === 403 && userStatus
                   ? `account_${userStatus}`
                   : "unknown",
-            error_message: backendMessage || detailString || "Unknown error",
+            error_message: backendMessage || detailString || "Unknown error"
           });
 
           // Handle status-specific errors (403 Forbidden)
           if (errorStatus === 403 && userStatus) {
             const statusMessages: Record<string, string> = {
-              disabled:
-                "Your account has been disabled. Please contact support.",
-              suspended:
-                "Your account has been suspended. Please contact support.",
+              disabled: "Your account has been disabled. Please contact support.",
+              suspended: "Your account has been suspended. Please contact support."
             };
             const message =
               statusMessages[userStatus] ||
@@ -325,7 +308,7 @@ export default function LoginScreen() {
             await showAlert({
               title: t("common.error"),
               message,
-              variant: "error",
+              variant: "error"
             });
 
             // Auto-logout if status is disabled or suspended
@@ -336,11 +319,11 @@ export default function LoginScreen() {
               }, 1000);
             }
           } else if (errorStatus === 401) {
-            // User not found or invalid credentials
+            // User not found or invalid credentials - show actual backend message
             await showAlert({
               title: t("common.error"),
-              message: t("errors.authentication_error"),
-              variant: "error",
+              message: backendMessage || t("errors.authentication_error"),
+              variant: "error"
             });
           } else if (errorStatus === 400) {
             await showAlert({
@@ -351,25 +334,24 @@ export default function LoginScreen() {
                 (detailRecord?.error as string | undefined) ||
                 backendMessage ||
                 t("errors.authentication_error"),
-              variant: "error",
+              variant: "error"
             });
           } else {
             await showAlert({
               title: t("common.error"),
               message: backendMessage || t("errors.authentication_error"),
-              variant: "error",
+              variant: "error"
             });
           }
-        },
-      },
+        }
+      }
     );
   };
 
   const handleGoogleSignIn = async () => {
     if (!showGoogle) {
       await handleSocialError(
-        t("errors.authentication_error") ||
-          "Google Sign-In is not configured for this build.",
+        t("errors.authentication_error") || "Google Sign-In is not configured for this build."
       );
       return;
     }
@@ -383,9 +365,7 @@ export default function LoginScreen() {
       if (response.data) {
         await handleSocialSuccess(response.data, "google");
       } else {
-        await handleSocialError(
-          response.error || t("errors.authentication_error"),
-        );
+        await handleSocialError(response.error || t("errors.authentication_error"));
       }
     } catch (error) {
       if (isGoogleCancelledError(error)) {
@@ -393,7 +373,16 @@ export default function LoginScreen() {
       }
 
       console.error("Google sign-in failed:", error);
-      void handleSocialError(getFriendlyGoogleError(error));
+
+      // Check if it's an API error (from our backend)
+      let errorMessage: string;
+      if (error instanceof ApiError) {
+        errorMessage = error.message;
+      } else {
+        errorMessage = getFriendlyGoogleError(error);
+      }
+
+      void handleSocialError(errorMessage);
     } finally {
       setIsGoogleLoading(false);
     }
@@ -401,14 +390,12 @@ export default function LoginScreen() {
 
   const handleAppleSignIn = async () => {
     if (!showApple) {
-      await handleSocialError(
-        "Sign in with Apple is not available on this device.",
-      );
+      await handleSocialError("Sign in with Apple is not available on this device.");
       return;
     }
 
     capture("user_login_attempt", {
-      method: "apple",
+      method: "apple"
     });
 
     try {
@@ -432,17 +419,15 @@ export default function LoginScreen() {
         fullName: credential.fullName
           ? {
               givenName: credential.fullName.givenName ?? undefined,
-              familyName: credential.fullName.familyName ?? undefined,
+              familyName: credential.fullName.familyName ?? undefined
             }
-          : undefined,
+          : undefined
       });
 
       if (response.data) {
         await handleSocialSuccess(response.data, "apple");
       } else {
-        await handleSocialError(
-          response.error || t("errors.authentication_error"),
-        );
+        await handleSocialError(response.error || t("errors.authentication_error"));
       }
     } catch (error: any) {
       if (isAppleCancelledError(error)) {
@@ -450,7 +435,16 @@ export default function LoginScreen() {
       }
 
       console.error("Apple sign-in failed:", error);
-      await handleSocialError(t("errors.authentication_error"));
+
+      // Check if it's an API error (from our backend)
+      let errorMessage: string;
+      if (error instanceof ApiError) {
+        errorMessage = error.message;
+      } else {
+        errorMessage = t("errors.authentication_error");
+      }
+
+      await handleSocialError(errorMessage);
     } finally {
       setIsAppleLoading(false);
     }
@@ -470,7 +464,7 @@ export default function LoginScreen() {
           style={{ flex: 1 }}
           contentContainerStyle={{
             flexGrow: 1,
-            paddingBottom: insets.bottom,
+            paddingBottom: insets.bottom
           }}
           showsVerticalScrollIndicator={false}
         >
@@ -555,11 +549,7 @@ export default function LoginScreen() {
 
             {/* Sign In Button */}
             <Button
-              title={
-                loginMutation.isPending
-                  ? t("auth.login.signing_in")
-                  : t("auth.login.sign_in")
-              }
+              title={loginMutation.isPending ? t("auth.login.signing_in") : t("auth.login.sign_in")}
               onPress={handleLogin}
               size="lg"
               disabled={loginMutation.isPending || manualLoginAttempt}
@@ -586,20 +576,20 @@ const makeLoginScreenStyles = (tokens: any, colors: any, brand: any) => {
   return {
     container: {
       flex: 1,
-      backgroundColor: colors.bg.canvas,
+      backgroundColor: colors.bg.canvas
     },
     logoContainer: {
       alignItems: "center" as const,
-      marginBottom: toRN(tokens.spacing[8]),
+      marginBottom: toRN(tokens.spacing[8])
     },
     logoImage: {
       width: 100,
-      height: 100,
+      height: 100
     },
     titleContainer: {
       alignItems: "center" as const,
       marginBottom: toRN(tokens.spacing[8]),
-      paddingHorizontal: toRN(tokens.spacing[6]),
+      paddingHorizontal: toRN(tokens.spacing[6])
     },
     title: {
       fontSize: toRN(tokens.typography.fontSize["3xl"]),
@@ -607,47 +597,44 @@ const makeLoginScreenStyles = (tokens: any, colors: any, brand: any) => {
       color: colors.text.primary,
       textAlign: "center" as const,
       marginBottom: toRN(tokens.spacing[3]),
-      fontFamily: fontFamily.groteskBold,
+      fontFamily: fontFamily.groteskBold
     },
     subtitle: {
       fontSize: toRN(tokens.typography.fontSize.base),
       color: colors.text.secondary,
       textAlign: "center" as const,
-      lineHeight: lineHeight(
-        tokens.typography.fontSize.base,
-        tokens.typography.lineHeight.relaxed,
-      ),
-      fontFamily: fontFamily.groteskRegular,
+      lineHeight: lineHeight(tokens.typography.fontSize.base, tokens.typography.lineHeight.relaxed),
+      fontFamily: fontFamily.groteskRegular
     },
     form: {
       paddingHorizontal: toRN(tokens.spacing[6]),
-      flex: 1,
+      flex: 1
     },
     optionsContainer: {
       flexDirection: "row" as const,
       justifyContent: "space-between" as const,
       alignItems: "center" as const,
       marginBottom: toRN(tokens.spacing[6]),
-      paddingHorizontal: toRN(tokens.spacing[2]),
+      paddingHorizontal: toRN(tokens.spacing[2])
     },
     rememberMeContainer: {
       flex: 1,
-      flexShrink: 1,
+      flexShrink: 1
     },
     forgotPasswordContainer: {
       flexShrink: 0,
-      paddingLeft: toRN(tokens.spacing[2]),
+      paddingLeft: toRN(tokens.spacing[2])
     },
     signInButton: {
       backgroundColor: brand.primary,
       borderRadius: toRN(tokens.borderRadius.lg),
       paddingVertical: toRN(tokens.spacing[4]),
-      marginBottom: toRN(tokens.spacing[8]),
+      marginBottom: toRN(tokens.spacing[8])
     },
     signupContainer: {
       alignItems: "center" as const,
       marginBottom: toRN(tokens.spacing[8]),
-      marginTop: toRN(tokens.spacing[4]),
-    },
+      marginTop: toRN(tokens.spacing[4])
+    }
   };
 };

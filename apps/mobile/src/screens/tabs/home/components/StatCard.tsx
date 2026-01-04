@@ -33,25 +33,25 @@ const makeStatCardStyles = (tokens: any, colors: any, brand: any) => ({
   card: {
     flex: 1,
     minWidth: "45%",
-    padding: toRN(tokens.spacing[4]),
+    padding: toRN(tokens.spacing[4])
   },
   content: {
-    alignItems: "center",
+    alignItems: "center"
   },
   icon: {
     fontSize: toRN(tokens.typography.fontSize["2xl"]),
-    marginBottom: toRN(tokens.spacing[2]),
+    marginBottom: toRN(tokens.spacing[2])
   },
   value: {
     fontSize: toRN(tokens.typography.fontSize["3xl"]),
     fontFamily: fontFamily.bold,
     color: brand.primary,
-    marginBottom: toRN(tokens.spacing[1]),
+    marginBottom: toRN(tokens.spacing[1])
   },
   label: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
     color: colors.text.secondary,
-    textAlign: "center",
-  },
+    textAlign: "center"
+  }
 });

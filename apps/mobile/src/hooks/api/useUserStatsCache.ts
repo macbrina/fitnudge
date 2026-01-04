@@ -21,7 +21,7 @@ import { useAuthStore } from "@/stores/authStore";
 // Query keys for user stats cache
 export const userStatsCacheQueryKeys = {
   all: ["userStatsCache"] as const,
-  user: (userId: string) => [...userStatsCacheQueryKeys.all, userId] as const,
+  user: (userId: string) => [...userStatsCacheQueryKeys.all, userId] as const
 };
 
 export interface UserStatsCache {
@@ -80,7 +80,7 @@ export const useUserStatsCache = () => {
       return data as UserStatsCache;
     },
     enabled: isAuthenticated && !!user?.id,
-    staleTime: 30 * 1000, // 30 seconds - cache is updated by triggers
+    staleTime: 30 * 1000 // 30 seconds - cache is updated by triggers
   });
 };
 
@@ -99,12 +99,12 @@ export const useRefreshUserStatsCache = () => {
       // Call the database function to refresh stats
       // Cast to any to handle the new RPC function not being in types yet
       await (supabase.rpc as any)("refresh_user_stats_cache", {
-        p_user_id: user.id,
+        p_user_id: user.id
       });
 
       // Invalidate queries to refetch fresh data
       queryClient.invalidateQueries({
-        queryKey: userStatsCacheQueryKeys.user(user.id),
+        queryKey: userStatsCacheQueryKeys.user(user.id)
       });
     } catch (error) {
       console.error("Failed to refresh user stats cache:", error);

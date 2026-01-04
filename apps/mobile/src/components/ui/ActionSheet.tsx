@@ -1,11 +1,5 @@
 import React from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  Image,
-  ImageSourcePropType,
-} from "react-native";
+import { View, Text, TouchableOpacity, Image, ImageSourcePropType } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStyles, useTheme } from "@/themes";
 import { tokens } from "@/themes/tokens";
@@ -58,7 +52,7 @@ export function ActionSheet({
   options,
   onClose,
   cancelLabel = "Cancel",
-  showCancel = true,
+  showCancel = true
 }: ActionSheetProps) {
   const styles = useStyles(makeActionSheetStyles);
   const { colors } = useTheme();
@@ -68,26 +62,13 @@ export function ActionSheet({
 
   return (
     <View style={styles.overlay}>
-      <TouchableOpacity
-        style={styles.backdrop}
-        activeOpacity={1}
-        onPress={onClose}
-      />
-      <View
-        style={[
-          styles.container,
-          { paddingBottom: insets.bottom + toRN(tokens.spacing[4]) },
-        ]}
-      >
+      <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
+      <View style={[styles.container, { paddingBottom: insets.bottom + toRN(tokens.spacing[4]) }]}>
         {/* Header with title and close button */}
         <View style={styles.header}>
           <View style={styles.headerSpacer} />
           {title && <Text style={styles.title}>{title}</Text>}
-          <TouchableOpacity
-            style={styles.closeButton}
-            onPress={onClose}
-            activeOpacity={0.7}
-          >
+          <TouchableOpacity style={styles.closeButton} onPress={onClose} activeOpacity={0.7}>
             <Ionicons name="close" size={24} color={colors.text.secondary} />
           </TouchableOpacity>
         </View>
@@ -98,7 +79,7 @@ export function ActionSheet({
             style={[
               styles.option,
               option.destructive && styles.optionDestructive,
-              option.disabled && styles.optionDisabled,
+              option.disabled && styles.optionDisabled
             ]}
             onPress={() => {
               if (option.disabled) return;
@@ -110,10 +91,7 @@ export function ActionSheet({
             {option.image ? (
               <Image
                 source={option.image}
-                style={[
-                  styles.optionImage,
-                  option.disabled && styles.optionImageDisabled,
-                ]}
+                style={[styles.optionImage, option.disabled && styles.optionImageDisabled]}
                 resizeMode="contain"
               />
             ) : option.icon ? (
@@ -134,7 +112,7 @@ export function ActionSheet({
               style={[
                 styles.optionText,
                 option.destructive && styles.optionTextDestructive,
-                option.disabled && styles.optionTextDisabled,
+                option.disabled && styles.optionTextDisabled
               ]}
             >
               {option.label}
@@ -148,11 +126,7 @@ export function ActionSheet({
         ))}
 
         {showCancel && (
-          <TouchableOpacity
-            style={styles.cancelButton}
-            onPress={onClose}
-            activeOpacity={0.7}
-          >
+          <TouchableOpacity style={styles.cancelButton} onPress={onClose} activeOpacity={0.7}>
             <Text style={styles.cancelText}>{cancelLabel}</Text>
           </TouchableOpacity>
         )}
@@ -169,7 +143,7 @@ const makeActionSheetStyles = (tokens: any, colors: any, brand: any) => ({
     right: 0,
     bottom: 0,
     justifyContent: "flex-end" as const,
-    zIndex: 1000,
+    zIndex: 1000
   },
   backdrop: {
     position: "absolute" as const,
@@ -177,35 +151,35 @@ const makeActionSheetStyles = (tokens: any, colors: any, brand: any) => ({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: "rgba(0, 0, 0, 0.5)"
   },
   container: {
     backgroundColor: colors.bg.card,
     borderTopLeftRadius: toRN(tokens.borderRadius["2xl"]),
     borderTopRightRadius: toRN(tokens.borderRadius["2xl"]),
-    padding: toRN(tokens.spacing[6]),
+    padding: toRN(tokens.spacing[6])
   },
   header: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
     justifyContent: "space-between" as const,
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   headerSpacer: {
-    width: 32,
+    width: 32
   },
   title: {
     flex: 1,
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.bold,
     color: colors.text.primary,
-    textAlign: "center" as const,
+    textAlign: "center" as const
   },
   closeButton: {
     width: 32,
     height: 32,
     alignItems: "center" as const,
-    justifyContent: "center" as const,
+    justifyContent: "center" as const
   },
   option: {
     flexDirection: "row" as const,
@@ -214,59 +188,59 @@ const makeActionSheetStyles = (tokens: any, colors: any, brand: any) => ({
     paddingHorizontal: toRN(tokens.spacing[4]),
     borderRadius: toRN(tokens.borderRadius.lg),
     backgroundColor: colors.bg.muted,
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   optionDestructive: {
-    backgroundColor: colors.feedback.error + "15",
+    backgroundColor: colors.feedback.error + "15"
   },
   optionIcon: {
-    marginRight: toRN(tokens.spacing[3]),
+    marginRight: toRN(tokens.spacing[3])
   },
   optionImage: {
     width: toRN(28),
     height: toRN(28),
     borderRadius: toRN(6),
-    marginRight: toRN(tokens.spacing[3]),
+    marginRight: toRN(tokens.spacing[3])
   },
   optionText: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.medium,
     color: colors.text.primary,
-    flex: 1,
+    flex: 1
   },
   optionTextDestructive: {
-    color: colors.feedback.error,
+    color: colors.feedback.error
   },
   optionDisabled: {
-    opacity: 0.5,
+    opacity: 0.5
   },
   optionTextDisabled: {
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   optionImageDisabled: {
-    opacity: 0.5,
+    opacity: 0.5
   },
   cancelButton: {
     marginTop: toRN(tokens.spacing[2]),
     paddingVertical: toRN(tokens.spacing[4]),
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   cancelText: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.semiBold,
-    color: colors.text.secondary,
+    color: colors.text.secondary
   },
   badge: {
     backgroundColor: brand.gradient?.start || "#8B5CF6",
     paddingHorizontal: toRN(tokens.spacing[2]),
     paddingVertical: toRN(2),
     borderRadius: toRN(tokens.borderRadius.sm),
-    marginLeft: toRN(tokens.spacing[2]),
+    marginLeft: toRN(tokens.spacing[2])
   },
   badgeText: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.bold,
     color: "#FFFFFF",
-    textTransform: "uppercase" as const,
-  },
+    textTransform: "uppercase" as const
+  }
 });

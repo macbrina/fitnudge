@@ -22,7 +22,7 @@ class PlanFeature(BaseModel):
     feature_value: int | None
     is_enabled: bool
     sort_order: int
-    minimum_tier: int = 0  # 0=free, 1=starter, 2=pro, 3=elite
+    minimum_tier: int = 0  # 0=free, 1=premium
 
 
 class SubscriptionPlan(BaseModel):

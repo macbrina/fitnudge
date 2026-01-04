@@ -4,10 +4,7 @@ import { WorkoutStats } from "@/hooks/useWorkoutTimer";
 import { AchievementUnlockedScreen } from "./AchievementUnlockedScreen";
 import { StreakScreen } from "./StreakScreen";
 import { WorkoutSummaryScreen } from "./WorkoutSummaryScreen";
-import {
-  WorkoutReflectionScreen,
-  WorkoutReflectionData,
-} from "./WorkoutReflectionScreen";
+import { WorkoutReflectionScreen, WorkoutReflectionData } from "./WorkoutReflectionScreen";
 
 interface Achievement {
   id: string;
@@ -42,9 +39,7 @@ interface CompletionFlowProps {
   completionData: CompletionData;
   dayNumber?: number;
   onComplete: (feedback: "hard" | "just_right" | "easy" | null) => void;
-  onUpdateFeedback?: (
-    feedback: "hard" | "just_right" | "easy",
-  ) => Promise<void>;
+  onUpdateFeedback?: (feedback: "hard" | "just_right" | "easy") => Promise<void>;
   onSaveReflection?: (data: WorkoutReflectionData) => Promise<unknown>;
 }
 
@@ -54,25 +49,17 @@ export function CompletionFlow({
   dayNumber = 1,
   onComplete,
   onUpdateFeedback,
-  onSaveReflection,
+  onSaveReflection
 }: CompletionFlowProps) {
   const [currentStep, setCurrentStep] = useState<FlowStep>("achievements");
   const [currentAchievementIndex, setCurrentAchievementIndex] = useState(0);
-  const [savedFeedback, setSavedFeedback] = useState<
-    "hard" | "just_right" | "easy" | null
-  >(null);
+  const [savedFeedback, setSavedFeedback] = useState<"hard" | "just_right" | "easy" | null>(null);
 
-  const {
-    achievements_unlocked,
-    streak,
-    workout_number_today,
-    is_practice,
-    can_add_reflection,
-  } = completionData;
+  const { achievements_unlocked, streak, workout_number_today, is_practice, can_add_reflection } =
+    completionData;
 
   // Determine the flow steps based on data
-  const hasAchievements =
-    achievements_unlocked && achievements_unlocked.length > 0;
+  const hasAchievements = achievements_unlocked && achievements_unlocked.length > 0;
   const hasStreak = streak && streak.current_streak > 0 && !is_practice;
 
   // Calculate initial step
@@ -106,9 +93,7 @@ export function CompletionFlow({
   };
 
   // Handle summary finish - move to reflection step (skip if not allowed)
-  const handleSummaryFinish = async (
-    feedback: "hard" | "just_right" | "easy" | null,
-  ) => {
+  const handleSummaryFinish = async (feedback: "hard" | "just_right" | "easy" | null) => {
     // Save feedback
     if (feedback && onUpdateFeedback) {
       try {
@@ -211,8 +196,8 @@ export function CompletionFlow({
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-  },
+    flex: 1
+  }
 });
 
 // Re-export types for use by parent components

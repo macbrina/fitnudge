@@ -4,14 +4,10 @@ import {
   useAudioPlayerStatus,
   setAudioModeAsync,
   createAudioPlayer,
-  AudioPlayer,
+  AudioPlayer
 } from "expo-audio";
 import * as Speech from "expo-speech";
-import type {
-  WorkoutMusicTrack,
-  UserAudioPreferences,
-  MusicPlayerState,
-} from "@/types/audio";
+import type { WorkoutMusicTrack, UserAudioPreferences, MusicPlayerState } from "@/types/audio";
 import { DEFAULT_AUDIO_PREFERENCES, getRandomPhrase } from "@/types/audio";
 
 // CDN URL for the ding sound effect
@@ -50,7 +46,7 @@ interface UseWorkoutAudioReturn {
   // Coach Voice
   speakCoachPhrase: (
     category: "ready" | "start" | "encouragement" | "rest" | "complete",
-    customText?: string,
+    customText?: string
   ) => void;
   speakExerciseName: (name: string) => void;
   speakCountdown: (number: number) => void;
@@ -64,24 +60,20 @@ interface UseWorkoutAudioReturn {
 /**
  * Hook to manage all workout audio: music, sound effects, and coach voice
  */
-export function useWorkoutAudio(
-  options: UseWorkoutAudioOptions = {},
-): UseWorkoutAudioReturn {
+export function useWorkoutAudio(options: UseWorkoutAudioOptions = {}): UseWorkoutAudioReturn {
   const { autoPlay = false, initialPreferences } = options;
 
   // State
   const [playlist, setPlaylist] = useState<WorkoutMusicTrack[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [isShuffleOn, setIsShuffleOn] = useState(
-    initialPreferences?.shuffle_enabled ?? true,
-  );
+  const [isShuffleOn, setIsShuffleOn] = useState(initialPreferences?.shuffle_enabled ?? true);
   const [preferences, setPreferences] = useState<UserAudioPreferences>({
     id: "",
     user_id: "",
     created_at: "",
     updated_at: "",
     ...DEFAULT_AUDIO_PREFERENCES,
-    ...initialPreferences, // Override with database preferences
+    ...initialPreferences // Override with database preferences
   });
   const prefsInitializedRef = useRef(false);
 
@@ -91,7 +83,7 @@ export function useWorkoutAudio(
       prefsInitializedRef.current = true;
       setPreferences((prev) => ({
         ...prev,
-        ...initialPreferences,
+        ...initialPreferences
       }));
       setIsShuffleOn(initialPreferences.shuffle_enabled ?? true);
     }
@@ -107,7 +99,7 @@ export function useWorkoutAudio(
     isPlaying: false,
     isLoaded: false,
     currentTime: 0,
-    duration: 0,
+    duration: 0
   });
 
   // Configure audio mode on mount (required for iOS silent mode and audio mixing)
@@ -120,7 +112,7 @@ export function useWorkoutAudio(
         await setAudioModeAsync({
           playsInSilentMode: true,
           // Allow sound effects (ding) and speech to play together without interrupting each other
-          interruptionMode: "mixWithOthers",
+          interruptionMode: "mixWithOthers"
         });
         setIsAudioReady(true);
       } catch (error) {
@@ -217,7 +209,7 @@ export function useWorkoutAudio(
     isShuffle: isShuffleOn,
     isRepeat: false,
     playlist,
-    currentIndex,
+    currentIndex
   };
 
   // ========== MUSIC CONTROLS ==========
@@ -291,8 +283,7 @@ export function useWorkoutAudio(
 
     // Set flag to auto-play when new track loads
     shouldAutoPlayOnTrackChangeRef.current = true;
-    const prevIndex =
-      currentIndex === 0 ? playlist.length - 1 : currentIndex - 1;
+    const prevIndex = currentIndex === 0 ? playlist.length - 1 : currentIndex - 1;
     setCurrentIndex(prevIndex);
     setPlayerState2((prev) => ({ ...prev, isPlaying: false }));
   }, [playlist, currentIndex, playerState2.currentTime]);
@@ -301,7 +292,7 @@ export function useWorkoutAudio(
     setIsShuffleOn((prev) => !prev);
     setPreferences((prev) => ({
       ...prev,
-      shuffle_enabled: !prev.shuffle_enabled,
+      shuffle_enabled: !prev.shuffle_enabled
     }));
   }, []);
 
@@ -327,18 +318,13 @@ export function useWorkoutAudio(
         setPlayerState2((prev) => ({ ...prev, isPlaying: false }));
       }
     },
-    [playlist],
+    [playlist]
   );
 
   // Auto-play on mount if enabled, or when playlist becomes available
   useEffect(() => {
     // Auto-play if autoPlay option is set
-    if (
-      autoPlay &&
-      preferences.music_enabled &&
-      playlist.length > 0 &&
-      isAudioReady
-    ) {
+    if (autoPlay && preferences.music_enabled && playlist.length > 0 && isAudioReady) {
       const timer = setTimeout(() => {
         playMusic();
       }, 100);
@@ -355,11 +341,7 @@ export function useWorkoutAudio(
     dingPlayer.volume = preferences.sound_effects_volume;
     dingPlayer.seekTo(0);
     dingPlayer.play();
-  }, [
-    dingPlayer,
-    preferences.sound_effects_enabled,
-    preferences.sound_effects_volume,
-  ]);
+  }, [dingPlayer, preferences.sound_effects_enabled, preferences.sound_effects_volume]);
 
   const stopDing = useCallback(() => {
     dingPlayer.pause();
@@ -368,10 +350,7 @@ export function useWorkoutAudio(
   // ========== COACH VOICE ==========
 
   const speakCoachPhrase = useCallback(
-    (
-      category: "ready" | "start" | "encouragement" | "rest" | "complete",
-      customText?: string,
-    ) => {
+    (category: "ready" | "start" | "encouragement" | "rest" | "complete", customText?: string) => {
       if (!preferences.coach_voice_enabled) return;
 
       const text = customText || getRandomPhrase(category);
@@ -379,10 +358,10 @@ export function useWorkoutAudio(
       Speech.speak(text, {
         rate: 0.9,
         pitch: 1.0,
-        volume: preferences.coach_voice_volume,
+        volume: preferences.coach_voice_volume
       });
     },
-    [preferences.coach_voice_enabled, preferences.coach_voice_volume],
+    [preferences.coach_voice_enabled, preferences.coach_voice_volume]
   );
 
   const speakExerciseName = useCallback(
@@ -392,10 +371,10 @@ export function useWorkoutAudio(
       Speech.speak(name, {
         rate: 0.85,
         pitch: 1.0,
-        volume: preferences.coach_voice_volume,
+        volume: preferences.coach_voice_volume
       });
     },
-    [preferences.coach_voice_enabled, preferences.coach_voice_volume],
+    [preferences.coach_voice_enabled, preferences.coach_voice_volume]
   );
 
   const speakCountdown = useCallback(
@@ -405,10 +384,10 @@ export function useWorkoutAudio(
       Speech.speak(String(number), {
         rate: 1.0,
         pitch: 1.0,
-        volume: preferences.coach_voice_volume,
+        volume: preferences.coach_voice_volume
       });
     },
-    [preferences.coach_voice_enabled, preferences.coach_voice_volume],
+    [preferences.coach_voice_enabled, preferences.coach_voice_volume]
   );
 
   const stopSpeaking = useCallback(() => {
@@ -417,20 +396,17 @@ export function useWorkoutAudio(
 
   // ========== PREFERENCES ==========
 
-  const updatePreferences = useCallback(
-    (updates: Partial<UserAudioPreferences>) => {
-      setPreferences((prev) => {
-        const updated = { ...prev, ...updates };
+  const updatePreferences = useCallback((updates: Partial<UserAudioPreferences>) => {
+    setPreferences((prev) => {
+      const updated = { ...prev, ...updates };
 
-        if (updates.music_volume !== undefined && musicPlayerRef.current) {
-          musicPlayerRef.current.volume = updates.music_volume;
-        }
+      if (updates.music_volume !== undefined && musicPlayerRef.current) {
+        musicPlayerRef.current.volume = updates.music_volume;
+      }
 
-        return updated;
-      });
-    },
-    [],
-  );
+      return updated;
+    });
+  }, []);
 
   // ========== CLEANUP ==========
 
@@ -481,7 +457,7 @@ export function useWorkoutAudio(
 
     // Preferences
     preferences,
-    updatePreferences,
+    updatePreferences
   };
 }
 

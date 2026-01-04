@@ -1,6 +1,8 @@
 from fastapi import APIRouter
 from app.api.v1.endpoints import (
+    app_version,
     auth,
+    data_export,
     goals,
     motivation,
     daily_motivations,
@@ -134,4 +136,14 @@ api_router.include_router(
     tracking_stats.router,
     prefix="/tracking-stats",
     tags=["Tracking Stats"],
+)
+api_router.include_router(
+    app_version.router,
+    prefix="/app-version",
+    tags=["App Version"],
+)
+api_router.include_router(
+    data_export.router,
+    prefix="/data-export",
+    tags=["Data Export"],
 )

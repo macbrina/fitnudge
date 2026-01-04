@@ -6,7 +6,7 @@ import { useUserTimezone } from "@/hooks/useUserTimezone";
 // Query keys for home dashboard
 export const homeDashboardQueryKeys = {
   all: ["home"] as const,
-  dashboard: () => [...homeDashboardQueryKeys.all, "dashboard"] as const,
+  dashboard: () => [...homeDashboardQueryKeys.all, "dashboard"] as const
 };
 
 /**
@@ -19,8 +19,8 @@ const EMPTY_DASHBOARD: HomeDashboardResponse = {
     active_count: 0,
     current_streak: 0,
     total_check_ins: 0,
-    completion_rate: 0,
-  },
+    completion_rate: 0
+  }
 };
 
 /**
@@ -52,7 +52,7 @@ export const useHomeDashboard = () => {
     refetchOnWindowFocus: false,
     // Provide empty data as placeholder to prevent loading spinners
     // This makes the UI render immediately with empty state
-    placeholderData: EMPTY_DASHBOARD,
+    placeholderData: EMPTY_DASHBOARD
   });
 };
 

@@ -35,41 +35,39 @@ export const useNotificationPermissions = () => {
     }
   }, []);
 
-  const requestPermissionsWithSoftPrompt =
-    useCallback(async (): Promise<boolean> => {
-      setIsLoading(true);
-      try {
-        const newStatus = await notificationService.requestPermissions();
-        setStatus(newStatus);
-        setShowSoftPrompt(false);
-        return newStatus === "granted";
-      } catch (error) {
-        console.error("Failed to request notification permission:", error);
-        setStatus("denied");
-        setShowSoftPrompt(false);
-        return false;
-      } finally {
-        setIsLoading(false);
-      }
-    }, []);
+  const requestPermissionsWithSoftPrompt = useCallback(async (): Promise<boolean> => {
+    setIsLoading(true);
+    try {
+      const newStatus = await notificationService.requestPermissions();
+      setStatus(newStatus);
+      setShowSoftPrompt(false);
+      return newStatus === "granted";
+    } catch (error) {
+      console.error("Failed to request notification permission:", error);
+      setStatus("denied");
+      setShowSoftPrompt(false);
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
-  const requestPermissionDirectly =
-    useCallback(async (): Promise<PermissionStatus> => {
-      setIsLoading(true);
-      try {
-        const newStatus = await notificationService.requestPermissions();
-        setStatus(newStatus);
-        setShowSoftPrompt(false);
-        return newStatus;
-      } catch (error) {
-        console.error("Failed to request notification permission:", error);
-        setStatus("denied");
-        setShowSoftPrompt(false);
-        return "denied";
-      } finally {
-        setIsLoading(false);
-      }
-    }, []);
+  const requestPermissionDirectly = useCallback(async (): Promise<PermissionStatus> => {
+    setIsLoading(true);
+    try {
+      const newStatus = await notificationService.requestPermissions();
+      setStatus(newStatus);
+      setShowSoftPrompt(false);
+      return newStatus;
+    } catch (error) {
+      console.error("Failed to request notification permission:", error);
+      setStatus("denied");
+      setShowSoftPrompt(false);
+      return "denied";
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   const hideSoftPrompt = useCallback(() => {
     setShowSoftPrompt(false);
@@ -96,6 +94,6 @@ export const useNotificationPermissions = () => {
     requestPermissionsWithSoftPrompt,
     requestPermissionDirectly,
     hideSoftPrompt,
-    showSoftPromptAgain,
+    showSoftPromptAgain
   };
 };

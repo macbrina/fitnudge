@@ -39,7 +39,7 @@ export interface UpdateAudioPreferencesRequest {
 
 // API routes
 const ROUTES = {
-  PREFERENCES: "/audio-preferences",
+  PREFERENCES: "/audio-preferences"
 };
 
 class AudioPreferencesService extends BaseApiService {
@@ -55,13 +55,8 @@ class AudioPreferencesService extends BaseApiService {
   /**
    * Update user's audio preferences (partial update)
    */
-  async updatePreferences(
-    updates: UpdateAudioPreferencesRequest,
-  ): Promise<AudioPreferences> {
-    const response = await this.patch<AudioPreferences>(
-      ROUTES.PREFERENCES,
-      updates,
-    );
+  async updatePreferences(updates: UpdateAudioPreferencesRequest): Promise<AudioPreferences> {
+    const response = await this.patch<AudioPreferences>(ROUTES.PREFERENCES, updates);
     return response.data!;
   }
 }

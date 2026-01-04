@@ -22,11 +22,7 @@ interface TodaysActionsCardProps {
   pendingCheckIns: PendingCheckIn[];
   isLoading: boolean;
   /** Callback when a check-in item is selected (for checkin tracking_type) */
-  onCheckInPress?: (
-    checkIn: CheckIn,
-    isChallenge: boolean,
-    entityId: string,
-  ) => void;
+  onCheckInPress?: (checkIn: CheckIn, isChallenge: boolean, entityId: string) => void;
   /** Callback when a meal log item is selected */
   onMealLogPress?: (entityId: string, isChallenge: boolean) => void;
   /** Callback when a hydration item is selected */
@@ -38,7 +34,7 @@ export function TodaysActionsCard({
   isLoading,
   onCheckInPress,
   onMealLogPress,
-  onHydrationPress,
+  onHydrationPress
 }: TodaysActionsCardProps) {
   const styles = useStyles(makeTodaysActionsCardStyles);
   const { colors, brandColors } = useTheme();
@@ -100,8 +96,7 @@ export function TodaysActionsCard({
 
   const handleItemPress = (item: PendingCheckIn) => {
     // Get tracking_type from the goal or challenge
-    const trackingType: TrackingType =
-      (item.item as any)?.tracking_type || "checkin";
+    const trackingType: TrackingType = (item.item as any)?.tracking_type || "checkin";
     const isChallenge = item.type === "challenge";
 
     if (item.type === "goal") {
@@ -147,15 +142,11 @@ export function TodaysActionsCard({
     if (item.type === "goal") {
       return (item.item as any)?.title || t("common.goal") || "Goal";
     } else {
-      return (
-        (item.item as Challenge)?.title || t("common.challenge") || "Challenge"
-      );
+      return (item.item as Challenge)?.title || t("common.challenge") || "Challenge";
     }
   };
 
-  const getItemIcon = (
-    item: PendingCheckIn,
-  ): keyof typeof Ionicons.glyphMap => {
+  const getItemIcon = (item: PendingCheckIn): keyof typeof Ionicons.glyphMap => {
     if (item.type === "goal") {
       return "flag-outline";
     } else {
@@ -177,9 +168,7 @@ export function TodaysActionsCard({
         <Text style={styles.title}>{t("home.today_actions")}</Text>
         <Text style={styles.subtitle}>
           {totalPending}{" "}
-          {totalPending === 1
-            ? t("home.pending_checkin")
-            : t("home.pending_checkins")}
+          {totalPending === 1 ? t("home.pending_checkin") : t("home.pending_checkins")}
         </Text>
       </View>
 
@@ -199,12 +188,7 @@ export function TodaysActionsCard({
               style={styles.checkInItem}
               onPress={() => handleItemPress(item)}
             >
-              <View
-                style={[
-                  styles.iconContainer,
-                  { backgroundColor: `${iconColor}15` },
-                ]}
-              >
+              <View style={[styles.iconContainer, { backgroundColor: `${iconColor}15` }]}>
                 <Ionicons name={icon} size={18} color={iconColor} />
               </View>
               <View style={styles.checkInContent}>
@@ -214,23 +198,16 @@ export function TodaysActionsCard({
                 <Text style={styles.checkInLabel}>
                   {item.type === "goal"
                     ? t("home.complete_checkin")
-                    : t("home.complete_challenge_checkin") ||
-                      "Complete check-in"}
+                    : t("home.complete_challenge_checkin") || "Complete check-in"}
                 </Text>
               </View>
-              <Ionicons
-                name="chevron-forward"
-                size={20}
-                color={colors.text.tertiary}
-              />
+              <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
             </TouchableOpacity>
           );
         })}
 
         {totalPending > 3 && (
-          <Text style={styles.moreText}>
-            {t("home.and_more", { count: totalPending - 3 })}
-          </Text>
+          <Text style={styles.moreText}>{t("home.and_more", { count: totalPending - 3 })}</Text>
         )}
       </View>
     </Card>
@@ -239,24 +216,24 @@ export function TodaysActionsCard({
 
 const makeTodaysActionsCardStyles = (tokens: any, colors: any, brand: any) => ({
   card: {
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   header: {
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   title: {
     fontSize: toRN(tokens.typography.fontSize.xl),
     fontFamily: fontFamily.bold,
     color: colors.text.primary,
-    marginBottom: toRN(tokens.spacing[1]),
+    marginBottom: toRN(tokens.spacing[1])
   },
   subtitle: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
-    color: colors.text.secondary,
+    color: colors.text.secondary
   },
   checkInsList: {
-    gap: toRN(tokens.spacing[3]),
+    gap: toRN(tokens.spacing[3])
   },
   checkInItem: {
     flexDirection: "row" as const,
@@ -265,34 +242,34 @@ const makeTodaysActionsCardStyles = (tokens: any, colors: any, brand: any) => ({
     paddingHorizontal: toRN(tokens.spacing[3]),
     backgroundColor: colors.bg.muted,
     borderRadius: toRN(tokens.borderRadius.lg),
-    gap: toRN(tokens.spacing[3]),
+    gap: toRN(tokens.spacing[3])
   },
   iconContainer: {
     width: 36,
     height: 36,
     borderRadius: 10,
     justifyContent: "center" as const,
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   checkInContent: {
-    flex: 1,
+    flex: 1
   },
   checkInGoal: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.semiBold,
     color: colors.text.primary,
-    marginBottom: toRN(tokens.spacing[0.5]),
+    marginBottom: toRN(tokens.spacing[0.5])
   },
   checkInLabel: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
-    color: colors.text.secondary,
+    color: colors.text.secondary
   },
   moreText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
     color: colors.text.tertiary,
     textAlign: "center" as const,
-    marginTop: toRN(tokens.spacing[2]),
-  },
+    marginTop: toRN(tokens.spacing[2])
+  }
 });

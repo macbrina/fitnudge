@@ -2,19 +2,13 @@ import { Svg, Path, G } from "react-native-svg";
 
 export const EyeClosedIcon = ({
   size = 24,
-  color = "currentColor",
+  color = "currentColor"
 }: {
   size?: number;
   color?: string;
 }) => {
   return (
-    <Svg
-      fill={color}
-      height={size}
-      viewBox="0 0 32 32"
-      width={size}
-      id="fi_9726597"
-    >
+    <Svg fill={color} height={size} viewBox="0 0 32 32" width={size} id="fi_9726597">
       <G clipRule="evenodd" fill={color} fillRule="evenodd">
         <Path d="m24.3852 14.6148c.7167-.4155 1.6345-.1713 2.05.5453l2.8625 4.9375c.4155.7167.1714 1.6346-.5453 2.0501s-1.6345.1713-2.05-.5454l-2.8625-4.9375c-.4155-.7167-.1714-1.6345.5453-2.05z" />
         <Path d="m19.0148 17.1852c.8159-.1437 1.5938.4012 1.7375 1.217l.8875 5.0375c.1437.8159-.4011 1.5938-1.217 1.7375-.8158.1438-1.5938-.4011-1.7375-1.217l-.8875-5.0375c-.1437-.8158.4011-1.5937 1.217-1.7375z" />

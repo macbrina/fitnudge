@@ -50,14 +50,10 @@ const calculateScheduledDays = (
   startDate: Date,
   endDate: Date,
   frequency: "daily" | "weekly",
-  daysOfWeek?: number[],
+  daysOfWeek?: number[]
 ): number => {
   if (frequency === "daily") {
-    return (
-      Math.ceil(
-        (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
-      ) + 1
-    );
+    return Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
   }
 
   if (frequency === "weekly" && daysOfWeek && daysOfWeek.length > 0) {
@@ -73,11 +69,7 @@ const calculateScheduledDays = (
   }
 
   // Fallback: assume daily
-  return (
-    Math.ceil(
-      (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
-    ) + 1
-  );
+  return Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 };
 
 export function ChallengeProgressSection({
@@ -94,7 +86,7 @@ export function ChallengeProgressSection({
   frequency = "daily",
   trackingType = "checkin",
   isLoading = false,
-  isPartnerView = false,
+  isPartnerView = false
 }: ChallengeProgressSectionProps) {
   const styles = useStyles(makeChallengeProgressSectionStyles);
   const { colors, brandColors } = useTheme();
@@ -106,9 +98,7 @@ export function ChallengeProgressSection({
     if (checkIns.length === 0) return 0;
 
     const sorted = [...checkIns].sort(
-      (a, b) =>
-        new Date(b.check_in_date).getTime() -
-        new Date(a.check_in_date).getTime(),
+      (a, b) => new Date(b.check_in_date).getTime() - new Date(a.check_in_date).getTime()
     );
 
     let streak = 0;
@@ -137,9 +127,7 @@ export function ChallengeProgressSection({
     if (checkIns.length === 0) return 0;
 
     const sorted = [...checkIns].sort(
-      (a, b) =>
-        new Date(a.check_in_date).getTime() -
-        new Date(b.check_in_date).getTime(),
+      (a, b) => new Date(a.check_in_date).getTime() - new Date(b.check_in_date).getTime()
     );
 
     let longest = 1;
@@ -151,8 +139,7 @@ export function ChallengeProgressSection({
       prevDate.setHours(0, 0, 0, 0);
       currDate.setHours(0, 0, 0, 0);
 
-      const diff =
-        (currDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24);
+      const diff = (currDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24);
 
       if (diff === 1) {
         current++;
@@ -194,7 +181,7 @@ export function ChallengeProgressSection({
       completed: completedCount,
       total: 7,
       percentage: Math.round((completedCount / 7) * 100),
-      daysCompleted,
+      daysCompleted
     };
   }, [checkIns]);
 
@@ -223,7 +210,7 @@ export function ChallengeProgressSection({
         date: dateStr,
         completed,
         isFuture,
-        isToday,
+        isToday
       });
     }
 
@@ -238,7 +225,7 @@ export function ChallengeProgressSection({
       bad: 2,
       okay: 3,
       good: 4,
-      great: 5,
+      great: 5
     };
 
     const moods = checkIns
@@ -246,7 +233,7 @@ export function ChallengeProgressSection({
       .slice(0, 7)
       .map((ci) => ({
         date: ci.check_in_date,
-        mood: moodToNumber[ci.mood || "good"] || 4,
+        mood: moodToNumber[ci.mood || "good"] || 4
       }));
 
     return moods;
@@ -266,9 +253,7 @@ export function ChallengeProgressSection({
       // Check if this day is a scheduled day
       const isScheduledDay =
         frequency === "daily" ||
-        (daysOfWeek && daysOfWeek.length > 0
-          ? daysOfWeek.includes(dayOfWeek)
-          : true); // If no daysOfWeek specified, count all days
+        (daysOfWeek && daysOfWeek.length > 0 ? daysOfWeek.includes(dayOfWeek) : true); // If no daysOfWeek specified, count all days
 
       if (isScheduledDay) {
         total++;
@@ -288,10 +273,7 @@ export function ChallengeProgressSection({
 
   // Challenge-specific progress
   const renderChallengeProgress = () => {
-    if (
-      (challengeType === "streak" || challengeType === "checkin_count") &&
-      targetValue
-    ) {
+    if ((challengeType === "streak" || challengeType === "checkin_count") && targetValue) {
       const progress = Math.min(checkIns.length, targetValue);
       const percentage = Math.round((progress / targetValue) * 100);
 
@@ -311,8 +293,8 @@ export function ChallengeProgressSection({
                 styles.progressBarFill,
                 {
                   width: `${percentage}%`,
-                  backgroundColor: brandColors.primary,
-                },
+                  backgroundColor: brandColors.primary
+                }
               ]}
             />
           </View>
@@ -320,8 +302,7 @@ export function ChallengeProgressSection({
             <View style={styles.completedBadge}>
               <Ionicons name="trophy" size={16} color="#FFD700" />
               <Text style={styles.completedBadgeText}>
-                {t("goals.progress.challenge_complete") ||
-                  "Challenge Complete!"}
+                {t("goals.progress.challenge_complete") || "Challenge Complete!"}
               </Text>
             </View>
           )}
@@ -334,21 +315,16 @@ export function ChallengeProgressSection({
       const end = new Date(endDate);
       const today = new Date();
 
-      const totalScheduledDays = calculateScheduledDays(
-        start,
-        end,
-        frequency,
-        daysOfWeek,
-      );
+      const totalScheduledDays = calculateScheduledDays(start, end, frequency, daysOfWeek);
 
       const calendarDaysRemaining = Math.max(
         0,
-        Math.ceil((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)),
+        Math.ceil((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
       );
 
       const percentage = Math.min(
         100,
-        Math.round((checkIns.length / Math.max(totalScheduledDays, 1)) * 100),
+        Math.round((checkIns.length / Math.max(totalScheduledDays, 1)) * 100)
       );
       const isCompleted = today > end;
 
@@ -370,15 +346,14 @@ export function ChallengeProgressSection({
                 styles.progressBarFill,
                 {
                   width: `${percentage}%`,
-                  backgroundColor: brandColors.primary,
-                },
+                  backgroundColor: brandColors.primary
+                }
               ]}
             />
           </View>
           <View style={styles.challengeMeta}>
             <Text style={styles.challengeMetaText}>
-              {checkIns.length}/{totalScheduledDays}{" "}
-              {t("goals.progress.checkins") || "check-ins"}
+              {checkIns.length}/{totalScheduledDays} {t("goals.progress.checkins") || "check-ins"}
             </Text>
             <Text style={styles.challengeMetaText}>
               {percentage}% {t("goals.progress.complete") || "complete"}
@@ -388,8 +363,7 @@ export function ChallengeProgressSection({
             <View style={styles.completedBadge}>
               <Ionicons name="trophy" size={16} color="#FFD700" />
               <Text style={styles.completedBadgeText}>
-                {t("goals.progress.challenge_complete") ||
-                  "Challenge Complete!"}
+                {t("goals.progress.challenge_complete") || "Challenge Complete!"}
               </Text>
             </View>
           )}
@@ -411,22 +385,10 @@ export function ChallengeProgressSection({
           />
         </View>
         <View style={styles.streakCardsRow}>
-          <SkeletonBox
-            width="48%"
-            height={100}
-            borderRadius={toRN(tokens.borderRadius.xl)}
-          />
-          <SkeletonBox
-            width="48%"
-            height={100}
-            borderRadius={toRN(tokens.borderRadius.xl)}
-          />
+          <SkeletonBox width="48%" height={100} borderRadius={toRN(tokens.borderRadius.xl)} />
+          <SkeletonBox width="48%" height={100} borderRadius={toRN(tokens.borderRadius.xl)} />
         </View>
-        <SkeletonBox
-          width="100%"
-          height={60}
-          borderRadius={toRN(tokens.borderRadius.md)}
-        />
+        <SkeletonBox width="100%" height={60} borderRadius={toRN(tokens.borderRadius.md)} />
       </Card>
     );
   }
@@ -477,26 +439,17 @@ export function ChallengeProgressSection({
               />
             </View>
             <View style={styles.rankInfo}>
-              <Text style={styles.rankLabel}>
-                {t("challenges.your_rank") || "Your Rank"}
-              </Text>
+              <Text style={styles.rankLabel}>{t("challenges.your_rank") || "Your Rank"}</Text>
               {myRank && myRank > 0 ? (
                 <Text style={styles.rankValue}>
-                  #{myRank}{" "}
-                  <Text style={styles.rankSecondary}>
-                    of {totalParticipants}
-                  </Text>
+                  #{myRank} <Text style={styles.rankSecondary}>of {totalParticipants}</Text>
                 </Text>
               ) : (
-                <Text style={styles.rankValue}>
-                  {t("challenges.no_rank") || "No rank yet"}
-                </Text>
+                <Text style={styles.rankValue}>{t("challenges.no_rank") || "No rank yet"}</Text>
               )}
             </View>
             <View style={styles.checkInsInfo}>
-              <Text style={styles.checkInsLabel}>
-                {t("checkin.check_ins") || "Check-ins"}
-              </Text>
+              <Text style={styles.checkInsLabel}>{t("checkin.check_ins") || "Check-ins"}</Text>
               <Text style={styles.checkInsValue}>{checkIns.length}</Text>
             </View>
           </View>
@@ -533,14 +486,13 @@ export function ChallengeProgressSection({
                         ? colors.feedback.success
                         : completionRate >= 50
                           ? brandColors.primary
-                          : colors.feedback.warning,
-                  },
+                          : colors.feedback.warning
+                  }
                 ]}
               />
             </View>
             <Text style={styles.completionRateSubtext}>
-              {completedScheduledDays} {t("goals.progress.of") || "of"}{" "}
-              {totalScheduledPastDays}{" "}
+              {completedScheduledDays} {t("goals.progress.of") || "of"} {totalScheduledPastDays}{" "}
               {t("goals.scheduled_days") || "scheduled days"}
             </Text>
           </View>
@@ -552,39 +504,33 @@ export function ChallengeProgressSection({
           <HabitChainCompact data={habitChainData} isLoading={false} />
 
           {/* Mood Trend */}
-          {moodTrendData.length > 0 && (
-            <MoodTrendMini data={moodTrendData} isLoading={false} />
-          )}
+          {moodTrendData.length > 0 && <MoodTrendMini data={moodTrendData} isLoading={false} />}
         </>
       )}
     </Card>
   );
 }
 
-const makeChallengeProgressSectionStyles = (
-  tokens: any,
-  colors: any,
-  brand: any,
-) => ({
+const makeChallengeProgressSectionStyles = (tokens: any, colors: any, brand: any) => ({
   container: {
     padding: toRN(tokens.spacing[5]),
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   header: {
     flexDirection: "row" as const,
     justifyContent: "space-between" as const,
     alignItems: "center" as const,
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   sectionTitle: {
     fontSize: toRN(tokens.typography.fontSize.xl),
     fontFamily: fontFamily.bold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   streakCardsRow: {
     flexDirection: "row" as const,
     gap: toRN(tokens.spacing[3]),
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   rankCard: {
     flexDirection: "row" as const,
@@ -593,7 +539,7 @@ const makeChallengeProgressSectionStyles = (
     backgroundColor: colors.bg.muted,
     borderRadius: toRN(tokens.borderRadius.lg),
     marginBottom: toRN(tokens.spacing[4]),
-    gap: toRN(tokens.spacing[3]),
+    gap: toRN(tokens.spacing[3])
   },
   rankIconContainer: {
     width: 48,
@@ -601,70 +547,70 @@ const makeChallengeProgressSectionStyles = (
     borderRadius: 24,
     backgroundColor: colors.bg.card,
     justifyContent: "center" as const,
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   rankInfo: {
-    flex: 1,
+    flex: 1
   },
   rankLabel: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.regular,
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   rankValue: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.bold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   rankSecondary: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   checkInsInfo: {
-    alignItems: "flex-end" as const,
+    alignItems: "flex-end" as const
   },
   checkInsLabel: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.regular,
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   checkInsValue: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.bold,
-    color: brand.primary,
+    color: brand.primary
   },
   challengeProgress: {
     marginBottom: toRN(tokens.spacing[4]),
     padding: toRN(tokens.spacing[4]),
     backgroundColor: colors.bg.muted,
-    borderRadius: toRN(tokens.borderRadius.lg),
+    borderRadius: toRN(tokens.borderRadius.lg)
   },
   challengeHeader: {
     flexDirection: "row" as const,
     justifyContent: "space-between" as const,
     alignItems: "center" as const,
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   challengeTitle: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.semiBold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   challengeStats: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
-    color: colors.text.secondary,
+    color: colors.text.secondary
   },
   challengeMeta: {
     flexDirection: "row" as const,
     justifyContent: "space-between" as const,
-    marginTop: toRN(tokens.spacing[2]),
+    marginTop: toRN(tokens.spacing[2])
   },
   challengeMetaText: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.regular,
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   completedBadge: {
     flexDirection: "row" as const,
@@ -675,49 +621,49 @@ const makeChallengeProgressSectionStyles = (
     paddingVertical: toRN(tokens.spacing[2]),
     paddingHorizontal: toRN(tokens.spacing[3]),
     backgroundColor: "rgba(255, 215, 0, 0.2)",
-    borderRadius: toRN(tokens.borderRadius.md),
+    borderRadius: toRN(tokens.borderRadius.md)
   },
   completedBadgeText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.bold,
-    color: "#B8860B",
+    color: "#B8860B"
   },
   completionRateCard: {
     marginBottom: toRN(tokens.spacing[4]),
     padding: toRN(tokens.spacing[4]),
     backgroundColor: colors.bg.muted,
-    borderRadius: toRN(tokens.borderRadius.lg),
+    borderRadius: toRN(tokens.borderRadius.lg)
   },
   completionRateHeader: {
     flexDirection: "row" as const,
     justifyContent: "space-between" as const,
     alignItems: "center" as const,
-    marginBottom: toRN(tokens.spacing[2]),
+    marginBottom: toRN(tokens.spacing[2])
   },
   completionRateLabel: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.semiBold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   completionRateValue: {
     fontSize: toRN(tokens.typography.fontSize.xl),
     fontFamily: fontFamily.bold,
-    color: brand.primary,
+    color: brand.primary
   },
   completionRateSubtext: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.regular,
     color: colors.text.tertiary,
-    marginTop: toRN(tokens.spacing[2]),
+    marginTop: toRN(tokens.spacing[2])
   },
   progressBarBg: {
     height: toRN(tokens.spacing[2]),
     backgroundColor: colors.bg.card,
     borderRadius: toRN(tokens.borderRadius.full),
-    overflow: "hidden" as const,
+    overflow: "hidden" as const
   },
   progressBarFill: {
     height: "100%",
-    borderRadius: toRN(tokens.borderRadius.full),
-  },
+    borderRadius: toRN(tokens.borderRadius.full)
+  }
 });

@@ -5,7 +5,7 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
-  ActivityIndicator,
+  ActivityIndicator
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -21,10 +21,7 @@ import Button from "@/components/ui/Button";
 import { ChallengeCard } from "@/screens/tabs/home/components/ChallengeCard";
 
 // Hooks
-import {
-  usePublicChallenges,
-  useMyChallenges,
-} from "@/hooks/api/useChallenges";
+import { usePublicChallenges, useMyChallenges } from "@/hooks/api/useChallenges";
 import { Challenge } from "@/services/api/challenges";
 import { useAlertModal } from "@/contexts/AlertModalContext";
 import { useSubscriptionStore } from "@/stores/subscriptionStore";
@@ -51,27 +48,20 @@ export default function SocialScreen() {
   const {
     data: publicChallengesData,
     isLoading: loadingChallenges,
-    refetch: refetchChallenges,
+    refetch: refetchChallenges
   } = usePublicChallenges();
-  const { data: myChallengesData, refetch: refetchMyChallenges } =
-    useMyChallenges();
+  const { data: myChallengesData, refetch: refetchMyChallenges } = useMyChallenges();
 
   const publicChallenges = publicChallengesData?.data || [];
   const myChallenges = myChallengesData?.data || [];
 
   // Get IDs of challenges user has joined
-  const myChallengeIds = useMemo(
-    () => new Set(myChallenges.map((c) => c.id)),
-    [myChallenges],
-  );
+  const myChallengeIds = useMemo(() => new Set(myChallenges.map((c) => c.id)), [myChallenges]);
 
   // Filter for active/upcoming challenges user is participating in
   const activeMyChallenges = useMemo(
-    () =>
-      myChallenges.filter(
-        (c) => c.status === "active" || c.status === "upcoming",
-      ),
-    [myChallenges],
+    () => myChallenges.filter((c) => c.status === "active" || c.status === "upcoming"),
+    [myChallenges]
   );
 
   // Count for limit checking
@@ -81,9 +71,7 @@ export default function SocialScreen() {
   // Discovery: Show upcoming/active public challenges that user hasn't joined
   const discoverChallenges = useMemo(() => {
     return publicChallenges.filter(
-      (c) =>
-        (c.status === "upcoming" || c.status === "active") &&
-        !myChallengeIds.has(c.id),
+      (c) => (c.status === "upcoming" || c.status === "active") && !myChallengeIds.has(c.id)
     );
   }, [publicChallenges, myChallengeIds]);
 
@@ -112,7 +100,7 @@ export default function SocialScreen() {
           "You've reached your challenge limit. Upgrade your plan to create more challenges.",
         variant: "warning",
         confirmLabel: t("common.upgrade") || "Upgrade",
-        cancelLabel: t("common.close") || "Close",
+        cancelLabel: t("common.close") || "Close"
       });
       if (confirmed) {
         setShowSubscriptionScreen(true);
@@ -126,7 +114,7 @@ export default function SocialScreen() {
   // Tab configuration
   const tabs: { id: SocialTab; label: string }[] = [
     { id: "posts", label: t("social.tabs.posts") || "Posts" },
-    { id: "challenges", label: t("social.tabs.challenges") || "Challenges" },
+    { id: "challenges", label: t("social.tabs.challenges") || "Challenges" }
   ];
 
   // Header action based on active tab
@@ -140,10 +128,7 @@ export default function SocialScreen() {
     }
 
     return (
-      <TouchableOpacity
-        style={styles.headerAction}
-        onPress={handleCreateChallenge}
-      >
+      <TouchableOpacity style={styles.headerAction} onPress={handleCreateChallenge}>
         <Ionicons name="add" size={24} color={brandColors.primary} />
       </TouchableOpacity>
     );
@@ -158,12 +143,7 @@ export default function SocialScreen() {
           style={[styles.tab, activeTab === tab.id && styles.tabActive]}
           onPress={() => setActiveTab(tab.id)}
         >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === tab.id && styles.tabTextActive,
-            ]}
-          >
+          <Text style={[styles.tabText, activeTab === tab.id && styles.tabTextActive]}>
             {tab.label}
           </Text>
           {activeTab === tab.id && <View style={styles.tabIndicator} />}
@@ -178,11 +158,7 @@ export default function SocialScreen() {
       {/* Coming Soon Card */}
       <Card style={styles.comingSoonCard}>
         <View style={styles.comingSoonIcon}>
-          <Ionicons
-            name="newspaper-outline"
-            size={32}
-            color={brandColors.primary}
-          />
+          <Ionicons name="newspaper-outline" size={32} color={brandColors.primary} />
         </View>
         <Text style={styles.comingSoonTitle}>
           {t("social.posts_coming_soon_title") || "Social Feed Coming Soon"}
@@ -203,9 +179,7 @@ export default function SocialScreen() {
             <Text style={styles.motivationAuthor}>
               {t("social.ai_motivation") || "FitNudge AI"}
             </Text>
-            <Text style={styles.motivationTime}>
-              {t("time.just_now") || "Just now"}
-            </Text>
+            <Text style={styles.motivationTime}>{t("time.just_now") || "Just now"}</Text>
           </View>
         </View>
         <Text style={styles.motivationText}>
@@ -214,25 +188,13 @@ export default function SocialScreen() {
         </Text>
         <View style={styles.postActions}>
           <TouchableOpacity style={styles.postAction}>
-            <Ionicons
-              name="heart-outline"
-              size={22}
-              color={colors.text.tertiary}
-            />
+            <Ionicons name="heart-outline" size={22} color={colors.text.tertiary} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.postAction}>
-            <Ionicons
-              name="chatbubble-outline"
-              size={20}
-              color={colors.text.tertiary}
-            />
+            <Ionicons name="chatbubble-outline" size={20} color={colors.text.tertiary} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.postAction}>
-            <Ionicons
-              name="share-outline"
-              size={22}
-              color={colors.text.tertiary}
-            />
+            <Ionicons name="share-outline" size={22} color={colors.text.tertiary} />
           </TouchableOpacity>
         </View>
       </Card>
@@ -246,32 +208,21 @@ export default function SocialScreen() {
       {activeMyChallenges.length > 0 && (
         <TouchableOpacity
           style={styles.statsCard}
-          onPress={() =>
-            router.push(`${MOBILE_ROUTES.GOALS.LIST}?tab=challenges`)
-          }
+          onPress={() => router.push(`${MOBILE_ROUTES.GOALS.LIST}?tab=challenges`)}
         >
           <View style={styles.statsLeft}>
             <Ionicons name="trophy" size={24} color={brandColors.primary} />
             <View style={styles.statsText}>
-              <Text style={styles.statsTitle}>
-                {t("social.my_challenges") || "My Challenges"}
-              </Text>
+              <Text style={styles.statsTitle}>{t("social.my_challenges") || "My Challenges"}</Text>
               <Text style={styles.statsSubtitle}>
                 {activeMyChallenges.filter((c) => c.status === "active").length}{" "}
                 {t("social.active_challenges") || "active"} •{" "}
-                {
-                  activeMyChallenges.filter((c) => c.status === "upcoming")
-                    .length
-                }{" "}
+                {activeMyChallenges.filter((c) => c.status === "upcoming").length}{" "}
                 {t("social.upcoming_challenges") || "upcoming"}
               </Text>
             </View>
           </View>
-          <Ionicons
-            name="chevron-forward"
-            size={20}
-            color={colors.text.tertiary}
-          />
+          <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
         </TouchableOpacity>
       )}
 
@@ -284,34 +235,21 @@ export default function SocialScreen() {
 
       {/* Challenge Cards */}
       {loadingChallenges ? (
-        <ActivityIndicator
-          size="large"
-          color={brandColors.primary}
-          style={styles.loader}
-        />
+        <ActivityIndicator size="large" color={brandColors.primary} style={styles.loader} />
       ) : discoverChallenges.length > 0 ? (
         discoverChallenges
           .slice(0, 10)
           .map((challenge: Challenge) => (
-            <ChallengeCard
-              key={challenge.id}
-              challenge={challenge}
-              variant="discovery"
-            />
+            <ChallengeCard key={challenge.id} challenge={challenge} variant="discovery" />
           ))
       ) : (
         <View style={styles.emptyState}>
-          <Ionicons
-            name="trophy-outline"
-            size={48}
-            color={colors.text.tertiary}
-          />
+          <Ionicons name="trophy-outline" size={48} color={colors.text.tertiary} />
           <Text style={styles.emptyTitle}>
             {t("social.no_challenges_title") || "No challenges found"}
           </Text>
           <Text style={styles.emptyText}>
-            {t("social.no_challenges_desc") ||
-              "Check back later or create your own challenge!"}
+            {t("social.no_challenges_desc") || "Check back later or create your own challenge!"}
           </Text>
           <Button
             title={t("social.create_challenge") || "Create Challenge"}
@@ -337,12 +275,7 @@ export default function SocialScreen() {
 
   // Subscription Modal
   if (showSubscriptionScreen) {
-    return (
-      <SubscriptionScreen
-        visible
-        onClose={() => setShowSubscriptionScreen(false)}
-      />
-    );
+    return <SubscriptionScreen visible onClose={() => setShowSubscriptionScreen(false)} />;
   }
 
   return (
@@ -378,7 +311,7 @@ export default function SocialScreen() {
 const makeSocialStyles = (tokens: any, colors: any, brand: any) => ({
   container: {
     flex: 1,
-    backgroundColor: colors.bg.canvas,
+    backgroundColor: colors.bg.canvas
   },
   // Header
   header: {
@@ -389,19 +322,19 @@ const makeSocialStyles = (tokens: any, colors: any, brand: any) => ({
     paddingVertical: toRN(tokens.spacing[3]),
     backgroundColor: colors.bg.canvas,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border.subtle,
+    borderBottomColor: colors.border.subtle
   },
   headerTitle: {
     fontSize: toRN(tokens.typography.fontSize["2xl"]),
     fontFamily: fontFamily.bold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   headerActions: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
     minWidth: 44,
     height: 44,
-    justifyContent: "flex-end" as const,
+    justifyContent: "flex-end" as const
   },
   headerAction: {
     width: 44,
@@ -409,30 +342,30 @@ const makeSocialStyles = (tokens: any, colors: any, brand: any) => ({
     borderRadius: 22,
     backgroundColor: colors.bg.muted,
     justifyContent: "center" as const,
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   // Tab Bar
   tabBar: {
     flexDirection: "row" as const,
     backgroundColor: colors.bg.card,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border.subtle,
+    borderBottomColor: colors.border.subtle
   },
   tab: {
     flex: 1,
     alignItems: "center" as const,
     paddingVertical: toRN(tokens.spacing[3]),
-    position: "relative" as const,
+    position: "relative" as const
   },
   tabActive: {},
   tabText: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.medium,
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   tabTextActive: {
     fontFamily: fontFamily.semiBold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   tabIndicator: {
     position: "absolute" as const,
@@ -441,24 +374,24 @@ const makeSocialStyles = (tokens: any, colors: any, brand: any) => ({
     right: "25%" as const,
     height: 2,
     backgroundColor: brand.primary,
-    borderRadius: 1,
+    borderRadius: 1
   },
   // Scroll
   scrollView: {
-    flex: 1,
+    flex: 1
   },
   scrollContent: {
-    flexGrow: 1,
+    flexGrow: 1
   },
   tabContent: {
     flex: 1,
-    padding: toRN(tokens.spacing[4]),
+    padding: toRN(tokens.spacing[4])
   },
   // Coming Soon Card
   comingSoonCard: {
     alignItems: "center" as const,
     padding: toRN(tokens.spacing[6]),
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   comingSoonIcon: {
     width: 64,
@@ -467,30 +400,30 @@ const makeSocialStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: `${brand.primary}15`,
     justifyContent: "center" as const,
     alignItems: "center" as const,
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   comingSoonTitle: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.semiBold,
     color: colors.text.primary,
     marginBottom: toRN(tokens.spacing[2]),
-    textAlign: "center" as const,
+    textAlign: "center" as const
   },
   comingSoonText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
     color: colors.text.secondary,
     textAlign: "center" as const,
-    lineHeight: toRN(tokens.typography.fontSize.sm) * 1.5,
+    lineHeight: toRN(tokens.typography.fontSize.sm) * 1.5
   },
   // Motivation Card
   motivationCard: {
-    padding: toRN(tokens.spacing[4]),
+    padding: toRN(tokens.spacing[4])
   },
   motivationHeader: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   motivationAvatar: {
     width: 40,
@@ -499,37 +432,37 @@ const makeSocialStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: `${brand.primary}15`,
     justifyContent: "center" as const,
     alignItems: "center" as const,
-    marginRight: toRN(tokens.spacing[3]),
+    marginRight: toRN(tokens.spacing[3])
   },
   motivationMeta: {
-    flex: 1,
+    flex: 1
   },
   motivationAuthor: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.semiBold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   motivationTime: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.regular,
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   motivationText: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.regular,
     color: colors.text.secondary,
     lineHeight: toRN(tokens.typography.fontSize.base) * 1.5,
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   postActions: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
     borderTopWidth: 1,
     borderTopColor: colors.border.subtle,
-    paddingTop: toRN(tokens.spacing[3]),
+    paddingTop: toRN(tokens.spacing[3])
   },
   postAction: {
-    marginRight: toRN(tokens.spacing[4]),
+    marginRight: toRN(tokens.spacing[4])
   },
   // Stats Card
   statsCard: {
@@ -544,38 +477,38 @@ const makeSocialStyles = (tokens: any, colors: any, brand: any) => ({
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 6,
     shadowOpacity: 0.08,
-    elevation: 2,
+    elevation: 2
   },
   statsLeft: {
     flexDirection: "row" as const,
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   statsText: {
-    marginLeft: toRN(tokens.spacing[3]),
+    marginLeft: toRN(tokens.spacing[3])
   },
   statsTitle: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.semiBold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   statsSubtitle: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
     color: colors.text.secondary,
-    marginTop: toRN(tokens.spacing[0.5]),
+    marginTop: toRN(tokens.spacing[0.5])
   },
   // Section
   sectionHeader: {
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   sectionTitle: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.semiBold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   // Loader
   loader: {
-    paddingVertical: toRN(tokens.spacing[8]),
+    paddingVertical: toRN(tokens.spacing[8])
   },
   // Empty State
   emptyState: {
@@ -583,14 +516,14 @@ const makeSocialStyles = (tokens: any, colors: any, brand: any) => ({
     justifyContent: "center" as const,
     alignItems: "center" as const,
     paddingVertical: toRN(tokens.spacing[8]),
-    paddingHorizontal: toRN(tokens.spacing[4]),
+    paddingHorizontal: toRN(tokens.spacing[4])
   },
   emptyTitle: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.semiBold,
     color: colors.text.primary,
     marginTop: toRN(tokens.spacing[4]),
-    marginBottom: toRN(tokens.spacing[2]),
+    marginBottom: toRN(tokens.spacing[2])
   },
   emptyText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
@@ -598,9 +531,9 @@ const makeSocialStyles = (tokens: any, colors: any, brand: any) => ({
     color: colors.text.tertiary,
     textAlign: "center" as const,
     marginBottom: toRN(tokens.spacing[4]),
-    maxWidth: 280,
+    maxWidth: 280
   },
   createButton: {
-    marginTop: toRN(tokens.spacing[2]),
-  },
+    marginTop: toRN(tokens.spacing[2])
+  }
 });

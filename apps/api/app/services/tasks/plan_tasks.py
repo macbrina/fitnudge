@@ -46,7 +46,7 @@ def generate_plan_task(
         goal_id: The goal ID
         goal_data: Goal data dictionary
         user_profile: Optional user profile for personalization
-        user_plan: User's subscription plan (free, starter, pro, elite)
+        user_plan: User's subscription plan (free, premium)
         activation_context: Context for activating goal when plan is ready
             - can_activate: Whether user has room for more active goals
             - user_timezone: User's timezone for check-in creation

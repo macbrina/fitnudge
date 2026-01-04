@@ -1,11 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  RefreshControl,
-} from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, RefreshControl } from "react-native";
 import { useTranslation } from "@/lib/i18n";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useStyles } from "@/themes";
@@ -59,7 +53,7 @@ export default function GoalDetailScreen() {
     if (!isPartnerView) return true; // Not partner view, always valid
     if (!partnersData?.data || !partnerId) return true; // Still loading, assume valid
     return partnersData.data.some(
-      (p) => p.partner?.id === partnerId || p.partner_user_id === partnerId,
+      (p) => p.partner?.id === partnerId || p.partner_user_id === partnerId
     );
   }, [partnersData?.data, partnerId, isPartnerView]);
 
@@ -68,11 +62,9 @@ export default function GoalDetailScreen() {
     if (isPartnerView && partnersData?.data && !isValidPartner) {
       showAlert({
         title: t("partners.access_denied") || "Access Denied",
-        message:
-          t("partners.not_partners_anymore") ||
-          "You are no longer accountability partners",
+        message: t("partners.not_partners_anymore") || "You are no longer accountability partners",
         variant: "error",
-        confirmLabel: t("common.ok"),
+        confirmLabel: t("common.ok")
       });
       router.back();
     }
@@ -81,15 +73,14 @@ export default function GoalDetailScreen() {
   const {
     data: goalResponse,
     isLoading: goalLoading,
-    refetch: refetchGoal,
+    refetch: refetchGoal
   } = useGoal(goalId || "");
   const {
     data: checkInsResponse,
     isLoading: checkInsLoading,
-    refetch: refetchCheckIns,
+    refetch: refetchCheckIns
   } = useCheckIns(goalId || undefined);
-  const { data: todayCheckInsResponse, refetch: refetchTodayCheckIns } =
-    useTodayCheckIns();
+  const { data: todayCheckInsResponse, refetch: refetchTodayCheckIns } = useTodayCheckIns();
 
   const goal = goalResponse?.data;
   const checkIns = checkInsResponse?.data || [];
@@ -98,8 +89,7 @@ export default function GoalDetailScreen() {
   // This ensures we detect when plan generation completes regardless of which tab is shown
   const { data: planStatusData } = usePlanStatus(goalId);
   const planStatus = planStatusData?.status;
-  const isPlanGenerating =
-    planStatus === "pending" || planStatus === "generating";
+  const isPlanGenerating = planStatus === "pending" || planStatus === "generating";
 
   const [showCheckInModal, setShowCheckInModal] = useState(false);
   const [showHydrationModal, setShowHydrationModal] = useState(false);
@@ -110,24 +100,20 @@ export default function GoalDetailScreen() {
   const [showAllCheckIns, setShowAllCheckIns] = useState(false);
 
   // Fetch plan data to get plan_type and targets
-  const { data: goalPlanData } = useGoalPlan(
-    goalId,
-    planStatus === "completed",
-  );
+  const { data: goalPlanData } = useGoalPlan(goalId, planStatus === "completed");
   const planType = goalPlanData?.plan?.plan_type;
 
   // Extract meal targets from plan for MealLogModal
   const mealPlanTargets = useMemo(() => {
     const structure = goalPlanData?.plan?.structured_data?.structure;
-    if (!structure)
-      return { calorieTarget: undefined, proteinTarget: undefined };
+    if (!structure) return { calorieTarget: undefined, proteinTarget: undefined };
 
     const dailyTargets = structure.daily_targets || {};
     const nutritionalTargets = structure.nutritional_targets || {}; // Legacy fallback
 
     return {
       calorieTarget: dailyTargets.calories || nutritionalTargets.calories,
-      proteinTarget: dailyTargets.protein_grams || nutritionalTargets.protein,
+      proteinTarget: dailyTargets.protein_grams || nutritionalTargets.protein
     };
   }, [goalPlanData]);
 
@@ -140,7 +126,7 @@ export default function GoalDetailScreen() {
     const today = new Date().toISOString().split("T")[0];
     return (
       todayCheckInsResponse.data.find(
-        (ci: CheckIn) => ci.goal_id === goalId && ci.check_in_date === today,
+        (ci: CheckIn) => ci.goal_id === goalId && ci.check_in_date === today
       ) || null
     );
   }, [todayCheckInsResponse, goalId]);
@@ -163,11 +149,7 @@ export default function GoalDetailScreen() {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      await Promise.all([
-        refetchGoal(),
-        refetchCheckIns(),
-        refetchTodayCheckIns(),
-      ]);
+      await Promise.all([refetchGoal(), refetchCheckIns(), refetchTodayCheckIns()]);
     } catch (error) {
       console.error("Error refreshing goal detail:", error);
     } finally {
@@ -180,7 +162,7 @@ export default function GoalDetailScreen() {
     return [
       { id: TAB_OVERVIEW, label: t("challenges.overview") || "Overview" },
       { id: TAB_PROGRESS, label: t("challenges.progress") || "Progress" },
-      { id: TAB_PLAN, label: t("challenges.plan") || "Plan" },
+      { id: TAB_PLAN, label: t("challenges.plan") || "Plan" }
     ];
   }, [t]);
 
@@ -190,16 +172,14 @@ export default function GoalDetailScreen() {
   const trackingType = goal?.tracking_type || "manual";
 
   // Determine if user can perform action based on tracking type
-  const canCheckIn =
-    isGoalActive && todayCheckIn && !todayCheckIn.is_checked_in;
+  const canCheckIn = isGoalActive && todayCheckIn && !todayCheckIn.is_checked_in;
 
   // For workout tracking, check-in is auto-completed after workout
   // For meal/hydration, user logs via respective modals
   const isWorkoutTracking = trackingType === "workout";
   const isMealTracking = trackingType === "meal";
   const isHydrationTracking = trackingType === "hydration";
-  const isManualTracking =
-    !isWorkoutTracking && !isMealTracking && !isHydrationTracking;
+  const isManualTracking = !isWorkoutTracking && !isMealTracking && !isHydrationTracking;
 
   // Check if today is a scheduled day for this goal
   // Daily goals: always scheduled, Weekly goals: only on selected days
@@ -225,12 +205,8 @@ export default function GoalDetailScreen() {
             <View style={styles.generatingContent}>
               <Ionicons name="sparkles" size={20} color={brandColors.primary} />
               <View style={styles.generatingTextContainer}>
-                <Text style={styles.generatingTitle}>
-                  {t("goals.plan.generating_title")}
-                </Text>
-                <Text style={styles.generatingMessage}>
-                  {t("goals.plan.generating_message")}
-                </Text>
+                <Text style={styles.generatingTitle}>{t("goals.plan.generating_title")}</Text>
+                <Text style={styles.generatingMessage}>{t("goals.plan.generating_message")}</Text>
               </View>
             </View>
           </Card>
@@ -239,90 +215,51 @@ export default function GoalDetailScreen() {
         {/* Goal Description */}
         <Card shadow="sm" style={styles.descriptionCard}>
           <Text style={styles.goalTitle}>{goal.title}</Text>
-          {goal.description && (
-            <Text style={styles.description}>{goal.description}</Text>
-          )}
+          {goal.description && <Text style={styles.description}>{goal.description}</Text>}
 
           {/* Date Info Row */}
           <View style={styles.dateInfoRow}>
             <View style={styles.dateInfoItem}>
-              <Ionicons
-                name="grid-outline"
-                size={14}
-                color={brandColors.primary}
-              />
-              <Text style={styles.dateInfoLabel}>
-                {t("goals.category") || "Category"}
-              </Text>
-              <Text style={styles.dateInfoValue}>
-                {t(`goals.category_${goal.category}`)}
-              </Text>
+              <Ionicons name="grid-outline" size={14} color={brandColors.primary} />
+              <Text style={styles.dateInfoLabel}>{t("goals.category") || "Category"}</Text>
+              <Text style={styles.dateInfoValue}>{t(`goals.category_${goal.category}`)}</Text>
             </View>
 
             <View style={styles.dateInfoItem}>
-              <Ionicons
-                name="repeat-outline"
-                size={14}
-                color={colors.text.secondary}
-              />
-              <Text style={styles.dateInfoLabel}>
-                {t("goals.plan.frequency") || "Frequency"}
-              </Text>
-              <Text style={styles.dateInfoValue}>
-                {t(`goals.frequency.${goal.frequency}`)}
-              </Text>
+              <Ionicons name="repeat-outline" size={14} color={colors.text.secondary} />
+              <Text style={styles.dateInfoLabel}>{t("goals.plan.frequency") || "Frequency"}</Text>
+              <Text style={styles.dateInfoValue}>{t(`goals.frequency.${goal.frequency}`)}</Text>
             </View>
           </View>
         </Card>
 
         {/* Scheduled Days - Show for weekly goals */}
-        {goal.frequency === "weekly" &&
-          goal.days_of_week &&
-          goal.days_of_week.length > 0 && (
-            <View style={styles.scheduledDaysCard}>
-              <Text style={styles.metaLabel}>
-                {t("goals.scheduled_days") || "Scheduled Days"}
-              </Text>
-              <View style={styles.daysRow}>
-                {["S", "M", "T", "W", "T", "F", "S"].map((dayLabel, index) => {
-                  const isActive = (goal.days_of_week || []).includes(index);
-                  return (
-                    <View
-                      key={index}
-                      style={[
-                        styles.dayBadge,
-                        isActive && styles.dayBadgeActive,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.dayBadgeText,
-                          isActive && styles.dayBadgeTextActive,
-                        ]}
-                      >
-                        {dayLabel}
-                      </Text>
-                    </View>
-                  );
-                })}
-              </View>
+        {goal.frequency === "weekly" && goal.days_of_week && goal.days_of_week.length > 0 && (
+          <View style={styles.scheduledDaysCard}>
+            <Text style={styles.metaLabel}>{t("goals.scheduled_days") || "Scheduled Days"}</Text>
+            <View style={styles.daysRow}>
+              {["S", "M", "T", "W", "T", "F", "S"].map((dayLabel, index) => {
+                const isActive = (goal.days_of_week || []).includes(index);
+                return (
+                  <View key={index} style={[styles.dayBadge, isActive && styles.dayBadgeActive]}>
+                    <Text style={[styles.dayBadgeText, isActive && styles.dayBadgeTextActive]}>
+                      {dayLabel}
+                    </Text>
+                  </View>
+                );
+              })}
             </View>
-          )}
+          </View>
+        )}
 
         {/* Reminder Times / Workout Times */}
         {goal.reminder_times && goal.reminder_times.length > 0 && (
           <View style={styles.scheduledDaysCard}>
-            <Text style={styles.metaLabel}>
-              {t("goals.reminder_times") || "Workout Times"}
-            </Text>
+            <Text style={styles.metaLabel}>{t("goals.reminder_times") || "Workout Times"}</Text>
             <View style={styles.reminderTimesRow}>
               {goal.reminder_times.map((time, index) => (
                 <View key={index} style={styles.reminderTimeBadge}>
-                  <Ionicons
-                    name="time-outline"
-                    size={14}
-                    color={brandColors.primary}
-                  />
+                  <Ionicons name="time-outline" size={14} color={brandColors.primary} />
                   <Text style={styles.reminderTimeText}>{time}</Text>
                 </View>
               ))}
@@ -333,14 +270,9 @@ export default function GoalDetailScreen() {
         {/* Partner View Banner */}
         {isPartnerView && (
           <View style={styles.partnerBanner}>
-            <Ionicons
-              name="eye-outline"
-              size={18}
-              color={brandColors.primary}
-            />
+            <Ionicons name="eye-outline" size={18} color={brandColors.primary} />
             <Text style={styles.partnerBannerText}>
-              {t("partners.viewing_partner_goal") ||
-                "Viewing partner's goal (read-only)"}
+              {t("partners.viewing_partner_goal") || "Viewing partner's goal (read-only)"}
             </Text>
           </View>
         )}
@@ -379,14 +311,9 @@ export default function GoalDetailScreen() {
             {/* Workout tracking - action is in Plan tab */}
             {isWorkoutTracking && planStatus === "completed" && (
               <View style={styles.workoutHint}>
-                <Ionicons
-                  name="fitness-outline"
-                  size={20}
-                  color={brandColors.primary}
-                />
+                <Ionicons name="fitness-outline" size={20} color={brandColors.primary} />
                 <Text style={styles.workoutHintText}>
-                  {t("goals.start_workout_hint") ||
-                    "Go to the Plan tab to start your workout"}
+                  {t("goals.start_workout_hint") || "Go to the Plan tab to start your workout"}
                 </Text>
               </View>
             )}
@@ -396,34 +323,24 @@ export default function GoalDetailScreen() {
         {/* Rest day indicator - show when goal is active but not a scheduled day (not in partner view) */}
         {!isPartnerView && isGoalActive && !isScheduledDay && (
           <View style={styles.restDayCard}>
-            <Ionicons
-              name="moon-outline"
-              size={20}
-              color={colors.text.tertiary}
-            />
+            <Ionicons name="moon-outline" size={20} color={colors.text.tertiary} />
             <Text style={styles.restDayText}>
-              {t("goals.rest_day") ||
-                "Rest day - no action scheduled for today"}
+              {t("goals.rest_day") || "Rest day - no action scheduled for today"}
             </Text>
           </View>
         )}
 
         {/* No check-in scheduled for today (for manual tracking, not in partner view) */}
-        {!isPartnerView &&
-          isManualTracking &&
-          !todayCheckIn &&
-          goal.status === "active" && (
-            <View style={styles.noCheckInCard}>
-              <Ionicons
-                name="calendar-outline"
-                size={toRN(tokens.typography.fontSize.xl)}
-                color={colors.text.tertiary}
-              />
-              <Text style={styles.noCheckInText}>
-                {t("home.no_checkins_message")}
-              </Text>
-            </View>
-          )}
+        {!isPartnerView && isManualTracking && !todayCheckIn && goal.status === "active" && (
+          <View style={styles.noCheckInCard}>
+            <Ionicons
+              name="calendar-outline"
+              size={toRN(tokens.typography.fontSize.xl)}
+              color={colors.text.tertiary}
+            />
+            <Text style={styles.noCheckInText}>{t("home.no_checkins_message")}</Text>
+          </View>
+        )}
 
         {/* Already checked in today */}
         {/* {todayCheckIn?.is_checked_in && (
@@ -455,11 +372,7 @@ export default function GoalDetailScreen() {
         {/* Goal is not active - show status message */}
         {!isGoalActive && goal.status && (
           <View style={styles.inactiveGoalCard}>
-            <Ionicons
-              name="pause-circle-outline"
-              size={20}
-              color={colors.text.tertiary}
-            />
+            <Ionicons name="pause-circle-outline" size={20} color={colors.text.tertiary} />
             <Text style={styles.inactiveGoalText}>
               {goal.status === "archived"
                 ? t("goals.goal_paused") || "This goal is paused"
@@ -492,9 +405,7 @@ export default function GoalDetailScreen() {
         {!isPartnerView && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>
-                {t("checkin.checkin_history")}
-              </Text>
+              <Text style={styles.sectionTitle}>{t("checkin.checkin_history")}</Text>
               {checkIns.length > 0 && (
                 <Text style={styles.sectionCount}>
                   {checkIns.length} {t("checkin.total") || "total"}
@@ -515,36 +426,22 @@ export default function GoalDetailScreen() {
               </View>
             ) : checkIns.length === 0 ? (
               <Card shadow="sm" style={styles.emptyCard}>
-                <Text style={styles.emptyText}>
-                  {t("checkin.no_checkins_yet")}
-                </Text>
+                <Text style={styles.emptyText}>{t("checkin.no_checkins_yet")}</Text>
               </Card>
             ) : (
               <>
                 <View style={styles.checkInsList}>
                   {checkIns
-                    .slice(
-                      0,
-                      showAllCheckIns
-                        ? checkIns.length
-                        : INITIAL_CHECKINS_COUNT,
-                    )
+                    .slice(0, showAllCheckIns ? checkIns.length : INITIAL_CHECKINS_COUNT)
                     .map((checkIn: CheckIn) => (
-                      <Card
-                        key={checkIn.id}
-                        shadow="sm"
-                        style={styles.checkInCard}
-                      >
+                      <Card key={checkIn.id} shadow="sm" style={styles.checkInCard}>
                         <View style={styles.checkInCardContent}>
                           <View style={styles.checkInCardLeft}>
                             <Text style={styles.checkInDate}>
                               {formatDate(checkIn.check_in_date, "short")}
                             </Text>
                             {checkIn.notes && (
-                              <Text
-                                style={styles.checkInReflection}
-                                numberOfLines={2}
-                              >
+                              <Text style={styles.checkInReflection} numberOfLines={2}>
                                 {checkIn.notes}
                               </Text>
                             )}
@@ -571,7 +468,7 @@ export default function GoalDetailScreen() {
                                     bad: "😐",
                                     okay: "😊",
                                     good: "😄",
-                                    great: "🤩",
+                                    great: "🤩"
                                   }[checkIn.mood]
                                 }
                               </Text>
@@ -643,17 +540,10 @@ export default function GoalDetailScreen() {
     return (
       <View style={styles.container}>
         <BackButton onPress={() => router.back()} />
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.content}
-        >
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
           {/* Description Card Skeleton */}
           <Card shadow="sm" style={styles.descriptionCard}>
-            <SkeletonBox
-              width="60%"
-              height={24}
-              borderRadius={toRN(tokens.borderRadius.md)}
-            />
+            <SkeletonBox width="60%" height={24} borderRadius={toRN(tokens.borderRadius.md)} />
             <SkeletonBox
               width="100%"
               height={60}
@@ -665,11 +555,7 @@ export default function GoalDetailScreen() {
           {/* Meta Row Skeleton */}
           <View style={styles.metaRow}>
             <View style={styles.metaCard}>
-              <SkeletonBox
-                width="50%"
-                height={12}
-                borderRadius={toRN(tokens.borderRadius.sm)}
-              />
+              <SkeletonBox width="50%" height={12} borderRadius={toRN(tokens.borderRadius.sm)} />
               <SkeletonBox
                 width="70%"
                 height={20}
@@ -678,11 +564,7 @@ export default function GoalDetailScreen() {
               />
             </View>
             <View style={styles.metaCard}>
-              <SkeletonBox
-                width="50%"
-                height={12}
-                borderRadius={toRN(tokens.borderRadius.sm)}
-              />
+              <SkeletonBox width="50%" height={12} borderRadius={toRN(tokens.borderRadius.sm)} />
               <SkeletonBox
                 width="70%"
                 height={20}
@@ -702,23 +584,15 @@ export default function GoalDetailScreen() {
 
           {/* Plan Section Skeleton */}
           <View style={styles.section}>
-            <SkeletonBox
-              width="40%"
-              height={24}
-              borderRadius={toRN(tokens.borderRadius.md)}
-            />
+            <SkeletonBox width="40%" height={24} borderRadius={toRN(tokens.borderRadius.md)} />
             <Card
               shadow="md"
               style={{
                 marginTop: toRN(tokens.spacing[4]),
-                padding: toRN(tokens.spacing[6]),
+                padding: toRN(tokens.spacing[6])
               }}
             >
-              <SkeletonBox
-                width="60%"
-                height={20}
-                borderRadius={toRN(tokens.borderRadius.md)}
-              />
+              <SkeletonBox width="60%" height={20} borderRadius={toRN(tokens.borderRadius.md)} />
               <SkeletonBox
                 width="100%"
                 height={100}
@@ -747,11 +621,7 @@ export default function GoalDetailScreen() {
 
   return (
     <View style={styles.container}>
-      <BackButton
-        onPress={() => router.back()}
-        title={goal.title}
-        titleCentered
-      />
+      <BackButton onPress={() => router.back()} title={goal.title} titleCentered />
 
       {/* Tabs */}
       <View style={styles.tabsContainer}>
@@ -830,49 +700,45 @@ export default function GoalDetailScreen() {
   );
 }
 
-const makeGoalDetailScreenStyles = (
-  tokens: any,
-  colors: any,
-  brandColors: any,
-) => ({
+const makeGoalDetailScreenStyles = (tokens: any, colors: any, brandColors: any) => ({
   container: {
     flex: 1,
-    backgroundColor: colors.bg.canvas,
+    backgroundColor: colors.bg.canvas
   },
   scrollView: {
-    flex: 1,
+    flex: 1
   },
   content: {
     paddingHorizontal: toRN(tokens.spacing[4]),
-    paddingBottom: toRN(tokens.spacing[6]),
+    paddingBottom: toRN(tokens.spacing[6])
   },
   tabsContainer: {
     paddingHorizontal: toRN(tokens.spacing[4]),
     paddingBottom: toRN(tokens.spacing[2]),
-    backgroundColor: colors.bg.canvas,
+    backgroundColor: colors.bg.canvas
   },
   errorContainer: {
     flex: 1,
     justifyContent: "center" as const,
     alignItems: "center" as const,
-    padding: toRN(tokens.spacing[6]),
+    padding: toRN(tokens.spacing[6])
   },
   errorText: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.regular,
-    color: colors.text.secondary,
+    color: colors.text.secondary
   },
   descriptionCard: {
     marginBottom: toRN(tokens.spacing[4]),
     padding: toRN(tokens.spacing[4]),
     marginTop: toRN(tokens.spacing[4]),
-    backgroundColor: colors.bg.card,
+    backgroundColor: colors.bg.card
   },
   description: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.groteskRegular,
     color: colors.text.primary,
-    lineHeight: toRN(tokens.typography.fontSize.base) * 1.6,
+    lineHeight: toRN(tokens.typography.fontSize.base) * 1.6
   },
   // Partner view banner
   partnerBanner: {
@@ -885,19 +751,19 @@ const makeGoalDetailScreenStyles = (
     backgroundColor: `${brandColors.primary}15`,
     borderRadius: toRN(tokens.borderRadius.lg),
     borderWidth: 1,
-    borderColor: `${brandColors.primary}30`,
+    borderColor: `${brandColors.primary}30`
   },
   partnerBannerText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
     color: brandColors.primary,
-    flex: 1,
+    flex: 1
   },
   goalTitle: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.bold,
     color: colors.text.primary,
-    marginBottom: toRN(tokens.spacing[2]),
+    marginBottom: toRN(tokens.spacing[2])
   },
   dateInfoRow: {
     flexDirection: "row" as const,
@@ -908,7 +774,7 @@ const makeGoalDetailScreenStyles = (
     paddingTop: toRN(tokens.spacing[3]),
     marginTop: toRN(tokens.spacing[3]),
     borderTopWidth: 1,
-    borderTopColor: colors.border.subtle,
+    borderTopColor: colors.border.subtle
   },
   dateInfoItem: {
     flexDirection: "row" as const,
@@ -917,22 +783,22 @@ const makeGoalDetailScreenStyles = (
     paddingHorizontal: toRN(tokens.spacing[3]),
     paddingVertical: toRN(tokens.spacing[2]),
     backgroundColor: colors.bg.muted,
-    borderRadius: toRN(tokens.borderRadius.full),
+    borderRadius: toRN(tokens.borderRadius.full)
   },
   dateInfoLabel: {
     fontFamily: fontFamily.regular,
     fontSize: toRN(tokens.typography.fontSize.xs),
-    color: colors.text.secondary,
+    color: colors.text.secondary
   },
   dateInfoValue: {
     fontFamily: fontFamily.semiBold,
     fontSize: toRN(tokens.typography.fontSize.xs),
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   metaRow: {
     flexDirection: "row" as const,
     gap: toRN(tokens.spacing[3]),
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   metaCard: {
     flex: 1,
@@ -940,7 +806,7 @@ const makeGoalDetailScreenStyles = (
     padding: toRN(tokens.spacing[4]),
     borderRadius: toRN(tokens.borderRadius.lg),
     borderWidth: 1,
-    borderColor: colors.border.default,
+    borderColor: colors.border.default
   },
   metaLabel: {
     fontSize: toRN(tokens.typography.fontSize.xs),
@@ -948,12 +814,12 @@ const makeGoalDetailScreenStyles = (
     color: colors.text.tertiary,
     marginBottom: toRN(tokens.spacing[1]),
     textTransform: "uppercase" as const,
-    letterSpacing: 0.5,
+    letterSpacing: 0.5
   },
   metaValue: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.groteskSemiBold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   scheduledDaysCard: {
     backgroundColor: colors.bg.card,
@@ -961,12 +827,12 @@ const makeGoalDetailScreenStyles = (
     borderRadius: toRN(tokens.borderRadius.xl),
     borderWidth: 1,
     borderColor: colors.border.subtle,
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   daysRow: {
     flexDirection: "row" as const,
     justifyContent: "space-between" as const,
-    marginTop: toRN(tokens.spacing[2]),
+    marginTop: toRN(tokens.spacing[2])
   },
   dayBadge: {
     width: toRN(tokens.spacing[8]),
@@ -974,21 +840,21 @@ const makeGoalDetailScreenStyles = (
     borderRadius: toRN(tokens.borderRadius.full),
     backgroundColor: colors.bg.muted,
     alignItems: "center" as const,
-    justifyContent: "center" as const,
+    justifyContent: "center" as const
   },
   dayBadgeActive: {
-    backgroundColor: brandColors.primary,
+    backgroundColor: brandColors.primary
   },
   dayBadgeText: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.groteskSemiBold,
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   reminderTimesRow: {
     flexDirection: "row" as const,
     flexWrap: "wrap" as const,
     gap: toRN(tokens.spacing[2]),
-    marginTop: toRN(tokens.spacing[2]),
+    marginTop: toRN(tokens.spacing[2])
   },
   reminderTimeBadge: {
     flexDirection: "row" as const,
@@ -997,15 +863,15 @@ const makeGoalDetailScreenStyles = (
     paddingHorizontal: toRN(tokens.spacing[3]),
     paddingVertical: toRN(tokens.spacing[2]),
     borderRadius: toRN(tokens.borderRadius.full),
-    backgroundColor: colors.bg.muted,
+    backgroundColor: colors.bg.muted
   },
   reminderTimeText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.groteskMedium,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   dayBadgeTextActive: {
-    color: "#FFFFFF",
+    color: "#FFFFFF"
   },
   checkInButton: {
     flexDirection: "row" as const,
@@ -1015,12 +881,12 @@ const makeGoalDetailScreenStyles = (
     paddingVertical: toRN(tokens.spacing[4]),
     borderRadius: toRN(tokens.borderRadius.xl),
     marginBottom: toRN(tokens.spacing[4]),
-    gap: toRN(tokens.spacing[2]),
+    gap: toRN(tokens.spacing[2])
   },
   checkInButtonText: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.bold,
-    color: "#FFFFFF",
+    color: "#FFFFFF"
   },
   noCheckInCard: {
     flexDirection: "row" as const,
@@ -1030,12 +896,12 @@ const makeGoalDetailScreenStyles = (
     padding: toRN(tokens.spacing[4]),
     borderRadius: toRN(tokens.borderRadius.xl),
     marginBottom: toRN(tokens.spacing[4]),
-    gap: toRN(tokens.spacing[2]),
+    gap: toRN(tokens.spacing[2])
   },
   noCheckInText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   restDayCard: {
     flexDirection: "row" as const,
@@ -1045,12 +911,12 @@ const makeGoalDetailScreenStyles = (
     padding: toRN(tokens.spacing[4]),
     borderRadius: toRN(tokens.borderRadius.xl),
     marginBottom: toRN(tokens.spacing[4]),
-    gap: toRN(tokens.spacing[2]),
+    gap: toRN(tokens.spacing[2])
   },
   restDayText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   workoutHint: {
     flexDirection: "row" as const,
@@ -1060,12 +926,12 @@ const makeGoalDetailScreenStyles = (
     padding: toRN(tokens.spacing[4]),
     borderRadius: toRN(tokens.borderRadius.xl),
     marginBottom: toRN(tokens.spacing[4]),
-    gap: toRN(tokens.spacing[2]),
+    gap: toRN(tokens.spacing[2])
   },
   workoutHintText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
-    color: brandColors.primary,
+    color: brandColors.primary
   },
   inactiveGoalCard: {
     flexDirection: "row" as const,
@@ -1075,12 +941,12 @@ const makeGoalDetailScreenStyles = (
     padding: toRN(tokens.spacing[4]),
     borderRadius: toRN(tokens.borderRadius.xl),
     marginBottom: toRN(tokens.spacing[4]),
-    gap: toRN(tokens.spacing[2]),
+    gap: toRN(tokens.spacing[2])
   },
   inactiveGoalText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   checkedInBadge: {
     flexDirection: "row" as const,
@@ -1091,73 +957,73 @@ const makeGoalDetailScreenStyles = (
     paddingHorizontal: toRN(tokens.spacing[4]),
     backgroundColor: colors.feedback.success + "15",
     borderRadius: toRN(tokens.borderRadius.xl),
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   checkedInText: {
     fontFamily: fontFamily.medium,
     fontSize: toRN(tokens.typography.fontSize.base),
-    color: colors.feedback.success,
+    color: colors.feedback.success
   },
   section: {
-    marginTop: toRN(tokens.spacing[4]),
+    marginTop: toRN(tokens.spacing[4])
   },
   sectionHeader: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
     justifyContent: "space-between" as const,
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   sectionTitle: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.bold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   sectionCount: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   emptyCard: {
     padding: toRN(tokens.spacing[6]),
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   emptyText: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.regular,
-    color: colors.text.secondary,
+    color: colors.text.secondary
   },
   checkInsList: {
-    gap: toRN(tokens.spacing[3]),
+    gap: toRN(tokens.spacing[3])
   },
   checkInCard: {
-    padding: toRN(tokens.spacing[4]),
+    padding: toRN(tokens.spacing[4])
   },
   checkInCardContent: {
     flexDirection: "row" as const,
     justifyContent: "space-between" as const,
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   checkInCardLeft: {
     flex: 1,
-    marginRight: toRN(tokens.spacing[3]),
+    marginRight: toRN(tokens.spacing[3])
   },
   checkInDate: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.semiBold,
     color: colors.text.primary,
-    marginBottom: toRN(tokens.spacing[1]),
+    marginBottom: toRN(tokens.spacing[1])
   },
   checkInReflection: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
-    color: colors.text.secondary,
+    color: colors.text.secondary
   },
   checkInCardRight: {
     alignItems: "center" as const,
-    gap: toRN(tokens.spacing[1]),
+    gap: toRN(tokens.spacing[1])
   },
   checkInMood: {
-    fontSize: toRN(tokens.typography.fontSize.lg),
+    fontSize: toRN(tokens.typography.fontSize.lg)
   },
   viewAllButton: {
     flexDirection: "row" as const,
@@ -1165,12 +1031,12 @@ const makeGoalDetailScreenStyles = (
     justifyContent: "center" as const,
     gap: toRN(tokens.spacing[1]),
     paddingVertical: toRN(tokens.spacing[3]),
-    marginTop: toRN(tokens.spacing[2]),
+    marginTop: toRN(tokens.spacing[2])
   },
   viewAllButtonText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
-    color: brandColors.primary,
+    color: brandColors.primary
   },
   // Plan generating indicator styles
   generatingCard: {
@@ -1178,26 +1044,26 @@ const makeGoalDetailScreenStyles = (
     padding: toRN(tokens.spacing[4]),
     backgroundColor: brandColors.primary + "15",
     borderWidth: 1,
-    borderColor: brandColors.primary + "30",
+    borderColor: brandColors.primary + "30"
   },
   generatingContent: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    gap: toRN(tokens.spacing[3]),
+    gap: toRN(tokens.spacing[3])
   },
   generatingTextContainer: {
-    flex: 1,
+    flex: 1
   },
   generatingTitle: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.semiBold,
-    color: brandColors.primary,
+    color: brandColors.primary
   },
   generatingMessage: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.regular,
     color: colors.text.secondary,
-    marginTop: toRN(tokens.spacing[0.5]),
+    marginTop: toRN(tokens.spacing[0.5])
   },
   // Plan ready indicator styles
   planReadyCard: {
@@ -1206,17 +1072,17 @@ const makeGoalDetailScreenStyles = (
     backgroundColor: colors.feedback.success + "15",
     borderRadius: toRN(tokens.borderRadius.lg),
     borderWidth: 1,
-    borderColor: colors.feedback.success + "30",
+    borderColor: colors.feedback.success + "30"
   },
   planReadyContent: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    gap: toRN(tokens.spacing[2]),
+    gap: toRN(tokens.spacing[2])
   },
   planReadyText: {
     flex: 1,
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
-    color: colors.feedback.success,
-  },
+    color: colors.feedback.success
+  }
 });

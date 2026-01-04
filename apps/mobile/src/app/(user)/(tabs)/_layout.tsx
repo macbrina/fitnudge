@@ -22,14 +22,14 @@ function NotificationBadge({ count }: { count: number }) {
         backgroundColor: colors.feedback.error,
         justifyContent: "center",
         alignItems: "center",
-        paddingHorizontal: 4,
+        paddingHorizontal: 4
       }}
     >
       <Text
         style={{
           fontSize: 10,
           fontWeight: "700",
-          color: "#FFFFFF",
+          color: "#FFFFFF"
         }}
       >
         {count > 99 ? "99+" : count}
@@ -50,7 +50,7 @@ export default function TabLayout() {
         headerShown: false,
         tabBarStyle: {
           backgroundColor: colors.bg.card,
-          borderTopColor: colors.border.subtle,
+          borderTopColor: colors.border.subtle
           // paddingBottom: 4,
           // paddingTop: 4,
           // height: 60,
@@ -60,29 +60,29 @@ export default function TabLayout() {
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: "500",
-          marginTop: 2,
-        },
+          marginTop: 2
+        }
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           title: "Home",
-          tabBarIcon: ({ color, size }) => <Home size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => <Home size={size} color={color} />
         }}
       />
       <Tabs.Screen
         name="goals"
         options={{
           title: "Goals",
-          tabBarIcon: ({ color, size }) => <Target size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => <Target size={size} color={color} />
         }}
       />
       <Tabs.Screen
         name="feed"
         options={{
           title: "Social",
-          tabBarIcon: ({ color, size }) => <Users size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => <Users size={size} color={color} />
         }}
       />
       <Tabs.Screen
@@ -94,14 +94,14 @@ export default function TabLayout() {
               <Bell size={size} color={color} />
               <NotificationBadge count={unreadCount} />
             </View>
-          ),
+          )
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: "Profile",
-          tabBarIcon: ({ color, size }) => <User size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => <User size={size} color={color} />
         }}
       />
     </Tabs>

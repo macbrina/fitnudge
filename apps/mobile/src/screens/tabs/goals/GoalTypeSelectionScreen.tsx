@@ -1,11 +1,5 @@
 import React, { useState, useCallback, useEffect } from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  ActivityIndicator,
-} from "react-native";
+import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
 import { useTranslation } from "@/lib/i18n";
 import { toRN } from "@/lib/units";
 import { useStyles } from "@/themes/makeStyles";
@@ -22,11 +16,7 @@ import { useActiveGoals } from "@/hooks/api/useGoals";
 import SubscriptionScreen from "@/screens/onboarding/SubscriptionScreen";
 
 // Extended type to include challenge types for this selection screen
-type SelectableType =
-  | GoalType
-  | "mixed"
-  | "time_challenge"
-  | "target_challenge";
+type SelectableType = GoalType | "mixed" | "time_challenge" | "target_challenge";
 
 interface GoalTypeOption {
   id: SelectableType;
@@ -46,14 +36,13 @@ export default function GoalTypeSelectionScreen() {
     hasFeature,
     isLoading: isLoadingSubscription,
     canCreateGoal,
-    getPlan,
+    getPlan
   } = useSubscriptionStore();
   const params = useLocalSearchParams<{ category?: string }>();
 
   const [selectedType, setSelectedType] = useState<SelectableType | null>(null);
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
-  const [upgradePromptType, setUpgradePromptType] =
-    useState<UpgradePromptType>("generic");
+  const [upgradePromptType, setUpgradePromptType] = useState<UpgradePromptType>("generic");
   const [showSubscriptionScreen, setShowSubscriptionScreen] = useState(false);
 
   // Check if user has premium access (challenge_create feature)
@@ -96,7 +85,7 @@ export default function GoalTypeSelectionScreen() {
         "Get a variety of habits and challenges to choose from",
       icon: "color-palette-outline",
       isPremium: false,
-      badge: t("goals.types.recommended") || "Recommended",
+      badge: t("goals.types.recommended") || "Recommended"
     },
     {
       id: "habit",
@@ -105,7 +94,7 @@ export default function GoalTypeSelectionScreen() {
         t("goals.types.habit.description") ||
         "Build a daily practice that becomes part of your routine. No end date.",
       icon: "refresh-outline",
-      isPremium: false,
+      isPremium: false
     },
     {
       id: "time_challenge",
@@ -115,7 +104,7 @@ export default function GoalTypeSelectionScreen() {
         "Commit to 30, 60, or 90 days of focused effort. Shareable with friends.",
       icon: "calendar-outline",
       isPremium: true,
-      isChallenge: true,
+      isChallenge: true
     },
     {
       id: "target_challenge",
@@ -125,8 +114,8 @@ export default function GoalTypeSelectionScreen() {
         "Achieve a specific number (50 workouts, 100 meals, etc.). Race with friends.",
       icon: "flag-outline",
       isPremium: true,
-      isChallenge: true,
-    },
+      isChallenge: true
+    }
   ];
 
   const handleBack = () => {
@@ -157,10 +146,9 @@ export default function GoalTypeSelectionScreen() {
         pathname: "/create-goal",
         params: {
           createType: "challenge",
-          challengeType:
-            selectedType === "time_challenge" ? "streak" : "checkin_count",
-          category: params.category,
-        },
+          challengeType: selectedType === "time_challenge" ? "streak" : "checkin_count",
+          category: params.category
+        }
       });
     } else {
       // Route to goal creation
@@ -168,8 +156,8 @@ export default function GoalTypeSelectionScreen() {
         pathname: "/create-goal",
         params: {
           goalType: selectedType,
-          category: params.category,
-        },
+          category: params.category
+        }
       });
     }
   };
@@ -188,8 +176,7 @@ export default function GoalTypeSelectionScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.subtitle}>
-          {t("goals.types.subtitle") ||
-            "What kind of goal do you want to create?"}
+          {t("goals.types.subtitle") || "What kind of goal do you want to create?"}
         </Text>
 
         <View style={styles.optionsContainer}>
@@ -205,17 +192,11 @@ export default function GoalTypeSelectionScreen() {
               >
                 <Card
                   shadow={isSelected ? "lg" : "sm"}
-                  style={[
-                    styles.optionCard,
-                    isSelected && styles.optionCardSelected,
-                  ]}
+                  style={[styles.optionCard, isSelected && styles.optionCardSelected]}
                 >
                   <View style={styles.optionHeader}>
                     <View
-                      style={[
-                        styles.iconContainer,
-                        isSelected && styles.iconContainerSelected,
-                      ]}
+                      style={[styles.iconContainer, isSelected && styles.iconContainerSelected]}
                     >
                       <Ionicons
                         name={option.icon}
@@ -227,10 +208,7 @@ export default function GoalTypeSelectionScreen() {
                     <View style={styles.optionTitleContainer}>
                       <View style={styles.titleRow}>
                         <Text
-                          style={[
-                            styles.optionTitle,
-                            isSelected && styles.optionTitleSelected,
-                          ]}
+                          style={[styles.optionTitle, isSelected && styles.optionTitleSelected]}
                         >
                           {option.title}
                         </Text>
@@ -249,25 +227,15 @@ export default function GoalTypeSelectionScreen() {
                     </View>
 
                     {isSelected && (
-                      <Ionicons
-                        name="checkmark-circle"
-                        size={24}
-                        color={brandColors.primary}
-                      />
+                      <Ionicons name="checkmark-circle" size={24} color={brandColors.primary} />
                     )}
                   </View>
 
-                  <Text style={styles.optionDescription}>
-                    {option.description}
-                  </Text>
+                  <Text style={styles.optionDescription}>{option.description}</Text>
 
                   {option.isPremium && !isLocked && (
                     <View style={styles.shareableTag}>
-                      <Ionicons
-                        name="people-outline"
-                        size={14}
-                        color={brandColors.primary}
-                      />
+                      <Ionicons name="people-outline" size={14} color={brandColors.primary} />
                       <Text style={styles.shareableText}>
                         {t("goals.types.shareable") || "Shareable with friends"}
                       </Text>
@@ -281,11 +249,7 @@ export default function GoalTypeSelectionScreen() {
 
         {/* Info text */}
         <View style={styles.infoContainer}>
-          <Ionicons
-            name="information-circle-outline"
-            size={20}
-            color={colors.text.tertiary}
-          />
+          <Ionicons name="information-circle-outline" size={20} color={colors.text.tertiary} />
           <Text style={styles.infoText}>
             {t("goals.types.info") ||
               "Habits are free for everyone. Challenges require a premium plan and can be shared with friends."}
@@ -296,19 +260,13 @@ export default function GoalTypeSelectionScreen() {
       {/* Continue Button */}
       <View style={styles.footer}>
         <TouchableOpacity
-          style={[
-            styles.continueButton,
-            !selectedType && styles.continueButtonDisabled,
-          ]}
+          style={[styles.continueButton, !selectedType && styles.continueButtonDisabled]}
           onPress={handleContinue}
           disabled={!selectedType}
           activeOpacity={0.8}
         >
           <Text
-            style={[
-              styles.continueButtonText,
-              !selectedType && styles.continueButtonTextDisabled,
-            ]}
+            style={[styles.continueButtonText, !selectedType && styles.continueButtonTextDisabled]}
           >
             {t("common.continue") || "Continue"}
           </Text>
@@ -326,9 +284,7 @@ export default function GoalTypeSelectionScreen() {
         onClose={handleUpgradePromptClose}
         onUpgrade={handleUpgrade}
         type={upgradePromptType}
-        featureName={
-          upgradePromptType === "feature_locked" ? "Challenges" : undefined
-        }
+        featureName={upgradePromptType === "feature_locked" ? "Challenges" : undefined}
       />
 
       {/* Subscription Screen */}
@@ -343,40 +299,40 @@ export default function GoalTypeSelectionScreen() {
 const makeStyles = (tokens: any, colors: any, brand: any) => ({
   container: {
     flex: 1,
-    backgroundColor: colors.bg.canvas,
+    backgroundColor: colors.bg.canvas
   },
   scrollView: {
-    flex: 1,
+    flex: 1
   },
   scrollContent: {
     padding: toRN(tokens.spacing[4]),
-    paddingBottom: toRN(tokens.spacing[24]),
+    paddingBottom: toRN(tokens.spacing[24])
   },
   subtitle: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.regular,
     color: colors.text.secondary,
     marginBottom: toRN(tokens.spacing[4]),
-    textAlign: "center" as const,
+    textAlign: "center" as const
   },
   optionsContainer: {
-    gap: toRN(tokens.spacing[3]),
+    gap: toRN(tokens.spacing[3])
   },
   optionCard: {
     padding: toRN(tokens.spacing[4]),
     borderWidth: 2,
-    borderColor: "transparent",
+    borderColor: "transparent"
   },
   optionCardSelected: {
-    borderColor: brand.primary,
+    borderColor: brand.primary
   },
   optionCardLocked: {
-    opacity: 0.7,
+    opacity: 0.7
   },
   optionHeader: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    marginBottom: toRN(tokens.spacing[2]),
+    marginBottom: toRN(tokens.spacing[2])
   },
   iconContainer: {
     width: 44,
@@ -385,70 +341,70 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: `${brand.primary}15`,
     alignItems: "center" as const,
     justifyContent: "center" as const,
-    marginRight: toRN(tokens.spacing[3]),
+    marginRight: toRN(tokens.spacing[3])
   },
   iconContainerSelected: {
-    backgroundColor: brand.primary,
+    backgroundColor: brand.primary
   },
   optionTitleContainer: {
-    flex: 1,
+    flex: 1
   },
   titleRow: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    gap: toRN(tokens.spacing[2]),
+    gap: toRN(tokens.spacing[2])
   },
   optionTitle: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.semiBold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   optionTitleSelected: {
-    color: brand.primary,
+    color: brand.primary
   },
   badge: {
     backgroundColor: `${brand.primary}20`,
     paddingHorizontal: toRN(tokens.spacing[2]),
     paddingVertical: 2,
-    borderRadius: 4,
+    borderRadius: 4
   },
   badgeText: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.medium,
-    color: brand.primary,
+    color: brand.primary
   },
   premiumBadge: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
     gap: 4,
-    marginTop: 2,
+    marginTop: 2
   },
   premiumText: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.medium,
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   proBadge: {
     backgroundColor: brand.gradient?.start || "#8B5CF6",
     paddingHorizontal: toRN(tokens.spacing[2]),
     paddingVertical: toRN(2),
     borderRadius: toRN(tokens.borderRadius.sm),
-    marginLeft: toRN(tokens.spacing[2]),
+    marginLeft: toRN(tokens.spacing[2])
   },
   proBadgeText: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.bold,
     color: "#FFFFFF",
-    textTransform: "uppercase" as const,
+    textTransform: "uppercase" as const
   },
   optionDescription: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
     color: colors.text.secondary,
-    lineHeight: toRN(tokens.typography.fontSize.sm) * 1.5,
+    lineHeight: toRN(tokens.typography.fontSize.sm) * 1.5
   },
   optionDescriptionLocked: {
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   shareableTag: {
     flexDirection: "row" as const,
@@ -457,12 +413,12 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     marginTop: toRN(tokens.spacing[2]),
     paddingTop: toRN(tokens.spacing[2]),
     borderTopWidth: 1,
-    borderTopColor: colors.border.default,
+    borderTopColor: colors.border.default
   },
   shareableText: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.medium,
-    color: brand.primary,
+    color: brand.primary
   },
   infoContainer: {
     flexDirection: "row" as const,
@@ -471,21 +427,21 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     marginTop: toRN(tokens.spacing[4]),
     padding: toRN(tokens.spacing[3]),
     backgroundColor: colors.bg.muted,
-    borderRadius: toRN(tokens.borderRadius.lg),
+    borderRadius: toRN(tokens.borderRadius.lg)
   },
   infoText: {
     flex: 1,
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
     color: colors.text.tertiary,
-    lineHeight: toRN(tokens.typography.fontSize.sm) * 1.5,
+    lineHeight: toRN(tokens.typography.fontSize.sm) * 1.5
   },
   footer: {
     padding: toRN(tokens.spacing[4]),
     paddingBottom: toRN(tokens.spacing[8]),
     borderTopWidth: 1,
     borderTopColor: colors.border.default,
-    backgroundColor: colors.bg.canvas,
+    backgroundColor: colors.bg.canvas
   },
   continueButton: {
     flexDirection: "row" as const,
@@ -494,17 +450,17 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     gap: toRN(tokens.spacing[2]),
     backgroundColor: brand.primary,
     paddingVertical: toRN(tokens.spacing[4]),
-    borderRadius: toRN(tokens.borderRadius.xl),
+    borderRadius: toRN(tokens.borderRadius.xl)
   },
   continueButtonDisabled: {
-    backgroundColor: colors.bg.muted,
+    backgroundColor: colors.bg.muted
   },
   continueButtonText: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.semiBold,
-    color: "#fff",
+    color: "#fff"
   },
   continueButtonTextDisabled: {
-    color: colors.text.tertiary,
-  },
+    color: colors.text.tertiary
+  }
 });

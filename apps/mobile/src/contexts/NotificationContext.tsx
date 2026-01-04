@@ -1,10 +1,4 @@
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  ReactNode,
-} from "react";
+import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { notificationService } from "@/services/notifications/notificationService";
 import { NotificationToast } from "@/components/notifications/NotificationToast";
 import { NotificationData } from "@/services/notifications/notificationTypes";
@@ -15,17 +9,13 @@ interface NotificationContextType {
   hideToast: () => void;
 }
 
-const NotificationContext = createContext<NotificationContextType | undefined>(
-  undefined,
-);
+const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
 interface NotificationProviderProps {
   children: ReactNode;
 }
 
-export const NotificationProvider: React.FC<NotificationProviderProps> = ({
-  children,
-}) => {
+export const NotificationProvider: React.FC<NotificationProviderProps> = ({ children }) => {
   const [toastVisible, setToastVisible] = useState(false);
   const [toastTitle, setToastTitle] = useState("");
   const [toastBody, setToastBody] = useState("");
@@ -59,7 +49,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 
   const value: NotificationContextType = {
     showToast,
-    hideToast,
+    hideToast
   };
 
   return (
@@ -80,9 +70,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 export const useNotification = (): NotificationContextType => {
   const context = useContext(NotificationContext);
   if (context === undefined) {
-    throw new Error(
-      "useNotification must be used within a NotificationProvider",
-    );
+    throw new Error("useNotification must be used within a NotificationProvider");
   }
   return context;
 };

@@ -4,14 +4,16 @@ import { logger } from "@/services/logger";
 
 export interface FitnessProfileRequest {
   biological_sex?: string; // 'male', 'female', 'prefer_not_to_say'
-  fitness_level: string;
-  primary_goal: string;
-  current_frequency: string;
-  preferred_location: string;
-  available_time: string;
-  motivation_style: string;
-  biggest_challenge: string;
+  fitness_level?: string;
+  primary_goal?: string;
+  current_frequency?: string;
+  preferred_location?: string;
+  available_time?: string;
+  motivation_style?: string;
+  biggest_challenge?: string;
   available_equipment?: string[];
+  hydration_unit?: string; // 'ml', 'oz'
+  hydration_daily_target_ml?: number;
 }
 
 export interface FitnessProfileResponse {
@@ -26,7 +28,11 @@ export interface FitnessProfileResponse {
   motivation_style: string;
   biggest_challenge: string;
   available_equipment?: string[];
+  hydration_unit?: string; // 'ml', 'oz'
+  hydration_daily_target_ml?: number;
   completed_at: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface SuggestedGoal {
@@ -45,11 +51,7 @@ export interface SuggestedGoal {
   target_checkins?: number; // For target_challenge
 }
 
-export type SuggestedGoalsStatus =
-  | "not_started"
-  | "pending"
-  | "ready"
-  | "failed";
+export type SuggestedGoalsStatus = "not_started" | "pending" | "ready" | "failed";
 
 export interface SuggestedGoalsStatusResponse {
   status: SuggestedGoalsStatus;
@@ -64,15 +66,13 @@ class OnboardingApiService extends BaseApiService {
   /**
    * Save user's fitness profile
    */
-  async saveProfile(
-    profileData: FitnessProfileRequest,
-  ): Promise<FitnessProfileResponse> {
+  async saveProfile(profileData: FitnessProfileRequest): Promise<FitnessProfileResponse> {
     try {
       // Saving profile - tracked via PostHog in component
 
       const response = await this.post<FitnessProfileResponse>(
         ROUTES.ONBOARDING.PROFILE,
-        profileData,
+        profileData
       );
 
       // Profile saved successfully - tracked via PostHog in component
@@ -80,7 +80,7 @@ class OnboardingApiService extends BaseApiService {
     } catch (error) {
       logger.error("Failed to save fitness profile", {
         error: error instanceof Error ? error.message : String(error),
-        profileData,
+        profileData
       });
       throw error;
     }
@@ -93,16 +93,35 @@ class OnboardingApiService extends BaseApiService {
     try {
       // Fetching profile - tracked via PostHog in component
 
-      const response = await this.get<FitnessProfileResponse>(
-        ROUTES.ONBOARDING.PROFILE,
-      );
+      const response = await this.get<FitnessProfileResponse>(ROUTES.ONBOARDING.PROFILE);
 
       // Profile fetched successfully - tracked via PostHog in component
       return response.data!;
     } catch (error) {
       console.log("Failed to fetch fitness profile", error);
       logger.error("Failed to fetch fitness profile", {
+        error: error instanceof Error ? error.message : String(error)
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Update user's fitness profile (partial update via PATCH)
+   */
+  async updateProfile(
+    profileData: Partial<FitnessProfileRequest>
+  ): Promise<FitnessProfileResponse> {
+    try {
+      const response = await this.patch<FitnessProfileResponse>(
+        ROUTES.ONBOARDING.PROFILE,
+        profileData
+      );
+      return response.data!;
+    } catch (error) {
+      logger.error("Failed to update fitness profile", {
         error: error instanceof Error ? error.message : String(error),
+        profileData
       });
       throw error;
     }
@@ -113,22 +132,18 @@ class OnboardingApiService extends BaseApiService {
    * @param goalType - Type of goals to generate: "habit" (default), "time_challenge", "target_challenge", or "mixed"
    */
   async requestSuggestedGoals(
-    goalType:
-      | "habit"
-      | "time_challenge"
-      | "target_challenge"
-      | "mixed" = "habit",
+    goalType: "habit" | "time_challenge" | "target_challenge" | "mixed" = "habit"
   ): Promise<SuggestedGoalsStatusResponse> {
     try {
       const response = await this.post<SuggestedGoalsStatusResponse>(
         ROUTES.ONBOARDING.SUGGESTED_GOALS,
-        { goal_type: goalType },
+        { goal_type: goalType }
       );
       return response.data!;
     } catch (error) {
       logger.error("Failed to request suggested goals generation", {
         error: error instanceof Error ? error.message : String(error),
-        goalType,
+        goalType
       });
       throw error;
     }
@@ -140,12 +155,12 @@ class OnboardingApiService extends BaseApiService {
   async getSuggestedGoalsStatus(): Promise<SuggestedGoalsStatusResponse> {
     try {
       const response = await this.get<SuggestedGoalsStatusResponse>(
-        ROUTES.ONBOARDING.SUGGESTED_GOALS,
+        ROUTES.ONBOARDING.SUGGESTED_GOALS
       );
       return response.data!;
     } catch (error) {
       logger.error("Failed to fetch suggested goals status", {
-        error: error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? error.message : String(error)
       });
       throw error;
     }
@@ -159,16 +174,12 @@ class OnboardingApiService extends BaseApiService {
    * @param goalType - Type of goals to generate: "habit" (default), "time_challenge", "target_challenge", or "mixed"
    */
   async regenerateSuggestedGoals(
-    goalType:
-      | "habit"
-      | "time_challenge"
-      | "target_challenge"
-      | "mixed" = "habit",
+    goalType: "habit" | "time_challenge" | "target_challenge" | "mixed" = "habit"
   ): Promise<SuggestedGoalsStatusResponse> {
     try {
       const response = await this.put<SuggestedGoalsStatusResponse>(
         `${ROUTES.ONBOARDING.SUGGESTED_GOALS}/regenerate`,
-        { goal_type: goalType },
+        { goal_type: goalType }
       );
       return response.data!;
     } catch (error) {
@@ -183,7 +194,7 @@ class OnboardingApiService extends BaseApiService {
         // Expected limit-reached scenario - just log info, don't log as error
         logger.error("Failed to regenerate suggested goals", {
           error: error instanceof Error ? error.message : String(error),
-          goalType,
+          goalType
         });
       }
       throw error;

@@ -72,7 +72,7 @@ This directory contains detailed documentation for each feature in the FitNudge 
     - Goal association
 
 12. **[AI Progress Reflections](12-ai-progress-reflections.md)**
-    - Premium deep analysis (Pro/Elite only)
+    - Premium deep analysis Premium
     - Weekly and monthly reflections
     - Actionable coaching recommendations
     - Pattern analysis

@@ -16,7 +16,7 @@ import {
   WorkoutStats,
   MealStats,
   HydrationStats,
-  CheckinStats,
+  CheckinStats
 } from "@/services/api/trackingStats";
 
 // Re-export types for convenience
@@ -26,7 +26,7 @@ export type {
   WorkoutStats,
   MealStats,
   HydrationStats,
-  CheckinStats,
+  CheckinStats
 };
 
 // =============================================================================
@@ -37,17 +37,8 @@ export const trackingStatsQueryKeys = {
   all: ["tracking-stats"] as const,
   entity: (entityType: string, entityId: string) =>
     [...trackingStatsQueryKeys.all, entityType, entityId] as const,
-  stats: (
-    entityType: string,
-    entityId: string,
-    trackingType: string,
-    period: number,
-  ) =>
-    [
-      ...trackingStatsQueryKeys.entity(entityType, entityId),
-      trackingType,
-      period,
-    ] as const,
+  stats: (entityType: string, entityId: string, trackingType: string, period: number) =>
+    [...trackingStatsQueryKeys.entity(entityType, entityId), trackingType, period] as const
 };
 
 // =============================================================================
@@ -68,26 +59,21 @@ export function useTrackingStats(
   entityType: "goal" | "challenge" = "goal",
   trackingType: TrackingType = "checkin",
   period: number = 30,
-  enabled: boolean = true,
+  enabled: boolean = true
 ) {
   return useQuery({
-    queryKey: trackingStatsQueryKeys.stats(
-      entityType,
-      entityId || "",
-      trackingType,
-      period,
-    ),
+    queryKey: trackingStatsQueryKeys.stats(entityType, entityId || "", trackingType, period),
     queryFn: async () => {
       const response = await trackingStatsService.getStats(
         entityId!,
         entityType,
         trackingType,
-        period,
+        period
       );
       return response.data;
     },
     enabled: enabled && !!entityId,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: 1000 * 60 * 5 // 5 minutes
   });
 }
 
@@ -98,19 +84,13 @@ export function useWorkoutStats(
   entityId: string | undefined,
   entityType: "goal" | "challenge" = "goal",
   period: number = 30,
-  enabled: boolean = true,
+  enabled: boolean = true
 ) {
-  const query = useTrackingStats(
-    entityId,
-    entityType,
-    "workout",
-    period,
-    enabled,
-  );
+  const query = useTrackingStats(entityId, entityType, "workout", period, enabled);
 
   return {
     ...query,
-    data: query.data?.workout,
+    data: query.data?.workout
   };
 }
 
@@ -121,13 +101,13 @@ export function useMealStats(
   entityId: string | undefined,
   entityType: "goal" | "challenge" = "goal",
   period: number = 30,
-  enabled: boolean = true,
+  enabled: boolean = true
 ) {
   const query = useTrackingStats(entityId, entityType, "meal", period, enabled);
 
   return {
     ...query,
-    data: query.data?.meal,
+    data: query.data?.meal
   };
 }
 
@@ -138,19 +118,13 @@ export function useHydrationStats(
   entityId: string | undefined,
   entityType: "goal" | "challenge" = "goal",
   period: number = 30,
-  enabled: boolean = true,
+  enabled: boolean = true
 ) {
-  const query = useTrackingStats(
-    entityId,
-    entityType,
-    "hydration",
-    period,
-    enabled,
-  );
+  const query = useTrackingStats(entityId, entityType, "hydration", period, enabled);
 
   return {
     ...query,
-    data: query.data?.hydration,
+    data: query.data?.hydration
   };
 }
 
@@ -161,18 +135,12 @@ export function useCheckinStats(
   entityId: string | undefined,
   entityType: "goal" | "challenge" = "goal",
   period: number = 30,
-  enabled: boolean = true,
+  enabled: boolean = true
 ) {
-  const query = useTrackingStats(
-    entityId,
-    entityType,
-    "checkin",
-    period,
-    enabled,
-  );
+  const query = useTrackingStats(entityId, entityType, "checkin", period, enabled);
 
   return {
     ...query,
-    data: query.data?.checkin,
+    data: query.data?.checkin
   };
 }

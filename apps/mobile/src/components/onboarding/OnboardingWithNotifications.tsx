@@ -8,9 +8,10 @@ interface OnboardingWithNotificationsProps {
   onSkip: () => void;
 }
 
-export const OnboardingWithNotifications: React.FC<
-  OnboardingWithNotificationsProps
-> = ({ onComplete, onSkip }) => {
+export const OnboardingWithNotifications: React.FC<OnboardingWithNotificationsProps> = ({
+  onComplete,
+  onSkip
+}) => {
   const [showOnboarding, setShowOnboarding] = useState(true);
   const { showSoftPrompt, requestPermissionDirectly, hideSoftPrompt } =
     useNotificationPermissions();
@@ -44,10 +45,7 @@ export const OnboardingWithNotifications: React.FC<
 
   if (showOnboarding) {
     return (
-      <OnboardingCarousel
-        onComplete={handleOnboardingComplete}
-        onSkip={handleOnboardingSkip}
-      />
+      <OnboardingCarousel onComplete={handleOnboardingComplete} onSkip={handleOnboardingSkip} />
     );
   }
 

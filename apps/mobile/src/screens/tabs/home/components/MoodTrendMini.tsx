@@ -30,11 +30,7 @@ const getMoodType = (moodNumber: number): MoodType => {
   return "okay"; // default
 };
 
-export function MoodTrendMini({
-  data = [],
-  days = 7,
-  isLoading = false,
-}: MoodTrendMiniProps) {
+export function MoodTrendMini({ data = [], days = 7, isLoading = false }: MoodTrendMiniProps) {
   const styles = useStyles(makeMoodTrendMiniStyles);
   const { colors, brandColors } = useTheme();
   const { t } = useTranslation();
@@ -42,9 +38,7 @@ export function MoodTrendMini({
   // Calculate average mood
   const validMoods = data.filter((d) => d.mood >= 1 && d.mood <= 5);
   const avgMood =
-    validMoods.length > 0
-      ? validMoods.reduce((sum, d) => sum + d.mood, 0) / validMoods.length
-      : 0;
+    validMoods.length > 0 ? validMoods.reduce((sum, d) => sum + d.mood, 0) / validMoods.length : 0;
 
   const avgMoodRounded = Math.round(avgMood);
   const avgMoodType = avgMoodRounded > 0 ? getMoodType(avgMoodRounded) : "okay";
@@ -63,8 +57,7 @@ export function MoodTrendMini({
       .reduce((sum, d) => sum + d.mood, 0);
 
     const firstAvg = firstHalf / Math.ceil(validMoods.length / 2);
-    const secondAvg =
-      secondHalf / Math.floor(validMoods.length - validMoods.length / 2);
+    const secondAvg = secondHalf / Math.floor(validMoods.length - validMoods.length / 2);
 
     if (secondAvg > firstAvg + 0.3) {
       trendIcon = "↗";
@@ -80,11 +73,7 @@ export function MoodTrendMini({
   if (isLoading) {
     return (
       <View style={styles.container}>
-        <SkeletonBox
-          width="40%"
-          height={16}
-          borderRadius={toRN(tokens.borderRadius.sm)}
-        />
+        <SkeletonBox width="40%" height={16} borderRadius={toRN(tokens.borderRadius.sm)} />
         <View style={styles.moodRow}>
           {[...Array(7)].map((_, index) => (
             <SkeletonBox
@@ -111,8 +100,7 @@ export function MoodTrendMini({
             <MoodIcon mood="okay" size={32} />
           </View>
           <Text style={styles.emptyText}>
-            {t("home.progress.no_mood_data") ||
-              "No mood data yet. Add your mood when checking in!"}
+            {t("home.progress.no_mood_data") || "No mood data yet. Add your mood when checking in!"}
           </Text>
         </View>
       </View>
@@ -124,10 +112,7 @@ export function MoodTrendMini({
       <View style={styles.header}>
         <Text style={styles.title}>{t("home.progress.mood_trend")}</Text>
         <View style={styles.avgContainer}>
-          <MoodIcon
-            mood={avgMoodType}
-            size={toRN(tokens.typography.fontSize.xl)}
-          />
+          <MoodIcon mood={avgMoodType} size={toRN(tokens.typography.fontSize.xl)} />
           <Text style={styles.avgText}>
             {Number.isInteger(avgMood) ? avgMood : avgMood.toFixed(1)}/5
           </Text>
@@ -138,10 +123,7 @@ export function MoodTrendMini({
         {data.slice(-7).map((day, index) => (
           <View key={index} style={styles.moodCell}>
             {day.mood ? (
-              <MoodIcon
-                mood={getMoodType(day.mood)}
-                size={toRN(tokens.typography.fontSize.xl)}
-              />
+              <MoodIcon mood={getMoodType(day.mood)} size={toRN(tokens.typography.fontSize.xl)} />
             ) : (
               <View style={styles.emptyMood} />
             )}
@@ -150,12 +132,8 @@ export function MoodTrendMini({
       </View>
 
       <View style={styles.trendContainer}>
-        <Text style={[styles.trendIcon, { color: trendColor }]}>
-          {trendIcon}
-        </Text>
-        <Text style={[styles.trendText, { color: trendColor }]}>
-          {trendText}
-        </Text>
+        <Text style={[styles.trendIcon, { color: trendColor }]}>{trendIcon}</Text>
+        <Text style={[styles.trendText, { color: trendColor }]}>{trendText}</Text>
       </View>
     </View>
   );
@@ -163,33 +141,33 @@ export function MoodTrendMini({
 
 const makeMoodTrendMiniStyles = (tokens: any, colors: any, brand: any) => ({
   container: {
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   header: {
     flexDirection: "row" as const,
     justifyContent: "space-between" as const,
     alignItems: "center" as const,
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   title: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.groteskSemiBold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   avgContainer: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    gap: toRN(tokens.spacing[1]),
+    gap: toRN(tokens.spacing[1])
   },
   avgText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.groteskBold,
-    color: brand.primary,
+    color: brand.primary
   },
   moodRow: {
     flexDirection: "row" as const,
     justifyContent: "space-between" as const,
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   moodCell: {
     width: toRN(tokens.spacing[8]),
@@ -197,13 +175,13 @@ const makeMoodTrendMiniStyles = (tokens: any, colors: any, brand: any) => ({
     borderRadius: toRN(tokens.borderRadius.md),
     backgroundColor: colors.bg.muted,
     alignItems: "center" as const,
-    justifyContent: "center" as const,
+    justifyContent: "center" as const
   },
   emptyMood: {
     width: toRN(tokens.spacing[2]),
     height: toRN(tokens.spacing[2]),
     borderRadius: toRN(tokens.borderRadius.full),
-    backgroundColor: colors.border.default,
+    backgroundColor: colors.border.default
   },
   trendContainer: {
     flexDirection: "row" as const,
@@ -212,15 +190,15 @@ const makeMoodTrendMiniStyles = (tokens: any, colors: any, brand: any) => ({
     paddingVertical: toRN(tokens.spacing[2]),
     paddingHorizontal: toRN(tokens.spacing[3]),
     backgroundColor: colors.bg.muted,
-    borderRadius: toRN(tokens.borderRadius.md),
+    borderRadius: toRN(tokens.borderRadius.md)
   },
   trendIcon: {
     fontSize: toRN(tokens.typography.fontSize.base),
-    fontFamily: fontFamily.groteskBold,
+    fontFamily: fontFamily.groteskBold
   },
   trendText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
-    fontFamily: fontFamily.groteskMedium,
+    fontFamily: fontFamily.groteskMedium
   },
   // Empty state styles
   emptyState: {
@@ -228,16 +206,16 @@ const makeMoodTrendMiniStyles = (tokens: any, colors: any, brand: any) => ({
     paddingVertical: toRN(tokens.spacing[4]),
     paddingHorizontal: toRN(tokens.spacing[3]),
     backgroundColor: colors.bg.muted,
-    borderRadius: toRN(tokens.borderRadius.lg),
+    borderRadius: toRN(tokens.borderRadius.lg)
   },
   emptyIconContainer: {
     marginBottom: toRN(tokens.spacing[2]),
-    opacity: 0.5,
+    opacity: 0.5
   },
   emptyText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
     color: colors.text.tertiary,
-    textAlign: "center" as const,
-  },
+    textAlign: "center" as const
+  }
 });

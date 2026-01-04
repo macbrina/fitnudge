@@ -4,10 +4,7 @@ import { useTranslation } from "@/lib/i18n";
 import { useAlertModal } from "@/contexts/AlertModalContext";
 import { MOBILE_ROUTES } from "@/lib/routes";
 import { Challenge } from "@/services/api/challenges";
-import {
-  useLeaveChallenge,
-  useCancelChallenge,
-} from "@/hooks/api/useChallenges";
+import { useLeaveChallenge, useCancelChallenge } from "@/hooks/api/useChallenges";
 import { BottomMenuSection } from "@/components/ui/BottomMenuSheet";
 
 interface UseChallengeMenuOptions {
@@ -15,6 +12,8 @@ interface UseChallengeMenuOptions {
   onClose: () => void;
   onLeft?: () => void;
   onCancelled?: () => void;
+  /** Callback when edit is requested (for opening edit modal) */
+  onEdit?: () => void;
   /** Whether we're on the detail screen (skip "View Details" option) */
   isDetailScreen?: boolean;
 }
@@ -28,7 +27,8 @@ export function useChallengeMenu({
   onClose,
   onLeft,
   onCancelled,
-  isDetailScreen = false,
+  onEdit,
+  isDetailScreen = false
 }: UseChallengeMenuOptions) {
   const { t } = useTranslation();
   const router = useRouter();
@@ -63,10 +63,8 @@ export function useChallengeMenu({
   const handleLeave = async () => {
     const confirmed = await showConfirm({
       title: t("challenges.leave_title") || "Leave Challenge?",
-      message:
-        t("challenges.leave_confirm") ||
-        "Are you sure you want to leave this challenge?",
-      showCancel: true,
+      message: t("challenges.leave_confirm") || "Are you sure you want to leave this challenge?",
+      showCancel: true
     });
     if (!confirmed) return;
 
@@ -75,14 +73,14 @@ export function useChallengeMenu({
       showToast({
         title: t("common.success"),
         message: t("challenges.leave_success") || "You have left the challenge",
-        variant: "success",
+        variant: "success"
       });
       onLeft?.();
     } catch (error) {
       showAlert({
         title: t("common.error"),
         message: t("challenges.leave_error") || "Failed to leave challenge",
-        variant: "error",
+        variant: "error"
       });
     }
   };
@@ -92,7 +90,7 @@ export function useChallengeMenu({
     const confirmMessage =
       participantCount > 0
         ? t("challenges.cancel_confirm_with_participants", {
-            count: participantCount,
+            count: participantCount
           }) ||
           `This will end the challenge for all ${participantCount} participant(s). This action cannot be undone.`
         : t("challenges.cancel_confirm") ||
@@ -104,7 +102,7 @@ export function useChallengeMenu({
       variant: "error",
       confirmLabel: t("challenges.cancel_confirm_button") || "Cancel Challenge",
       cancelLabel: t("common.nevermind") || "Nevermind",
-      showCancel: true,
+      showCancel: true
     });
 
     if (!confirmed) return;
@@ -113,9 +111,8 @@ export function useChallengeMenu({
       await cancelChallenge.mutateAsync({ challengeId: challenge.id });
       showToast({
         title: t("common.success"),
-        message:
-          t("challenges.cancel_success") || "Challenge has been cancelled",
-        variant: "success",
+        message: t("challenges.cancel_success") || "Challenge has been cancelled",
+        variant: "success"
       });
       onCancelled?.();
     } catch (error: any) {
@@ -126,7 +123,7 @@ export function useChallengeMenu({
       showAlert({
         title: t("common.error"),
         message: errorMessage,
-        variant: "error",
+        variant: "error"
       });
     }
   };
@@ -150,8 +147,8 @@ export function useChallengeMenu({
           onPress: () => {
             onClose();
             router.push(MOBILE_ROUTES.CHALLENGES.DETAILS(challenge.id));
-          },
-        },
+          }
+        }
       ];
 
       sections.push({ id: "primary", options: primaryOptions });
@@ -166,23 +163,21 @@ export function useChallengeMenu({
         onPress: () => {
           onClose();
           router.push(MOBILE_ROUTES.CHALLENGES.LEADERBOARD(challenge.id));
-        },
-      },
+        }
+      }
     ];
 
     // Add invite option for participants/creators only if join deadline hasn't passed
     // and challenge is still active or upcoming
     const canInvite =
-      (isParticipant || isCreator) &&
-      isJoinDeadlineValid &&
-      (isActive || isUpcoming);
+      (isParticipant || isCreator) && isJoinDeadlineValid && (isActive || isUpcoming);
 
     if (canInvite) {
       secondaryOptions.push({
         id: "invite",
         label: t("challenges.invite_users") || "Invite Users",
         icon: "person-add-outline",
-        onPress: handleInvite,
+        onPress: handleInvite
       });
     }
 
@@ -201,9 +196,9 @@ export function useChallengeMenu({
               onClose();
               handleLeave();
             },
-            destructive: true,
-          },
-        ],
+            destructive: true
+          }
+        ]
       });
     }
 
@@ -211,19 +206,34 @@ export function useChallengeMenu({
     if (isCreator && !isCompleted && !isCancelled) {
       const creatorOptions: BottomMenuSection["options"] = [];
 
+      // Edit option (only for upcoming challenges)
+      if (isUpcoming && onEdit) {
+        creatorOptions.push({
+          id: "edit",
+          label: t("challenges.edit_challenge") || "Edit Challenge",
+          icon: "create-outline",
+          description:
+            t("challenges.edit_challenge_desc") ||
+            "Edit title, description, deadline, or participants",
+          onPress: () => {
+            onClose();
+            onEdit();
+          }
+        });
+      }
+
       // Cancel option (for active/upcoming challenges)
       if (isActive || isUpcoming) {
         creatorOptions.push({
           id: "cancel",
           label: t("challenges.cancel") || "Cancel Challenge",
           icon: "close-circle-outline",
-          description:
-            t("challenges.cancel_desc") || "End the challenge for everyone",
+          description: t("challenges.cancel_desc") || "End the challenge for everyone",
           onPress: () => {
             onClose();
             handleCancel();
           },
-          destructive: true,
+          destructive: true
         });
       }
 
@@ -242,6 +252,6 @@ export function useChallengeMenu({
     handleInvite,
     isLeaving: leaveChallenge.isPending,
     isCancelling: cancelChallenge.isPending,
-    isJoinDeadlineValid,
+    isJoinDeadlineValid
   };
 }

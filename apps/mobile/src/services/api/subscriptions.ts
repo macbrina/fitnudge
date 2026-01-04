@@ -51,9 +51,9 @@ export interface FeaturesResponse {
   features_list: PlanFeature[]; // Full feature objects with metadata
 }
 
-// Sync subscription request/response
+// Sync subscription request/response (2-tier system)
 export interface SyncSubscriptionRequest {
-  tier: "free" | "starter" | "pro" | "elite";
+  tier: "free" | "premium";
   is_active: boolean;
   expires_at?: string | null;
   will_renew: boolean;
@@ -67,6 +67,14 @@ export interface SyncSubscriptionResponse {
   previous_plan?: string;
   new_plan?: string;
   plan?: string;
+}
+
+// Subscription history response
+export interface SubscriptionHistoryResponse {
+  has_ever_subscribed: boolean;
+  subscription_count: number;
+  first_subscription_date: string | null;
+  last_subscription_date: string | null;
 }
 
 // Subscriptions Service
@@ -90,22 +98,16 @@ export class SubscriptionsService extends BaseApiService {
    * Backend will validate with Apple/Google and update subscription
    */
   async verifyPurchase(
-    request: VerifyPurchaseRequest,
+    request: VerifyPurchaseRequest
   ): Promise<ApiResponse<VerifyPurchaseResponse>> {
-    return this.post<VerifyPurchaseResponse>(
-      `${ROUTES.SUBSCRIPTIONS.ME}/verify`,
-      request,
-    );
+    return this.post<VerifyPurchaseResponse>(`${ROUTES.SUBSCRIPTIONS.ME}/verify`, request);
   }
 
   /**
    * Restore purchases - fetches all purchases for this user
    */
   async restorePurchases(): Promise<ApiResponse<SubscriptionResponse>> {
-    return this.post<SubscriptionResponse>(
-      `${ROUTES.SUBSCRIPTIONS.ME}/restore`,
-      {},
-    );
+    return this.post<SubscriptionResponse>(`${ROUTES.SUBSCRIPTIONS.ME}/restore`, {});
   }
 
   /**
@@ -113,12 +115,18 @@ export class SubscriptionsService extends BaseApiService {
    * Called when app detects potential mismatch between RevenueCat and backend
    */
   async syncSubscription(
-    request: SyncSubscriptionRequest,
+    request: SyncSubscriptionRequest
   ): Promise<ApiResponse<SyncSubscriptionResponse>> {
-    return this.post<SyncSubscriptionResponse>(
-      ROUTES.SUBSCRIPTIONS.SYNC,
-      request,
-    );
+    return this.post<SyncSubscriptionResponse>(ROUTES.SUBSCRIPTIONS.SYNC, request);
+  }
+
+  /**
+   * Get subscription history to check if user has ever subscribed
+   * Used for exit offer eligibility - users who have previously subscribed
+   * should not see the exit offer discount
+   */
+  async getSubscriptionHistory(): Promise<ApiResponse<SubscriptionHistoryResponse>> {
+    return this.get<SubscriptionHistoryResponse>(ROUTES.SUBSCRIPTIONS.HISTORY);
   }
 }
 

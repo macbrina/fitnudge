@@ -5,14 +5,14 @@ import {
   UpdateSessionRequest,
   CompleteSessionRequest,
   WorkoutHistoryParams,
-  CompletedSessionResponse,
+  CompletedSessionResponse
 } from "@/services/api/workoutSessions";
 import type {
   WorkoutSession,
   ActiveSessionResponse,
   SaveProgressRequest,
   SubmitFeedbackRequest,
-  WorkoutStats,
+  WorkoutStats
 } from "@/types/workout";
 import { trackingStatsQueryKeys } from "./api/useTrackingStats";
 import { progressQueryKeys } from "./api/useProgressData";
@@ -22,7 +22,7 @@ import {
   optimisticallyUpdateProgress,
   rollbackProgressData,
   optimisticallyUpdateWorkoutStats,
-  ProgressOptimisticContext,
+  ProgressOptimisticContext
 } from "./api/progressOptimisticUpdates";
 
 // Query keys factory for workout sessions
@@ -33,11 +33,11 @@ export const workoutSessionQueryKeys = {
       ...workoutSessionQueryKeys.all,
       "active",
       isChallenge ? "challenge" : "goal",
-      entityId,
+      entityId
     ] as const,
   history: (params?: WorkoutHistoryParams) =>
     [...workoutSessionQueryKeys.all, "history", params] as const,
-  stats: () => ["workout-stats"] as const,
+  stats: () => ["workout-stats"] as const
 };
 
 /**
@@ -54,10 +54,7 @@ export const workoutSessionQueryKeys = {
  * @param entityId - Either a goal ID or challenge ID
  * @param isChallenge - Whether this is for a standalone challenge (default: false)
  */
-export function useWorkoutSession(
-  entityId?: string,
-  isChallenge: boolean = false,
-) {
+export function useWorkoutSession(entityId?: string, isChallenge: boolean = false) {
   const queryClient = useQueryClient();
 
   // For backwards compatibility, treat entityId as goalId when isChallenge is false
@@ -72,12 +69,12 @@ export function useWorkoutSession(
       // Use entity-based lookup that supports both goals and challenges
       const response = await workoutSessionsService.getActiveSessionByEntity(
         entityId,
-        isChallenge ? "challenge" : "goal",
+        isChallenge ? "challenge" : "goal"
       );
       return response.data || { session: null, can_resume: false };
     },
     enabled: !!entityId,
-    staleTime: 30000, // 30 seconds
+    staleTime: 30000 // 30 seconds
   });
 
   // Start a new workout session (or return existing one)
@@ -89,7 +86,7 @@ export function useWorkoutSession(
 
       // Check if there's already an active session for this entity
       const existingSession = queryClient.getQueryData<ActiveSessionResponse>(
-        workoutSessionQueryKeys.active(sessionEntityId, sessionIsChallenge),
+        workoutSessionQueryKeys.active(sessionEntityId, sessionIsChallenge)
       );
 
       // If there's an existing in-progress session, return it instead of creating new one
@@ -111,56 +108,37 @@ export function useWorkoutSession(
             can_resume: true,
             completion_percentage: session.completion_percentage || 0,
             current_phase: session.current_phase || "warmup",
-            current_exercise_index: session.current_exercise_index || 0,
-          },
+            current_exercise_index: session.current_exercise_index || 0
+          }
         );
       }
-    },
+    }
   });
 
   // Update session progress
   const updateSessionMutation = useMutation({
-    mutationFn: async ({
-      sessionId,
-      data,
-    }: {
-      sessionId: string;
-      data: UpdateSessionRequest;
-    }) => {
-      const response = await workoutSessionsService.updateSession(
-        sessionId,
-        data,
-      );
+    mutationFn: async ({ sessionId, data }: { sessionId: string; data: UpdateSessionRequest }) => {
+      const response = await workoutSessionsService.updateSession(sessionId, data);
       return response.data!;
-    },
+    }
   });
 
   // Save progress for resume later with optimistic update
   const saveProgressMutation = useMutation({
-    mutationFn: async ({
-      sessionId,
-      data,
-    }: {
-      sessionId: string;
-      data: SaveProgressRequest;
-    }) => {
-      const response = await workoutSessionsService.saveProgress(
-        sessionId,
-        data,
-      );
+    mutationFn: async ({ sessionId, data }: { sessionId: string; data: SaveProgressRequest }) => {
+      const response = await workoutSessionsService.saveProgress(sessionId, data);
       return response.data!;
     },
 
     // Optimistic update
     onMutate: async ({ data }) => {
       await queryClient.cancelQueries({
-        queryKey: workoutSessionQueryKeys.active(entityId, isChallenge),
+        queryKey: workoutSessionQueryKeys.active(entityId, isChallenge)
       });
 
-      const previousActiveSession =
-        queryClient.getQueryData<ActiveSessionResponse>(
-          workoutSessionQueryKeys.active(entityId, isChallenge),
-        );
+      const previousActiveSession = queryClient.getQueryData<ActiveSessionResponse>(
+        workoutSessionQueryKeys.active(entityId, isChallenge)
+      );
 
       if (previousActiveSession?.session) {
         queryClient.setQueryData<ActiveSessionResponse>(
@@ -174,9 +152,9 @@ export function useWorkoutSession(
             session: {
               ...previousActiveSession.session,
               ...data,
-              paused_at: new Date().toISOString(),
-            },
-          },
+              paused_at: new Date().toISOString()
+            }
+          }
         );
       }
 
@@ -187,16 +165,16 @@ export function useWorkoutSession(
       if (context?.previousActiveSession) {
         queryClient.setQueryData(
           workoutSessionQueryKeys.active(entityId, isChallenge),
-          context.previousActiveSession,
+          context.previousActiveSession
         );
       }
     },
 
     onSettled: () => {
       queryClient.invalidateQueries({
-        queryKey: workoutSessionQueryKeys.active(entityId, isChallenge),
+        queryKey: workoutSessionQueryKeys.active(entityId, isChallenge)
       });
-    },
+    }
   });
 
   // Complete workout session
@@ -211,10 +189,7 @@ export function useWorkoutSession(
     }
   >({
     mutationFn: async ({ sessionId, data }) => {
-      const response = await workoutSessionsService.completeSession(
-        sessionId,
-        data,
-      );
+      const response = await workoutSessionsService.completeSession(sessionId, data);
       return response.data!;
     },
 
@@ -226,24 +201,18 @@ export function useWorkoutSession(
       const entityType = isChallenge ? "challenge" : "goal";
 
       await queryClient.cancelQueries({
-        queryKey: workoutSessionQueryKeys.active(entityId, isChallenge),
+        queryKey: workoutSessionQueryKeys.active(entityId, isChallenge)
       });
 
-      const previousActiveSession =
-        queryClient.getQueryData<ActiveSessionResponse>(
-          workoutSessionQueryKeys.active(entityId, isChallenge),
-        );
+      const previousActiveSession = queryClient.getQueryData<ActiveSessionResponse>(
+        workoutSessionQueryKeys.active(entityId, isChallenge)
+      );
 
       // Cancel and snapshot progress queries (for both goals and challenges)
       let previousProgressData: ProgressOptimisticContext | undefined;
       if (entityId) {
         await cancelProgressQueries(queryClient, entityId, entityType);
-        previousProgressData = snapshotProgressData(
-          queryClient,
-          entityId,
-          today,
-          entityType,
-        );
+        previousProgressData = snapshotProgressData(queryClient, entityId, today, entityType);
       }
 
       // Clear the active session (workout is done)
@@ -252,8 +221,8 @@ export function useWorkoutSession(
         {
           session: null,
           can_resume: false,
-          completion_percentage: 0,
-        },
+          completion_percentage: 0
+        }
       );
 
       // Optimistically update progress data (streak, week, chain) for goals
@@ -268,11 +237,7 @@ export function useWorkoutSession(
         const estimatedDurationSeconds =
           (previousActiveSession?.session?.started_at
             ? Math.floor(
-                (Date.now() -
-                  new Date(
-                    previousActiveSession.session.started_at,
-                  ).getTime()) /
-                  1000,
+                (Date.now() - new Date(previousActiveSession.session.started_at).getTime()) / 1000
               )
             : 0) - (data.paused_duration_seconds || 0);
 
@@ -280,7 +245,7 @@ export function useWorkoutSession(
           durationSeconds: Math.max(0, estimatedDurationSeconds),
           exercisesCompleted: data.exercises_completed,
           // Calories will be calculated by backend, estimate ~6.5 cal/min
-          caloriesBurned: Math.round((estimatedDurationSeconds / 60) * 6.5),
+          caloriesBurned: Math.round((estimatedDurationSeconds / 60) * 6.5)
         });
       }
 
@@ -291,7 +256,7 @@ export function useWorkoutSession(
       if (context?.previousActiveSession) {
         queryClient.setQueryData(
           workoutSessionQueryKeys.active(entityId, isChallenge),
-          context.previousActiveSession,
+          context.previousActiveSession
         );
       }
       // Rollback progress data
@@ -302,31 +267,28 @@ export function useWorkoutSession(
 
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: workoutSessionQueryKeys.all,
+        queryKey: workoutSessionQueryKeys.all
       });
       queryClient.invalidateQueries({
-        queryKey: workoutSessionQueryKeys.stats(),
+        queryKey: workoutSessionQueryKeys.stats()
       });
       // Invalidate tracking stats for workout progress display
       if (entityId) {
         queryClient.invalidateQueries({
-          queryKey: trackingStatsQueryKeys.entity(
-            isChallenge ? "challenge" : "goal",
-            entityId,
-          ),
+          queryKey: trackingStatsQueryKeys.entity(isChallenge ? "challenge" : "goal", entityId)
         });
         // Invalidate progress data (streak, habit chain, week progress) for instant UI update
         queryClient.invalidateQueries({
-          queryKey: progressQueryKeys.streak(entityId),
+          queryKey: progressQueryKeys.streak(entityId)
         });
         queryClient.invalidateQueries({
-          queryKey: progressQueryKeys.weekProgress(entityId),
+          queryKey: progressQueryKeys.weekProgress(entityId)
         });
         queryClient.invalidateQueries({
-          queryKey: [...progressQueryKeys.all, "chain", entityId],
+          queryKey: [...progressQueryKeys.all, "chain", entityId]
         });
       }
-    },
+    }
   });
 
   // Submit workout feedback with optimistic update
@@ -344,17 +306,13 @@ export function useWorkoutSession(
 
       // Cancel any outgoing queries
       await queryClient.cancelQueries({
-        queryKey: workoutSessionQueryKeys.active(
-          feedbackEntityId,
-          feedbackIsChallenge,
-        ),
+        queryKey: workoutSessionQueryKeys.active(feedbackEntityId, feedbackIsChallenge)
       });
 
       // Snapshot previous value for rollback
-      const previousActiveSession =
-        queryClient.getQueryData<ActiveSessionResponse>(
-          workoutSessionQueryKeys.active(feedbackEntityId, feedbackIsChallenge),
-        );
+      const previousActiveSession = queryClient.getQueryData<ActiveSessionResponse>(
+        workoutSessionQueryKeys.active(feedbackEntityId, feedbackIsChallenge)
+      );
 
       // Optimistically update the active session with new progress
       if (previousActiveSession?.session) {
@@ -368,16 +326,16 @@ export function useWorkoutSession(
               ...previousActiveSession.session,
               completion_percentage: data.completion_percentage,
               exercises_completed: data.exercises_completed,
-              paused_at: new Date().toISOString(),
-            },
-          },
+              paused_at: new Date().toISOString()
+            }
+          }
         );
       }
 
       return {
         previousActiveSession,
         entityId: feedbackEntityId,
-        isChallenge: feedbackIsChallenge,
+        isChallenge: feedbackIsChallenge
       };
     },
 
@@ -386,7 +344,7 @@ export function useWorkoutSession(
       if (context?.previousActiveSession) {
         queryClient.setQueryData(
           workoutSessionQueryKeys.active(context.entityId, context.isChallenge),
-          context.previousActiveSession,
+          context.previousActiveSession
         );
       }
     },
@@ -396,12 +354,9 @@ export function useWorkoutSession(
       const feedbackEntityId = variables.goal_id || variables.challenge_id;
       const feedbackIsChallenge = !!variables.challenge_id;
       queryClient.invalidateQueries({
-        queryKey: workoutSessionQueryKeys.active(
-          feedbackEntityId,
-          feedbackIsChallenge,
-        ),
+        queryKey: workoutSessionQueryKeys.active(feedbackEntityId, feedbackIsChallenge)
       });
-    },
+    }
   });
 
   // Get workout history
@@ -412,7 +367,7 @@ export function useWorkoutSession(
         const response = await workoutSessionsService.getHistory(options);
         return response.data || { sessions: [], total: 0 };
       },
-      staleTime: 60000, // 1 minute
+      staleTime: 60000 // 1 minute
     });
   };
 
@@ -423,7 +378,7 @@ export function useWorkoutSession(
       const response = await workoutSessionsService.getStats();
       return response.data!;
     },
-    staleTime: 60000, // 1 minute
+    staleTime: 60000 // 1 minute
   });
 
   return {
@@ -457,7 +412,7 @@ export function useWorkoutSession(
     // Refresh functions
     refreshActiveSession: () =>
       queryClient.invalidateQueries({
-        queryKey: workoutSessionQueryKeys.active(entityId, isChallenge),
-      }),
+        queryKey: workoutSessionQueryKeys.active(entityId, isChallenge)
+      })
   };
 }

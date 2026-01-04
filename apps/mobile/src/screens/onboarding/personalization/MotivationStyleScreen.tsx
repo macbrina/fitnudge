@@ -8,6 +8,7 @@ import { lineHeight } from "@/themes/tokens";
 import { useTheme } from "@/themes";
 import PersonalizationLayout from "./PersonalizationLayout";
 import { useOnboardingStore } from "@/stores/onboardingStore";
+import { MOTIVATION_STYLES } from "@/constants/personalization";
 
 interface MotivationStyleScreenProps {
   onContinue: (motivationStyle: string) => void;
@@ -18,39 +19,16 @@ interface MotivationStyleScreenProps {
   totalSteps: number;
 }
 
-const MOTIVATION_STYLES = [
-  {
-    id: "tough_love",
-    label: "onboarding.personalization.motivation_style.tough_love.title",
-  },
-  {
-    id: "gentle_encouragement",
-    label:
-      "onboarding.personalization.motivation_style.gentle_encouragement.title",
-  },
-  {
-    id: "data_driven",
-    label: "onboarding.personalization.motivation_style.data_driven.title",
-  },
-  {
-    id: "accountability_buddy",
-    label:
-      "onboarding.personalization.motivation_style.accountability_buddy.title",
-  },
-];
-
 export default function MotivationStyleScreen({
   onContinue,
   onBack,
   isSubmitting,
   hasExistingProfile = false,
   currentStep,
-  totalSteps,
+  totalSteps
 }: MotivationStyleScreenProps) {
   const { motivation_style } = useOnboardingStore();
-  const [selectedStyle, setSelectedStyle] = useState<string>(
-    motivation_style || "",
-  );
+  const [selectedStyle, setSelectedStyle] = useState<string>(motivation_style || "");
   const { t } = useTranslation();
   const styles = useStyles(makeStyles);
   const { brandColors } = useTheme();
@@ -84,9 +62,7 @@ export default function MotivationStyleScreen({
       }
     >
       <View style={styles.content}>
-        <Text style={styles.title}>
-          {t("onboarding.personalization.motivation_style.title")}
-        </Text>
+        <Text style={styles.title}>{t("onboarding.personalization.motivation_style.title")}</Text>
 
         <Text style={styles.subtitle}>
           {t("onboarding.personalization.motivation_style.subtitle")}
@@ -94,30 +70,24 @@ export default function MotivationStyleScreen({
 
         <View style={styles.optionsContainer}>
           {MOTIVATION_STYLES.map((motivationStyle) => {
-            const isSelected = selectedStyle === motivationStyle.id;
+            const isSelected = selectedStyle === motivationStyle.value;
             return (
               <TouchableOpacity
-                key={motivationStyle.id}
-                onPress={() => setSelectedStyle(motivationStyle.id)}
+                key={motivationStyle.value}
+                onPress={() => setSelectedStyle(motivationStyle.value)}
                 activeOpacity={0.7}
                 style={[
                   styles.optionCard,
-                  isSelected && [
-                    styles.optionCardSelected,
-                    { borderColor: brandColors.primary },
-                  ],
+                  isSelected && [styles.optionCardSelected, { borderColor: brandColors.primary }]
                 ]}
               >
                 <Text
                   style={[
                     styles.optionLabel,
-                    isSelected && [
-                      styles.optionLabelSelected,
-                      { color: brandColors.primary },
-                    ],
+                    isSelected && [styles.optionLabelSelected, { color: brandColors.primary }]
                   ]}
                 >
-                  {t(motivationStyle.label)}
+                  {t(motivationStyle.onboardingLabelKey)}
                 </Text>
               </TouchableOpacity>
             );
@@ -132,7 +102,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => {
   return {
     content: {
       flex: 1,
-      paddingTop: toRN(tokens.spacing[2]),
+      paddingTop: toRN(tokens.spacing[2])
     },
     title: {
       fontSize: toRN(tokens.typography.fontSize["2xl"]),
@@ -140,23 +110,17 @@ const makeStyles = (tokens: any, colors: any, brand: any) => {
       color: colors.text.primary,
       marginBottom: toRN(tokens.spacing[2]),
       fontFamily: fontFamily.groteskBold,
-      lineHeight: lineHeight(
-        tokens.typography.fontSize["2xl"],
-        tokens.typography.lineHeight.tight,
-      ),
+      lineHeight: lineHeight(tokens.typography.fontSize["2xl"], tokens.typography.lineHeight.tight)
     },
     subtitle: {
       fontSize: toRN(tokens.typography.fontSize.base),
       color: colors.text.secondary,
       marginBottom: toRN(tokens.spacing[6]),
       fontFamily: fontFamily.groteskRegular,
-      lineHeight: lineHeight(
-        tokens.typography.fontSize.base,
-        tokens.typography.lineHeight.relaxed,
-      ),
+      lineHeight: lineHeight(tokens.typography.fontSize.base, tokens.typography.lineHeight.relaxed)
     },
     optionsContainer: {
-      gap: toRN(tokens.spacing[3]),
+      gap: toRN(tokens.spacing[3])
     },
     optionCard: {
       backgroundColor: colors.bg.muted,
@@ -164,17 +128,17 @@ const makeStyles = (tokens: any, colors: any, brand: any) => {
       paddingVertical: toRN(tokens.spacing[5]),
       paddingHorizontal: toRN(tokens.spacing[5]),
       borderWidth: 2,
-      borderColor: colors.border.subtle,
+      borderColor: colors.border.subtle
     },
     optionCardSelected: {
-      backgroundColor: brand.primary + "08",
+      backgroundColor: brand.primary + "08"
     },
     optionLabel: {
       fontSize: toRN(tokens.typography.fontSize.lg),
       fontWeight: tokens.typography.fontWeight.semibold,
       color: colors.text.primary,
-      fontFamily: fontFamily.groteskSemiBold,
+      fontFamily: fontFamily.groteskSemiBold
     },
-    optionLabelSelected: {},
+    optionLabelSelected: {}
   };
 };

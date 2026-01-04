@@ -32,9 +32,7 @@ export interface ParsedApiError<T = unknown> {
   raw: unknown;
 }
 
-export const parseApiError = <T = unknown>(
-  error: unknown,
-): ParsedApiError<T> => {
+export const parseApiError = <T = unknown>(error: unknown): ParsedApiError<T> => {
   let status: number | undefined;
   let data: unknown;
   let baseMessage: string | undefined;
@@ -66,9 +64,7 @@ export const parseApiError = <T = unknown>(
   }
 
   const detail =
-    (isRecord(data) && "detail" in data
-      ? (data as UnknownRecord).detail
-      : data) ?? data;
+    (isRecord(data) && "detail" in data ? (data as UnknownRecord).detail : data) ?? data;
 
   const message = baseMessage ?? extractMessage(detail) ?? extractMessage(data);
 
@@ -77,7 +73,7 @@ export const parseApiError = <T = unknown>(
     data: data as T,
     detail,
     message,
-    raw: error,
+    raw: error
   };
 };
 
@@ -94,12 +90,8 @@ export interface ApiErrorDetails {
 
 export const getApiErrorDetails = (error: unknown): ApiErrorDetails => {
   const parsed = parseApiError(error);
-  const dataRecord = isRecord(parsed.data)
-    ? (parsed.data as UnknownRecord)
-    : undefined;
-  const detailRecord = isRecord(parsed.detail)
-    ? (parsed.detail as UnknownRecord)
-    : undefined;
+  const dataRecord = isRecord(parsed.data) ? (parsed.data as UnknownRecord) : undefined;
+  const detailRecord = isRecord(parsed.detail) ? (parsed.detail as UnknownRecord) : undefined;
   const detailString =
     typeof parsed.detail === "string"
       ? parsed.detail
@@ -108,10 +100,7 @@ export const getApiErrorDetails = (error: unknown): ApiErrorDetails => {
         : undefined;
 
   const backendMessage =
-    parsed.message ||
-    detailString ||
-    extractMessage(detailRecord) ||
-    extractMessage(dataRecord);
+    parsed.message || detailString || extractMessage(detailRecord) || extractMessage(dataRecord);
 
   return {
     status: parsed.status,
@@ -119,6 +108,6 @@ export const getApiErrorDetails = (error: unknown): ApiErrorDetails => {
     detailRecord,
     detailString,
     backendMessage,
-    raw: parsed.raw,
+    raw: parsed.raw
   };
 };

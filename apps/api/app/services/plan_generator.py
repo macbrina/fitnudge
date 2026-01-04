@@ -554,7 +554,7 @@ class PlanGenerator:
         Args:
             goal: Goal dictionary with title, description, category, frequency, etc.
             user_profile: Optional user profile for personalization
-            user_plan: User's subscription plan (free, starter, pro, elite)
+            user_plan: User's subscription plan (free, premium)
             user_id: User ID for feature checking (optional, for sanitization)
             use_multi_agent: Use multi-agent system for fitness plans (default: True)
 

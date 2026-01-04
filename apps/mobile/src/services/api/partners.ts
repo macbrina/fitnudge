@@ -21,6 +21,7 @@ export interface Partner {
   created_at: string;
   accepted_at?: string;
   partner?: PartnerUserInfo;
+  has_active_items?: boolean; // Whether partner has active goals or challenges
 }
 
 // Partner Dashboard types (for viewing partner's goals and challenges)
@@ -135,36 +136,22 @@ class PartnersService extends BaseApiService {
   /**
    * Reject a partner request (when someone sent you a request)
    */
-  async rejectRequest(
-    partnershipId: string,
-  ): Promise<ApiResponse<{ message: string }>> {
-    return this.post<{ message: string }>(
-      ROUTES.PARTNERS.REJECT(partnershipId),
-      {},
-    );
+  async rejectRequest(partnershipId: string): Promise<ApiResponse<{ message: string }>> {
+    return this.post<{ message: string }>(ROUTES.PARTNERS.REJECT(partnershipId), {});
   }
 
   /**
    * Cancel a partner request that you initiated
    */
-  async cancelRequest(
-    partnershipId: string,
-  ): Promise<ApiResponse<{ message: string }>> {
-    return this.post<{ message: string }>(
-      ROUTES.PARTNERS.CANCEL(partnershipId),
-      {},
-    );
+  async cancelRequest(partnershipId: string): Promise<ApiResponse<{ message: string }>> {
+    return this.post<{ message: string }>(ROUTES.PARTNERS.CANCEL(partnershipId), {});
   }
 
   /**
    * Remove an existing partner
    */
-  async removePartner(
-    partnershipId: string,
-  ): Promise<ApiResponse<{ message: string }>> {
-    return this.delete<{ message: string }>(
-      ROUTES.PARTNERS.REMOVE(partnershipId),
-    );
+  async removePartner(partnershipId: string): Promise<ApiResponse<{ message: string }>> {
+    return this.delete<{ message: string }>(ROUTES.PARTNERS.REMOVE(partnershipId));
   }
 
   /**
@@ -173,7 +160,7 @@ class PartnersService extends BaseApiService {
   async searchUsers(
     query: string,
     page: number = 1,
-    limit: number = 20,
+    limit: number = 20
   ): Promise<ApiResponse<PaginatedSearchResponse>> {
     const params = new URLSearchParams();
     params.append("query", query);
@@ -181,7 +168,7 @@ class PartnersService extends BaseApiService {
     params.append("limit", limit.toString());
 
     return this.get<PaginatedSearchResponse>(
-      `${ROUTES.PARTNERS.SEARCH_USERS}?${params.toString()}`,
+      `${ROUTES.PARTNERS.SEARCH_USERS}?${params.toString()}`
     );
   }
 
@@ -190,23 +177,21 @@ class PartnersService extends BaseApiService {
    */
   async getSuggestedUsers(
     page: number = 1,
-    limit: number = 20,
+    limit: number = 20
   ): Promise<ApiResponse<PaginatedSearchResponse>> {
     const params = new URLSearchParams();
     params.append("page", page.toString());
     params.append("limit", limit.toString());
 
     return this.get<PaginatedSearchResponse>(
-      `${ROUTES.PARTNERS.SUGGESTED_USERS}?${params.toString()}`,
+      `${ROUTES.PARTNERS.SUGGESTED_USERS}?${params.toString()}`
     );
   }
 
   /**
    * Get partner's accountability dashboard (goals, challenges, progress)
    */
-  async getPartnerDashboard(
-    partnerUserId: string,
-  ): Promise<ApiResponse<PartnerDashboard>> {
+  async getPartnerDashboard(partnerUserId: string): Promise<ApiResponse<PartnerDashboard>> {
     return this.get<PartnerDashboard>(ROUTES.PARTNERS.DASHBOARD(partnerUserId));
   }
 

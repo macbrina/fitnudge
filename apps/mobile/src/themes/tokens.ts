@@ -24,13 +24,13 @@ export const tokens = {
       border: "#e2e8f0",
       borderSubtle: "#f1f5f9",
       input: "#e2e8f0",
-      ring: "#2563eb",
+      ring: "#2563eb"
     },
     // Dark mode colors
     dark: {
       background: "#0f172a",
       foreground: "#f8fafc",
-      primary: "#3b82f6",
+      primary: "#60a5fa", // Lighter blue for better visibility on dark backgrounds
       primaryForeground: "#ffffff",
       secondary: "#1e293b",
       secondaryForeground: "#f8fafc",
@@ -47,13 +47,13 @@ export const tokens = {
       border: "#334155",
       borderSubtle: "#1e293b",
       input: "#334155",
-      ring: "#3b82f6",
-    },
+      ring: "#60a5fa" // Match primary color
+    }
   },
   typography: {
     fontFamily: {
       sans: ["Space Grotesk", "system-ui", "sans-serif"],
-      mono: ["JetBrains Mono", "monospace"],
+      mono: ["JetBrains Mono", "monospace"]
     },
     fontSize: {
       xs: "0.75rem",
@@ -65,21 +65,21 @@ export const tokens = {
       "3xl": "1.875rem",
       "4xl": "2.25rem",
       "5xl": "3rem",
-      "6xl": "3.75rem",
+      "6xl": "3.75rem"
     },
     fontWeight: {
       normal: "400",
       medium: "500",
       semibold: "600",
-      bold: "700",
+      bold: "700"
     },
     lineHeight: {
       tight: "1.25",
       snug: "1.375",
       normal: "1.5",
       relaxed: "1.625",
-      loose: "2",
-    },
+      loose: "2"
+    }
   },
   spacing: {
     0: "0",
@@ -100,7 +100,7 @@ export const tokens = {
     40: "10rem",
     48: "12rem",
     56: "14rem",
-    64: "16rem",
+    64: "16rem"
   },
   borderRadius: {
     none: "0",
@@ -111,7 +111,7 @@ export const tokens = {
     xl: "0.75rem",
     "2xl": "1rem",
     "3xl": "1.5rem",
-    full: "9999px",
+    full: "9999px"
   },
   shadows: {
     sm: "0 1px 2px 0 rgb(0 0 0 / 0.05)",
@@ -121,15 +121,15 @@ export const tokens = {
     xl: "0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)",
     "2xl": "0 25px 50px -12px rgb(0 0 0 / 0.25)",
     inner: "inset 0 2px 4px 0 rgb(0 0 0 / 0.05)",
-    none: "none",
+    none: "none"
   },
   breakpoints: {
     sm: "640px",
     md: "768px",
     lg: "1024px",
     xl: "1280px",
-    "2xl": "1536px",
-  },
+    "2xl": "1536px"
+  }
 } as const;
 
 export type Theme = "light" | "dark";
@@ -145,7 +145,7 @@ export type TypographyToken = keyof typeof tokens.typography;
  */
 export const lineHeight = (
   fontSize: number | string,
-  lineHeightMultiplier: number | string,
+  lineHeightMultiplier: number | string
 ): number => {
   return calculateLineHeight(fontSize, lineHeightMultiplier);
 };

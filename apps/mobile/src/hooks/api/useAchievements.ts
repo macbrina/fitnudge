@@ -3,7 +3,7 @@ import {
   achievementsService,
   UserAchievement,
   AchievementType,
-  AchievementStats,
+  AchievementStats
 } from "@/services/api";
 import { useAuthStore } from "@/stores/authStore";
 
@@ -12,7 +12,7 @@ export const achievementsQueryKeys = {
   all: ["achievements"] as const,
   types: () => [...achievementsQueryKeys.all, "types"] as const,
   myAchievements: () => [...achievementsQueryKeys.all, "my"] as const,
-  stats: () => [...achievementsQueryKeys.all, "stats"] as const,
+  stats: () => [...achievementsQueryKeys.all, "stats"] as const
 } as const;
 
 // Empty placeholders to prevent loading spinners
@@ -21,7 +21,7 @@ const EMPTY_ACHIEVEMENT_TYPES: AchievementType[] = [];
 const EMPTY_STATS: AchievementStats = {
   total_achievements: 0,
   total_points: 0,
-  by_rarity: { common: 0, rare: 0, epic: 0, legendary: 0 },
+  by_rarity: { common: 0, rare: 0, epic: 0, legendary: 0 }
 };
 
 /**
@@ -33,7 +33,7 @@ export const useAchievementTypes = () => {
     queryFn: () => achievementsService.getAchievementTypes(),
     staleTime: 30 * 60 * 1000, // 30 minutes - achievement types rarely change
     refetchOnMount: false,
-    placeholderData: EMPTY_ACHIEVEMENT_TYPES,
+    placeholderData: EMPTY_ACHIEVEMENT_TYPES
   });
 };
 
@@ -49,7 +49,7 @@ export const useMyAchievements = () => {
     enabled: isAuthenticated,
     staleTime: 5 * 60 * 1000, // 5 minutes
     refetchOnMount: false,
-    placeholderData: EMPTY_ACHIEVEMENTS,
+    placeholderData: EMPTY_ACHIEVEMENTS
   });
 };
 
@@ -65,7 +65,7 @@ export const useAchievementStats = () => {
     enabled: isAuthenticated,
     staleTime: 5 * 60 * 1000, // 5 minutes
     refetchOnMount: false,
-    placeholderData: EMPTY_STATS,
+    placeholderData: EMPTY_STATS
   });
 };
 
@@ -81,13 +81,13 @@ export const useCheckAchievements = () => {
       // If new achievements were unlocked, invalidate queries
       if (newAchievements.length > 0) {
         queryClient.invalidateQueries({
-          queryKey: achievementsQueryKeys.myAchievements(),
+          queryKey: achievementsQueryKeys.myAchievements()
         });
         queryClient.invalidateQueries({
-          queryKey: achievementsQueryKeys.stats(),
+          queryKey: achievementsQueryKeys.stats()
         });
       }
-    },
+    }
   });
 };
 
@@ -140,7 +140,7 @@ export const getBadgeIcon = (badgeKey: string): string => {
     checkins_50: "✅",
     checkins_100: "💯",
     first_goal: "🎯",
-    perfect_week: "⭐",
+    perfect_week: "⭐"
   };
   return icons[badgeKey] || "🏅";
 };

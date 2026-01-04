@@ -7,19 +7,8 @@
  */
 
 import React, { useState, useCallback } from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Animated,
-} from "react-native";
-import Svg, {
-  Defs,
-  LinearGradient as SvgLinearGradient,
-  Stop,
-  Rect,
-} from "react-native-svg";
+import { View, Text, TouchableOpacity, StyleSheet, Animated } from "react-native";
+import Svg, { Defs, LinearGradient as SvgLinearGradient, Stop, Rect } from "react-native-svg";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "@/lib/i18n";
 import { useStyles, useTheme } from "@/themes";
@@ -35,11 +24,7 @@ interface GradientBackgroundProps {
   children?: React.ReactNode;
 }
 
-function GradientBackground({
-  colors,
-  style,
-  children,
-}: GradientBackgroundProps) {
+function GradientBackground({ colors, style, children }: GradientBackgroundProps) {
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
   return (
@@ -51,11 +36,7 @@ function GradientBackground({
       }}
     >
       {dimensions.width > 0 && dimensions.height > 0 && (
-        <Svg
-          width={dimensions.width}
-          height={dimensions.height}
-          style={StyleSheet.absoluteFill}
-        >
+        <Svg width={dimensions.width} height={dimensions.height} style={StyleSheet.absoluteFill}>
           <Defs>
             <SvgLinearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
               <Stop offset="0%" stopColor={colors[0]} />
@@ -87,11 +68,7 @@ interface UpgradeBannerProps {
   style?: any;
 }
 
-export function UpgradeBanner({
-  onUpgrade,
-  compact = false,
-  style,
-}: UpgradeBannerProps) {
+export function UpgradeBanner({ onUpgrade, compact = false, style }: UpgradeBannerProps) {
   const { t } = useTranslation();
   const { brandColors, colors } = useTheme();
   const styles = useStyles(bannerStyles);
@@ -106,7 +83,7 @@ export function UpgradeBanner({
     Animated.timing(fadeAnim, {
       toValue: 0,
       duration: 200,
-      useNativeDriver: true,
+      useNativeDriver: true
     }).start(() => {
       setIsDismissed(true);
     });
@@ -139,23 +116,15 @@ export function UpgradeBanner({
 
         {/* Content */}
         <View style={styles.content}>
-          <Text style={styles.title}>
-            {t("onboarding.subscription.upgrade_banner.title")}
-          </Text>
+          <Text style={styles.title}>{t("onboarding.subscription.upgrade_banner.title")}</Text>
           <Text style={styles.subtitle}>
             {t("onboarding.subscription.upgrade_banner.subtitle")}
           </Text>
         </View>
 
         {/* CTA Button */}
-        <TouchableOpacity
-          style={styles.ctaButton}
-          onPress={onUpgrade}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.ctaText}>
-            {t("onboarding.subscription.upgrade_banner.cta")}
-          </Text>
+        <TouchableOpacity style={styles.ctaButton} onPress={onUpgrade} activeOpacity={0.8}>
+          <Text style={styles.ctaText}>{t("onboarding.subscription.upgrade_banner.cta")}</Text>
           <Ionicons
             name="arrow-forward"
             size={16}
@@ -177,11 +146,11 @@ const bannerStyles = (tokens: any, colors: any, brand: any) => ({
     borderRadius: toRN(tokens.borderRadius.xl),
     marginHorizontal: toRN(tokens.spacing[4]),
     marginVertical: toRN(tokens.spacing[2]),
-    position: "relative",
+    position: "relative"
   },
   containerCompact: {
     padding: toRN(tokens.spacing[3]),
-    paddingTop: toRN(tokens.spacing[4]),
+    paddingTop: toRN(tokens.spacing[4])
   },
   dismissButton: {
     position: "absolute",
@@ -190,7 +159,7 @@ const bannerStyles = (tokens: any, colors: any, brand: any) => ({
     zIndex: 1,
     padding: toRN(tokens.spacing[1]),
     backgroundColor: "rgba(0,0,0,0.15)",
-    borderRadius: toRN(tokens.borderRadius.full),
+    borderRadius: toRN(tokens.borderRadius.full)
   },
   iconContainer: {
     width: toRN(tokens.spacing[10]),
@@ -199,24 +168,24 @@ const bannerStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: "rgba(255,255,255,0.2)",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: toRN(tokens.spacing[3]),
+    marginRight: toRN(tokens.spacing[3])
   },
   content: {
     flex: 1,
-    paddingRight: toRN(tokens.spacing[2]),
+    paddingRight: toRN(tokens.spacing[2])
   },
   title: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontWeight: "700",
     fontFamily: fontFamily.groteskBold,
     color: "white",
-    marginBottom: toRN(tokens.spacing[1]),
+    marginBottom: toRN(tokens.spacing[1])
   },
   subtitle: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.groteskRegular,
     color: "rgba(255,255,255,0.9)",
-    lineHeight: toRN(tokens.typography.fontSize.xs) * 1.4,
+    lineHeight: toRN(tokens.typography.fontSize.xs) * 1.4
   },
   ctaButton: {
     flexDirection: "row",
@@ -229,17 +198,17 @@ const bannerStyles = (tokens: any, colors: any, brand: any) => ({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 3
   },
   ctaText: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontWeight: "600",
     fontFamily: fontFamily.semiBold,
-    color: brand.primary,
+    color: brand.primary
   },
   ctaIcon: {
-    marginLeft: toRN(tokens.spacing[1]),
-  },
+    marginLeft: toRN(tokens.spacing[1])
+  }
 });
 
 export default UpgradeBanner;

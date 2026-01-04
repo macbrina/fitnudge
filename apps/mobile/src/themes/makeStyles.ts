@@ -2,17 +2,13 @@ import { useMemo } from "react";
 import { StyleSheet } from "react-native";
 import { useTheme } from "./provider";
 import { tokens, type Tokens } from "./tokens";
-import {
-  semanticLight,
-  semanticDark,
-  type SemanticColors,
-} from "./semanticColors";
+import { semanticLight, semanticDark, type SemanticColors } from "./semanticColors";
 import { type BrandColors } from "./brandVariants";
 
 type MakeStylesFunction = (
   tokens: Tokens,
   colors: SemanticColors | typeof semanticLight | typeof semanticDark,
-  brand: BrandColors,
+  brand: BrandColors
 ) => any;
 
 const styleCache = new Map<string, any>();
@@ -28,7 +24,7 @@ export function makeStyles(
   stylesFn: MakeStylesFunction,
   mode: "light" | "dark",
   brand: "buyer" | "vendor",
-  brandColors: BrandColors,
+  brandColors: BrandColors
 ) {
   const cacheKey = `${mode}-${brand}`;
 

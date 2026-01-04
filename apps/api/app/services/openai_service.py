@@ -148,7 +148,7 @@ class OpenAIService:
 
         Args:
             profile: User's fitness profile dictionary
-            user_plan: User's subscription plan (free, starter, pro, elite)
+            user_plan: User's subscription plan (free, premium)
         """
         try:
             user_prompt = self._build_goal_suggestion_prompt(

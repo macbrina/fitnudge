@@ -2,7 +2,7 @@ import { Svg, Path, G, Circle } from "react-native-svg";
 
 export const WeightIcon = ({
   size = 24,
-  color = "currentColor",
+  color = "currentColor"
 }: {
   size?: number;
   color?: string;

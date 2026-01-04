@@ -13,13 +13,7 @@ import { useStyles } from "@/themes/makeStyles";
 import { tokens } from "@/themes/tokens";
 import { router } from "expo-router";
 import React from "react";
-import {
-  Dimensions,
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { Dimensions, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
@@ -28,45 +22,43 @@ const makeAuthScreenStyles = (tokens: any, colors: any, brandColors: any) => {
   return {
     container: {
       flex: 1,
-      backgroundColor: brandColors.primary,
+      backgroundColor: brandColors.primary
     },
     header: {
       flexDirection: "row" as const,
       justifyContent: "space-between",
       alignItems: "center" as const,
       paddingHorizontal: toRN(tokens.spacing[6]),
-      paddingTop: toRN(tokens.spacing[4]),
+      paddingTop: toRN(tokens.spacing[4])
     },
     imageGrid: {
       paddingHorizontal: toRN(tokens.spacing[4]),
       paddingTop: toRN(tokens.spacing[8]),
-      paddingBottom: toRN(tokens.spacing[8]),
+      paddingBottom: toRN(tokens.spacing[8])
     },
     imageRow: {
       flexDirection: "row" as const,
       justifyContent: "space-between",
-      marginBottom: toRN(tokens.spacing[3]),
+      marginBottom: toRN(tokens.spacing[3])
     },
     imageContainer: {
-      width:
-        (screenWidth - toRN(tokens.spacing[8]) - toRN(tokens.spacing[4])) / 3,
-      height:
-        (screenWidth - toRN(tokens.spacing[8]) - toRN(tokens.spacing[4])) / 3,
+      width: (screenWidth - toRN(tokens.spacing[8]) - toRN(tokens.spacing[4])) / 3,
+      height: (screenWidth - toRN(tokens.spacing[8]) - toRN(tokens.spacing[4])) / 3,
       borderRadius: toRN(tokens.borderRadius.lg),
       backgroundColor: "rgba(255, 255, 255, 0.1)",
       justifyContent: "center" as const,
       alignItems: "center" as const,
-      overflow: "hidden" as const,
+      overflow: "hidden" as const
     },
     imagePlaceholder: {
       width: "100%",
       height: "100%",
-      backgroundColor: "rgba(255, 255, 255, 0.1)",
+      backgroundColor: "rgba(255, 255, 255, 0.1)"
     },
     brandingSection: {
       paddingHorizontal: toRN(tokens.spacing[6]),
       paddingVertical: toRN(tokens.spacing[8]),
-      alignItems: "center" as const,
+      alignItems: "center" as const
     },
     appName: {
       fontSize: toRN(tokens.typography.fontSize["4xl"]),
@@ -74,18 +66,18 @@ const makeAuthScreenStyles = (tokens: any, colors: any, brandColors: any) => {
       color: "#ffffff",
       fontFamily: fontFamily.groteskBold,
       textAlign: "center" as const,
-      marginBottom: toRN(tokens.spacing[2]),
+      marginBottom: toRN(tokens.spacing[2])
     },
     tagline: {
       fontSize: toRN(tokens.typography.fontSize.lg),
       color: "#ffffff",
       fontFamily: fontFamily.groteskRegular,
       textAlign: "center" as const,
-      opacity: 0.9,
+      opacity: 0.9
     },
     buttonsSection: {
       paddingHorizontal: toRN(tokens.spacing[6]),
-      paddingBottom: toRN(tokens.spacing[8]),
+      paddingBottom: toRN(tokens.spacing[8])
     },
     button: {
       flexDirection: "row" as const,
@@ -95,34 +87,34 @@ const makeAuthScreenStyles = (tokens: any, colors: any, brandColors: any) => {
       paddingHorizontal: toRN(tokens.spacing[6]),
       borderRadius: toRN(tokens.borderRadius.full),
       marginBottom: toRN(tokens.spacing[4]),
-      minHeight: toRN(56),
+      minHeight: toRN(56)
     },
     emailButton: {
-      backgroundColor: "#ffffff",
+      backgroundColor: "#ffffff"
     },
     signupButton: {
       backgroundColor: "#000000",
       borderWidth: 1,
-      borderColor: "#000000",
+      borderColor: "#000000"
     },
     buttonText: {
       fontSize: toRN(tokens.typography.fontSize.lg),
       fontWeight: tokens.typography.fontWeight.bold,
       fontFamily: fontFamily.groteskBold,
-      marginLeft: toRN(tokens.spacing[3]),
+      marginLeft: toRN(tokens.spacing[3])
     },
     emailButtonText: {
-      color: brandColors.primary,
+      color: brandColors.primary
     },
     signupButtonText: {
-      color: "#ffffff",
+      color: "#ffffff"
     },
     iconContainer: {
       width: 24,
       height: 24,
       justifyContent: "center" as const,
-      alignItems: "center" as const,
-    },
+      alignItems: "center" as const
+    }
   };
 };
 
@@ -141,7 +133,7 @@ export const AuthScreen: React.FC = () => {
     null, // Placeholder
     FemaleIcon, // SVG Icon
     null, // Placeholder
-    TabsIcon, // SVG Icon
+    TabsIcon // SVG Icon
   ];
 
   const handleEmailLogin = () => {
@@ -154,17 +146,10 @@ export const AuthScreen: React.FC = () => {
     router.push(MOBILE_ROUTES.AUTH.SIGNUP);
   };
 
-  const renderImagePlaceholder = (
-    key: number,
-    SvgComponent?: React.ComponentType<any> | null,
-  ) => (
+  const renderImagePlaceholder = (key: number, SvgComponent?: React.ComponentType<any> | null) => (
     <View key={key} style={styles.imageContainer}>
       {SvgComponent ? (
-        <SvgComponent
-          size={80}
-          color="#ffffff"
-          style={styles.imagePlaceholder}
-        />
+        <SvgComponent size={80} color="#ffffff" style={styles.imagePlaceholder} />
       ) : (
         <View style={styles.imagePlaceholder} />
       )}
@@ -179,12 +164,7 @@ export const AuthScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
       >
         {/* Header with top safe area */}
-        <View
-          style={[
-            styles.header,
-            { paddingTop: insets.top + toRN(tokens.spacing[4]) },
-          ]}
-        >
+        <View style={[styles.header, { paddingTop: insets.top + toRN(tokens.spacing[4]) }]}>
           <View />
         </View>
 
@@ -216,10 +196,7 @@ export const AuthScreen: React.FC = () => {
         {/* Action Buttons */}
         <View style={styles.buttonsSection}>
           {/* Email Login Button */}
-          <TouchableOpacity
-            style={[styles.button, styles.emailButton]}
-            onPress={handleEmailLogin}
-          >
+          <TouchableOpacity style={[styles.button, styles.emailButton]} onPress={handleEmailLogin}>
             <View style={styles.iconContainer}>
               <EmailIcon size={24} color={styles.emailButtonText.color} />
             </View>
@@ -229,10 +206,7 @@ export const AuthScreen: React.FC = () => {
           </TouchableOpacity>
 
           {/* Sign Up Button */}
-          <TouchableOpacity
-            style={[styles.button, styles.signupButton]}
-            onPress={handleSignup}
-          >
+          <TouchableOpacity style={[styles.button, styles.signupButton]} onPress={handleSignup}>
             <View style={styles.iconContainer}>
               <UserPlusIcon size={24} color="#ffffff" />
             </View>

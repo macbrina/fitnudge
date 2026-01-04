@@ -1,12 +1,7 @@
 import { BaseApiService } from "./base";
 import { ROUTES } from "@/lib/routes";
 
-export type PlanStatus =
-  | "not_started"
-  | "pending"
-  | "generating"
-  | "completed"
-  | "failed";
+export type PlanStatus = "not_started" | "pending" | "generating" | "completed" | "failed";
 
 export interface PlanStatusResponse {
   goal_id?: string;
@@ -93,11 +88,7 @@ export interface ActionablePlan {
   id: string;
   goal_id?: string;
   challenge_id?: string; // For standalone challenges
-  plan_type:
-    | "meal_plan"
-    | "workout_plan"
-    | "habit_plan"
-    | "accountability_plan";
+  plan_type: "meal_plan" | "workout_plan" | "habit_plan" | "accountability_plan";
   structured_data: {
     plan_type: string;
     tracking_type?: "workout" | "meal" | "hydration" | "checkin";
@@ -127,7 +118,7 @@ class ActionablePlansService extends BaseApiService {
    */
   async getPlanStatus(goalId: string): Promise<PlanStatusResponse> {
     const response = await this.get<PlanStatusResponse>(
-      `${ROUTES.GOALS.BASE}/${goalId}/plan-status`,
+      `${ROUTES.GOALS.BASE}/${goalId}/plan-status`
     );
     return response.data!;
   }
@@ -135,11 +126,9 @@ class ActionablePlansService extends BaseApiService {
   /**
    * Get plan generation status for a challenge
    */
-  async getChallengePlanStatus(
-    challengeId: string,
-  ): Promise<PlanStatusResponse> {
+  async getChallengePlanStatus(challengeId: string): Promise<PlanStatusResponse> {
     const response = await this.get<PlanStatusResponse>(
-      `${ROUTES.CHALLENGES.BASE}/${challengeId}/plan-status`,
+      `${ROUTES.CHALLENGES.BASE}/${challengeId}/plan-status`
     );
     return response.data!;
   }
@@ -148,9 +137,7 @@ class ActionablePlansService extends BaseApiService {
    * Get the complete actionable plan for a goal
    */
   async getGoalPlan(goalId: string): Promise<GoalPlanResponse> {
-    const response = await this.get<GoalPlanResponse>(
-      `${ROUTES.GOALS.BASE}/${goalId}/plan`,
-    );
+    const response = await this.get<GoalPlanResponse>(`${ROUTES.GOALS.BASE}/${goalId}/plan`);
     return response.data!;
   }
 
@@ -159,7 +146,7 @@ class ActionablePlansService extends BaseApiService {
    */
   async getChallengePlan(challengeId: string): Promise<ChallengePlanResponse> {
     const response = await this.get<ChallengePlanResponse>(
-      `${ROUTES.CHALLENGES.BASE}/${challengeId}/plan`,
+      `${ROUTES.CHALLENGES.BASE}/${challengeId}/plan`
     );
     return response.data!;
   }
@@ -170,7 +157,7 @@ class ActionablePlansService extends BaseApiService {
   async retryPlanGeneration(goalId: string): Promise<PlanStatusResponse> {
     const response = await this.post<PlanStatusResponse>(
       `${ROUTES.GOALS.BASE}/${goalId}/plan/retry`,
-      {},
+      {}
     );
     return response.data!;
   }
@@ -178,12 +165,10 @@ class ActionablePlansService extends BaseApiService {
   /**
    * Retry plan generation for a failed challenge plan
    */
-  async retryChallengePlanGeneration(
-    challengeId: string,
-  ): Promise<PlanStatusResponse> {
+  async retryChallengePlanGeneration(challengeId: string): Promise<PlanStatusResponse> {
     const response = await this.post<PlanStatusResponse>(
       `${ROUTES.CHALLENGES.BASE}/${challengeId}/plan/retry`,
-      {},
+      {}
     );
     return response.data!;
   }

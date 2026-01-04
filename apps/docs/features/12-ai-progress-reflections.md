@@ -2,7 +2,7 @@
 
 ## Overview
 
-AI Progress Reflections provide premium, deep insights into user progress with actionable coaching recommendations. This is an enhanced version of weekly recaps, available to Pro/Elite users only.
+AI Progress Reflections provide premium, deep insights into user progress with actionable coaching recommendations. This is an enhanced version of weekly recaps, available to Premium users only.
 
 ## Features
 
@@ -20,7 +20,7 @@ Generate monthly AI progress reflection.
 
 - `goal_id`: Optional specific goal to focus on
 
-**Access Control**: Pro/Elite users only
+**Access Control**: Premium users only
 
 **Implementation**: `apps/api/app/services/ai_progress_reflections_service.py`
 
@@ -113,7 +113,7 @@ If AI generation fails:
 
 | Feature              | Weekly Recaps  | AI Progress Reflections |
 | -------------------- | -------------- | ----------------------- |
-| **Access**           | All users      | Pro/Elite only          |
+| **Access**           | All users      | Premium                 |
 | **AI Effort**        | Low            | Medium                  |
 | **Length**           | 2-3 paragraphs | 4-5 paragraphs          |
 | **Depth**            | Summary        | Deep analysis           |
@@ -125,7 +125,7 @@ If AI generation fails:
 ## Flow Diagram
 
 ```
-1. Pro/Elite User Requests Reflection (GET /progress-reflections/{period})
+1. Premium User Requests Reflection (GET /progress-reflections/{period})
    ↓
 2. Verify User Subscription Level
    ↓

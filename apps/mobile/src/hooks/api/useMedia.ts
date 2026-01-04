@@ -1,14 +1,10 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  mediaService,
-  MediaUploadResponse,
-  UploadOptions,
-} from "@/services/api/media";
+import { mediaService, MediaUploadResponse, UploadOptions } from "@/services/api/media";
 
 // Query Keys
 export const mediaQueryKeys = {
   all: ["media"] as const,
-  user: () => [...mediaQueryKeys.all, "user"] as const,
+  user: () => [...mediaQueryKeys.all, "user"] as const
 } as const;
 
 interface UploadMediaParams {
@@ -20,7 +16,7 @@ interface UploadMediaParams {
 export const useUploadMedia = () => {
   return useMutation({
     mutationFn: ({ fileUri, options }: UploadMediaParams) =>
-      mediaService.uploadMedia(fileUri, options),
+      mediaService.uploadMedia(fileUri, options)
   });
 };
 
@@ -29,12 +25,11 @@ export const useUploadMultipleMedia = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (fileUris: string[]) =>
-      mediaService.uploadMultipleMedia(fileUris),
+    mutationFn: (fileUris: string[]) => mediaService.uploadMultipleMedia(fileUris),
     onSuccess: () => {
       // Invalidate user media queries
       queryClient.invalidateQueries({ queryKey: mediaQueryKeys.user() });
-    },
+    }
   });
 };
 
@@ -46,13 +41,13 @@ export const useDeleteMedia = () => {
     mutationFn: (mediaId: string) => mediaService.deleteMedia(mediaId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: mediaQueryKeys.user() });
-    },
+    }
   });
 };
 
 // Delete media by URL hook (for checkin/profile media)
 export const useDeleteMediaByUrl = () => {
   return useMutation({
-    mutationFn: (url: string) => mediaService.deleteMediaByUrl(url),
+    mutationFn: (url: string) => mediaService.deleteMediaByUrl(url)
   });
 };

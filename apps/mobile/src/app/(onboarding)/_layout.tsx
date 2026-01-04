@@ -8,7 +8,7 @@ export default function OnboardingLayout() {
         options={{
           title: "Welcome",
           headerShown: false,
-          gestureEnabled: false, // Prevent swipe back
+          gestureEnabled: false // Prevent swipe back
         }}
       />
     </Stack>

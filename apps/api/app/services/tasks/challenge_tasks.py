@@ -198,6 +198,27 @@ def _process_ended_challenge(supabase, challenge: Dict[str, Any]) -> None:
         participant_user_ids, "challenge_completed"
     )
 
+    # 7. Check achievements for winners (non-blocking) - e.g., "first_win" badge
+    # SCALABILITY: Queue achievement checks for all winners in parallel
+    try:
+        from app.services.tasks import check_achievements_task
+
+        for winner in winners:
+            check_achievements_task.delay(
+                user_id=winner["user_id"],
+                source_type="challenge_win",
+                source_id=challenge_id,
+            )
+        logger.info(
+            f"Queued achievement checks for {len(winners)} challenge winner(s)",
+            {"challenge_id": challenge_id, "winner_count": len(winners)},
+        )
+    except Exception as e:
+        logger.warning(
+            f"Failed to queue achievement checks for challenge winners: {e}",
+            {"challenge_id": challenge_id},
+        )
+
 
 def _send_challenge_completion_notifications(
     supabase,

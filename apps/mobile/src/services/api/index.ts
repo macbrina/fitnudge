@@ -5,14 +5,14 @@ export {
   authService,
   type LoginRequest,
   type LoginResponse,
-  type SignupRequest,
+  type SignupRequest
 } from "./auth";
 export {
   UserService,
   userService,
   type User,
   type UpdateUserRequest,
-  type UserStats,
+  type UserStats
 } from "./user";
 export {
   GoalsService,
@@ -21,7 +21,7 @@ export {
   type CreateGoalRequest,
   type UpdateGoalRequest,
   type GoalTemplate,
-  type GoalStats,
+  type GoalStats
 } from "./goals";
 export {
   CheckInsService,
@@ -30,7 +30,7 @@ export {
   type CreateCheckInRequest,
   type UpdateCheckInRequest,
   type CheckInStats,
-  type CheckInCalendar,
+  type CheckInCalendar
 } from "./checkins";
 export {
   SocialService,
@@ -39,19 +39,19 @@ export {
   type CreatePostRequest,
   type Comment,
   type CreateCommentRequest,
-  type UserProfile,
+  type UserProfile
 } from "./social";
 export {
   DailyMotivationService,
   dailyMotivationService,
-  type DailyMotivation,
+  type DailyMotivation
 } from "./dailyMotivations";
 export {
   SubscriptionsService,
   subscriptionsService,
   type SubscriptionResponse,
   type FeaturesResponse,
-  type PlanFeature,
+  type PlanFeature
 } from "./subscriptions";
 export { MediaService, mediaService, type MediaUploadResponse } from "./media";
 export {
@@ -59,7 +59,7 @@ export {
   type PlanStatus,
   type PlanStatusResponse,
   type ActionablePlan,
-  type GoalPlanResponse,
+  type GoalPlanResponse
 } from "./actionablePlans";
 export {
   achievementsService,
@@ -67,14 +67,14 @@ export {
   type UserAchievement,
   type AchievementStats,
   type AchievementRarity,
-  type AchievementCategory,
+  type AchievementCategory
 } from "./achievements";
 export {
   nudgesService,
   type Nudge,
   type NudgeType,
   type SendNudgeRequest,
-  type UnreadCountResponse,
+  type UnreadCountResponse
 } from "./nudges";
 export {
   challengesService,
@@ -87,21 +87,21 @@ export {
   type ChallengeCheckInResponse,
   type LeaderboardEntry,
   type ShareAsChallengeRequest,
-  type ShareAsChallengeResponse,
+  type ShareAsChallengeResponse
 } from "./challenges";
 export {
   partnersService,
   type Partner,
   type PartnershipStatus,
   type PartnerRequest,
-  type SearchUserResult,
+  type SearchUserResult
 } from "./partners";
 export {
   homeService,
   type ActiveItem,
   type PendingCheckIn,
   type DashboardStats,
-  type HomeDashboardResponse,
+  type HomeDashboardResponse
 } from "./home";
 
 // Tracking Stats
@@ -112,14 +112,14 @@ export {
   type WorkoutStats,
   type MealStats,
   type HydrationStats,
-  type CheckinStats,
+  type CheckinStats
 } from "./trackingStats";
 
 // Notifications
 export {
   notificationsService,
   type NotificationHistoryItem,
-  type NotificationType,
+  type NotificationType
 } from "./notifications";
 
 // Legacy compatibility - re-export the main services as apiService

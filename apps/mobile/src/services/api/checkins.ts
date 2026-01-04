@@ -73,9 +73,7 @@ export interface CheckInCalendar {
 // Check-ins Service
 export class CheckInsService extends BaseApiService {
   async getCheckIns(goalId?: string): Promise<ApiResponse<CheckIn[]>> {
-    const endpoint = goalId
-      ? ROUTES.GOALS.CHECKINS(goalId)
-      : ROUTES.CHECKINS.LIST;
+    const endpoint = goalId ? ROUTES.GOALS.CHECKINS(goalId) : ROUTES.CHECKINS.LIST;
     return this.get<CheckIn[]>(endpoint);
   }
 
@@ -83,15 +81,13 @@ export class CheckInsService extends BaseApiService {
     return this.get<CheckIn>(ROUTES.CHECKINS.GET(checkInId));
   }
 
-  async createCheckIn(
-    checkIn: CreateCheckInRequest,
-  ): Promise<ApiResponse<CheckIn>> {
+  async createCheckIn(checkIn: CreateCheckInRequest): Promise<ApiResponse<CheckIn>> {
     return this.post<CheckIn>(ROUTES.CHECKINS.CREATE, checkIn);
   }
 
   async updateCheckIn(
     checkInId: string,
-    updates: UpdateCheckInRequest,
+    updates: UpdateCheckInRequest
   ): Promise<ApiResponse<CheckIn>> {
     return this.put<CheckIn>(ROUTES.CHECKINS.UPDATE(checkInId), updates);
   }
@@ -101,48 +97,42 @@ export class CheckInsService extends BaseApiService {
   }
 
   async getCheckInStats(goalId?: string): Promise<ApiResponse<CheckInStats>> {
-    const endpoint = goalId
-      ? ROUTES.CHECKINS.STATS_BY_GOAL(goalId)
-      : ROUTES.CHECKINS.STATS;
+    const endpoint = goalId ? ROUTES.CHECKINS.STATS_BY_GOAL(goalId) : ROUTES.CHECKINS.STATS;
     return this.get<CheckInStats>(endpoint);
   }
 
   async getCheckInCalendar(
     year: number,
     month: number,
-    goalId?: string,
+    goalId?: string
   ): Promise<ApiResponse<CheckInCalendar[]>> {
     const params = new URLSearchParams({
       year: year.toString(),
-      month: month.toString(),
+      month: month.toString()
     });
 
     if (goalId) {
       params.append("goal_id", goalId);
     }
 
-    return this.get<CheckInCalendar[]>(
-      `${ROUTES.CHECKINS.CALENDAR}?${params.toString()}`,
-    );
+    return this.get<CheckInCalendar[]>(`${ROUTES.CHECKINS.CALENDAR}?${params.toString()}`);
   }
 
   async getCheckInsByDateRange(
     startDate: string,
     endDate: string,
-    goalId?: string,
+    goalId?: string
   ): Promise<ApiResponse<CheckIn[]>> {
     const params = new URLSearchParams({
       start_date: startDate,
-      end_date: endDate,
+      end_date: endDate
     });
 
     if (goalId) {
       params.append("goal_id", goalId);
     }
 
-    return this.get<CheckIn[]>(
-      `${ROUTES.CHECKINS.BY_DATE_RANGE}?${params.toString()}`,
-    );
+    return this.get<CheckIn[]>(`${ROUTES.CHECKINS.BY_DATE_RANGE}?${params.toString()}`);
   }
 
   async getTodayCheckIns(): Promise<ApiResponse<CheckIn[]>> {
@@ -156,9 +146,7 @@ export class CheckInsService extends BaseApiService {
       streak_dates: string[];
     }>
   > {
-    const endpoint = goalId
-      ? ROUTES.CHECKINS.STREAK_BY_GOAL(goalId)
-      : ROUTES.CHECKINS.STREAK;
+    const endpoint = goalId ? ROUTES.CHECKINS.STREAK_BY_GOAL(goalId) : ROUTES.CHECKINS.STREAK;
     return this.get(endpoint);
   }
 
@@ -177,17 +165,15 @@ export class CheckInsService extends BaseApiService {
     return this.get(`${ROUTES.CHECKINS.STREAK}?${params.toString()}`);
   }
 
-  async bulkCreateCheckIns(
-    checkIns: CreateCheckInRequest[],
-  ): Promise<ApiResponse<CheckIn[]>> {
+  async bulkCreateCheckIns(checkIns: CreateCheckInRequest[]): Promise<ApiResponse<CheckIn[]>> {
     return this.post<CheckIn[]>(ROUTES.CHECKINS.BULK_CREATE, {
-      check_ins: checkIns,
+      check_ins: checkIns
     });
   }
 
   async getMoodTrends(
     goalId?: string,
-    days: number = 30,
+    days: number = 30
   ): Promise<
     ApiResponse<
       {
@@ -198,7 +184,7 @@ export class CheckInsService extends BaseApiService {
     >
   > {
     const params = new URLSearchParams({
-      days: days.toString(),
+      days: days.toString()
     });
 
     if (goalId) {

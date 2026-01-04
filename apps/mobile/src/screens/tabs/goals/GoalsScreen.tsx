@@ -8,7 +8,7 @@ import { TabItem, Tabs } from "@/components/ui/Tabs";
 import { useAlertModal } from "@/contexts/AlertModalContext";
 import {
   useBatchChallengePlanStatuses,
-  useBatchPlanStatuses,
+  useBatchPlanStatuses
 } from "@/hooks/api/useActionablePlans";
 import { useMyChallenges } from "@/hooks/api/useChallenges";
 import { useGoals } from "@/hooks/api/useGoals";
@@ -26,13 +26,7 @@ import { tokens } from "@/themes/tokens";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  RefreshControl,
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from "react-native";
 
 // Extend Goal type to include optional fields used in GoalCard
 type GoalWithStreak = Goal & {
@@ -70,7 +64,7 @@ const CATEGORIES = [
   { id: "nutrition", label: "Nutrition", icon: "nutrition-outline" as const },
   { id: "wellness", label: "Wellness", icon: "leaf-outline" as const },
   { id: "mindfulness", label: "Mindfulness", icon: "flower-outline" as const },
-  { id: "sleep", label: "Sleep", icon: "moon-outline" as const },
+  { id: "sleep", label: "Sleep", icon: "moon-outline" as const }
 ] as const;
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
@@ -79,7 +73,7 @@ const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: "alphabetical-asc", label: "A-Z" },
   { value: "alphabetical-desc", label: "Z-A" },
   { value: "streak-high", label: "Streak (High)" },
-  { value: "streak-low", label: "Streak (Low)" },
+  { value: "streak-low", label: "Streak (Low)" }
 ];
 
 export default function GoalsScreen() {
@@ -92,9 +86,7 @@ export default function GoalsScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
   const [typeFilter, setTypeFilter] = useState<GoalTypeFilter>("all");
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([
-    "all",
-  ]);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(["all"]);
   const [sortBy, setSortBy] = useState<SortOption>("recent");
   const [refreshing, setRefreshing] = useState(false);
 
@@ -116,13 +108,13 @@ export default function GoalsScreen() {
     data: goalsResponse,
     isLoading: isLoadingGoals,
     refetch: refetchGoals,
-    error: goalsError,
+    error: goalsError
   } = useGoals();
   const {
     data: challengesResponse,
     isLoading: isLoadingChallenges,
     refetch: refetchChallenges,
-    error: challengesError,
+    error: challengesError
   } = useMyChallenges(); // Fetch challenges user has created or joined
   // Dedupe goals and challenges to prevent duplicate key errors
   // This can happen if realtime INSERT races with mutation optimistic update
@@ -150,7 +142,7 @@ export default function GoalsScreen() {
   // Filter out temp IDs from optimistic updates - they don't have plan status yet
   const goalIds = useMemo(
     () => goals.filter((g) => !g.id.startsWith("temp-")).map((g) => g.id),
-    [goals],
+    [goals]
   );
 
   // Get all challenge IDs for batch plan status fetch (only for participated challenges)
@@ -158,23 +150,17 @@ export default function GoalsScreen() {
   const participatedChallengeIds = useMemo(
     () =>
       challenges
-        .filter(
-          (c) =>
-            (c.is_creator || c.is_participant) && !c.id.startsWith("temp-"),
-        )
+        .filter((c) => (c.is_creator || c.is_participant) && !c.id.startsWith("temp-"))
         .map((c) => c.id),
-    [challenges],
+    [challenges]
   );
 
   // Batch fetch all plan statuses at once (instead of each GoalCard fetching individually)
-  const { planStatusMap, isLoading: isLoadingPlanStatuses } =
-    useBatchPlanStatuses(goalIds);
+  const { planStatusMap, isLoading: isLoadingPlanStatuses } = useBatchPlanStatuses(goalIds);
 
   // Batch fetch challenge plan statuses
-  const {
-    planStatusMap: challengePlanStatusMap,
-    isLoading: isLoadingChallengePlanStatuses,
-  } = useBatchChallengePlanStatuses(participatedChallengeIds);
+  const { planStatusMap: challengePlanStatusMap, isLoading: isLoadingChallengePlanStatuses } =
+    useBatchChallengePlanStatuses(participatedChallengeIds);
 
   // Combined loading state
   // Only show loading skeleton on initial fetch (when we have no data yet)
@@ -198,7 +184,7 @@ export default function GoalsScreen() {
   // Count active goals for limit checking
   const activeGoalsCount = useMemo(
     () => goals.filter((g) => g.status === "active").length,
-    [goals],
+    [goals]
   );
 
   // Filter and sort challenges (separate from goals)
@@ -208,11 +194,11 @@ export default function GoalsScreen() {
     // Status filter for challenges
     if (statusFilter === "active") {
       filteredChallenges = filteredChallenges.filter(
-        (c) => c.status === "active" || c.status === "upcoming",
+        (c) => c.status === "active" || c.status === "upcoming"
       );
     } else if (statusFilter === "archived") {
       filteredChallenges = filteredChallenges.filter(
-        (c) => c.status === "completed" || c.status === "cancelled",
+        (c) => c.status === "completed" || c.status === "cancelled"
       );
     }
 
@@ -220,9 +206,7 @@ export default function GoalsScreen() {
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filteredChallenges = filteredChallenges.filter(
-        (c) =>
-          c.title.toLowerCase().includes(query) ||
-          c.description?.toLowerCase().includes(query),
+        (c) => c.title.toLowerCase().includes(query) || c.description?.toLowerCase().includes(query)
       );
     }
 
@@ -230,14 +214,12 @@ export default function GoalsScreen() {
     switch (sortBy) {
       case "recent":
         filteredChallenges.sort(
-          (a, b) =>
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
         break;
       case "oldest":
         filteredChallenges.sort(
-          (a, b) =>
-            new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
         );
         break;
       case "alphabetical-asc":
@@ -248,8 +230,7 @@ export default function GoalsScreen() {
         break;
       default:
         filteredChallenges.sort(
-          (a, b) =>
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
     }
 
@@ -266,27 +247,20 @@ export default function GoalsScreen() {
       filtered = filtered.filter((g) => g.status === "active");
     } else if (statusFilter === "archived") {
       filtered = filtered.filter(
-        (g) =>
-          g.status === "archived" ||
-          g.status === "paused" ||
-          g.status === "completed",
+        (g) => g.status === "archived" || g.status === "paused" || g.status === "completed"
       );
     }
 
     // Category filter
     if (selectedCategories.length > 0 && !selectedCategories.includes("all")) {
-      filtered = filtered.filter((g) =>
-        selectedCategories.includes(g.category),
-      );
+      filtered = filtered.filter((g) => selectedCategories.includes(g.category));
     }
 
     // Search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(
-        (g) =>
-          g.title.toLowerCase().includes(query) ||
-          g.description?.toLowerCase().includes(query),
+        (g) => g.title.toLowerCase().includes(query) || g.description?.toLowerCase().includes(query)
       );
     }
 
@@ -294,14 +268,12 @@ export default function GoalsScreen() {
     switch (sortBy) {
       case "recent":
         filtered.sort(
-          (a, b) =>
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
         break;
       case "oldest":
         filtered.sort(
-          (a, b) =>
-            new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
         );
         break;
       case "alphabetical-asc":
@@ -311,27 +283,15 @@ export default function GoalsScreen() {
         filtered.sort((a, b) => b.title.localeCompare(a.title));
         break;
       case "streak-high":
-        filtered.sort(
-          (a, b) => (b.current_streak || 0) - (a.current_streak || 0),
-        );
+        filtered.sort((a, b) => (b.current_streak || 0) - (a.current_streak || 0));
         break;
       case "streak-low":
-        filtered.sort(
-          (a, b) => (a.current_streak || 0) - (b.current_streak || 0),
-        );
+        filtered.sort((a, b) => (a.current_streak || 0) - (b.current_streak || 0));
         break;
     }
 
     return filtered;
-  }, [
-    goals,
-    challenges,
-    statusFilter,
-    typeFilter,
-    selectedCategories,
-    searchQuery,
-    sortBy,
-  ]);
+  }, [goals, challenges, statusFilter, typeFilter, selectedCategories, searchQuery, sortBy]);
 
   // Combined list for "all" filter - merges goals and challenges
   const combinedList = useMemo((): CombinedListItem[] => {
@@ -339,12 +299,8 @@ export default function GoalsScreen() {
 
     // Create combined list
     const items: CombinedListItem[] = [
-      ...filteredAndSortedGoals.map(
-        (g): CombinedListItem => ({ type: "goal", data: g }),
-      ),
-      ...filteredAndSortedChallenges.map(
-        (c): CombinedListItem => ({ type: "challenge", data: c }),
-      ),
+      ...filteredAndSortedGoals.map((g): CombinedListItem => ({ type: "goal", data: g })),
+      ...filteredAndSortedChallenges.map((c): CombinedListItem => ({ type: "challenge", data: c }))
     ];
 
     // Sort combined list by created_at (most recent first)
@@ -366,10 +322,10 @@ export default function GoalsScreen() {
 
     // Challenges breakdown
     const activeChallenges = challenges.filter(
-      (c) => c.status === "active" || c.status === "upcoming",
+      (c) => c.status === "active" || c.status === "upcoming"
     ).length;
     const archivedChallenges = challenges.filter(
-      (c) => c.status === "completed" || c.status === "cancelled",
+      (c) => c.status === "completed" || c.status === "cancelled"
     ).length;
 
     // Combined counts (goals + challenges)
@@ -385,7 +341,7 @@ export default function GoalsScreen() {
       challenges: challenges.length,
       activeChallenges,
       archivedChallenges,
-      total: goals.length + challenges.length,
+      total: goals.length + challenges.length
     };
   }, [goals, challenges]);
 
@@ -424,17 +380,17 @@ export default function GoalsScreen() {
       {
         id: "active",
         label: t("goals.active") || "Active",
-        badge: stats.active > 0 ? stats.active : undefined,
+        badge: stats.active > 0 ? stats.active : undefined
       },
       { id: "my_goals", label: t("goals.my_goals") || "My Goals" },
       { id: "challenges", label: t("goals.challenges") || "Challenges" },
       {
         id: "archived",
         label: t("goals.archived") || "Archived",
-        badge: stats.archived > 0 ? stats.archived : undefined,
-      },
+        badge: stats.archived > 0 ? stats.archived : undefined
+      }
     ],
-    [stats.active, stats.archived, t],
+    [stats.active, stats.archived, t]
   );
 
   // Active filter state (combined status + type)
@@ -471,11 +427,8 @@ export default function GoalsScreen() {
   const categoryOptions: ActionSheetOption[] = CATEGORIES.map((cat) => ({
     id: cat.id,
     label: cat.label,
-    icon:
-      selectedCategories[0] === cat.id
-        ? ("checkmark-circle" as const)
-        : cat.icon,
-    onPress: () => handleCategoryToggle(cat.id),
+    icon: selectedCategories[0] === cat.id ? ("checkmark-circle" as const) : cat.icon,
+    onPress: () => handleCategoryToggle(cat.id)
   }));
 
   // Sort options for ActionSheet
@@ -483,7 +436,7 @@ export default function GoalsScreen() {
     id: opt.value,
     label: opt.label,
     icon: sortBy === opt.value ? ("checkmark-circle" as const) : undefined,
-    onPress: () => setSortBy(opt.value),
+    onPress: () => setSortBy(opt.value)
   }));
 
   return (
@@ -497,10 +450,7 @@ export default function GoalsScreen() {
             {t("goals.archived") || "Archived"}
           </Text>
         </View>
-        <TouchableOpacity
-          style={styles.createButton}
-          onPress={handleCreateGoal}
-        >
+        <TouchableOpacity style={styles.createButton} onPress={handleCreateGoal}>
           <Ionicons
             name="add"
             size={toRN(tokens.typography.fontSize.xl)}
@@ -546,61 +496,39 @@ export default function GoalsScreen() {
         <View style={styles.filterRow}>
           {/* Category Filter Chip */}
           <TouchableOpacity
-            style={[
-              styles.filterChip,
-              selectedCategories[0] !== "all" && styles.filterChipActive,
-            ]}
+            style={[styles.filterChip, selectedCategories[0] !== "all" && styles.filterChipActive]}
             onPress={() => setShowCategorySheet(true)}
           >
             <Ionicons
               name="funnel-outline"
               size={14}
-              color={
-                selectedCategories[0] !== "all"
-                  ? brandColors.primary
-                  : colors.text.secondary
-              }
+              color={selectedCategories[0] !== "all" ? brandColors.primary : colors.text.secondary}
             />
             <Text
               style={[
                 styles.filterChipText,
-                selectedCategories[0] !== "all" && styles.filterChipTextActive,
+                selectedCategories[0] !== "all" && styles.filterChipTextActive
               ]}
             >
               {selectedCategories[0] === "all"
                 ? t("goals.category") || "Category"
-                : CATEGORIES.find((c) => c.id === selectedCategories[0])
-                    ?.label || selectedCategories[0]}
+                : CATEGORIES.find((c) => c.id === selectedCategories[0])?.label ||
+                  selectedCategories[0]}
             </Text>
             <Ionicons
               name="chevron-down"
               size={12}
-              color={
-                selectedCategories[0] !== "all"
-                  ? brandColors.primary
-                  : colors.text.secondary
-              }
+              color={selectedCategories[0] !== "all" ? brandColors.primary : colors.text.secondary}
             />
           </TouchableOpacity>
 
           {/* Sort Button */}
-          <TouchableOpacity
-            style={styles.sortButton}
-            onPress={() => setShowSortSheet(true)}
-          >
-            <Ionicons
-              name="swap-vertical-outline"
-              size={14}
-              color={colors.text.secondary}
-            />
+          <TouchableOpacity style={styles.sortButton} onPress={() => setShowSortSheet(true)}>
+            <Ionicons name="swap-vertical-outline" size={14} color={colors.text.secondary} />
             <Text style={styles.sortButtonText}>
               {SORT_OPTIONS.find((o) => o.value === sortBy)?.label}
             </Text>
-            <Ionicons
-              name="chevron-down"
-              size={12}
-              color={colors.text.secondary}
-            />
+            <Ionicons name="chevron-down" size={12} color={colors.text.secondary} />
           </TouchableOpacity>
         </View>
 
@@ -623,24 +551,12 @@ export default function GoalsScreen() {
             <Card shadow="md" style={styles.emptyCard}>
               <EmptyState
                 icon="flag-outline"
-                title={
-                  searchQuery
-                    ? t("goals.no_results_title")
-                    : t("goals.no_goals_title")
-                }
-                message={
-                  searchQuery
-                    ? t("goals.no_results_message")
-                    : t("goals.no_goals_message")
-                }
+                title={searchQuery ? t("goals.no_results_title") : t("goals.no_goals_title")}
+                message={searchQuery ? t("goals.no_results_message") : t("goals.no_goals_message")}
               />
               {!searchQuery && (
                 <Button
-                  title={
-                    goals.length === 0
-                      ? t("goals.create_first_goal")
-                      : t("goals.create_goal")
-                  }
+                  title={goals.length === 0 ? t("goals.create_first_goal") : t("goals.create_goal")}
                   onPress={handleCreateGoal}
                   variant="primary"
                   borderRadius="full"
@@ -668,13 +584,12 @@ export default function GoalsScreen() {
                     onPress={() => handleChallengePress(item.data)}
                     showMenu={true}
                     activeChallengesCount={
-                      challenges.filter(
-                        (c) => c.status === "active" || c.status === "upcoming",
-                      ).length
+                      challenges.filter((c) => c.status === "active" || c.status === "upcoming")
+                        .length
                     }
                     style={styles.goalCard}
                   />
-                ),
+                )
               )}
             </View>
           )
@@ -685,9 +600,7 @@ export default function GoalsScreen() {
               <EmptyState
                 icon="trophy-outline"
                 title={
-                  searchQuery
-                    ? t("goals.no_results_title")
-                    : t("challenges.no_challenges_title")
+                  searchQuery ? t("goals.no_results_title") : t("challenges.no_challenges_title")
                 }
                 message={
                   searchQuery
@@ -714,9 +627,8 @@ export default function GoalsScreen() {
                   onPress={() => handleChallengePress(challenge)}
                   showMenu={true}
                   activeChallengesCount={
-                    challenges.filter(
-                      (c) => c.status === "active" || c.status === "upcoming",
-                    ).length
+                    challenges.filter((c) => c.status === "active" || c.status === "upcoming")
+                      .length
                   }
                   style={styles.goalCard}
                 />
@@ -739,20 +651,14 @@ export default function GoalsScreen() {
                   : t("goals.no_goals_message")
               }
             />
-            {!searchQuery &&
-              selectedCategories.includes("all") &&
-              statusFilter !== "archived" && (
-                <Button
-                  title={
-                    goals.length === 0
-                      ? t("goals.create_first_goal")
-                      : t("goals.create_goal")
-                  }
-                  onPress={handleCreateGoal}
-                  variant="primary"
-                  borderRadius="full"
-                />
-              )}
+            {!searchQuery && selectedCategories.includes("all") && statusFilter !== "archived" && (
+              <Button
+                title={goals.length === 0 ? t("goals.create_first_goal") : t("goals.create_goal")}
+                onPress={handleCreateGoal}
+                variant="primary"
+                borderRadius="full"
+              />
+            )}
           </Card>
         ) : (
           // Render Goals
@@ -794,7 +700,7 @@ export default function GoalsScreen() {
 const makeGoalsScreenStyles = (tokens: any, colors: any, brand: any) => ({
   container: {
     flex: 1,
-    backgroundColor: colors.bg.canvas,
+    backgroundColor: colors.bg.canvas
   },
   header: {
     flexDirection: "row",
@@ -804,18 +710,18 @@ const makeGoalsScreenStyles = (tokens: any, colors: any, brand: any) => ({
     paddingVertical: toRN(tokens.spacing[4]),
     backgroundColor: colors.bg.canvas,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border.subtle,
+    borderBottomColor: colors.border.subtle
   },
   title: {
     fontSize: toRN(tokens.typography.fontSize["2xl"]),
     fontFamily: fontFamily.bold,
     color: colors.text.primary,
-    marginBottom: toRN(tokens.spacing[1]),
+    marginBottom: toRN(tokens.spacing[1])
   },
   stats: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
-    color: colors.text.secondary,
+    color: colors.text.secondary
   },
   createButton: {
     backgroundColor: brand.primary,
@@ -828,21 +734,21 @@ const makeGoalsScreenStyles = (tokens: any, colors: any, brand: any) => ({
     shadowOffset: { width: 0, height: 4 },
     shadowRadius: 8,
     shadowOpacity: 0.12,
-    elevation: 4,
+    elevation: 4
   },
   scrollView: {
-    flex: 1,
+    flex: 1
   },
   scrollContent: {
-    paddingBottom: toRN(tokens.spacing[6]),
+    paddingBottom: toRN(tokens.spacing[6])
   },
   searchContainer: {
     paddingHorizontal: toRN(tokens.spacing[4]),
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   tabsContainer: {
     paddingHorizontal: toRN(tokens.spacing[4]),
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   filterRow: {
     flexDirection: "row" as const,
@@ -850,7 +756,7 @@ const makeGoalsScreenStyles = (tokens: any, colors: any, brand: any) => ({
     justifyContent: "space-between" as const,
     paddingHorizontal: toRN(tokens.spacing[4]),
     marginBottom: toRN(tokens.spacing[3]),
-    gap: toRN(tokens.spacing[3]),
+    gap: toRN(tokens.spacing[3])
   },
   filterChip: {
     flexDirection: "row" as const,
@@ -861,19 +767,19 @@ const makeGoalsScreenStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: colors.bg.card,
     borderRadius: toRN(tokens.borderRadius.full),
     borderWidth: 1,
-    borderColor: colors.border.default,
+    borderColor: colors.border.default
   },
   filterChipActive: {
     backgroundColor: brand.primary + "10",
-    borderColor: brand.primary,
+    borderColor: brand.primary
   },
   filterChipText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
-    color: colors.text.secondary,
+    color: colors.text.secondary
   },
   filterChipTextActive: {
-    color: brand.primary,
+    color: brand.primary
   },
   sortButton: {
     flexDirection: "row" as const,
@@ -884,27 +790,27 @@ const makeGoalsScreenStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: colors.bg.card,
     borderRadius: toRN(tokens.borderRadius.full),
     borderWidth: 1,
-    borderColor: colors.border.default,
+    borderColor: colors.border.default
   },
   sortButtonText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
-    color: colors.text.secondary,
+    color: colors.text.secondary
   },
   loadingContainer: {
-    paddingHorizontal: toRN(tokens.spacing[4]),
+    paddingHorizontal: toRN(tokens.spacing[4])
   },
   goalsList: {
-    paddingHorizontal: toRN(tokens.spacing[4]),
+    paddingHorizontal: toRN(tokens.spacing[4])
   },
   goalCard: {
     width: "100%",
     marginRight: 0,
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   emptyCard: {
     marginHorizontal: toRN(tokens.spacing[4]),
     padding: toRN(tokens.spacing[6]),
-    alignItems: "center",
-  },
+    alignItems: "center"
+  }
 });

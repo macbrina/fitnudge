@@ -1,18 +1,8 @@
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  useMemo,
-} from "react";
-import { StatusBar, useColorScheme } from "react-native";
+import React, { createContext, useContext, useEffect, useState, useMemo } from "react";
+import { Appearance, StatusBar, useColorScheme } from "react-native";
 import { tokens, type Tokens } from "./tokens";
-import {
-  semanticLight,
-  semanticDark,
-  type SemanticColors,
-} from "./semanticColors";
-import { type BrandName, brandUser, type BrandColors } from "./brandVariants";
+import { semanticLight, semanticDark, type SemanticColors } from "./semanticColors";
+import { type BrandName, getBrandColors, type BrandColors } from "./brandVariants";
 import { storageUtil } from "@/utils/storageUtil";
 
 type Preference = "light" | "dark";
@@ -41,7 +31,7 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 const STORAGE_KEYS = {
   THEME_PREFERENCE: "@theme_preference",
   BRAND: "@brand",
-  IS_SYSTEM: "@is_system",
+  IS_SYSTEM: "@is_system"
 } as const;
 
 interface ThemeProviderProps {
@@ -52,22 +42,21 @@ interface ThemeProviderProps {
 export function ThemeProvider({ children, initialBrand }: ThemeProviderProps) {
   const systemColorScheme = useColorScheme();
 
-  // State
+  // State - default to system theme
   const [preference, setPreferenceState] = useState<Preference>("light");
   const [brand, setBrandState] = useState<BrandName>(initialBrand);
-  const [isSystem, setIsSystemState] = useState(false);
+  const [isSystem, setIsSystemState] = useState(true); // Default to system theme
   const [isLoaded, setIsLoaded] = useState(false);
 
   // Load persisted preferences
   useEffect(() => {
     const loadPreferences = async () => {
       try {
-        const [storedPreference, storedBrand, storedIsSystem] =
-          await Promise.all([
-            storageUtil.getItem(STORAGE_KEYS.THEME_PREFERENCE),
-            storageUtil.getItem(STORAGE_KEYS.BRAND),
-            storageUtil.getItem(STORAGE_KEYS.IS_SYSTEM),
-          ]);
+        const [storedPreference, storedBrand, storedIsSystem] = await Promise.all([
+          storageUtil.getItem(STORAGE_KEYS.THEME_PREFERENCE),
+          storageUtil.getItem(STORAGE_KEYS.BRAND),
+          storageUtil.getItem(STORAGE_KEYS.IS_SYSTEM)
+        ]);
 
         if (storedPreference) {
           setPreferenceState(storedPreference as Preference);
@@ -75,8 +64,12 @@ export function ThemeProvider({ children, initialBrand }: ThemeProviderProps) {
         if (storedBrand) {
           setBrandState(storedBrand as BrandName);
         }
-        if (storedIsSystem) {
-          setIsSystemState(storedIsSystem as unknown as boolean);
+
+        // Handle storedIsSystem - check if it exists (not null/undefined)
+        // and properly parse boolean value (could be stored as string or boolean)
+        if (storedIsSystem !== null && storedIsSystem !== undefined) {
+          const isSystemValue = storedIsSystem === true || storedIsSystem === "true";
+          setIsSystemState(isSystemValue);
         }
       } catch (error) {
         console.warn("Failed to load theme preferences:", error);
@@ -121,7 +114,9 @@ export function ThemeProvider({ children, initialBrand }: ThemeProviderProps) {
   // Resolve current mode
   const mode = useMemo(() => {
     if (isSystem) {
-      return systemColorScheme || "light";
+      // useColorScheme() can return null initially, fallback to Appearance API
+      const detectedScheme = systemColorScheme ?? Appearance.getColorScheme();
+      return detectedScheme || "light";
     }
     return preference;
   }, [preference, systemColorScheme, isSystem]);
@@ -133,10 +128,10 @@ export function ThemeProvider({ children, initialBrand }: ThemeProviderProps) {
     return mode === "light" ? semanticLight : semanticDark;
   }, [mode]);
 
-  // Get brand colors
+  // Get brand colors based on current mode
   const brandColors = useMemo(() => {
-    return brandUser;
-  }, [brand]);
+    return getBrandColors(mode);
+  }, [mode]);
 
   // Sync StatusBar with theme
   useEffect(() => {
@@ -156,9 +151,9 @@ export function ThemeProvider({ children, initialBrand }: ThemeProviderProps) {
       brandColors,
       setPreference,
       setIsSystem,
-      setBrand,
+      setBrand
     }),
-    [mode, preference, brand, isDark, isSystem, colors, brandColors],
+    [mode, preference, brand, isDark, isSystem, colors, brandColors]
   );
 
   // Don't render until preferences are loaded to prevent flash
@@ -167,9 +162,7 @@ export function ThemeProvider({ children, initialBrand }: ThemeProviderProps) {
   }
 
   return (
-    <ThemeContext.Provider value={value as ThemeContextValue}>
-      {children}
-    </ThemeContext.Provider>
+    <ThemeContext.Provider value={value as ThemeContextValue}>{children}</ThemeContext.Provider>
   );
 }
 
@@ -184,7 +177,7 @@ export function useTheme(): ThemeContextValue {
 
 // Hook to create themed styles
 export function useThemedStyles<T extends Record<string, any>>(
-  stylesFn: (tokens: Tokens, colors: SemanticColors, brand: BrandColors) => T,
+  stylesFn: (tokens: Tokens, colors: SemanticColors, brand: BrandColors) => T
 ): T {
   const { tokens: themeTokens, colors, brandColors } = useTheme();
 

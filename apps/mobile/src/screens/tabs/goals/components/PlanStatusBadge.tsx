@@ -27,8 +27,8 @@ export function PlanStatusBadge({ status, size = "sm" }: PlanStatusBadgeProps) {
         Animated.timing(spinAnim, {
           toValue: 1,
           duration: 1000,
-          useNativeDriver: true,
-        }),
+          useNativeDriver: true
+        })
       );
       animation.start();
       return () => animation.stop();
@@ -37,7 +37,7 @@ export function PlanStatusBadge({ status, size = "sm" }: PlanStatusBadgeProps) {
 
   const spin = spinAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: ["0deg", "360deg"],
+    outputRange: ["0deg", "360deg"]
   });
 
   const getStatusConfig = () => {
@@ -49,7 +49,7 @@ export function PlanStatusBadge({ status, size = "sm" }: PlanStatusBadgeProps) {
           text: t("goals.plan.status_pending") || "Queued",
           bgColor: brandColors.primary + "1A", // 10% opacity
           textColor: brandColors.primary,
-          animated: true,
+          animated: true
         };
       case "generating":
         return {
@@ -58,7 +58,7 @@ export function PlanStatusBadge({ status, size = "sm" }: PlanStatusBadgeProps) {
           text: t("goals.plan.status_generating"),
           bgColor: brandColors.primary + "1A", // 10% opacity
           textColor: brandColors.primary,
-          animated: true,
+          animated: true
         };
       case "completed":
         return {
@@ -67,7 +67,7 @@ export function PlanStatusBadge({ status, size = "sm" }: PlanStatusBadgeProps) {
           text: t("goals.plan.status_ready"),
           bgColor: colors.bg.success + "1A",
           textColor: colors.feedback.success,
-          animated: false,
+          animated: false
         };
       case "failed":
         return {
@@ -76,7 +76,7 @@ export function PlanStatusBadge({ status, size = "sm" }: PlanStatusBadgeProps) {
           text: t("goals.plan.status_failed"),
           bgColor: colors.feedback.error + "1A",
           textColor: colors.feedback.error,
-          animated: false,
+          animated: false
         };
       default:
         return null;
@@ -93,29 +93,21 @@ export function PlanStatusBadge({ status, size = "sm" }: PlanStatusBadgeProps) {
       style={[
         styles.badge,
         { backgroundColor: config.bgColor },
-        isSizeSmall ? styles.badgeSm : styles.badgeMd,
+        isSizeSmall ? styles.badgeSm : styles.badgeMd
       ]}
     >
       {config.animated ? (
         <Animated.View style={{ transform: [{ rotate: spin }] }}>
-          <Ionicons
-            name={config.icon}
-            size={isSizeSmall ? 12 : 16}
-            color={config.iconColor}
-          />
+          <Ionicons name={config.icon} size={isSizeSmall ? 12 : 16} color={config.iconColor} />
         </Animated.View>
       ) : (
-        <Ionicons
-          name={config.icon}
-          size={isSizeSmall ? 12 : 16}
-          color={config.iconColor}
-        />
+        <Ionicons name={config.icon} size={isSizeSmall ? 12 : 16} color={config.iconColor} />
       )}
       <Text
         style={[
           styles.badgeText,
           { color: config.textColor },
-          isSizeSmall ? styles.badgeTextSm : styles.badgeTextMd,
+          isSizeSmall ? styles.badgeTextSm : styles.badgeTextMd
         ]}
       >
         {config.text}
@@ -129,25 +121,25 @@ const makePlanStatusBadgeStyles = (tokens: any, colors: any, brand: any) => ({
     flexDirection: "row" as const,
     alignItems: "center" as const,
     borderRadius: toRN(tokens.borderRadius.full),
-    alignSelf: "flex-start" as const,
+    alignSelf: "flex-start" as const
   },
   badgeSm: {
     gap: toRN(tokens.spacing[1]),
     paddingVertical: toRN(tokens.spacing[0.5]),
-    paddingHorizontal: toRN(tokens.spacing[2]),
+    paddingHorizontal: toRN(tokens.spacing[2])
   },
   badgeMd: {
     gap: toRN(tokens.spacing[2]),
     paddingVertical: toRN(tokens.spacing[1]),
-    paddingHorizontal: toRN(tokens.spacing[3]),
+    paddingHorizontal: toRN(tokens.spacing[3])
   },
   badgeText: {
-    fontFamily: fontFamily.groteskMedium,
+    fontFamily: fontFamily.groteskMedium
   },
   badgeTextSm: {
-    fontSize: toRN(tokens.typography.fontSize.xs),
+    fontSize: toRN(tokens.typography.fontSize.xs)
   },
   badgeTextMd: {
-    fontSize: toRN(tokens.typography.fontSize.sm),
-  },
+    fontSize: toRN(tokens.typography.fontSize.sm)
+  }
 });

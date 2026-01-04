@@ -6,13 +6,7 @@
  * Handles app state changes to refresh data when returning from background.
  */
 
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  useRef,
-} from "react";
+import React, { createContext, useContext, useEffect, useState, useRef } from "react";
 import { AppState, AppStateStatus } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
 import { realtimeService } from "@/services/realtime/realtimeService";
@@ -32,7 +26,7 @@ interface RealtimeContextType {
 const RealtimeContext = createContext<RealtimeContextType>({
   isConnected: false,
   channelCount: 0,
-  reconnectAttempts: 0,
+  reconnectAttempts: 0
 });
 
 export const useRealtime = () => useContext(RealtimeContext);
@@ -47,7 +41,7 @@ export function RealtimeProvider({ children }: RealtimeProviderProps) {
   const [connectionStatus, setConnectionStatus] = useState({
     isConnected: false,
     channelCount: 0,
-    reconnectAttempts: 0,
+    reconnectAttempts: 0
   });
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
 
@@ -68,9 +62,7 @@ export function RealtimeProvider({ children }: RealtimeProviderProps) {
         isAuthenticated &&
         user?.id
       ) {
-        console.log(
-          "[RealtimeContext] 📱 App returned to foreground, refreshing data...",
-        );
+        console.log("[RealtimeContext] 📱 App returned to foreground, refreshing data...");
 
         // Invalidate key queries to ensure fresh data
         // Realtime reconnection is handled by the service's AppState listener
@@ -88,10 +80,7 @@ export function RealtimeProvider({ children }: RealtimeProviderProps) {
       appStateRef.current = nextAppState;
     };
 
-    const subscription = AppState.addEventListener(
-      "change",
-      handleAppStateChange,
-    );
+    const subscription = AppState.addEventListener("change", handleAppStateChange);
 
     return () => {
       subscription.remove();
@@ -101,9 +90,7 @@ export function RealtimeProvider({ children }: RealtimeProviderProps) {
   useEffect(() => {
     if (!ENABLE_REALTIME) {
       if (__DEV__) {
-        console.log(
-          "[RealtimeContext] ⚠️ Realtime DISABLED (EXPO_PUBLIC_ENABLE_REALTIME=false)",
-        );
+        console.log("[RealtimeContext] ⚠️ Realtime DISABLED (EXPO_PUBLIC_ENABLE_REALTIME=false)");
         console.log("[RealtimeContext] App will use polling for updates");
       }
       return;
@@ -137,9 +124,5 @@ export function RealtimeProvider({ children }: RealtimeProviderProps) {
     }
   }, [isAuthenticated, user?.id, isVerifyingUser]);
 
-  return (
-    <RealtimeContext.Provider value={connectionStatus}>
-      {children}
-    </RealtimeContext.Provider>
-  );
+  return <RealtimeContext.Provider value={connectionStatus}>{children}</RealtimeContext.Provider>;
 }

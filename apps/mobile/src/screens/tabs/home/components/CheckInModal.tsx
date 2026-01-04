@@ -13,7 +13,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
-  ActivityIndicator,
+  ActivityIndicator
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { useStyles } from "@/themes";
@@ -27,10 +27,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { CheckIn, CheckInMood } from "@/services/api/checkins";
 import { ChallengeCheckIn } from "@/services/api/challenges";
 import { useUpdateCheckIn } from "@/hooks/api/useCheckIns";
-import {
-  useChallengeCheckIn,
-  useUpdateChallengeCheckIn,
-} from "@/hooks/api/useChallenges";
+import { useChallengeCheckIn, useUpdateChallengeCheckIn } from "@/hooks/api/useChallenges";
 import { getApiErrorDetails } from "@/services/api/errors";
 import { Card } from "@/components/ui/Card";
 import { ActionSheet } from "@/components/ui/ActionSheet";
@@ -75,7 +72,7 @@ export function CheckInModal({
   challengeCheckIn,
   onClose,
   onComplete,
-  isLoading = false,
+  isLoading = false
 }: CheckInModalProps) {
   const styles = useStyles(makeCheckInModalStyles);
   const { colors, brandColors } = useTheme();
@@ -97,7 +94,7 @@ export function CheckInModal({
         mood: challengeCheckIn.mood,
         photo_url: challengeCheckIn.photo_url,
         check_in_date: challengeCheckIn.check_in_date,
-        challenge: challengeCheckIn.challenge,
+        challenge: challengeCheckIn.challenge
       };
     } else if (!isChallenge && checkIn) {
       return {
@@ -106,19 +103,17 @@ export function CheckInModal({
         mood: checkIn.mood,
         photo_url: checkIn.photo_url,
         check_in_date: checkIn.check_in_date,
-        goal: checkIn.goal,
+        goal: checkIn.goal
       };
     }
     return null;
   }, [isChallenge, checkIn, challengeCheckIn]);
 
   // API hooks for goal check-ins
-  const { mutate: updateGoalCheckIn, isPending: isUpdatingGoal } =
-    useUpdateCheckIn();
+  const { mutate: updateGoalCheckIn, isPending: isUpdatingGoal } = useUpdateCheckIn();
 
   // API hooks for challenge check-ins
-  const { mutate: createChallengeCheckIn, isPending: isCreatingChallenge } =
-    useChallengeCheckIn();
+  const { mutate: createChallengeCheckIn, isPending: isCreatingChallenge } = useChallengeCheckIn();
   const { mutate: updateChallengeCheckIn, isPending: isUpdatingChallenge } =
     useUpdateChallengeCheckIn();
 
@@ -133,7 +128,7 @@ export function CheckInModal({
     hasLibraryPermission,
     hasCameraPermission,
     requestLibraryPermission,
-    requestCameraPermission,
+    requestCameraPermission
   } = useMediaPermissions();
 
   // Local state
@@ -175,14 +170,14 @@ export function CheckInModal({
         damping: 20,
         mass: 1,
         stiffness: 120,
-        useNativeDriver: true,
+        useNativeDriver: true
       }).start();
     } else if (internalVisible) {
       Animated.timing(translateY, {
         toValue: screenHeight,
         duration: 300,
         easing: Easing.in(Easing.ease),
-        useNativeDriver: true,
+        useNativeDriver: true
       }).start(() => {
         setInternalVisible(false);
       });
@@ -207,7 +202,7 @@ export function CheckInModal({
             message: t("checkin.photo_permission_message"),
             variant: "warning",
             confirmLabel: t("checkin.grant_access"),
-            cancelLabel: t("common.cancel"),
+            cancelLabel: t("common.cancel")
           });
           return;
         }
@@ -216,7 +211,7 @@ export function CheckInModal({
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ["images"],
         allowsEditing: false,
-        quality: 0.8,
+        quality: 0.8
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
@@ -228,7 +223,7 @@ export function CheckInModal({
         title: t("common.error"),
         message: t("checkin.photo_upload_error") || "Failed to select photo",
         variant: "error",
-        confirmLabel: t("common.ok"),
+        confirmLabel: t("common.ok")
       });
     }
   };
@@ -246,7 +241,7 @@ export function CheckInModal({
             message: t("checkin.photo_permission_message"),
             variant: "warning",
             confirmLabel: t("checkin.grant_access"),
-            cancelLabel: t("common.cancel"),
+            cancelLabel: t("common.cancel")
           });
           return;
         }
@@ -254,7 +249,7 @@ export function CheckInModal({
 
       const result = await ImagePicker.launchCameraAsync({
         allowsEditing: false,
-        quality: 0.8,
+        quality: 0.8
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
@@ -266,7 +261,7 @@ export function CheckInModal({
         title: t("common.error"),
         message: t("checkin.photo_upload_error") || "Failed to take photo",
         variant: "error",
-        confirmLabel: t("common.ok"),
+        confirmLabel: t("common.ok")
       });
     }
   };
@@ -286,10 +281,9 @@ export function CheckInModal({
           } else {
             showAlert({
               title: t("common.error"),
-              message:
-                t("checkin.photo_upload_error") || "Failed to upload photo",
+              message: t("checkin.photo_upload_error") || "Failed to upload photo",
               variant: "error",
-              confirmLabel: t("common.ok"),
+              confirmLabel: t("common.ok")
             });
           }
         },
@@ -297,16 +291,15 @@ export function CheckInModal({
           console.error("Error uploading photo:", error);
           showAlert({
             title: t("common.error"),
-            message:
-              t("checkin.photo_upload_error") || "Failed to upload photo",
+            message: t("checkin.photo_upload_error") || "Failed to upload photo",
             variant: "error",
-            confirmLabel: t("common.ok"),
+            confirmLabel: t("common.ok")
           });
         },
         onSettled: () => {
           setUploadingPhoto(false);
-        },
-      },
+        }
+      }
     );
   };
 
@@ -322,7 +315,7 @@ export function CheckInModal({
     const checkInData = {
       notes: notes.trim() || undefined,
       mood: selectedMood || undefined,
-      photo_url: selectedPhoto || undefined,
+      photo_url: selectedPhoto || undefined
     };
 
     if (isChallenge && challengeId) {
@@ -332,14 +325,14 @@ export function CheckInModal({
           {
             challengeId,
             checkInId: normalizedCheckIn.id,
-            data: checkInData,
+            data: checkInData
           },
           {
             onSuccess: () => {
               showToast({
                 title: t("common.success"),
                 message: t("checkin.updated") || "Check-in updated!",
-                variant: "success",
+                variant: "success"
               });
               onComplete?.();
               onClose();
@@ -352,23 +345,23 @@ export function CheckInModal({
                   errorDetails.backendMessage ||
                   t("checkin.update_error") ||
                   "Failed to update check-in",
-                variant: "error",
+                variant: "error"
               });
-            },
-          },
+            }
+          }
         );
       } else {
         createChallengeCheckIn(
           {
             challengeId,
-            data: checkInData,
+            data: checkInData
           },
           {
             onSuccess: () => {
               showToast({
                 title: t("common.success"),
                 message: t("checkin.created") || "Check-in complete!",
-                variant: "success",
+                variant: "success"
               });
               onComplete?.();
               onClose();
@@ -378,13 +371,11 @@ export function CheckInModal({
               showAlert({
                 title: t("common.error"),
                 message:
-                  errorDetails.backendMessage ||
-                  t("checkin.create_error") ||
-                  "Failed to check in",
-                variant: "error",
+                  errorDetails.backendMessage || t("checkin.create_error") || "Failed to check in",
+                variant: "error"
               });
-            },
-          },
+            }
+          }
         );
       }
     } else if (goalId && normalizedCheckIn) {
@@ -396,15 +387,15 @@ export function CheckInModal({
             completed: true,
             notes: checkInData.notes,
             mood: checkInData.mood as CheckInMood | undefined,
-            photo_url: checkInData.photo_url,
-          },
+            photo_url: checkInData.photo_url
+          }
         },
         {
           onSuccess: () => {
             showToast({
               title: t("common.success"),
               message: t("checkin.saved") || "Check-in saved!",
-              variant: "success",
+              variant: "success"
             });
             onComplete?.();
             onClose();
@@ -415,10 +406,10 @@ export function CheckInModal({
               title: t("common.error"),
               message: t("checkin.update_error") || "Failed to save check-in",
               variant: "error",
-              confirmLabel: t("common.ok"),
+              confirmLabel: t("common.ok")
             });
-          },
-        },
+          }
+        }
       );
     }
   };
@@ -447,8 +438,8 @@ export function CheckInModal({
           style={[
             styles.modalContainer,
             {
-              transform: [{ translateY }],
-            },
+              transform: [{ translateY }]
+            }
           ]}
         >
           <View
@@ -456,8 +447,8 @@ export function CheckInModal({
               styles.contentContainer,
               {
                 paddingTop: insets.top + toRN(tokens.spacing[4]),
-                paddingBottom: insets.bottom + toRN(tokens.spacing[4]),
-              },
+                paddingBottom: insets.bottom + toRN(tokens.spacing[4])
+              }
             ]}
           >
             {/* Header */}
@@ -491,7 +482,7 @@ export function CheckInModal({
                     borderRadius={30}
                     style={{
                       alignSelf: "center",
-                      marginBottom: toRN(tokens.spacing[4]),
+                      marginBottom: toRN(tokens.spacing[4])
                     }}
                   />
                   <SkeletonBox
@@ -500,7 +491,7 @@ export function CheckInModal({
                     borderRadius={toRN(tokens.borderRadius.md)}
                     style={{
                       alignSelf: "center",
-                      marginBottom: toRN(tokens.spacing[2]),
+                      marginBottom: toRN(tokens.spacing[2])
                     }}
                   />
                   <SkeletonBox
@@ -512,19 +503,11 @@ export function CheckInModal({
                   <View
                     style={{
                       alignItems: "center",
-                      marginTop: toRN(tokens.spacing[8]),
+                      marginTop: toRN(tokens.spacing[8])
                     }}
                   >
-                    <ActivityIndicator
-                      size="large"
-                      color={brandColors.primary}
-                    />
-                    <Text
-                      style={[
-                        styles.loadingText,
-                        { marginTop: toRN(tokens.spacing[3]) },
-                      ]}
-                    >
+                    <ActivityIndicator size="large" color={brandColors.primary} />
+                    <Text style={[styles.loadingText, { marginTop: toRN(tokens.spacing[3]) }]}>
                       {t("common.loading") || "Loading..."}
                     </Text>
                   </View>
@@ -542,8 +525,7 @@ export function CheckInModal({
                     </View>
                     <Text style={styles.title}>{title}</Text>
                     <Text style={styles.subtitle}>
-                      {normalizedCheckIn?.check_in_date ||
-                        new Date().toLocaleDateString()}
+                      {normalizedCheckIn?.check_in_date || new Date().toLocaleDateString()}
                     </Text>
                   </View>
 
@@ -558,13 +540,8 @@ export function CheckInModal({
                         return (
                           <TouchableOpacity
                             key={mood.value}
-                            style={[
-                              styles.moodButton,
-                              isSelected && styles.moodButtonActive,
-                            ]}
-                            onPress={() =>
-                              setSelectedMood(isSelected ? null : mood.value)
-                            }
+                            style={[styles.moodButton, isSelected && styles.moodButtonActive]}
+                            onPress={() => setSelectedMood(isSelected ? null : mood.value)}
                             activeOpacity={0.7}
                           >
                             <MoodIcon
@@ -587,8 +564,7 @@ export function CheckInModal({
                     </View>
                     {selectedMood && (
                       <Text style={styles.moodLabel}>
-                        {MOODS.find((m) => m.value === selectedMood)?.label ||
-                          selectedMood}
+                        {MOODS.find((m) => m.value === selectedMood)?.label || selectedMood}
                       </Text>
                     )}
                   </View>
@@ -597,16 +573,11 @@ export function CheckInModal({
                   <Card shadow="sm" style={styles.notesCard}>
                     <Text style={styles.sectionLabel}>
                       {t("checkin.notes") || "Notes"}
-                      <Text style={styles.optionalText}>
-                        {" "}
-                        ({t("common.optional")})
-                      </Text>
+                      <Text style={styles.optionalText}> ({t("common.optional")})</Text>
                     </Text>
                     <TextInput
                       style={styles.notesInput}
-                      placeholder={
-                        t("checkin.notes_placeholder") || "How did it go?"
-                      }
+                      placeholder={t("checkin.notes_placeholder") || "How did it go?"}
                       placeholderTextColor={colors.text.tertiary}
                       value={notes}
                       onChangeText={setNotes}
@@ -620,10 +591,7 @@ export function CheckInModal({
                   <View style={styles.photoSection}>
                     <Text style={styles.sectionLabel}>
                       {t("checkin.photo") || "Progress Photo"}
-                      <Text style={styles.optionalText}>
-                        {" "}
-                        ({t("common.optional")})
-                      </Text>
+                      <Text style={styles.optionalText}> ({t("common.optional")})</Text>
                     </Text>
 
                     {/* Selected Photo */}
@@ -638,11 +606,7 @@ export function CheckInModal({
                           style={styles.removePhotoButton}
                           onPress={handleRemovePhoto}
                         >
-                          <Ionicons
-                            name="close-circle"
-                            size={24}
-                            color={colors.feedback.error}
-                          />
+                          <Ionicons name="close-circle" size={24} color={colors.feedback.error} />
                         </TouchableOpacity>
                       </View>
                     )}
@@ -650,10 +614,7 @@ export function CheckInModal({
                     {/* Uploading Photo */}
                     {uploadingPhoto && (
                       <View style={styles.uploadingContainer}>
-                        <ActivityIndicator
-                          size="small"
-                          color={brandColors.primary}
-                        />
+                        <ActivityIndicator size="small" color={brandColors.primary} />
                         <Text style={styles.uploadingText}>
                           {t("checkin.uploading") || "Uploading photo..."}
                         </Text>
@@ -681,19 +642,13 @@ export function CheckInModal({
 
                   {/* Save Button */}
                   <TouchableOpacity
-                    style={[
-                      styles.saveButton,
-                      !canSave && styles.saveButtonDisabled,
-                    ]}
+                    style={[styles.saveButton, !canSave && styles.saveButtonDisabled]}
                     onPress={handleSave}
                     disabled={!canSave}
                     activeOpacity={0.8}
                   >
                     <Text
-                      style={[
-                        styles.saveButtonText,
-                        !canSave && styles.saveButtonTextDisabled,
-                      ]}
+                      style={[styles.saveButtonText, !canSave && styles.saveButtonTextDisabled]}
                     >
                       {isSaving
                         ? t("checkin.saving") || "Saving..."
@@ -716,15 +671,14 @@ export function CheckInModal({
                 id: "camera",
                 label: t("checkin.take_photo") || "Take Photo",
                 icon: "camera-outline",
-                onPress: handleTakePhoto,
+                onPress: handleTakePhoto
               },
               {
                 id: "library",
-                label:
-                  t("checkin.choose_from_library") || "Choose from Library",
+                label: t("checkin.choose_from_library") || "Choose from Library",
                 icon: "image-outline",
-                onPress: handlePickPhoto,
-              },
+                onPress: handlePickPhoto
+              }
             ]}
             onClose={() => setShowPhotoOptions(false)}
             cancelLabel={t("common.cancel")}
@@ -737,7 +691,7 @@ export function CheckInModal({
 
 const makeCheckInModalStyles = (tokens: any, colors: any, brand: any) => ({
   keyboardView: {
-    flex: 1,
+    flex: 1
   },
   modalContainer: {
     flex: 1,
@@ -748,28 +702,28 @@ const makeCheckInModalStyles = (tokens: any, colors: any, brand: any) => ({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: colors.bg.canvas,
+    backgroundColor: colors.bg.canvas
   },
   contentContainer: {
     flex: 1,
-    width: "100%",
+    width: "100%"
   },
   loadingContainer: {
     flex: 1,
-    paddingHorizontal: toRN(tokens.spacing[4]),
+    paddingHorizontal: toRN(tokens.spacing[4])
   },
   loadingText: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.medium,
     color: colors.text.secondary,
-    textAlign: "center" as const,
+    textAlign: "center" as const
   },
   header: {
     flexDirection: "row" as const,
     justifyContent: "flex-end" as const,
     alignItems: "center" as const,
     paddingHorizontal: toRN(tokens.spacing[4]),
-    marginBottom: toRN(tokens.spacing[2]),
+    marginBottom: toRN(tokens.spacing[2])
   },
   closeButton: {
     width: toRN(tokens.spacing[10]),
@@ -777,18 +731,18 @@ const makeCheckInModalStyles = (tokens: any, colors: any, brand: any) => ({
     borderRadius: toRN(tokens.borderRadius.full),
     backgroundColor: colors.bg.muted,
     justifyContent: "center" as const,
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   scrollView: {
-    flex: 1,
+    flex: 1
   },
   scrollContent: {
     paddingHorizontal: toRN(tokens.spacing[4]),
-    paddingBottom: toRN(tokens.spacing[6]),
+    paddingBottom: toRN(tokens.spacing[6])
   },
   headerSection: {
     alignItems: "center" as const,
-    marginBottom: toRN(tokens.spacing[6]),
+    marginBottom: toRN(tokens.spacing[6])
   },
   checkInIcon: {
     width: toRN(tokens.spacing[16]),
@@ -797,38 +751,38 @@ const makeCheckInModalStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: colors.bg.muted,
     justifyContent: "center" as const,
     alignItems: "center" as const,
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   title: {
     fontSize: toRN(tokens.typography.fontSize["2xl"]),
     fontFamily: fontFamily.bold,
     color: colors.text.primary,
     textAlign: "center" as const,
-    marginBottom: toRN(tokens.spacing[1]),
+    marginBottom: toRN(tokens.spacing[1])
   },
   subtitle: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.regular,
     color: colors.text.secondary,
-    textAlign: "center" as const,
+    textAlign: "center" as const
   },
   sectionLabel: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.semiBold,
     color: colors.text.primary,
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   optionalText: {
     fontFamily: fontFamily.regular,
-    color: colors.text.secondary,
+    color: colors.text.secondary
   },
   moodSection: {
-    marginBottom: toRN(tokens.spacing[6]),
+    marginBottom: toRN(tokens.spacing[6])
   },
   moodContainer: {
     flexDirection: "row" as const,
     justifyContent: "space-between" as const,
-    gap: toRN(tokens.spacing[2]),
+    gap: toRN(tokens.spacing[2])
   },
   moodButton: {
     flex: 1,
@@ -839,11 +793,11 @@ const makeCheckInModalStyles = (tokens: any, colors: any, brand: any) => ({
     alignItems: "center" as const,
     borderWidth: 2,
     borderColor: "transparent",
-    position: "relative" as const,
+    position: "relative" as const
   },
   moodButtonActive: {
     borderColor: brand.primary,
-    backgroundColor: brand.primary + "10",
+    backgroundColor: brand.primary + "10"
   },
   moodCheck: {
     position: "absolute" as const,
@@ -854,18 +808,18 @@ const makeCheckInModalStyles = (tokens: any, colors: any, brand: any) => ({
     borderRadius: 9,
     backgroundColor: brand.primary,
     justifyContent: "center" as const,
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   moodLabel: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
     color: brand.primary,
     textAlign: "center" as const,
-    marginTop: toRN(tokens.spacing[2]),
+    marginTop: toRN(tokens.spacing[2])
   },
   notesCard: {
     padding: toRN(tokens.spacing[4]),
-    marginBottom: toRN(tokens.spacing[6]),
+    marginBottom: toRN(tokens.spacing[6])
   },
   notesInput: {
     fontSize: toRN(tokens.typography.fontSize.base),
@@ -874,10 +828,10 @@ const makeCheckInModalStyles = (tokens: any, colors: any, brand: any) => ({
     minHeight: toRN(tokens.spacing[20]),
     padding: toRN(tokens.spacing[3]),
     backgroundColor: colors.bg.muted,
-    borderRadius: toRN(tokens.borderRadius.lg),
+    borderRadius: toRN(tokens.borderRadius.lg)
   },
   photoSection: {
-    marginBottom: toRN(tokens.spacing[6]),
+    marginBottom: toRN(tokens.spacing[6])
   },
   photoContainer: {
     width: "100%",
@@ -885,12 +839,12 @@ const makeCheckInModalStyles = (tokens: any, colors: any, brand: any) => ({
     borderRadius: toRN(tokens.borderRadius.xl),
     overflow: "hidden" as const,
     position: "relative" as const,
-    marginTop: toRN(tokens.spacing[3]),
+    marginTop: toRN(tokens.spacing[3])
   },
   photoPreview: {
     width: "100%",
     height: "100%",
-    backgroundColor: colors.bg.muted,
+    backgroundColor: colors.bg.muted
   },
   removePhotoButton: {
     position: "absolute" as const,
@@ -898,7 +852,7 @@ const makeCheckInModalStyles = (tokens: any, colors: any, brand: any) => ({
     right: toRN(tokens.spacing[2]),
     backgroundColor: colors.bg.canvas,
     borderRadius: toRN(tokens.borderRadius.full),
-    padding: toRN(tokens.spacing[1]),
+    padding: toRN(tokens.spacing[1])
   },
   uploadingContainer: {
     flexDirection: "row" as const,
@@ -908,12 +862,12 @@ const makeCheckInModalStyles = (tokens: any, colors: any, brand: any) => ({
     marginTop: toRN(tokens.spacing[3]),
     padding: toRN(tokens.spacing[4]),
     backgroundColor: colors.bg.muted,
-    borderRadius: toRN(tokens.borderRadius.xl),
+    borderRadius: toRN(tokens.borderRadius.xl)
   },
   uploadingText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
-    color: colors.text.secondary,
+    color: colors.text.secondary
   },
   addPhotoButton: {
     flexDirection: "row" as const,
@@ -927,12 +881,12 @@ const makeCheckInModalStyles = (tokens: any, colors: any, brand: any) => ({
     borderStyle: "dashed" as const,
     borderRadius: toRN(tokens.borderRadius.xl),
     backgroundColor: "transparent",
-    marginTop: toRN(tokens.spacing[2]),
+    marginTop: toRN(tokens.spacing[2])
   },
   addPhotoText: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.semiBold,
-    color: brand.primary,
+    color: brand.primary
   },
   saveButton: {
     backgroundColor: brand.primary,
@@ -940,18 +894,18 @@ const makeCheckInModalStyles = (tokens: any, colors: any, brand: any) => ({
     borderRadius: toRN(tokens.borderRadius.xl),
     justifyContent: "center" as const,
     alignItems: "center" as const,
-    marginTop: toRN(tokens.spacing[4]),
+    marginTop: toRN(tokens.spacing[4])
   },
   saveButtonDisabled: {
     backgroundColor: colors.bg.muted,
-    opacity: 0.5,
+    opacity: 0.5
   },
   saveButtonText: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.bold,
-    color: brand.onPrimary,
+    color: brand.onPrimary
   },
   saveButtonTextDisabled: {
-    color: colors.text.tertiary,
-  },
+    color: colors.text.tertiary
+  }
 });

@@ -36,21 +36,11 @@ export default function CreateChallengeScreen() {
         description: params.description,
         category: params.category,
         frequency: params.frequency as "daily" | "weekly" | undefined,
-        target_days: params.target_days
-          ? parseInt(params.target_days)
-          : undefined,
-        days_of_week: params.days_of_week
-          ? JSON.parse(params.days_of_week)
-          : undefined,
-        reminder_times: params.reminder_times
-          ? JSON.parse(params.reminder_times)
-          : undefined,
-        duration_days: params.duration_days
-          ? parseInt(params.duration_days)
-          : undefined,
-        target_checkins: params.target_checkins
-          ? parseInt(params.target_checkins)
-          : undefined,
+        target_days: params.target_days ? parseInt(params.target_days) : undefined,
+        days_of_week: params.days_of_week ? JSON.parse(params.days_of_week) : undefined,
+        reminder_times: params.reminder_times ? JSON.parse(params.reminder_times) : undefined,
+        duration_days: params.duration_days ? parseInt(params.duration_days) : undefined,
+        target_checkins: params.target_checkins ? parseInt(params.target_checkins) : undefined
       }
     : undefined;
 
@@ -71,18 +61,14 @@ export default function CreateChallengeScreen() {
   );
 }
 
-const makeCreateChallengeScreenStyles = (
-  tokens: any,
-  colors: any,
-  brand: any,
-) => {
+const makeCreateChallengeScreenStyles = (tokens: any, colors: any, brand: any) => {
   return {
     container: {
       flex: 1,
-      backgroundColor: colors.bg.canvas,
+      backgroundColor: colors.bg.canvas
     },
     content: {
-      flex: 1,
-    },
+      flex: 1
+    }
   };
 };

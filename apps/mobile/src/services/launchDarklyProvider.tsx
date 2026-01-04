@@ -4,25 +4,19 @@ import { useAuthStore } from "@/stores/authStore";
 import {
   AutoEnvAttributes,
   LDProvider,
-  ReactNativeLDClient,
+  ReactNativeLDClient
 } from "@launchdarkly/react-native-client-sdk";
 
-import {
-  useBoolVariation,
-  useLDClient,
-} from "@launchdarkly/react-native-client-sdk";
+import { useBoolVariation, useLDClient } from "@launchdarkly/react-native-client-sdk";
 
 // Fallback components when LaunchDarkly is not available
 const FallbackLDProvider = ({ children }: { children: ReactNode }) => {
   return <>{children}</>;
 };
 
-const useFallbackBoolVariation = (
-  flagKey: string,
-  defaultValue: boolean = false,
-) => {
+const useFallbackBoolVariation = (flagKey: string, defaultValue: boolean = false) => {
   console.warn(
-    `LaunchDarkly: Using fallback for flag ${flagKey}, returning default: ${defaultValue}`,
+    `LaunchDarkly: Using fallback for flag ${flagKey}, returning default: ${defaultValue}`
   );
   return defaultValue;
 };
@@ -34,7 +28,7 @@ const useFallbackLDClient = () => {
     },
     track: async (eventKey: string, data?: any) => {
       console.warn("LaunchDarkly: Using fallback track:", eventKey, data);
-    },
+    }
   };
 };
 
@@ -50,7 +44,7 @@ const createLDClient = () => {
   // Optional: Hint if the key does not look like a mobile (Test) key
   if (!clientId.startsWith("mob-")) {
     console.warn(
-      "LaunchDarkly: SDK key may be incorrect for Test environment (expected to start with 'mob-').",
+      "LaunchDarkly: SDK key may be incorrect for Test environment (expected to start with 'mob-')."
     );
   }
 
@@ -60,17 +54,13 @@ const createLDClient = () => {
   }
 
   try {
-    return new ReactNativeLDClient(
-      clientId,
-      AutoEnvAttributes?.Enabled || true,
-      {
-        debug: false,
-        applicationInfo: {
-          id: "fitnudge-mobile",
-          version: "1.0.0",
-        },
-      },
-    );
+    return new ReactNativeLDClient(clientId, AutoEnvAttributes?.Enabled || true, {
+      debug: false,
+      applicationInfo: {
+        id: "fitnudge-mobile",
+        version: "1.0.0"
+      }
+    });
   } catch (error) {
     console.error("LaunchDarkly: Failed to create client:", error);
     return null;
@@ -95,13 +85,13 @@ function UserIdentifier({ children }: { children: ReactNode }) {
               plan: user.plan,
               emailVerified: user.email_verified,
               authProvider: user.auth_provider,
-              createdAt: user.created_at,
-            },
+              createdAt: user.created_at
+            }
           }
         : {
             kind: "user",
             key: "anonymous",
-            anonymous: true,
+            anonymous: true
           };
 
       // track("68fed7daead2430abe79ae24");
@@ -165,10 +155,4 @@ export function useFeatureFlagClient() {
 }
 
 // Export LaunchDarkly components for direct use
-export {
-  ReactNativeLDClient,
-  AutoEnvAttributes,
-  LDProvider,
-  useBoolVariation,
-  useLDClient,
-};
+export { ReactNativeLDClient, AutoEnvAttributes, LDProvider, useBoolVariation, useLDClient };

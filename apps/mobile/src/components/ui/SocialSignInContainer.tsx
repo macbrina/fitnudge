@@ -18,22 +18,18 @@ interface SocialSignInContainerProps {
   containerStyle?: any;
 }
 
-const makeSocialSignInContainerStyles = (
-  tokens: any,
-  colors: any,
-  brandColors: any,
-) => {
+const makeSocialSignInContainerStyles = (tokens: any, colors: any, brandColors: any) => {
   return {
     container: {
       alignItems: "center" as const,
       marginBottom: toRN(tokens.spacing[8]),
-      paddingHorizontal: toRN(tokens.spacing[6]),
+      paddingHorizontal: toRN(tokens.spacing[6])
     },
     orText: {
       fontSize: toRN(tokens.typography.fontSize.sm),
       color: "#9ca3af",
-      fontFamily: fontFamily.groteskRegular,
-    },
+      fontFamily: fontFamily.groteskRegular
+    }
   };
 };
 
@@ -47,7 +43,7 @@ export const SocialSignInContainer: React.FC<SocialSignInContainerProps> = ({
   googleLoading = false,
   appleLoading = false,
   showDividerText = true,
-  containerStyle,
+  containerStyle
 }) => {
   const styles = useStyles(makeSocialSignInContainerStyles);
 

@@ -30,7 +30,7 @@ export class MediaService extends BaseApiService {
    */
   async uploadMedia(
     fileUri: string,
-    options: UploadOptions = {},
+    options: UploadOptions = {}
   ): Promise<ApiResponse<MediaUploadResponse>> {
     const { filename, mediaType = "other", postId } = options;
 
@@ -43,8 +43,7 @@ export class MediaService extends BaseApiService {
 
       // Determine file type from URI
       const uriParts = fileUri.split(".");
-      const fileExtension =
-        uriParts[uriParts.length - 1]?.toLowerCase() || "jpg";
+      const fileExtension = uriParts[uriParts.length - 1]?.toLowerCase() || "jpg";
       const mimeType = this.getMimeType(fileExtension);
 
       // Extract filename from URI or use provided
@@ -55,7 +54,7 @@ export class MediaService extends BaseApiService {
       formData.append("file", {
         uri: fileUri,
         type: mimeType,
-        name: finalFilename,
+        name: finalFilename
       } as any);
 
       // Get access token
@@ -74,15 +73,15 @@ export class MediaService extends BaseApiService {
       const uploadResponse = await fetch(url, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${token}`
           // Don't set Content-Type - React Native will set it with boundary for FormData
         },
-        body: formData,
+        body: formData
       });
 
       if (!uploadResponse.ok) {
         const errorData = await uploadResponse.json().catch(() => ({
-          detail: uploadResponse.statusText,
+          detail: uploadResponse.statusText
         }));
         throw new Error(errorData.detail || "Upload failed");
       }
@@ -91,7 +90,7 @@ export class MediaService extends BaseApiService {
 
       return {
         data,
-        status: uploadResponse.status,
+        status: uploadResponse.status
       };
     } catch (error) {
       console.error("Media upload error:", error);
@@ -110,10 +109,8 @@ export class MediaService extends BaseApiService {
    * Upload multiple media files at once
    */
   async uploadMultipleMedia(
-    fileUris: string[],
-  ): Promise<
-    ApiResponse<{ uploaded_files: MediaUploadResponse[]; errors: any[] }>
-  > {
+    fileUris: string[]
+  ): Promise<ApiResponse<{ uploaded_files: MediaUploadResponse[]; errors: any[] }>> {
     const uploadedFiles: MediaUploadResponse[] = [];
     const errors: any[] = [];
 
@@ -126,7 +123,7 @@ export class MediaService extends BaseApiService {
       } catch (error) {
         errors.push({
           fileUri,
-          error: error instanceof Error ? error.message : String(error),
+          error: error instanceof Error ? error.message : String(error)
         });
       }
     }
@@ -134,27 +131,23 @@ export class MediaService extends BaseApiService {
     return {
       data: {
         uploaded_files: uploadedFiles,
-        errors,
+        errors
       },
-      status: 200,
+      status: 200
     };
   }
 
   /**
    * Delete a media file by ID (for post media stored in database)
    */
-  async deleteMedia(
-    mediaId: string,
-  ): Promise<ApiResponse<{ message: string }>> {
+  async deleteMedia(mediaId: string): Promise<ApiResponse<{ message: string }>> {
     return this.delete<{ message: string }>(ROUTES.MEDIA.DELETE(mediaId));
   }
 
   /**
    * Delete a media file by URL (for checkin/profile media not in database)
    */
-  async deleteMediaByUrl(
-    url: string,
-  ): Promise<ApiResponse<{ message: string }>> {
+  async deleteMediaByUrl(url: string): Promise<ApiResponse<{ message: string }>> {
     return this.post<{ message: string }>(ROUTES.MEDIA.DELETE_BY_URL, { url });
   }
 
@@ -174,7 +167,7 @@ export class MediaService extends BaseApiService {
       mp3: "audio/mpeg",
       wav: "audio/wav",
       m4a: "audio/mp4",
-      aac: "audio/aac",
+      aac: "audio/aac"
     };
 
     return mimeTypes[extension] || "application/octet-stream";

@@ -1,12 +1,5 @@
 import React, { useState } from "react";
-import {
-  View,
-  Text,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  Image,
-} from "react-native";
+import { View, Text, KeyboardAvoidingView, Platform, ScrollView, Image } from "react-native";
 import { useTranslation } from "@/lib/i18n";
 import { fontFamily } from "@/lib/fonts";
 import { toRN } from "@/lib/units";
@@ -19,6 +12,7 @@ import { tokens, lineHeight } from "@/themes/tokens";
 import { MOBILE_ROUTES } from "@/lib/routes";
 import { useChangePassword } from "@/hooks/api/useAuth";
 import { useAlertModal } from "@/contexts/AlertModalContext";
+import { ApiError } from "@/services/api/base";
 
 export default function ChangePasswordScreen() {
   const [currentPassword, setCurrentPassword] = useState("");
@@ -40,9 +34,7 @@ export default function ChangePasswordScreen() {
     const newErrors: typeof errors = {};
 
     if (!currentPassword) {
-      newErrors.currentPassword = t(
-        "auth.change_password.current_password_required",
-      );
+      newErrors.currentPassword = t("auth.change_password.current_password_required");
     }
 
     if (!newPassword) {
@@ -56,13 +48,9 @@ export default function ChangePasswordScreen() {
     }
 
     if (!confirmPassword) {
-      newErrors.confirmPassword = t(
-        "auth.change_password.confirm_password_required",
-      );
+      newErrors.confirmPassword = t("auth.change_password.confirm_password_required");
     } else if (newPassword !== confirmPassword) {
-      newErrors.confirmPassword = t(
-        "auth.change_password.passwords_dont_match",
-      );
+      newErrors.confirmPassword = t("auth.change_password.passwords_dont_match");
     }
 
     setErrors(newErrors);
@@ -79,7 +67,7 @@ export default function ChangePasswordScreen() {
     changePasswordMutation.mutate(
       {
         current_password: currentPassword,
-        new_password: newPassword,
+        new_password: newPassword
       },
       {
         onSuccess: async () => {
@@ -87,35 +75,34 @@ export default function ChangePasswordScreen() {
             title: t("auth.change_password.success_title"),
             message: t("auth.change_password.success_message"),
             variant: "success",
-            duration: 2000,
+            duration: 2000
           });
           setTimeout(() => router.back(), 500);
         },
-        onError: async (error: any) => {
+        onError: async (error: unknown) => {
           console.error("Change password error:", error);
           const errorMessage =
-            error?.error ||
-            error?.response?.data?.detail ||
-            error?.message ||
-            t("auth.change_password.error_change_failed");
+            error instanceof ApiError
+              ? error.message
+              : t("auth.change_password.error_change_failed");
 
-          if (errorMessage.includes("incorrect")) {
+          const errorLower = errorMessage.toLowerCase();
+
+          if (errorLower.includes("incorrect") || errorLower.includes("wrong")) {
             setErrors((prev) => ({
               ...prev,
-              currentPassword: t(
-                "auth.change_password.error_incorrect_password",
-              ),
+              currentPassword: errorMessage
             }));
           } else {
             await showAlert({
               title: t("common.error"),
               message: errorMessage,
               variant: "error",
-              confirmLabel: t("common.ok"),
+              confirmLabel: t("common.ok")
             });
           }
-        },
-      },
+        }
+      }
     );
   };
 
@@ -129,7 +116,7 @@ export default function ChangePasswordScreen() {
           style={{ flex: 1 }}
           contentContainerStyle={{
             flexGrow: 1,
-            paddingBottom: insets.bottom,
+            paddingBottom: insets.bottom
           }}
           showsVerticalScrollIndicator={false}
         >
@@ -145,25 +132,21 @@ export default function ChangePasswordScreen() {
           {/* Title and Subtitle */}
           <View style={styles.titleContainer}>
             <Text style={styles.title}>{t("auth.change_password.title")}</Text>
-            <Text style={styles.subtitle}>
-              {t("auth.change_password.subtitle")}
-            </Text>
+            <Text style={styles.subtitle}>{t("auth.change_password.subtitle")}</Text>
           </View>
 
           {/* Form */}
           <View style={styles.form}>
             <TextInput
               label={t("auth.change_password.current_password_label")}
-              placeholder={t(
-                "auth.change_password.current_password_placeholder",
-              )}
+              placeholder={t("auth.change_password.current_password_placeholder")}
               value={currentPassword}
               onChangeText={(text) => {
                 setCurrentPassword(text);
                 if (errors.currentPassword) {
                   setErrors((prev) => ({
                     ...prev,
-                    currentPassword: undefined,
+                    currentPassword: undefined
                   }));
                 }
               }}
@@ -191,16 +174,14 @@ export default function ChangePasswordScreen() {
 
             <TextInput
               label={t("auth.change_password.confirm_password_label")}
-              placeholder={t(
-                "auth.change_password.confirm_password_placeholder",
-              )}
+              placeholder={t("auth.change_password.confirm_password_placeholder")}
               value={confirmPassword}
               onChangeText={(text) => {
                 setConfirmPassword(text);
                 if (errors.confirmPassword) {
                   setErrors((prev) => ({
                     ...prev,
-                    confirmPassword: undefined,
+                    confirmPassword: undefined
                   }));
                 }
               }}
@@ -228,28 +209,24 @@ export default function ChangePasswordScreen() {
   );
 }
 
-const makeChangePasswordScreenStyles = (
-  tokens: any,
-  colors: any,
-  brand: any,
-) => {
+const makeChangePasswordScreenStyles = (tokens: any, colors: any, brand: any) => {
   return {
     container: {
       flex: 1,
-      backgroundColor: colors.bg.canvas,
+      backgroundColor: colors.bg.canvas
     },
     logoContainer: {
       alignItems: "center" as const,
-      marginBottom: toRN(tokens.spacing[8]),
+      marginBottom: toRN(tokens.spacing[8])
     },
     logoImage: {
       width: 100,
-      height: 100,
+      height: 100
     },
     titleContainer: {
       alignItems: "center" as const,
       marginBottom: toRN(tokens.spacing[8]),
-      paddingHorizontal: toRN(tokens.spacing[6]),
+      paddingHorizontal: toRN(tokens.spacing[6])
     },
     title: {
       fontSize: toRN(tokens.typography.fontSize["3xl"]),
@@ -257,21 +234,18 @@ const makeChangePasswordScreenStyles = (
       color: colors.text.primary,
       textAlign: "center" as const,
       marginBottom: toRN(tokens.spacing[3]),
-      fontFamily: fontFamily.groteskBold,
+      fontFamily: fontFamily.groteskBold
     },
     subtitle: {
       fontSize: toRN(tokens.typography.fontSize.base),
       color: colors.text.secondary,
       textAlign: "center" as const,
-      lineHeight: lineHeight(
-        tokens.typography.fontSize.base,
-        tokens.typography.lineHeight.relaxed,
-      ),
-      fontFamily: fontFamily.groteskRegular,
+      lineHeight: lineHeight(tokens.typography.fontSize.base, tokens.typography.lineHeight.relaxed),
+      fontFamily: fontFamily.groteskRegular
     },
     form: {
       paddingHorizontal: toRN(tokens.spacing[6]),
-      flex: 1,
-    },
+      flex: 1
+    }
   };
 };

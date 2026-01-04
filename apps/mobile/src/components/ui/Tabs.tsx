@@ -5,7 +5,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Animated,
-  LayoutChangeEvent,
+  LayoutChangeEvent
 } from "react-native";
 import { useStyles } from "@/themes";
 import { useTheme } from "@/themes";
@@ -39,18 +39,16 @@ export function Tabs({
   size = "md",
   fullWidth = false,
   scrollable = false,
-  style,
+  style
 }: TabsProps) {
   const styles = useStyles((tokens, colors, brand) =>
-    makeTabsStyles(tokens, colors, brand, variant, size, fullWidth),
+    makeTabsStyles(tokens, colors, brand, variant, size, fullWidth)
   );
   const { colors, brandColors } = useTheme();
 
   // Animated indicator for underline variant
   const slideAnim = useRef(new Animated.Value(0)).current;
-  const [tabLayouts, setTabLayouts] = useState<
-    Array<{ x: number; width: number }>
-  >([]);
+  const [tabLayouts, setTabLayouts] = useState<Array<{ x: number; width: number }>>([]);
 
   const handleTabLayout = (event: LayoutChangeEvent, index: number) => {
     const { x, width } = event.nativeEvent.layout;
@@ -71,7 +69,7 @@ export function Tabs({
         Animated.timing(slideAnim, {
           toValue: selected.x,
           duration: 250,
-          useNativeDriver: true,
+          useNativeDriver: true
         }).start();
       }
     }
@@ -83,24 +81,16 @@ export function Tabs({
     return (
       <TouchableOpacity
         key={tab.id}
-        style={[
-          styles.tab,
-          isSelected && styles.tabSelected,
-          fullWidth && styles.tabFullWidth,
-        ]}
+        style={[styles.tab, isSelected && styles.tabSelected, fullWidth && styles.tabFullWidth]}
         onPress={() => onChange(tab.id)}
         activeOpacity={0.7}
         onLayout={(e) => handleTabLayout(e, index)}
       >
         {tab.icon && <View style={styles.tabIcon}>{tab.icon}</View>}
-        <Text style={[styles.tabText, isSelected && styles.tabTextSelected]}>
-          {tab.label}
-        </Text>
+        <Text style={[styles.tabText, isSelected && styles.tabTextSelected]}>{tab.label}</Text>
         {tab.badge !== undefined && tab.badge > 0 && (
           <View style={styles.badge}>
-            <Text style={styles.badgeText}>
-              {tab.badge > 99 ? "99+" : tab.badge}
-            </Text>
+            <Text style={styles.badgeText}>{tab.badge > 99 ? "99+" : tab.badge}</Text>
           </View>
         )}
       </TouchableOpacity>
@@ -112,9 +102,7 @@ export function Tabs({
 
   const containerContent = (
     <View style={[styles.container, style]}>
-      <View style={styles.tabsRow}>
-        {tabs.map((tab, index) => renderTab(tab, index))}
-      </View>
+      <View style={styles.tabsRow}>{tabs.map((tab, index) => renderTab(tab, index))}</View>
 
       {/* Animated indicator for underline variant */}
       {variant === "underline" && selectedLayout && (
@@ -123,8 +111,8 @@ export function Tabs({
             styles.indicator,
             {
               width: selectedLayout.width,
-              transform: [{ translateX: slideAnim }],
-            },
+              transform: [{ translateX: slideAnim }]
+            }
           ]}
         />
       )}
@@ -152,7 +140,7 @@ const makeTabsStyles = (
   brand: any,
   variant: TabsProps["variant"],
   size: TabsProps["size"],
-  fullWidth: boolean,
+  fullWidth: boolean
 ) => {
   // Size-based values
   const sizeConfig = {
@@ -160,55 +148,55 @@ const makeTabsStyles = (
       fontSize: tokens.typography.fontSize.sm,
       paddingVertical: tokens.spacing[2],
       paddingHorizontal: tokens.spacing[3],
-      gap: tokens.spacing[1],
+      gap: tokens.spacing[1]
     },
     md: {
       fontSize: tokens.typography.fontSize.base,
       paddingVertical: tokens.spacing[3],
       paddingHorizontal: tokens.spacing[4],
-      gap: tokens.spacing[2],
+      gap: tokens.spacing[2]
     },
     lg: {
       fontSize: tokens.typography.fontSize.lg,
       paddingVertical: tokens.spacing[4],
       paddingHorizontal: tokens.spacing[5],
-      gap: tokens.spacing[3],
-    },
+      gap: tokens.spacing[3]
+    }
   }[size!];
 
   const baseStyles: any = {
     container: {
-      position: "relative" as const,
+      position: "relative" as const
     },
     scrollContainer: {
-      paddingHorizontal: toRN(tokens.spacing[4]),
+      paddingHorizontal: toRN(tokens.spacing[4])
     },
     tabsRow: {
       flexDirection: "row" as const,
-      gap: toRN(sizeConfig.gap),
+      gap: toRN(sizeConfig.gap)
     },
     tab: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
       paddingVertical: toRN(sizeConfig.paddingVertical),
       paddingHorizontal: toRN(sizeConfig.paddingHorizontal),
-      gap: toRN(tokens.spacing[2]),
+      gap: toRN(tokens.spacing[2])
     },
     tabFullWidth: {
       flex: 1,
-      justifyContent: "center" as const,
+      justifyContent: "center" as const
     },
     tabIcon: {
-      marginRight: toRN(tokens.spacing[1]),
+      marginRight: toRN(tokens.spacing[1])
     },
     tabText: {
       fontSize: toRN(sizeConfig.fontSize),
       fontFamily: fontFamily.medium,
-      color: colors.text.secondary,
+      color: colors.text.secondary
     },
     tabTextSelected: {
       fontFamily: fontFamily.semiBold,
-      color: brand.primary,
+      color: brand.primary
     },
     badge: {
       backgroundColor: brand.primary,
@@ -218,13 +206,13 @@ const makeTabsStyles = (
       marginLeft: toRN(tokens.spacing[1]),
       minWidth: toRN(tokens.spacing[5]),
       alignItems: "center" as const,
-      justifyContent: "center" as const,
+      justifyContent: "center" as const
     },
     badgeText: {
       fontSize: toRN(tokens.typography.fontSize.xs),
       fontFamily: fontFamily.semiBold,
-      color: colors.text.onPrimary,
-    },
+      color: colors.text.onPrimary
+    }
   };
 
   // Variant-specific styles
@@ -236,12 +224,12 @@ const makeTabsStyles = (
         backgroundColor: colors.bg.card,
         borderRadius: toRN(tokens.borderRadius.lg), // Squared corners
         borderWidth: 1,
-        borderColor: colors.border.default,
+        borderColor: colors.border.default
       },
       tabSelected: {
         backgroundColor: brand.primary + "15",
-        borderColor: brand.primary,
-      },
+        borderColor: brand.primary
+      }
     };
   }
 
@@ -251,19 +239,19 @@ const makeTabsStyles = (
       tab: {
         ...baseStyles.tab,
         backgroundColor: colors.bg.card,
-        borderRadius: toRN(tokens.borderRadius.full), // Fully rounded
+        borderRadius: toRN(tokens.borderRadius.full) // Fully rounded
       },
       tabSelected: {
-        backgroundColor: brand.primary,
+        backgroundColor: brand.primary
       },
       tabText: {
         ...baseStyles.tabText,
-        color: colors.text.secondary,
+        color: colors.text.secondary
       },
       tabTextSelected: {
         fontFamily: fontFamily.semiBold,
-        color: colors.text.onPrimary,
-      },
+        color: colors.text.onPrimary
+      }
     };
   }
 
@@ -273,21 +261,21 @@ const makeTabsStyles = (
       container: {
         ...baseStyles.container,
         borderBottomWidth: 1,
-        borderBottomColor: colors.border.default,
+        borderBottomColor: colors.border.default
       },
       tab: {
         ...baseStyles.tab,
-        backgroundColor: "transparent",
+        backgroundColor: "transparent"
       },
       tabSelected: {
-        backgroundColor: "transparent",
+        backgroundColor: "transparent"
       },
       indicator: {
         position: "absolute" as const,
         bottom: 0,
         height: 2,
-        backgroundColor: brand.primary,
-      },
+        backgroundColor: brand.primary
+      }
     };
   }
 

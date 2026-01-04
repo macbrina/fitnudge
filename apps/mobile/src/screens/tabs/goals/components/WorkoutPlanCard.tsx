@@ -38,16 +38,10 @@ export function WorkoutPlanCard({ plan }: WorkoutPlanCardProps) {
       {/* Exercise Routine */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>
-            {t("goals.plan.exercise_routine")}
-          </Text>
+          <Text style={styles.sectionTitle}>{t("goals.plan.exercise_routine")}</Text>
           {routine.duration_minutes && (
             <View style={styles.durationBadge}>
-              <Ionicons
-                name="time-outline"
-                size={14}
-                color={colors.text.secondary}
-              />
+              <Ionicons name="time-outline" size={14} color={colors.text.secondary} />
               <Text style={styles.durationText}>
                 {routine.duration_minutes} {t("common.minutes")}
               </Text>
@@ -64,10 +58,7 @@ export function WorkoutPlanCard({ plan }: WorkoutPlanCardProps) {
         </View>
 
         {exercises.length > 4 && (
-          <TouchableOpacity
-            style={styles.expandButton}
-            onPress={() => setIsExpanded(!isExpanded)}
-          >
+          <TouchableOpacity style={styles.expandButton} onPress={() => setIsExpanded(!isExpanded)}>
             <Text style={styles.expandText}>
               {isExpanded
                 ? t("common.show_less")
@@ -100,11 +91,7 @@ export function WorkoutPlanCard({ plan }: WorkoutPlanCardProps) {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t("goals.plan.schedule")}</Text>
           <View style={styles.scheduleInfo}>
-            <Ionicons
-              name="calendar-outline"
-              size={20}
-              color={colors.text.secondary}
-            />
+            <Ionicons name="calendar-outline" size={20} color={colors.text.secondary} />
             <Text style={styles.scheduleText}>
               {schedule.days_per_week} {t("goals.plan.days_per_week")}
             </Text>
@@ -125,7 +112,7 @@ export function WorkoutPlanCard({ plan }: WorkoutPlanCardProps) {
 
 const makeWorkoutPlanCardStyles = (tokens: any, colors: any, brand: any) => ({
   card: {
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   header: {
     flexDirection: "row" as const,
@@ -133,7 +120,7 @@ const makeWorkoutPlanCardStyles = (tokens: any, colors: any, brand: any) => ({
     marginBottom: toRN(tokens.spacing[4]),
     paddingBottom: toRN(tokens.spacing[3]),
     borderBottomWidth: 1,
-    borderBottomColor: colors.border.default,
+    borderBottomColor: colors.border.default
   },
   iconContainer: {
     width: toRN(tokens.spacing[10]),
@@ -142,26 +129,26 @@ const makeWorkoutPlanCardStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: brand.primary + "1A", // 10% opacity
     alignItems: "center" as const,
     justifyContent: "center" as const,
-    marginRight: toRN(tokens.spacing[3]),
+    marginRight: toRN(tokens.spacing[3])
   },
   cardTitle: {
     fontSize: toRN(tokens.typography.fontSize.xl),
     fontFamily: fontFamily.groteskBold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   section: {
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   sectionHeader: {
     flexDirection: "row" as const,
     justifyContent: "space-between" as const,
     alignItems: "center" as const,
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   sectionTitle: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.semiBold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   durationBadge: {
     flexDirection: "row" as const,
@@ -170,15 +157,15 @@ const makeWorkoutPlanCardStyles = (tokens: any, colors: any, brand: any) => ({
     paddingVertical: toRN(tokens.spacing[0.5]),
     paddingHorizontal: toRN(tokens.spacing[2]),
     borderRadius: toRN(tokens.borderRadius.full),
-    backgroundColor: colors.bg.muted,
+    backgroundColor: colors.bg.muted
   },
   durationText: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.medium,
-    color: colors.text.secondary,
+    color: colors.text.secondary
   },
   exerciseList: {
-    gap: toRN(tokens.spacing[0]),
+    gap: toRN(tokens.spacing[0])
   },
   expandButton: {
     flexDirection: "row" as const,
@@ -186,45 +173,45 @@ const makeWorkoutPlanCardStyles = (tokens: any, colors: any, brand: any) => ({
     justifyContent: "center" as const,
     gap: toRN(tokens.spacing[1]),
     paddingVertical: toRN(tokens.spacing[2]),
-    marginTop: toRN(tokens.spacing[2]),
+    marginTop: toRN(tokens.spacing[2])
   },
   expandText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
-    color: brand.primary,
+    color: brand.primary
   },
   infoRow: {
     flexDirection: "row" as const,
     alignItems: "flex-start" as const,
     gap: toRN(tokens.spacing[2]),
-    marginTop: toRN(tokens.spacing[2]),
+    marginTop: toRN(tokens.spacing[2])
   },
   infoLabel: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.semiBold,
-    color: colors.text.secondary,
+    color: colors.text.secondary
   },
   infoValue: {
     flex: 1,
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.groteskRegular,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   scheduleInfo: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
     gap: toRN(tokens.spacing[2]),
-    paddingVertical: toRN(tokens.spacing[2]),
+    paddingVertical: toRN(tokens.spacing[2])
   },
   scheduleText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   progressionText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.groteskRegular,
     color: colors.text.secondary,
-    lineHeight: toRN(tokens.typography.fontSize.sm) * 1.5,
-  },
+    lineHeight: toRN(tokens.typography.fontSize.sm) * 1.5
+  }
 });

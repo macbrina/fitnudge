@@ -7,7 +7,7 @@ export const userQueryKeys = {
   currentUser: ["user", "current"] as const,
   userById: (id: string) => ["user", id] as const,
   userStats: (id?: string) => ["user", "stats", id] as const,
-  notificationSettings: ["user", "notification-settings"] as const,
+  notificationSettings: ["user", "notification-settings"] as const
 } as const;
 
 // Empty placeholder to prevent loading spinners - no longer needed since types conflict
@@ -18,7 +18,7 @@ export const useCurrentUser = () => {
     queryKey: userQueryKeys.currentUser,
     queryFn: () => userService.getCurrentUser(),
     staleTime: 5 * 60 * 1000, // 5 minutes
-    refetchOnMount: false,
+    refetchOnMount: false
   });
 };
 
@@ -27,7 +27,7 @@ export const useUserById = (userId: string) => {
     queryKey: userQueryKeys.userById(userId),
     queryFn: () => userService.getUserById(userId),
     enabled: !!userId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000 // 5 minutes
   });
 };
 
@@ -35,8 +35,7 @@ export const useUpdateProfile = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (updates: UpdateUserRequest) =>
-      userService.updateProfile(updates),
+    mutationFn: (updates: UpdateUserRequest) => userService.updateProfile(updates),
     // Optimistic update for instant UI feedback
     onMutate: async (updates) => {
       await queryClient.cancelQueries({ queryKey: userQueryKeys.currentUser });
@@ -53,10 +52,7 @@ export const useUpdateProfile = () => {
     },
     onError: (err, updates, context) => {
       if (context?.previousUser) {
-        queryClient.setQueryData(
-          userQueryKeys.currentUser,
-          context.previousUser,
-        );
+        queryClient.setQueryData(userQueryKeys.currentUser, context.previousUser);
       }
     },
     onSuccess: (response) => {
@@ -65,10 +61,10 @@ export const useUpdateProfile = () => {
       if (realUser) {
         queryClient.setQueryData(userQueryKeys.currentUser, (old: any) => ({
           ...old,
-          data: realUser,
+          data: realUser
         }));
       }
-    },
+    }
   });
 };
 
@@ -80,13 +76,13 @@ export const useDeleteAccount = () => {
     onSuccess: () => {
       // Clear all data on account deletion
       queryClient.clear();
-    },
+    }
   });
 };
 
 export const useExportData = () => {
   return useMutation({
-    mutationFn: () => userService.exportData(),
+    mutationFn: () => userService.requestDataExport()
   });
 };
 
@@ -98,7 +94,7 @@ export const useUserStats = (userId?: string) => {
     queryFn: () => userService.getUserStats(userId),
     enabled: isAuthenticated,
     staleTime: 0, // Refetch immediately when invalidated (realtime updates)
-    refetchOnMount: false,
+    refetchOnMount: false
   });
 };
 
@@ -106,11 +102,11 @@ export const useUpdatePassword = () => {
   return useMutation({
     mutationFn: ({
       currentPassword,
-      newPassword,
+      newPassword
     }: {
       currentPassword: string;
       newPassword: string;
-    }) => userService.updatePassword(currentPassword, newPassword),
+    }) => userService.updatePassword(currentPassword, newPassword)
   });
 };
 
@@ -118,11 +114,10 @@ export const useUploadProfilePicture = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (imageUri: string) =>
-      userService.uploadProfilePicture(imageUri),
+    mutationFn: (imageUri: string) => userService.uploadProfilePicture(imageUri),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: userQueryKeys.currentUser });
-    },
+    }
   });
 };
 
@@ -133,7 +128,7 @@ export const useDeleteProfilePicture = () => {
     mutationFn: () => userService.deleteProfilePicture(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: userQueryKeys.currentUser });
-    },
+    }
   });
 };
 
@@ -141,7 +136,7 @@ export const useNotificationSettings = () => {
   return useQuery({
     queryKey: userQueryKeys.notificationSettings,
     queryFn: () => userService.getNotificationSettings(),
-    staleTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: 10 * 60 * 1000 // 10 minutes
   });
 };
 
@@ -159,31 +154,23 @@ export const useUpdateNotificationSettings = () => {
     // Optimistic update for instant toggle feedback
     onMutate: async (newSettings) => {
       await queryClient.cancelQueries({
-        queryKey: userQueryKeys.notificationSettings,
+        queryKey: userQueryKeys.notificationSettings
       });
 
-      const previousSettings = queryClient.getQueryData(
-        userQueryKeys.notificationSettings,
-      );
+      const previousSettings = queryClient.getQueryData(userQueryKeys.notificationSettings);
 
       // Optimistically update settings
-      queryClient.setQueryData(
-        userQueryKeys.notificationSettings,
-        (old: any) => {
-          if (!old?.data) return old;
-          return { ...old, data: { ...old.data, ...newSettings } };
-        },
-      );
+      queryClient.setQueryData(userQueryKeys.notificationSettings, (old: any) => {
+        if (!old?.data) return old;
+        return { ...old, data: { ...old.data, ...newSettings } };
+      });
 
       return { previousSettings };
     },
     onError: (err, newSettings, context) => {
       if (context?.previousSettings) {
-        queryClient.setQueryData(
-          userQueryKeys.notificationSettings,
-          context.previousSettings,
-        );
+        queryClient.setQueryData(userQueryKeys.notificationSettings, context.previousSettings);
       }
-    },
+    }
   });
 };

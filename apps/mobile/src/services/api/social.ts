@@ -69,13 +69,8 @@ export interface FollowRequest {
 // Social Service
 export class SocialService extends BaseApiService {
   // Posts
-  async getFeed(
-    page: number = 1,
-    limit: number = 20,
-  ): Promise<ApiResponse<Post[]>> {
-    return this.get<Post[]>(
-      `${ROUTES.SOCIAL.FEED}?page=${page}&limit=${limit}`,
-    );
+  async getFeed(page: number = 1, limit: number = 20): Promise<ApiResponse<Post[]>> {
+    return this.get<Post[]>(`${ROUTES.SOCIAL.FEED}?page=${page}&limit=${limit}`);
   }
 
   async getPost(postId: string): Promise<ApiResponse<Post>> {
@@ -102,22 +97,17 @@ export class SocialService extends BaseApiService {
   async getComments(
     postId: string,
     page: number = 1,
-    limit: number = 20,
+    limit: number = 20
   ): Promise<ApiResponse<Comment[]>> {
     return this.get<Comment[]>(
-      `${ROUTES.SOCIAL.POSTS.COMMENTS(postId)}?page=${page}&limit=${limit}`,
+      `${ROUTES.SOCIAL.POSTS.COMMENTS(postId)}?page=${page}&limit=${limit}`
     );
   }
 
-  async createComment(
-    comment: CreateCommentRequest,
-  ): Promise<ApiResponse<Comment>> {
-    return this.post<Comment>(
-      ROUTES.SOCIAL.POSTS.CREATE_COMMENT(comment.post_id),
-      {
-        content: comment.content,
-      },
-    );
+  async createComment(comment: CreateCommentRequest): Promise<ApiResponse<Comment>> {
+    return this.post<Comment>(ROUTES.SOCIAL.POSTS.CREATE_COMMENT(comment.post_id), {
+      content: comment.content
+    });
   }
 
   async deleteComment(commentId: string): Promise<ApiResponse> {
@@ -136,20 +126,20 @@ export class SocialService extends BaseApiService {
   async getFollowers(
     userId: string,
     page: number = 1,
-    limit: number = 20,
+    limit: number = 20
   ): Promise<ApiResponse<UserProfile[]>> {
     return this.get<UserProfile[]>(
-      `${ROUTES.SOCIAL.USERS.FOLLOWERS(userId)}?page=${page}&limit=${limit}`,
+      `${ROUTES.SOCIAL.USERS.FOLLOWERS(userId)}?page=${page}&limit=${limit}`
     );
   }
 
   async getFollowing(
     userId: string,
     page: number = 1,
-    limit: number = 20,
+    limit: number = 20
   ): Promise<ApiResponse<UserProfile[]>> {
     return this.get<UserProfile[]>(
-      `${ROUTES.SOCIAL.USERS.FOLLOWING(userId)}?page=${page}&limit=${limit}`,
+      `${ROUTES.SOCIAL.USERS.FOLLOWING(userId)}?page=${page}&limit=${limit}`
     );
   }
 
@@ -160,31 +150,29 @@ export class SocialService extends BaseApiService {
   async getUserPosts(
     userId: string,
     page: number = 1,
-    limit: number = 20,
+    limit: number = 20
   ): Promise<ApiResponse<Post[]>> {
-    return this.get<Post[]>(
-      `${ROUTES.USERS.GET(userId)}/posts?page=${page}&limit=${limit}`,
-    );
+    return this.get<Post[]>(`${ROUTES.USERS.GET(userId)}/posts?page=${page}&limit=${limit}`);
   }
 
   // Search
   async searchUsers(
     query: string,
     page: number = 1,
-    limit: number = 20,
+    limit: number = 20
   ): Promise<ApiResponse<UserProfile[]>> {
     return this.get<UserProfile[]>(
-      `${ROUTES.SOCIAL.SEARCH.USERS}?q=${encodeURIComponent(query)}&page=${page}&limit=${limit}`,
+      `${ROUTES.SOCIAL.SEARCH.USERS}?q=${encodeURIComponent(query)}&page=${page}&limit=${limit}`
     );
   }
 
   async searchPosts(
     query: string,
     page: number = 1,
-    limit: number = 20,
+    limit: number = 20
   ): Promise<ApiResponse<Post[]>> {
     return this.get<Post[]>(
-      `${ROUTES.SOCIAL.SEARCH.POSTS}?q=${encodeURIComponent(query)}&page=${page}&limit=${limit}`,
+      `${ROUTES.SOCIAL.SEARCH.POSTS}?q=${encodeURIComponent(query)}&page=${page}&limit=${limit}`
     );
   }
 
@@ -193,18 +181,14 @@ export class SocialService extends BaseApiService {
     return this.get<Post[]>(ROUTES.SOCIAL.TRENDING.POSTS);
   }
 
-  async getTrendingHashtags(): Promise<
-    ApiResponse<{ hashtag: string; count: number }[]>
-  > {
-    return this.get<{ hashtag: string; count: number }[]>(
-      ROUTES.SOCIAL.TRENDING.HASHTAGS,
-    );
+  async getTrendingHashtags(): Promise<ApiResponse<{ hashtag: string; count: number }[]>> {
+    return this.get<{ hashtag: string; count: number }[]>(ROUTES.SOCIAL.TRENDING.HASHTAGS);
   }
 
   // Notifications
   async getNotifications(
     page: number = 1,
-    limit: number = 20,
+    limit: number = 20
   ): Promise<
     ApiResponse<
       {
@@ -218,9 +202,7 @@ export class SocialService extends BaseApiService {
       }[]
     >
   > {
-    return this.get(
-      `${ROUTES.SOCIAL.NOTIFICATIONS}?page=${page}&limit=${limit}`,
-    );
+    return this.get(`${ROUTES.SOCIAL.NOTIFICATIONS}?page=${page}&limit=${limit}`);
   }
 
   async markNotificationAsRead(notificationId: string): Promise<ApiResponse> {

@@ -6,8 +6,9 @@ import { useTranslation } from "@/lib/i18n";
 import { MOBILE_ROUTES } from "@/lib/routes";
 import { toRN } from "@/lib/units";
 import { logger } from "@/services/logger";
-import { useStyles } from "@/themes/makeStyles";
+import { useStyles, useTheme } from "@/themes";
 import { STORAGE_KEYS, storageUtil } from "@/utils/storageUtil";
+import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useState } from "react";
 import { Text, TouchableOpacity, View } from "react-native";
@@ -17,6 +18,7 @@ export default function NotificationPermissionScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const { t } = useTranslation();
   const styles = useStyles(makeNotificationPermissionScreenStyles);
+  const { brandColors } = useTheme();
   const insets = useSafeAreaInsets();
   const { requestPermissionsWithSoftPrompt } = useNotificationPermissions();
   const { capture } = usePostHog();
@@ -39,7 +41,7 @@ export default function NotificationPermissionScreen() {
       // Track event
       capture("notification_permission_requested", {
         source: "onboarding",
-        screen: "notification_permission",
+        screen: "notification_permission"
       });
 
       // Request permissions
@@ -49,7 +51,7 @@ export default function NotificationPermissionScreen() {
         // Track success
         capture("notification_permission_granted", {
           source: "onboarding",
-          screen: "notification_permission",
+          screen: "notification_permission"
         });
 
         // Permission granted - tracked via PostHog above
@@ -57,17 +59,14 @@ export default function NotificationPermissionScreen() {
         // Track denial
         capture("notification_permission_denied", {
           source: "onboarding",
-          screen: "notification_permission",
+          screen: "notification_permission"
         });
 
         // Permission denied - tracked via PostHog above
       }
 
       // Mark step as seen
-      await storageUtil.setItem(
-        STORAGE_KEYS.HAS_SEEN_NOTIFICATION_PERMISSION,
-        true,
-      );
+      await storageUtil.setItem(STORAGE_KEYS.HAS_SEEN_NOTIFICATION_PERMISSION, true);
 
       // Navigate to personalization flow regardless of permission result
 
@@ -81,7 +80,7 @@ export default function NotificationPermissionScreen() {
     } catch (error) {
       logger.error("Error requesting notification permissions", {
         error: error instanceof Error ? error.message : String(error),
-        screen: "notification_permission",
+        screen: "notification_permission"
       });
 
       // Still navigate to personalization flow
@@ -95,15 +94,13 @@ export default function NotificationPermissionScreen() {
     // Track skip
     capture("notification_permission_skipped", {
       source: "onboarding",
-      screen: "notification_permission",
+      screen: "notification_permission"
     });
 
     // Permission skipped - tracked via PostHog above
 
     // Mark step as seen
-    storageUtil
-      .setItem(STORAGE_KEYS.HAS_SEEN_NOTIFICATION_PERMISSION, true)
-      .catch(() => {});
+    storageUtil.setItem(STORAGE_KEYS.HAS_SEEN_NOTIFICATION_PERMISSION, true).catch(() => {});
 
     // Navigate to personalization flow
     router.push(MOBILE_ROUTES.ONBOARDING.PERSONALIZATION);
@@ -114,30 +111,43 @@ export default function NotificationPermissionScreen() {
       {/* Content */}
       <View style={styles.content}>
         <View style={styles.iconContainer}>
-          <Text style={styles.icon}>🔔</Text>
+          <Ionicons name="notifications" size={60} color={brandColors.primary} />
         </View>
 
         <Text style={styles.title}>{t("onboarding.notifications.title")}</Text>
-        <Text style={styles.subtitle}>
-          {t("onboarding.notifications.subtitle")}
-        </Text>
+        <Text style={styles.subtitle}>{t("onboarding.notifications.subtitle")}</Text>
 
         {/* Benefits List */}
         <View style={styles.benefitsContainer}>
           <View style={styles.benefitItem}>
-            <Text style={styles.benefitIcon}>✓</Text>
+            <Ionicons
+              name="checkmark-circle"
+              size={22}
+              color={brandColors.primary}
+              style={styles.benefitIcon}
+            />
             <Text style={styles.benefitText}>
               {t("onboarding.notifications.benefit_reminders")}
             </Text>
           </View>
           <View style={styles.benefitItem}>
-            <Text style={styles.benefitIcon}>✓</Text>
+            <Ionicons
+              name="checkmark-circle"
+              size={22}
+              color={brandColors.primary}
+              style={styles.benefitIcon}
+            />
             <Text style={styles.benefitText}>
               {t("onboarding.notifications.benefit_motivation")}
             </Text>
           </View>
           <View style={styles.benefitItem}>
-            <Text style={styles.benefitIcon}>✓</Text>
+            <Ionicons
+              name="checkmark-circle"
+              size={22}
+              color={brandColors.primary}
+              style={styles.benefitIcon}
+            />
             <Text style={styles.benefitText}>
               {t("onboarding.notifications.benefit_celebrations")}
             </Text>
@@ -154,47 +164,36 @@ export default function NotificationPermissionScreen() {
           loading={isLoading}
         />
 
-        <TouchableOpacity
-          onPress={handleMaybeLater}
-          style={styles.maybeLaterButton}
-        >
-          <Text style={styles.maybeLaterText}>
-            {t("onboarding.notifications.maybe_later")}
-          </Text>
+        <TouchableOpacity onPress={handleMaybeLater} style={styles.maybeLaterButton}>
+          <Text style={styles.maybeLaterText}>{t("onboarding.notifications.maybe_later")}</Text>
         </TouchableOpacity>
 
-        <Text style={styles.disclaimer}>
-          {t("onboarding.notifications.disclaimer")}
-        </Text>
+        <Text style={styles.disclaimer}>{t("onboarding.notifications.disclaimer")}</Text>
       </View>
     </View>
   );
 }
 
-const makeNotificationPermissionScreenStyles = (
-  tokens: any,
-  colors: any,
-  brand: any,
-) => {
+const makeNotificationPermissionScreenStyles = (tokens: any, colors: any, brand: any) => {
   return {
     container: {
       flex: 1,
-      backgroundColor: colors.bg.canvas,
+      backgroundColor: colors.bg.canvas
     },
     header: {
       alignItems: "center" as const,
       paddingTop: toRN(tokens.spacing[8]),
-      paddingBottom: toRN(tokens.spacing[6]),
+      paddingBottom: toRN(tokens.spacing[6])
     },
     logo: {
       width: 60,
-      height: 60,
+      height: 60
     },
     content: {
       flex: 1,
       alignItems: "center" as const,
       paddingHorizontal: toRN(tokens.spacing[6]),
-      justifyContent: "center" as const,
+      justifyContent: "center" as const
     },
     iconContainer: {
       width: 120,
@@ -203,10 +202,7 @@ const makeNotificationPermissionScreenStyles = (
       backgroundColor: brand.primary + "20",
       alignItems: "center" as const,
       justifyContent: "center" as const,
-      marginBottom: toRN(tokens.spacing[8]),
-    },
-    icon: {
-      fontSize: 60,
+      marginBottom: toRN(tokens.spacing[8])
     },
     title: {
       fontSize: toRN(tokens.typography.fontSize["3xl"]),
@@ -214,54 +210,51 @@ const makeNotificationPermissionScreenStyles = (
       color: colors.text.primary,
       textAlign: "center" as const,
       marginBottom: toRN(tokens.spacing[4]),
-      fontFamily: fontFamily.groteskBold,
+      fontFamily: fontFamily.groteskBold
     },
     subtitle: {
       fontSize: toRN(tokens.typography.fontSize.lg),
       color: colors.text.secondary,
       textAlign: "center" as const,
       marginBottom: toRN(tokens.spacing[8]),
-      fontFamily: fontFamily.groteskRegular,
+      fontFamily: fontFamily.groteskRegular
     },
     benefitsContainer: {
       width: "100%",
-      maxWidth: 300,
+      maxWidth: 300
     },
     benefitItem: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
-      marginBottom: toRN(tokens.spacing[4]),
+      marginBottom: toRN(tokens.spacing[4])
     },
     benefitIcon: {
-      fontSize: toRN(tokens.typography.fontSize.lg),
-      color: brand.primary,
-      marginRight: toRN(tokens.spacing[3]),
-      fontWeight: tokens.typography.fontWeight.bold,
+      marginRight: toRN(tokens.spacing[3])
     },
     benefitText: {
       fontSize: toRN(tokens.typography.fontSize.base),
       color: colors.text.primary,
       flex: 1,
-      fontFamily: fontFamily.groteskRegular,
+      fontFamily: fontFamily.groteskRegular
     },
     actions: {
-      paddingHorizontal: toRN(tokens.spacing[6]),
+      paddingHorizontal: toRN(tokens.spacing[6])
     },
     maybeLaterButton: {
       alignItems: "center" as const,
       marginTop: toRN(tokens.spacing[4]),
-      marginBottom: toRN(tokens.spacing[6]),
+      marginBottom: toRN(tokens.spacing[6])
     },
     maybeLaterText: {
       fontSize: toRN(tokens.typography.fontSize.base),
       color: colors.text.secondary,
-      fontFamily: fontFamily.groteskMedium,
+      fontFamily: fontFamily.groteskMedium
     },
     disclaimer: {
       fontSize: toRN(tokens.typography.fontSize.sm),
       color: colors.text.tertiary,
       textAlign: "center" as const,
-      fontFamily: fontFamily.groteskRegular,
-    },
+      fontFamily: fontFamily.groteskRegular
+    }
   };
 };

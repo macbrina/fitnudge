@@ -13,6 +13,8 @@ Events handled:
 - PRODUCT_CHANGE: User changes plan
 - UNCANCELLATION: User re-enables auto-renew
 - TRANSFER: Subscription transferred to different app user
+- NON_RENEWING_PURCHASE: One-time purchase (lifetime, consumable)
+- SUBSCRIPTION_EXTENDED: Subscription extended via store API
 
 Features:
 - Idempotency: Each event is processed only once
@@ -99,27 +101,24 @@ class RevenueCatWebhook(BaseModel):
 
 
 def get_plan_from_product_id(product_id: str) -> str:
-    """Map product ID to plan name"""
+    """Map product ID to plan name (2-tier system: free + premium)"""
     if not product_id:
         return "free"
 
     product_id_lower = product_id.lower()
 
-    if "elite" in product_id_lower:
-        return "elite"
-    elif "pro" in product_id_lower:
-        return "pro"
-    elif "starter" in product_id_lower:
-        return "starter"
-    else:
-        return "free"
+    # Any paid product is premium
+    if "premium" in product_id_lower:
+        return "premium"
+
+    return "free"
 
 
 def get_plan_from_entitlement_ids(
     entitlement_ids: Optional[List[str]],
 ) -> Optional[str]:
     """
-    Derive plan from entitlement IDs.
+    Derive plan from entitlement IDs (2-tier system: free + premium).
     Entitlement IDs are more reliable than product_id for determining the current plan,
     especially during product changes.
 
@@ -128,21 +127,11 @@ def get_plan_from_entitlement_ids(
     if not entitlement_ids:
         return None
 
-    # Priority order: elite > pro > starter
+    # Check for premium entitlement
     for eid in entitlement_ids:
         eid_lower = eid.lower()
-        if "elite" in eid_lower:
-            return "elite"
-
-    for eid in entitlement_ids:
-        eid_lower = eid.lower()
-        if "pro" in eid_lower:
-            return "pro"
-
-    for eid in entitlement_ids:
-        eid_lower = eid.lower()
-        if "starter" in eid_lower:
-            return "starter"
+        if "premium" in eid_lower:
+            return "premium"
 
     return None
 
@@ -329,6 +318,12 @@ async def revenuecat_webhook(
         elif event.type == "TRANSFER":
             await handle_subscription_transfer(supabase, event, user_id)
 
+        elif event.type == "NON_RENEWING_PURCHASE":
+            await handle_non_renewing_purchase(supabase, event, user_id)
+
+        elif event.type == "SUBSCRIPTION_EXTENDED":
+            await handle_subscription_extended(supabase, event, user_id)
+
         else:
             logger.info(f"Unhandled event type: {event.type}")
 
@@ -375,6 +370,43 @@ async def notify_partners_of_subscription_change(supabase, user_id: str):
         logger.warning(f"Failed to notify partners of subscription change: {e}")
 
 
+async def process_referral_bonus_on_subscription(supabase, user_id: str):
+    """
+    Grant referral bonus when a referred user subscribes for the first time.
+
+    This is called on INITIAL_PURCHASE and NON_RENEWING_PURCHASE events.
+    The referrer gets bonus days when the user they referred becomes a paying customer.
+    """
+    try:
+        # Check if user was referred and hasn't received bonus yet
+        user_result = (
+            supabase.table("users")
+            .select("id, referred_by_user_id, referral_bonus_granted_at")
+            .eq("id", user_id)
+            .execute()
+        )
+
+        if not user_result.data:
+            return
+
+        user = user_result.data[0]
+        referrer_id = user.get("referred_by_user_id")
+        bonus_granted = user.get("referral_bonus_granted_at")
+
+        # Only grant bonus if user was referred and hasn't received it yet
+        if referrer_id and not bonus_granted:
+            from app.services.referral_service import process_referral_bonus
+
+            logger.info(
+                f"Granting referral bonus: user {user_id} subscribed, referrer {referrer_id}"
+            )
+            await process_referral_bonus(user_id, referrer_id)
+
+    except Exception as e:
+        # Don't fail the subscription if referral bonus fails
+        logger.error(f"Error processing referral bonus for user {user_id}: {e}")
+
+
 async def handle_subscription_active(supabase, event: RevenueCatEvent, user_id: str):
     """Handle active subscription (new purchase, renewal, uncancellation)"""
     # Prefer entitlement_ids over product_id for plan determination
@@ -415,7 +447,7 @@ async def handle_subscription_active(supabase, event: RevenueCatEvent, user_id: 
         current_sub = existing.data[0]
         current_plan = current_sub.get("plan", "free")
 
-        plan_tiers = {"free": 0, "starter": 1, "pro": 2, "elite": 3}
+        plan_tiers = {"free": 0, "premium": 1}
         current_tier = plan_tiers.get(current_plan, 0)
         new_tier = plan_tiers.get(plan, 0)
 
@@ -460,6 +492,10 @@ async def handle_subscription_active(supabase, event: RevenueCatEvent, user_id: 
 
     # Update user's plan
     supabase.table("users").update({"plan": plan}).eq("id", user_id).execute()
+
+    # Grant referral bonus on first purchase (not on renewals/uncancellations)
+    if event.type == "INITIAL_PURCHASE":
+        await process_referral_bonus_on_subscription(supabase, user_id)
 
     # Notify partners so their PartnerDetailScreen shows updated premium status
     await notify_partners_of_subscription_change(supabase, user_id)
@@ -667,7 +703,7 @@ async def handle_product_change(supabase, event: RevenueCatEvent, user_id: str):
     logger.info(f"Plan changed for user {user_id} from {previous_plan} to {new_plan}")
 
     # Check if this is a downgrade that requires deactivation
-    plan_tiers = {"free": 0, "starter": 1, "pro": 2, "elite": 3}
+    plan_tiers = {"free": 0, "premium": 1}
 
     if plan_tiers.get(new_plan, 0) < plan_tiers.get(previous_plan, 0):
         # This is a downgrade - may need to deactivate excess items
@@ -718,6 +754,115 @@ async def handle_subscription_transfer(supabase, event: RevenueCatEvent, user_id
         await handle_subscription_active(supabase, event, new_user_id)
 
         logger.info(f"Subscription transferred from {old_user_id} to {new_user_id}")
+
+
+async def handle_non_renewing_purchase(supabase, event: RevenueCatEvent, user_id: str):
+    """
+    Handle non-renewing purchase (lifetime, one-time unlocks, consumables).
+
+    This is similar to INITIAL_PURCHASE but:
+    - auto_renew is always False
+    - May have no expiration date (lifetime purchases)
+    """
+    # Prefer entitlement_ids over product_id for plan determination
+    plan_from_entitlements = get_plan_from_entitlement_ids(event.entitlement_ids)
+    plan_from_product = get_plan_from_product_id(event.product_id)
+    plan = plan_from_entitlements or plan_from_product
+    platform = get_platform_from_store(event.store or "")
+
+    logger.info(
+        f"Processing NON_RENEWING_PURCHASE for user {user_id}: "
+        f"product_id={event.product_id}, plan={plan}"
+    )
+
+    expires_at = None
+    if event.expiration_at_ms:
+        expires_at = datetime.fromtimestamp(event.expiration_at_ms / 1000).isoformat()
+
+    purchased_at = None
+    if event.purchased_at_ms:
+        purchased_at = datetime.fromtimestamp(event.purchased_at_ms / 1000).isoformat()
+
+    # Check if subscription exists
+    existing = (
+        supabase.table("subscriptions").select("id").eq("user_id", user_id).execute()
+    )
+
+    subscription_data = {
+        "user_id": user_id,
+        "plan": plan,
+        "status": "active",
+        "platform": platform,
+        "product_id": event.product_id,
+        "purchase_date": purchased_at,
+        "expires_date": expires_at,  # May be None for lifetime
+        "auto_renew": False,  # Non-renewing purchases never auto-renew
+        "revenuecat_event_id": event.id,
+        "environment": event.environment,
+        "grace_period_ends_at": None,
+        "updated_at": datetime.utcnow().isoformat(),
+    }
+
+    if existing.data:
+        supabase.table("subscriptions").update(subscription_data).eq(
+            "user_id", user_id
+        ).execute()
+        logger.info(f"Updated non-renewing subscription for user {user_id}: {plan}")
+    else:
+        subscription_data["created_at"] = datetime.utcnow().isoformat()
+        supabase.table("subscriptions").insert(subscription_data).execute()
+        logger.info(f"Created non-renewing subscription for user {user_id}: {plan}")
+
+    # Update user's plan
+    supabase.table("users").update({"plan": plan}).eq("id", user_id).execute()
+
+    # Grant referral bonus on non-renewing purchase (lifetime, one-time)
+    await process_referral_bonus_on_subscription(supabase, user_id)
+
+    # Notify partners
+    await notify_partners_of_subscription_change(supabase, user_id)
+
+
+async def handle_subscription_extended(supabase, event: RevenueCatEvent, user_id: str):
+    """
+    Handle subscription extension (expiration date pushed to future).
+
+    This can happen when:
+    - Apple/Google extends subscription via their API
+    - Google defers charging for a renewal by <24 hours
+    """
+    expires_at = None
+    if event.expiration_at_ms:
+        expires_at = datetime.fromtimestamp(event.expiration_at_ms / 1000).isoformat()
+
+    if not expires_at:
+        logger.warning(
+            f"SUBSCRIPTION_EXTENDED for user {user_id} but no expiration_at_ms provided"
+        )
+        return
+
+    # Update the subscription expiration date
+    result = (
+        supabase.table("subscriptions")
+        .update(
+            {
+                "expires_date": expires_at,
+                "status": "active",  # Ensure status is active
+                "updated_at": datetime.utcnow().isoformat(),
+            }
+        )
+        .eq("user_id", user_id)
+        .execute()
+    )
+
+    if result.data:
+        logger.info(
+            f"Subscription extended for user {user_id}, new expiry: {expires_at}"
+        )
+    else:
+        logger.warning(
+            f"SUBSCRIPTION_EXTENDED for user {user_id} but no subscription record found"
+        )
 
 
 # Health check endpoint

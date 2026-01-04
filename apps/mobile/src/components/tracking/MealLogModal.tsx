@@ -12,7 +12,7 @@ import {
   Easing,
   StatusBar,
   KeyboardAvoidingView,
-  Platform,
+  Platform
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import TextInput from "@/components/ui/TextInput";
@@ -28,7 +28,7 @@ import { AlertOverlay, useAlertModal } from "@/contexts/AlertModalContext";
 import {
   useLogMeal,
   useEstimateNutrition,
-  useTodaysNutritionSummary,
+  useTodaysNutritionSummary
 } from "@/hooks/api/useMealLogs";
 import { useMediaPermissions } from "@/hooks/media/useMediaPermissions";
 import { useUploadMedia, useDeleteMediaByUrl } from "@/hooks/api/useMedia";
@@ -53,7 +53,7 @@ interface MealLogModalProps {
 const HEALTH_RATINGS: { key: HealthRating; color: string; label: string }[] = [
   { key: "healthy", color: "#22c55e", label: "Healthy" },
   { key: "okay", color: "#f59e0b", label: "Okay" },
-  { key: "unhealthy", color: "#ef4444", label: "Unhealthy" },
+  { key: "unhealthy", color: "#ef4444", label: "Unhealthy" }
 ];
 
 export function MealLogModal({
@@ -63,7 +63,7 @@ export function MealLogModal({
   challengeId,
   onSuccess,
   calorieTarget,
-  proteinTarget,
+  proteinTarget
 }: MealLogModalProps) {
   const styles = useStyles(makeMealLogModalStyles);
   const { colors, brandColors } = useTheme();
@@ -76,9 +76,7 @@ export function MealLogModal({
   const [mealType, setMealType] = useState<MealType>("lunch");
   const [mealName, setMealName] = useState("");
   const [mealDescription, setMealDescription] = useState("");
-  const [estimatedCalories, setEstimatedCalories] = useState<number | null>(
-    null,
-  );
+  const [estimatedCalories, setEstimatedCalories] = useState<number | null>(null);
   const [estimatedProtein, setEstimatedProtein] = useState<number | null>(null);
   const [healthRating, setHealthRating] = useState<HealthRating | null>(null);
   const [hasEstimated, setHasEstimated] = useState(false);
@@ -99,7 +97,7 @@ export function MealLogModal({
     hasLibraryPermission,
     hasCameraPermission,
     requestLibraryPermission,
-    requestCameraPermission,
+    requestCameraPermission
   } = useMediaPermissions();
 
   // Mutations
@@ -109,13 +107,12 @@ export function MealLogModal({
   const { mutate: deleteMediaByUrl } = useDeleteMediaByUrl();
 
   // Today's nutrition summary - use plan targets if provided
-  const { data: todaySummary, refetch: refetchSummary } =
-    useTodaysNutritionSummary(
-      goalId,
-      challengeId,
-      calorieTarget,
-      proteinTarget,
-    );
+  const { data: todaySummary, refetch: refetchSummary } = useTodaysNutritionSummary(
+    goalId,
+    challengeId,
+    calorieTarget,
+    proteinTarget
+  );
 
   // Handle modal visibility animation - slide from bottom to top
   useEffect(() => {
@@ -126,14 +123,14 @@ export function MealLogModal({
         damping: 20,
         mass: 1,
         stiffness: 120,
-        useNativeDriver: true,
+        useNativeDriver: true
       }).start();
     } else if (internalVisible) {
       Animated.timing(translateY, {
         toValue: screenHeight,
         duration: 300,
         easing: Easing.in(Easing.ease),
-        useNativeDriver: true,
+        useNativeDriver: true
       }).start(() => {
         setInternalVisible(false);
       });
@@ -167,10 +164,9 @@ export function MealLogModal({
           await showAlert({
             title: t("meals.photo_permission_title") || "Photo Access Required",
             message:
-              t("meals.photo_permission_message") ||
-              "Please grant access to your photo library",
+              t("meals.photo_permission_message") || "Please grant access to your photo library",
             variant: "warning",
-            confirmLabel: t("common.ok"),
+            confirmLabel: t("common.ok")
           });
           return;
         }
@@ -179,7 +175,7 @@ export function MealLogModal({
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ["images"],
         allowsEditing: false,
-        quality: 0.8,
+        quality: 0.8
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
@@ -191,7 +187,7 @@ export function MealLogModal({
         title: t("common.error"),
         message: t("meals.photo_error") || "Failed to select photo",
         variant: "error",
-        confirmLabel: t("common.ok"),
+        confirmLabel: t("common.ok")
       });
     }
   };
@@ -205,13 +201,11 @@ export function MealLogModal({
         hasPermission = await requestCameraPermission();
         if (!hasPermission) {
           await showAlert({
-            title:
-              t("meals.camera_permission_title") || "Camera Access Required",
+            title: t("meals.camera_permission_title") || "Camera Access Required",
             message:
-              t("meals.camera_permission_message") ||
-              "Please grant camera access to take photos",
+              t("meals.camera_permission_message") || "Please grant camera access to take photos",
             variant: "warning",
-            confirmLabel: t("common.ok"),
+            confirmLabel: t("common.ok")
           });
           return;
         }
@@ -219,7 +213,7 @@ export function MealLogModal({
 
       const result = await ImagePicker.launchCameraAsync({
         allowsEditing: false,
-        quality: 0.8,
+        quality: 0.8
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
@@ -231,7 +225,7 @@ export function MealLogModal({
         title: t("common.error"),
         message: t("meals.photo_error") || "Failed to take photo",
         variant: "error",
-        confirmLabel: t("common.ok"),
+        confirmLabel: t("common.ok")
       });
     }
   };
@@ -255,7 +249,7 @@ export function MealLogModal({
               title: t("common.error"),
               message: t("meals.photo_error") || "Failed to upload photo",
               variant: "error",
-              confirmLabel: t("common.ok"),
+              confirmLabel: t("common.ok")
             });
           }
         },
@@ -265,13 +259,13 @@ export function MealLogModal({
             title: t("common.error"),
             message: t("meals.photo_error") || "Failed to upload photo",
             variant: "error",
-            confirmLabel: t("common.ok"),
+            confirmLabel: t("common.ok")
           });
         },
         onSettled: () => {
           setUploadingPhoto(false);
-        },
-      },
+        }
+      }
     );
   };
 
@@ -289,14 +283,12 @@ export function MealLogModal({
     // Need either description or photo for estimation
     if (!mealDescription.trim() && !selectedPhoto) {
       await showAlert({
-        title:
-          t("meals.description_required_title") ||
-          "Description or Photo Required",
+        title: t("meals.description_required_title") || "Description or Photo Required",
         message:
           t("meals.description_required_message") ||
           "Please describe your meal or add a photo for AI estimation",
         variant: "warning",
-        confirmLabel: t("common.ok"),
+        confirmLabel: t("common.ok")
       });
       return;
     }
@@ -305,7 +297,7 @@ export function MealLogModal({
       const result = await estimateNutritionMutation.mutateAsync({
         meal_description: mealDescription || "Analyze this meal from the photo",
         meal_name: mealName || undefined,
-        photo_url: selectedPhoto || undefined, // Include photo for vision analysis
+        photo_url: selectedPhoto || undefined // Include photo for vision analysis
       });
 
       setEstimatedCalories(result.estimated_calories);
@@ -320,19 +312,16 @@ export function MealLogModal({
     } catch (error) {
       await showAlert({
         title: t("common.error"),
-        message:
-          t("meals.estimate_error") ||
-          "Failed to estimate nutrition. Please try again.",
+        message: t("meals.estimate_error") || "Failed to estimate nutrition. Please try again.",
         variant: "error",
-        confirmLabel: t("common.ok"),
+        confirmLabel: t("common.ok")
       });
     }
   };
 
   const handleSubmit = async () => {
     // Need at least a meal name, description, or photo for the backend to work with
-    const hasContent =
-      mealName.trim() || mealDescription.trim() || selectedPhoto;
+    const hasContent = mealName.trim() || mealDescription.trim() || selectedPhoto;
 
     if (!hasContent) {
       await showAlert({
@@ -341,7 +330,7 @@ export function MealLogModal({
           t("meals.content_required_message") ||
           "Please enter a meal name, description, or add a photo",
         variant: "warning",
-        confirmLabel: t("common.ok"),
+        confirmLabel: t("common.ok")
       });
       return;
     }
@@ -357,8 +346,7 @@ export function MealLogModal({
 
       // If user hasn't estimated yet but has content to estimate from, estimate first
       // This ensures optimistic updates have real values for immediate UI feedback
-      const canEstimate =
-        mealName.trim() || mealDescription.trim() || selectedPhoto;
+      const canEstimate = mealName.trim() || mealDescription.trim() || selectedPhoto;
       if (!hasEstimated && canEstimate) {
         try {
           // Build description for estimation - prioritize explicit description, then photo, then meal name
@@ -371,7 +359,7 @@ export function MealLogModal({
           const result = await estimateNutritionMutation.mutateAsync({
             meal_description: estimationDescription,
             meal_name: mealName || undefined,
-            photo_url: selectedPhoto || undefined,
+            photo_url: selectedPhoto || undefined
           });
 
           finalCalories = result.estimated_calories;
@@ -400,14 +388,14 @@ export function MealLogModal({
         estimated_protein: finalProtein || undefined,
         health_rating: finalHealthRating || undefined,
         photo_url: selectedPhoto || undefined,
-        use_ai_estimation: false, // Already estimated on frontend
+        use_ai_estimation: false // Already estimated on frontend
       });
 
       showToast({
         title: t("common.success"),
         message: t("meals.logged_success") || "Meal logged successfully!",
         variant: "success",
-        duration: 2000,
+        duration: 2000
       });
 
       onSuccess?.();
@@ -415,10 +403,9 @@ export function MealLogModal({
     } catch (error) {
       await showAlert({
         title: t("common.error"),
-        message:
-          t("meals.log_error") || "Failed to log meal. Please try again.",
+        message: t("meals.log_error") || "Failed to log meal. Please try again.",
         variant: "error",
-        confirmLabel: t("common.ok"),
+        confirmLabel: t("common.ok")
       });
     }
   };
@@ -448,16 +435,16 @@ export function MealLogModal({
           style={[
             styles.modalContainer,
             {
-              transform: [{ translateY }],
-            },
+              transform: [{ translateY }]
+            }
           ]}
         >
           <View
             style={[
               styles.contentContainer,
               {
-                paddingTop: insets.top + toRN(tokens.spacing[4]),
-              },
+                paddingTop: insets.top + toRN(tokens.spacing[4])
+              }
             ]}
           >
             {/* Header */}
@@ -492,18 +479,11 @@ export function MealLogModal({
                 {/* Calories Progress */}
                 <View style={styles.progressRow}>
                   <View style={styles.progressLabelRow}>
-                    <Ionicons
-                      name="flame-outline"
-                      size={16}
-                      color={brandColors.primary}
-                    />
-                    <Text style={styles.progressLabel}>
-                      {t("meals.calories") || "Calories"}
-                    </Text>
+                    <Ionicons name="flame-outline" size={16} color={brandColors.primary} />
+                    <Text style={styles.progressLabel}>{t("meals.calories") || "Calories"}</Text>
                   </View>
                   <Text style={styles.progressValue}>
-                    {todaySummary?.total_calories || 0} /{" "}
-                    {todaySummary?.target_calories || 2000}
+                    {todaySummary?.total_calories || 0} / {todaySummary?.target_calories || 2000}
                   </Text>
                 </View>
                 <View style={styles.progressBar}>
@@ -515,8 +495,8 @@ export function MealLogModal({
                         backgroundColor:
                           (todaySummary?.calories_percentage || 0) > 100
                             ? colors.feedback.error
-                            : brandColors.primary,
-                      },
+                            : brandColors.primary
+                      }
                     ]}
                   />
                 </View>
@@ -527,25 +507,13 @@ export function MealLogModal({
                 </Text>
 
                 {/* Protein Progress */}
-                <View
-                  style={[
-                    styles.progressRow,
-                    { marginTop: toRN(tokens.spacing[3]) },
-                  ]}
-                >
+                <View style={[styles.progressRow, { marginTop: toRN(tokens.spacing[3]) }]}>
                   <View style={styles.progressLabelRow}>
-                    <Ionicons
-                      name="barbell-outline"
-                      size={16}
-                      color={colors.feedback.success}
-                    />
-                    <Text style={styles.progressLabel}>
-                      {t("meals.protein") || "Protein"}
-                    </Text>
+                    <Ionicons name="barbell-outline" size={16} color={colors.feedback.success} />
+                    <Text style={styles.progressLabel}>{t("meals.protein") || "Protein"}</Text>
                   </View>
                   <Text style={styles.progressValue}>
-                    {todaySummary?.total_protein || 0}g /{" "}
-                    {todaySummary?.target_protein || 50}g
+                    {todaySummary?.total_protein || 0}g / {todaySummary?.target_protein || 50}g
                   </Text>
                 </View>
                 <View style={styles.progressBar}>
@@ -557,8 +525,8 @@ export function MealLogModal({
                         backgroundColor:
                           (todaySummary?.protein_percentage || 0) > 100
                             ? colors.feedback.success
-                            : colors.feedback.success,
-                      },
+                            : colors.feedback.success
+                      }
                     ]}
                   />
                 </View>
@@ -571,11 +539,7 @@ export function MealLogModal({
                 {/* Meals logged today */}
                 {(todaySummary?.meal_count || 0) > 0 && (
                   <View style={styles.mealsLoggedBadge}>
-                    <Ionicons
-                      name="restaurant-outline"
-                      size={14}
-                      color={brandColors.primary}
-                    />
+                    <Ionicons name="restaurant-outline" size={14} color={brandColors.primary} />
                     <Text style={styles.mealsLoggedText}>
                       {todaySummary?.meal_count}{" "}
                       {(todaySummary?.meal_count || 0) === 1
@@ -595,24 +559,14 @@ export function MealLogModal({
                   return (
                     <TouchableOpacity
                       key={type.key}
-                      style={[
-                        styles.mealTypeButton,
-                        isSelected && styles.mealTypeButtonSelected,
-                      ]}
+                      style={[styles.mealTypeButton, isSelected && styles.mealTypeButtonSelected]}
                       onPress={() => setMealType(type.key)}
                     >
                       <View style={styles.mealTypeIconContainer}>
-                        <MealTypeIcon
-                          type={type.key}
-                          size={24}
-                          selected={isSelected}
-                        />
+                        <MealTypeIcon type={type.key} size={24} selected={isSelected} />
                       </View>
                       <Text
-                        style={[
-                          styles.mealTypeLabel,
-                          isSelected && styles.mealTypeLabelSelected,
-                        ]}
+                        style={[styles.mealTypeLabel, isSelected && styles.mealTypeLabelSelected]}
                       >
                         {type.label}
                       </Text>
@@ -647,10 +601,7 @@ export function MealLogModal({
               {/* Photo Section */}
               <Text style={styles.label}>
                 {t("meals.photo") || "Photo"}
-                <Text style={styles.optionalText}>
-                  {" "}
-                  ({t("common.optional")})
-                </Text>
+                <Text style={styles.optionalText}> ({t("common.optional")})</Text>
               </Text>
 
               {/* Selected Photo Preview */}
@@ -661,15 +612,8 @@ export function MealLogModal({
                     style={styles.photoPreview}
                     resizeMode="cover"
                   />
-                  <TouchableOpacity
-                    style={styles.removePhotoButton}
-                    onPress={handleRemovePhoto}
-                  >
-                    <Ionicons
-                      name="close-circle"
-                      size={24}
-                      color={colors.feedback.error}
-                    />
+                  <TouchableOpacity style={styles.removePhotoButton} onPress={handleRemovePhoto}>
+                    <Ionicons name="close-circle" size={24} color={colors.feedback.error} />
                   </TouchableOpacity>
                 </View>
               )}
@@ -697,8 +641,7 @@ export function MealLogModal({
                     color={brandColors.primary}
                   />
                   <Text style={styles.addPhotoText}>
-                    {t("meals.add_photo") ||
-                      "Add Photo for Better AI Estimation"}
+                    {t("meals.add_photo") || "Add Photo for Better AI Estimation"}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -709,10 +652,7 @@ export function MealLogModal({
                   <Button
                     variant="outline"
                     size="md"
-                    title={
-                      t("meals.estimate_nutrition") ||
-                      "Estimate Nutrition with AI"
-                    }
+                    title={t("meals.estimate_nutrition") || "Estimate Nutrition with AI"}
                     leftIcon="sparkles"
                     onPress={handleEstimateNutrition}
                     disabled={isEstimatingNutrition || isUploadingPhoto}
@@ -736,21 +676,13 @@ export function MealLogModal({
 
                   <View style={styles.estimatesRow}>
                     <View style={styles.estimateItem}>
-                      <Text style={styles.estimateValue}>
-                        {estimatedCalories}
-                      </Text>
-                      <Text style={styles.estimateLabel}>
-                        {t("meals.calories") || "Calories"}
-                      </Text>
+                      <Text style={styles.estimateValue}>{estimatedCalories}</Text>
+                      <Text style={styles.estimateLabel}>{t("meals.calories") || "Calories"}</Text>
                     </View>
 
                     <View style={styles.estimateItem}>
-                      <Text style={styles.estimateValue}>
-                        {estimatedProtein}g
-                      </Text>
-                      <Text style={styles.estimateLabel}>
-                        {t("meals.protein") || "Protein"}
-                      </Text>
+                      <Text style={styles.estimateValue}>{estimatedProtein}g</Text>
+                      <Text style={styles.estimateLabel}>{t("meals.protein") || "Protein"}</Text>
                     </View>
 
                     <View style={styles.estimateItem}>
@@ -759,14 +691,13 @@ export function MealLogModal({
                           styles.healthBadge,
                           {
                             backgroundColor:
-                              HEALTH_RATINGS.find((r) => r.key === healthRating)
-                                ?.color || colors.border.default,
-                          },
+                              HEALTH_RATINGS.find((r) => r.key === healthRating)?.color ||
+                              colors.border.default
+                          }
                         ]}
                       >
                         <Text style={styles.healthBadgeText}>
-                          {HEALTH_RATINGS.find((r) => r.key === healthRating)
-                            ?.label || ""}
+                          {HEALTH_RATINGS.find((r) => r.key === healthRating)?.label || ""}
                         </Text>
                       </View>
                     </View>
@@ -782,19 +713,15 @@ export function MealLogModal({
                         {t("meals.calories") || "Calories"}:
                       </Text>
                       <Text style={styles.projectedValue}>
-                        {(todaySummary?.total_calories || 0) +
-                          (estimatedCalories || 0)}{" "}
-                        / {todaySummary?.target_calories || 2000}
+                        {(todaySummary?.total_calories || 0) + (estimatedCalories || 0)} /{" "}
+                        {todaySummary?.target_calories || 2000}
                       </Text>
                     </View>
                     <View style={styles.projectedRow}>
-                      <Text style={styles.projectedLabel}>
-                        {t("meals.protein") || "Protein"}:
-                      </Text>
+                      <Text style={styles.projectedLabel}>{t("meals.protein") || "Protein"}:</Text>
                       <Text style={styles.projectedValue}>
-                        {(todaySummary?.total_protein || 0) +
-                          (estimatedProtein || 0)}
-                        g / {todaySummary?.target_protein || 50}g
+                        {(todaySummary?.total_protein || 0) + (estimatedProtein || 0)}g /{" "}
+                        {todaySummary?.target_protein || 50}g
                       </Text>
                     </View>
                   </View>
@@ -832,15 +759,15 @@ export function MealLogModal({
                 label: t("meals.take_photo") || "Take Photo",
                 icon: "camera-outline",
                 onPress: handleTakePhoto,
-                disabled: isUploadingPhoto,
+                disabled: isUploadingPhoto
               },
               {
                 id: "library",
                 label: t("meals.choose_from_library") || "Choose from Library",
                 icon: "image-outline",
                 onPress: handlePickPhoto,
-                disabled: isUploadingPhoto,
-              },
+                disabled: isUploadingPhoto
+              }
             ]}
             onClose={() => setShowPhotoOptions(false)}
             cancelLabel={t("common.cancel")}
@@ -856,7 +783,7 @@ export function MealLogModal({
 
 const makeMealLogModalStyles = (tokens: any, colors: any, brand: any) => ({
   keyboardView: {
-    flex: 1,
+    flex: 1
   },
   modalContainer: {
     flex: 1,
@@ -867,23 +794,23 @@ const makeMealLogModalStyles = (tokens: any, colors: any, brand: any) => ({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: colors.bg.canvas,
+    backgroundColor: colors.bg.canvas
   },
   contentContainer: {
     flex: 1,
-    width: "100%",
+    width: "100%"
   },
   header: {
     flexDirection: "row" as const,
     justifyContent: "space-between" as const,
     alignItems: "center" as const,
     paddingHorizontal: toRN(tokens.spacing[4]),
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   headerTitle: {
     fontSize: toRN(tokens.typography.fontSize["2xl"]),
     fontFamily: fontFamily.bold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   closeButton: {
     width: toRN(tokens.spacing[10]),
@@ -891,65 +818,65 @@ const makeMealLogModalStyles = (tokens: any, colors: any, brand: any) => ({
     borderRadius: toRN(tokens.borderRadius.full),
     backgroundColor: colors.bg.muted,
     justifyContent: "center" as const,
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   scrollView: {
-    flex: 1,
+    flex: 1
   },
   scrollContent: {
     paddingHorizontal: toRN(tokens.spacing[4]),
-    paddingBottom: toRN(tokens.spacing[6]),
+    paddingBottom: toRN(tokens.spacing[6])
   },
   // Daily Progress Card
   progressCard: {
     backgroundColor: colors.bg.card,
     padding: toRN(tokens.spacing[4]),
     borderRadius: toRN(tokens.borderRadius.xl),
-    marginBottom: toRN(tokens.spacing[5]),
+    marginBottom: toRN(tokens.spacing[5])
   },
   progressTitle: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.semiBold,
     color: colors.text.primary,
     marginBottom: toRN(tokens.spacing[3]),
-    textAlign: "center" as const,
+    textAlign: "center" as const
   },
   progressRow: {
     flexDirection: "row" as const,
     justifyContent: "space-between" as const,
     alignItems: "center" as const,
-    marginBottom: toRN(tokens.spacing[1.5]),
+    marginBottom: toRN(tokens.spacing[1.5])
   },
   progressLabelRow: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    gap: toRN(tokens.spacing[1.5]),
+    gap: toRN(tokens.spacing[1.5])
   },
   progressLabel: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
-    color: colors.text.secondary,
+    color: colors.text.secondary
   },
   progressValue: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.semiBold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   progressBar: {
     height: toRN(tokens.spacing[2]),
     borderRadius: toRN(tokens.borderRadius.md),
     backgroundColor: colors.border.default,
     overflow: "hidden" as const,
-    marginBottom: toRN(tokens.spacing[1]),
+    marginBottom: toRN(tokens.spacing[1])
   },
   progressFill: {
     height: "100%" as const,
-    borderRadius: toRN(tokens.borderRadius.md),
+    borderRadius: toRN(tokens.borderRadius.md)
   },
   progressSubtext: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.regular,
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   mealsLoggedBadge: {
     flexDirection: "row" as const,
@@ -961,24 +888,24 @@ const makeMealLogModalStyles = (tokens: any, colors: any, brand: any) => ({
     paddingHorizontal: toRN(tokens.spacing[3]),
     backgroundColor: `${brand.primary}10`,
     borderRadius: toRN(tokens.borderRadius.full),
-    alignSelf: "center" as const,
+    alignSelf: "center" as const
   },
   mealsLoggedText: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.medium,
-    color: brand.primary,
+    color: brand.primary
   },
   label: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.semiBold,
     color: colors.text.primary,
-    marginBottom: toRN(tokens.spacing[2]),
+    marginBottom: toRN(tokens.spacing[2])
   },
   mealTypeRow: {
     flexDirection: "row" as const,
     flexWrap: "wrap" as const,
     gap: toRN(tokens.spacing[2]),
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   mealTypeButton: {
     paddingHorizontal: toRN(tokens.spacing[3]),
@@ -988,29 +915,29 @@ const makeMealLogModalStyles = (tokens: any, colors: any, brand: any) => ({
     borderColor: colors.border.default,
     backgroundColor: colors.bg.card,
     alignItems: "center" as const,
-    minWidth: 64,
+    minWidth: 64
   },
   mealTypeButtonSelected: {
     backgroundColor: brand.primary,
-    borderColor: brand.primary,
+    borderColor: brand.primary
   },
   mealTypeIconContainer: {
-    marginBottom: toRN(tokens.spacing[1]),
+    marginBottom: toRN(tokens.spacing[1])
   },
   mealTypeLabel: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.medium,
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   mealTypeLabelSelected: {
-    color: brand.onPrimary,
+    color: brand.onPrimary
   },
   inputContainer: {
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   optionalText: {
     fontFamily: fontFamily.regular,
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   // Photo styles
   photoContainer: {
@@ -1019,12 +946,12 @@ const makeMealLogModalStyles = (tokens: any, colors: any, brand: any) => ({
     borderRadius: toRN(tokens.borderRadius.xl),
     overflow: "hidden" as const,
     position: "relative" as const,
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   photoPreview: {
     width: "100%",
     height: "100%",
-    backgroundColor: colors.bg.muted,
+    backgroundColor: colors.bg.muted
   },
   removePhotoButton: {
     position: "absolute" as const,
@@ -1032,7 +959,7 @@ const makeMealLogModalStyles = (tokens: any, colors: any, brand: any) => ({
     right: toRN(tokens.spacing[2]),
     backgroundColor: colors.bg.canvas,
     borderRadius: toRN(tokens.borderRadius.full),
-    padding: toRN(tokens.spacing[1]),
+    padding: toRN(tokens.spacing[1])
   },
   uploadingContainer: {
     flexDirection: "row" as const,
@@ -1042,12 +969,12 @@ const makeMealLogModalStyles = (tokens: any, colors: any, brand: any) => ({
     padding: toRN(tokens.spacing[4]),
     backgroundColor: colors.bg.muted,
     borderRadius: toRN(tokens.borderRadius.xl),
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   uploadingText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
-    color: colors.text.secondary,
+    color: colors.text.secondary
   },
   addPhotoButton: {
     flexDirection: "row" as const,
@@ -1061,18 +988,18 @@ const makeMealLogModalStyles = (tokens: any, colors: any, brand: any) => ({
     borderStyle: "dashed" as const,
     borderRadius: toRN(tokens.borderRadius.xl),
     backgroundColor: "transparent",
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   addPhotoText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.semiBold,
-    color: brand.primary,
+    color: brand.primary
   },
   estimateSection: {
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   estimateButton: {
-    borderRadius: toRN(tokens.borderRadius.lg),
+    borderRadius: toRN(tokens.borderRadius.lg)
   },
   estimateHint: {
     fontSize: toRN(tokens.typography.fontSize.xs),
@@ -1081,82 +1008,82 @@ const makeMealLogModalStyles = (tokens: any, colors: any, brand: any) => ({
     textAlign: "center" as const,
     marginTop: toRN(tokens.spacing[2]),
     paddingHorizontal: toRN(tokens.spacing[2]),
-    lineHeight: toRN(tokens.typography.fontSize.xs) * 1.5,
+    lineHeight: toRN(tokens.typography.fontSize.xs) * 1.5
   },
   estimatesContainer: {
     backgroundColor: colors.bg.card,
     padding: toRN(tokens.spacing[4]),
     borderRadius: toRN(tokens.borderRadius.xl),
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   estimatesTitle: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.semiBold,
     color: colors.text.primary,
     marginBottom: toRN(tokens.spacing[3]),
-    textAlign: "center" as const,
+    textAlign: "center" as const
   },
   estimatesRow: {
     flexDirection: "row" as const,
-    justifyContent: "space-around" as const,
+    justifyContent: "space-around" as const
   },
   estimateItem: {
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   estimateValue: {
     fontSize: toRN(tokens.typography.fontSize["2xl"]),
     fontFamily: fontFamily.bold,
-    color: brand.primary,
+    color: brand.primary
   },
   estimateLabel: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.regular,
     color: colors.text.tertiary,
-    marginTop: toRN(tokens.spacing[0.5]),
+    marginTop: toRN(tokens.spacing[0.5])
   },
   healthBadge: {
     paddingHorizontal: toRN(tokens.spacing[3]),
     paddingVertical: toRN(tokens.spacing[1.5]),
-    borderRadius: toRN(tokens.borderRadius.full),
+    borderRadius: toRN(tokens.borderRadius.full)
   },
   healthBadgeText: {
     color: "#fff",
     fontSize: toRN(tokens.typography.fontSize.xs),
-    fontFamily: fontFamily.semiBold,
+    fontFamily: fontFamily.semiBold
   },
   // Projected totals after AI estimation
   projectedTotals: {
     marginTop: toRN(tokens.spacing[4]),
     paddingTop: toRN(tokens.spacing[3]),
     borderTopWidth: 1,
-    borderTopColor: colors.border.subtle,
+    borderTopColor: colors.border.subtle
   },
   projectedTitle: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.semiBold,
     color: colors.text.secondary,
     marginBottom: toRN(tokens.spacing[2]),
-    textAlign: "center" as const,
+    textAlign: "center" as const
   },
   projectedRow: {
     flexDirection: "row" as const,
     justifyContent: "space-between" as const,
     alignItems: "center" as const,
-    paddingVertical: toRN(tokens.spacing[1]),
+    paddingVertical: toRN(tokens.spacing[1])
   },
   projectedLabel: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   projectedValue: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.semiBold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   submitButton: {
-    marginTop: toRN(tokens.spacing[2]),
-  },
+    marginTop: toRN(tokens.spacing[2])
+  }
 });
 
 export default MealLogModal;

@@ -1,5 +1,7 @@
 {
   "common": {
+    "pro": "PRO",
+    "not_now": "Not now",
     "success": "Success",
     "error": "Error",
     "info": "Information",
@@ -16,6 +18,7 @@
     "delete": "Delete",
     "edit": "Edit",
     "done": "Done",
+    "add": "Add",
     "and": "and",
     "ok": "OK",
     "back": "Back",
@@ -30,6 +33,8 @@
     "challenge": "Challenge",
     "yes": "Yes",
     "no": "No",
+    "apply": "Apply",
+    "export": "Export",
     "today": "Today",
     "yesterday": "Yesterday",
     "optional": "optional",
@@ -53,6 +58,8 @@
     "remove": "Remove",
     "sharing": "Sharing...",
     "not_specified": "Not specified",
+    "no_results": "No results found",
+    "search": "Search",
     "premium": "Premium",
     "premium_feature": "Premium feature",
     "upgrade": "Upgrade to Unlock"
@@ -510,6 +517,18 @@
     "resume_goal": "Resume Goal",
     "resume_goal_desc": "Continue tracking this goal",
     "resume_goal_error": "Failed to resume goal. Please try again.",
+    "edit_goal": "Edit Goal",
+    "edit_goal_desc": "Edit title, description, days, or reminders",
+    "edit": {
+      "plan_warning": "Your plan was generated based on your original goal. Editing the title or description won't regenerate the plan.",
+      "cannot_remove_day_title": "Cannot Remove Day",
+      "cannot_remove_day_message": "Days with planned tasks cannot be removed. You can only add new days.",
+      "add_days_only": "(You can only add new days)",
+      "success_title": "Goal Updated",
+      "success_message": "Your goal has been updated successfully.",
+      "error_title": "Update Failed",
+      "error_message": "Failed to update goal."
+    },
     "start_workout_hint": "Go to the Plan tab to start your workout",
     "rest_day": "Rest day - no action scheduled for today",
     "goal_paused": "This goal is paused",
@@ -951,18 +970,32 @@
     "upgrade": "Upgrade",
     "support": "Support",
     "help_center": "Help Center",
+    "help_center_desc": "FAQs and guides",
     "contact_us": "Contact Us",
+    "contact_us_desc": "Email or live chat",
     "free_plan": "Free Plan",
-    "starter_plan": "Starter",
-    "pro_plan": "Pro",
-    "elite_plan": "Elite",
+    "premium_plan": "Premium",
+    "upgrade_to_premium": "Upgrade to Premium",
+    "upgrade_subtitle": "Get a bit better everyday",
     "linked_accounts": "Linked Accounts",
+    "linked_accounts_info": "Link additional accounts for easier sign-in. Your primary account cannot be unlinked.",
+    "primary_account": "Primary Account",
+    "primary_provider": "Primary sign-in method",
+    "primary": "Primary",
+    "other_accounts": "Other Accounts",
+    "no_other_accounts": "No other accounts available to link.",
+    "security_note": "Your account data is secure. Linking accounts only provides alternative sign-in methods.",
     "link_account": "Link",
     "unlink_account": "Unlink",
     "linked": "Linked",
     "not_linked": "Not linked",
     "linking_unavailable": "Linking coming soon.",
     "primary_provider_notice": "Your primary sign-in method is {{provider}}.",
+    "google_linked_success": "Google account linked successfully!",
+    "apple_linked_success": "Apple account linked successfully!",
+    "account_unlinked_success": "Account unlinked successfully.",
+    "unlink_confirm_title": "Unlink Account",
+    "unlink_confirm_message": "Are you sure you want to unlink your {{provider}} account? You won't be able to sign in with it anymore.",
     "my_partners": "My Partners",
     "partners_count": "{{count}} partners",
     "find_accountability_partners": "Find accountability partners",
@@ -988,7 +1021,88 @@
     "achievements_description": "Your milestones and badges",
     "achievements_error": "Failed to load achievements",
     "no_achievements_title": "No Achievements Yet",
-    "no_achievements_description": "Complete goals, challenges, and streaks to earn achievements!"
+    "no_achievements_description": "Complete goals, challenges, and streaks to earn achievements!",
+    "personalization": "Personalization",
+    "personalization_desc": "Fitness preferences & goals",
+    "legal_section": "Legal",
+    "privacy_policy": "Privacy Policy",
+    "terms_of_service": "Terms of Service",
+    "export_data": "Export My Data",
+    "export_data_confirm": "We'll send a copy of all your data to your email address. This may take a few minutes.",
+    "export_data_success": "Your data export has been initiated. You will receive an email with your data shortly.",
+    "export_rate_limit": "You can only request one data export per day. Please try again tomorrow.",
+    "delete_account": "Delete Account",
+    "delete_account_desc": "Permanently delete your account and all associated data",
+    "delete_account_warning": "This action is permanent and cannot be undone. All your data will be deleted. Are you sure?",
+    "delete_confirm": "Delete Account",
+    "audio_settings": "Audio Settings",
+    "audio_settings_desc": "Music, voice & sound effects",
+    "rate_app": "Rate the App",
+    "rate_app_title": "Enjoying FitNudge?",
+    "rate_app_description": "Please tap on the stars to rate",
+    "rate_app_desc": "Love FitNudge? Leave a review!",
+    "app_version": "Version",
+    "build": "Build"
+  },
+  "audio": {
+    "music_section": "Music",
+    "music_enabled": "Background Music",
+    "music_enabled_desc": "Play music during workouts",
+    "volume": "Volume",
+    "shuffle": "Shuffle",
+    "preferred_app": "Preferred Music App",
+    "music_app_playlist": "Built-in Playlist",
+    "music_app_apple": "Apple Music",
+    "music_app_spotify": "Spotify",
+    "coach_section": "Coach Voice",
+    "coach_enabled": "Coach Voice",
+    "coach_enabled_desc": "Audio cues and instructions",
+    "effects_section": "Sound Effects",
+    "effects_enabled": "Sound Effects",
+    "effects_enabled_desc": "Completion sounds and alerts"
+  },
+  "account_settings": {
+    "account": "Account",
+    "preferences": "Preferences",
+    "security_settings": "Security Settings",
+    "profile_settings": "Profile Settings",
+    "language": "Language",
+    "country": "Country",
+    "timezone": "Timezone",
+    "select_language": "Select Language",
+    "select_country": "Select Country",
+    "select_timezone": "Select Timezone",
+    "danger_zone": "Danger Zone"
+  },
+  "security_settings": {
+    "title": "Security Settings",
+    "email": "Email",
+    "email_oauth_notice": "Your email is managed by {{provider}} and cannot be changed here.",
+    "add_password": "Add Password",
+    "add_password_description": "Create a password to sign in with email in addition to your social account.",
+    "change_password": "Change Password",
+    "change_password_description": "Update your password to keep your account secure.",
+    "password_set_success": "Password set successfully! You can now sign in with email and password.",
+    "set_password_button": "Set Password",
+    "password_requirements": "Password Requirements",
+    "requirement_length": "At least 8 characters",
+    "requirement_uppercase": "One uppercase letter",
+    "requirement_lowercase": "One lowercase letter",
+    "requirement_number": "One number"
+  },
+  "profile_settings": {
+    "title": "Profile Settings",
+    "tap_to_change_photo": "Tap to change profile photo",
+    "choose_avatar": "Choose Avatar",
+    "name_label": "Name",
+    "name_placeholder": "Enter your name",
+    "name_required": "Name is required",
+    "name_too_short": "Name must be at least 2 characters",
+    "username_label": "Username",
+    "username_placeholder": "your_username",
+    "bio_label": "Bio",
+    "bio_placeholder": "Write a short bio about yourself...",
+    "update_success": "Profile updated successfully!"
   },
   "web": {
     "hero": {
@@ -1021,7 +1135,110 @@
     "goal_not_found_title": "Goal Not Found",
     "goal_not_found_description": "This goal doesn't exist or you don't have access to view it.",
     "challenge_not_found_title": "Challenge Not Found",
-    "challenge_not_found_description": "This challenge doesn't exist or you don't have access to view it."
+    "challenge_not_found_description": "This challenge doesn't exist or you don't have access to view it.",
+    "unlink_error": "Failed to unlink account. Please try again.",
+    "export_failed": "Failed to export data. Please try again.",
+    "delete_failed": "Failed to delete account. Please try again.",
+    "link_error": "Failed to link account. Please try again.",
+    "email_already_linked": "This email is already associated with another account.",
+    "generic_error": "Something went wrong. Please try again.",
+    "update_failed": "Failed to update. Please try again."
+  },
+  "settings": {
+    "theme": "Theme",
+    "choose_theme": "Choose Theme",
+    "theme_system": "System",
+    "theme_light": "Light",
+    "theme_dark": "Dark"
+  },
+  "personalization": {
+    "title": "Personalization",
+    "fitness_section": "Fitness",
+    "equipment_section": "Equipment",
+    "personal_section": "Personal",
+    "hydration_section": "Hydration",
+    "fitness_level": "Fitness Level",
+    "fitness_level_beginner": "Beginner",
+    "fitness_level_intermediate": "Intermediate",
+    "fitness_level_advanced": "Advanced",
+    "fitness_level_athlete": "Athlete",
+    "primary_goal": "Primary Goal",
+    "goal_lose_weight": "Lose Weight",
+    "goal_build_muscle": "Build Muscle",
+    "goal_stay_active": "Stay Active",
+    "goal_general_fitness": "General Fitness",
+    "goal_sport_specific": "Sport Specific",
+    "current_frequency": "Current Frequency",
+    "frequency_never": "Never",
+    "frequency_1_2x": "1-2x per week",
+    "frequency_3_4x": "3-4x per week",
+    "frequency_5_plus": "5+ per week",
+    "frequency_daily": "Daily",
+    "preferred_location": "Preferred Location",
+    "location_gym": "Gym",
+    "location_home": "Home",
+    "location_outdoor": "Outdoor",
+    "location_mix": "Mix",
+    "location_dont_know": "Not sure yet",
+    "available_time": "Available Time",
+    "time_less_30": "Less than 30 min",
+    "time_30_60": "30-60 minutes",
+    "time_1_2hrs": "1-2 hours",
+    "time_flexible": "Flexible",
+    "motivation_style": "Motivation Style",
+    "motivation_tough_love": "Tough Love",
+    "motivation_gentle": "Gentle Encouragement",
+    "motivation_data": "Data Driven",
+    "motivation_buddy": "Accountability Buddy",
+    "biggest_challenge": "Biggest Challenge",
+    "challenge_consistency": "Staying Consistent",
+    "challenge_getting_started": "Getting Started",
+    "challenge_time": "Time Management",
+    "challenge_knowledge": "Lack of Knowledge",
+    "challenge_motivation": "Lack of Motivation",
+    "challenge_not_knowing": "Not Knowing What to Do",
+    "challenge_consistency_alt": "Consistency",
+    "challenge_accountability": "Accountability",
+    "challenge_injury": "Injury Concerns",
+    "available_equipment": "Available Equipment",
+    "no_equipment": "None selected",
+    "equipment_count": "{{count}} items",
+    "equipment_dumbbell": "Dumbbells",
+    "equipment_barbell": "Barbell",
+    "equipment_kettlebell": "Kettlebells",
+    "equipment_resistance_band": "Resistance Bands",
+    "equipment_pull_up_bar": "Pull-up Bar",
+    "equipment_bench": "Bench",
+    "equipment_cable_machine": "Cable Machine",
+    "equipment_treadmill": "Treadmill",
+    "equipment_bike": "Stationary Bike",
+    "equipment_rowing": "Rowing Machine",
+    "equipment_yoga_mat": "Yoga Mat",
+    "equipment_foam_roller": "Foam Roller",
+    "equipment_jump_rope": "Jump Rope",
+    "equipment_medicine_ball": "Medicine Ball",
+    "equipment_none": "No Equipment",
+    "biological_sex": "Biological Sex",
+    "sex_male": "Male",
+    "sex_female": "Female",
+    "sex_prefer_not": "Prefer not to say",
+    "not_set": "Not set",
+    "hydration_unit": "Hydration Unit",
+    "hydration_ml": "Milliliters (ml)",
+    "hydration_oz": "Ounces (oz)",
+    "hydration_target": "Daily Hydration Target",
+    "daily_hydration_target": "Daily Hydration Target",
+    "custom_target": "Custom target",
+    "select_fitness_level": "Select Fitness Level",
+    "select_primary_goal": "Select Primary Goal",
+    "select_frequency": "Select Frequency",
+    "select_location": "Select Location",
+    "select_time": "Select Available Time",
+    "select_motivation": "Select Motivation Style",
+    "select_challenge": "Select Biggest Challenge",
+    "select_equipment": "Select Equipment",
+    "select_biological_sex": "Select Biological Sex",
+    "select_hydration_unit": "Select Unit"
   },
   "notifications": {
     "title": "Notifications",
@@ -1035,6 +1252,7 @@
       "requests": "Requests",
       "system": "System"
     },
+    "mark_all_read": "Mark all as read",
     "empty": {
       "all_title": "No Notifications",
       "all_description": "You're all caught up! Check back later for updates.",
@@ -1105,18 +1323,45 @@
     },
     "settings": {
       "title": "Notification Settings",
-      "master_toggle": "Enable Notifications",
+      "channels": "Channels",
+      "master_toggle": "All Notifications",
+      "master_toggle_desc": "Enable or disable all notifications",
+      "push": "Push Notifications",
+      "push_desc": "Receive notifications on your device",
+      "email": "Email Notifications",
+      "email_desc": "Receive updates via email",
+      "categories_title": "Categories",
       "categories": {
-        "ai_motivation": "AI Motivation Calls",
-        "reminders": "Workout Reminders",
-        "social": "Social Activity",
+        "ai_motivation": "AI Motivation",
+        "ai_motivation_desc": "Daily motivation & workout tips",
+        "reminders": "Reminders",
+        "reminders_desc": "Workout & goal reminders",
+        "social": "Social Notifications",
         "achievements": "Achievements",
-        "reengagement": "Re-engagement"
+        "achievements_desc": "Badges & milestone celebrations",
+        "reengagement": "Re-engagement",
+        "reengagement_desc": "We miss you when you're away"
+      },
+      "social_title": "Social",
+      "social_desc": "Partner & challenge updates",
+      "partners_section": "Partners",
+      "challenges_section": "Challenges",
+      "motivation_section": "Motivation",
+      "social": {
+        "partner_requests": "Partner Requests",
+        "partner_nudges": "Partner Nudges",
+        "partner_cheers": "Partner Cheers",
+        "partner_milestones": "Partner Milestones",
+        "challenge_invites": "Challenge Invites",
+        "challenge_leaderboard": "Leaderboard Updates",
+        "challenge_nudges": "Challenge Nudges",
+        "challenge_reminders": "Challenge Reminders",
+        "motivation_messages": "Motivation Messages"
       },
       "quiet_hours": {
         "title": "Quiet Hours",
-        "subtitle": "Don't disturb me during these times",
-        "enabled": "Enable Quiet Hours",
+        "subtitle": "Pause notifications during set times",
+        "enabled": "Quiet Hours",
         "start_time": "Start Time",
         "end_time": "End Time"
       },
@@ -1219,7 +1464,9 @@
     "partners_can_motivate": "Send motivation and encouragement to each other",
     "partners_get_notified": "Get notified when your partner checks in",
     "partner": "Partner",
-    "pending": "Pending",
+    "partner_singular": "partner",
+    "partner_plural": "partners",
+    "pending": "pending",
     "search_for_friends": "Search for Friends",
     "search_instructions": "Enter at least 2 characters to search by name or username.",
     "search_placeholder": "Search by name or username...",
@@ -1380,7 +1627,49 @@
     "no_longer_partners": "Partnership Ended",
     "partnership_removed_message": "You are no longer accountability partners",
     "account_unavailable": "Account Unavailable",
-    "account_inactive": "This user's account is no longer active"
+    "account_inactive": "This user's account is no longer active",
+    "partner": "Partner"
+  },
+  "nudge": {
+    "send_to": "Send to {{name}}",
+    "custom_message": "Custom Message",
+    "quick_reactions": "Quick Reactions",
+    "nudge_types": "Nudge Types",
+    "write_custom": "Write a custom message",
+    "type_message": "Type your message...",
+    "send": "Send",
+    "types": {
+      "nudge": "Nudge",
+      "cheer": "Cheer",
+      "milestone": "Milestone",
+      "competitive": "Competitive"
+    },
+    "messages": {
+      "nudge": {
+        "hey_time": "Hey! Time to check in!",
+        "dont_forget": "Don't forget your goals today!",
+        "stay_on_track": "Stay on track! You've got this!",
+        "friendly_reminder": "Friendly reminder to log your progress!"
+      },
+      "cheer": {
+        "amazing": "You're doing amazing!",
+        "great_work": "Keep up the great work!",
+        "rockstar": "You're a rockstar!",
+        "on_fire": "You're on fire!"
+      },
+      "milestone": {
+        "congrats_streak": "Congrats on your streak!",
+        "achievement": "What an achievement!",
+        "crushed_it": "You crushed it!",
+        "legendary": "Legendary progress!"
+      },
+      "competitive": {
+        "catching_up": "I'm catching up to you!",
+        "beat_me": "Think you can beat me?",
+        "game_on": "Game on!",
+        "race": "Race you to the finish!"
+      }
+    }
   },
   "challenges": {
     "title": "Challenges",
@@ -1454,6 +1743,27 @@
     "cancel_confirm_button": "Cancel Challenge",
     "cancel_success": "Challenge has been cancelled",
     "cancel_error": "Failed to cancel challenge. Please try again.",
+    "edit_challenge": "Edit Challenge",
+    "edit_challenge_desc": "Edit title, description, deadline, or participants",
+    "edit": {
+      "plan_warning": "Your plan was generated based on your original challenge. Editing the title or description won't regenerate the plan.",
+      "title_too_short": "Title must be at least 3 characters",
+      "title_too_long": "Title must be 100 characters or less",
+      "max_participants_min": "Must be at least 2 participants",
+      "max_below_current": "Cannot be less than current participants ({{count}})",
+      "max_decrease_not_allowed": "Can only increase (original: {{original}})",
+      "deadline_past": "Deadline cannot be in the past",
+      "deadline_shorten_not_allowed": "Can only extend deadline, not shorten",
+      "deadline_after_start": "Deadline must be before start date",
+      "extend_only": "(Extend only)",
+      "increase_only": "(Increase only)",
+      "original": "Original",
+      "current_participants": "Current",
+      "success_title": "Challenge Updated",
+      "success_message": "Your challenge has been updated successfully.",
+      "error_title": "Update Failed",
+      "error_message": "Failed to update challenge."
+    },
     "invite_friends": "Invite Friends",
     "invite_friends_desc": "Share this challenge with friends",
     "rank": "Rank",
@@ -1600,13 +1910,17 @@
     "mark_all_read": "Mark all read"
   },
   "system_status": {
+    "network": {
+      "title": "No Internet Connection",
+      "message": "Please check your internet connection and try again."
+    },
     "offline": {
-      "title": "Service temporarily unavailable",
-      "message": "We’re having trouble reaching the server. Some actions may not work right now."
+      "title": "Service Unavailable",
+      "message": "We're having trouble reaching the server. Please try again."
     },
     "degraded": {
       "title": "Service is experiencing issues",
-      "message": "We’re still online, but some features may be slow or temporarily unavailable."
+      "message": "We're still online, but some features may be slow or temporarily unavailable."
     },
     "retry": "Retry",
     "refreshing": "Checking…"
@@ -1787,6 +2101,42 @@
         "yoga_mat": {
           "title": "Yoga mat",
           "description": "Mat for floor exercises and stretching"
+        },
+        "barbell": {
+          "title": "Barbell",
+          "description": "Long bar for heavy compound lifts"
+        },
+        "bench": {
+          "title": "Workout bench",
+          "description": "Bench for pressing and supported exercises"
+        },
+        "cable_machine": {
+          "title": "Cable machine",
+          "description": "Adjustable cable pulley system"
+        },
+        "treadmill": {
+          "title": "Treadmill",
+          "description": "Indoor running and walking machine"
+        },
+        "stationary_bike": {
+          "title": "Stationary bike",
+          "description": "Indoor cycling machine"
+        },
+        "rowing_machine": {
+          "title": "Rowing machine",
+          "description": "Full-body cardio machine"
+        },
+        "foam_roller": {
+          "title": "Foam roller",
+          "description": "For muscle recovery and mobility"
+        },
+        "jump_rope": {
+          "title": "Jump rope",
+          "description": "For cardio and conditioning"
+        },
+        "medicine_ball": {
+          "title": "Medicine ball",
+          "description": "Weighted ball for dynamic exercises"
         }
       },
       "available_time": {
@@ -2029,7 +2379,7 @@
   "referral": {
     "title": "Invite Friends",
     "hero_title": "Invite Friends, Earn Rewards",
-    "hero_subtitle": "Share your referral link and get 7 days free when a friend joins!",
+    "hero_subtitle": "Share your referral link and get 7 days free when a friend subscribes!",
     "your_code": "Your Referral Code",
     "copied_title": "Copied!",
     "code_copied": "Referral code copied to clipboard",
@@ -2037,16 +2387,39 @@
     "share_link": "Share Referral Link",
     "copy_link": "Copy Link",
     "share_message": "Join me on FitNudge! Use my referral link to get started: {{link}}",
+    "share_message_short": "Join me on FitNudge and start your fitness journey! 💪",
     "how_it_works": "How It Works",
     "step1_title": "Share Your Link",
     "step1_desc": "Send your unique referral link to friends",
-    "step2_title": "Friend Signs Up",
-    "step2_desc": "When they create an account using your link",
-    "step3_title": "Both Get Rewarded",
-    "step3_desc": "You get 7 days free, they get 3 extra days!",
+    "step2_title": "Friend Joins & Subscribes",
+    "step2_desc": "They sign up and subscribe to premium",
+    "step3_title": "You Get Rewarded",
+    "step3_desc": "Earn 7 free days added to your subscription!",
     "your_referrals": "Your Referrals",
     "referrals_count": "{{count}} friend(s) joined",
     "joined_on": "Joined {{date}}",
-    "bonus_earned": "+7 days"
+    "bonus_earned": "+7 days",
+    "subscribed": "Subscribed",
+    "stat_friends": "Friends Invited",
+    "stat_days": "Days Earned",
+    "earned": "Earned",
+    "pending": "Pending",
+    "no_referrals_title": "No referrals yet",
+    "no_referrals_desc": "Share your link with friends to start earning rewards!"
+  },
+  "contact": {
+    "description": "Have questions or feedback? We'd love to hear from you!",
+    "send_email": "Send us an Email",
+    "send_email_desc": "We typically respond within 24 hours",
+    "live_chat": "Chat with Us",
+    "live_chat_desc": "Get instant support from our team"
+  },
+  "update": {
+    "title": "Update Available",
+    "current_version": "Current",
+    "description": "A new version of FitNudge is available. Update now to get the latest features and improvements.",
+    "required": "This update is required to continue using the app",
+    "update_now": "Update Now",
+    "maybe_later": "Maybe Later"
   }
 }

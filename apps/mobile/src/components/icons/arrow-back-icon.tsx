@@ -2,20 +2,13 @@ import { Svg, Path, G } from "react-native-svg";
 
 export const ArrowBackIcon = ({
   size = 24,
-  color = "currentColor",
+  color = "currentColor"
 }: {
   size?: number;
   color?: string;
 }) => {
   return (
-    <Svg
-      fill={color}
-      height={size}
-      width={size}
-      x="0px"
-      y="0px"
-      viewBox="0 0 447.243 447.243"
-    >
+    <Svg fill={color} height={size} width={size} x="0px" y="0px" viewBox="0 0 447.243 447.243">
       <G>
         <G>
           <Path

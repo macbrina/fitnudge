@@ -1,7 +1,7 @@
 import {
   HYDRATION_TYPES,
   HydrationIcon,
-  type HydrationType,
+  type HydrationType
 } from "@/components/icons/HydrationIcons";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
@@ -10,7 +10,7 @@ import { AlertOverlay, useAlertModal } from "@/contexts/AlertModalContext";
 import {
   HYDRATION_PRESETS,
   useLogHydration,
-  useTodaysHydrationSummary,
+  useTodaysHydrationSummary
 } from "@/hooks/api/useHydrationLogs";
 import { fontFamily } from "@/lib/fonts";
 import { toRN } from "@/lib/units";
@@ -35,7 +35,7 @@ export function HydrationModal({
   onClose,
   goalId,
   challengeId,
-  onSuccess,
+  onSuccess
 }: HydrationModalProps) {
   const styles = useStyles(makeHydrationModalStyles);
   const { colors, brandColors } = useTheme();
@@ -49,8 +49,10 @@ export function HydrationModal({
   const [isSubmittingCustom, setIsSubmittingCustom] = useState(false);
 
   // Queries and mutations
-  const { data: todaySummary, refetch: refetchSummary } =
-    useTodaysHydrationSummary(goalId, challengeId);
+  const { data: todaySummary, refetch: refetchSummary } = useTodaysHydrationSummary(
+    goalId,
+    challengeId
+  );
   const logHydrationMutation = useLogHydration();
 
   // Reset state when modal opens
@@ -75,7 +77,7 @@ export function HydrationModal({
       await logHydrationMutation.mutateAsync({
         amount_ml: preset.amount,
         goal_id: goalId,
-        challenge_id: challengeId,
+        challenge_id: challengeId
       });
 
       // Only proceed if modal is still visible
@@ -87,7 +89,7 @@ export function HydrationModal({
           title: t("common.success"),
           message: t("hydration.logged_success") || "Water logged!",
           variant: "success",
-          duration: 1500,
+          duration: 1500
         });
 
         onClose();
@@ -98,10 +100,9 @@ export function HydrationModal({
       // Use alert for errors
       showAlert({
         title: t("common.error"),
-        message:
-          t("hydration.log_error") || "Failed to log water. Please try again.",
+        message: t("hydration.log_error") || "Failed to log water. Please try again.",
         variant: "error",
-        confirmLabel: t("common.ok"),
+        confirmLabel: t("common.ok")
       });
     }
   };
@@ -113,11 +114,9 @@ export function HydrationModal({
       // Use alert for validation errors
       await showAlert({
         title: t("hydration.invalid_amount_title") || "Invalid Amount",
-        message:
-          t("hydration.invalid_amount_message") ||
-          "Please enter a valid amount in ml",
+        message: t("hydration.invalid_amount_message") || "Please enter a valid amount in ml",
         variant: "warning",
-        confirmLabel: t("common.ok"),
+        confirmLabel: t("common.ok")
       });
       return;
     }
@@ -128,7 +127,7 @@ export function HydrationModal({
       await logHydrationMutation.mutateAsync({
         amount_ml: amount,
         goal_id: goalId,
-        challenge_id: challengeId,
+        challenge_id: challengeId
       });
 
       refetchSummary();
@@ -138,7 +137,7 @@ export function HydrationModal({
         title: t("common.success"),
         message: t("hydration.logged_success") || "Water logged!",
         variant: "success",
-        duration: 1500,
+        duration: 1500
       });
 
       onClose();
@@ -146,10 +145,9 @@ export function HydrationModal({
       // Use alert for errors
       await showAlert({
         title: t("common.error"),
-        message:
-          t("hydration.log_error") || "Failed to log water. Please try again.",
+        message: t("hydration.log_error") || "Failed to log water. Please try again.",
         variant: "error",
-        confirmLabel: t("common.ok"),
+        confirmLabel: t("common.ok")
       });
     } finally {
       setIsSubmittingCustom(false);
@@ -163,8 +161,7 @@ export function HydrationModal({
   const glassesLogged = Math.floor(totalAmount / HYDRATION_PRESETS.glass);
 
   // Determine if we're submitting a preset (loading + preset selected)
-  const isSubmittingPreset =
-    isLoading && selectedPreset !== null && !isSubmittingCustom;
+  const isSubmittingPreset = isLoading && selectedPreset !== null && !isSubmittingCustom;
   // Presets are disabled when ANY submission is in progress
   const presetsDisabled = isLoading;
   // Custom is disabled only when a preset is being submitted
@@ -175,17 +172,12 @@ export function HydrationModal({
       <View style={styles.container}>
         {/* Daily Progress */}
         <View style={styles.progressCard}>
-          <Text style={styles.progressTitle}>
-            {t("hydration.daily_progress")}
-          </Text>
+          <Text style={styles.progressTitle}>{t("hydration.daily_progress")}</Text>
 
           {/* Progress Bar */}
           <View style={styles.progressBar}>
             <View
-              style={[
-                styles.progressFill,
-                { width: `${Math.min(progressPercentage, 100)}%` },
-              ]}
+              style={[styles.progressFill, { width: `${Math.min(progressPercentage, 100)}%` }]}
             />
           </View>
 
@@ -200,9 +192,7 @@ export function HydrationModal({
 
           {progressPercentage >= 100 && (
             <View style={styles.targetReachedBadge}>
-              <Text style={styles.targetReachedText}>
-                {t("hydration.target_reached")}
-              </Text>
+              <Text style={styles.targetReachedText}>{t("hydration.target_reached")}</Text>
             </View>
           )}
         </View>
@@ -221,7 +211,7 @@ export function HydrationModal({
                 style={[
                   styles.presetButton,
                   isSelected && styles.presetButtonSelected,
-                  isDisabled && styles.presetButtonDisabled,
+                  isDisabled && styles.presetButtonDisabled
                 ]}
                 onPress={() => handlePresetSelect(preset)}
                 disabled={presetsDisabled}
@@ -232,7 +222,7 @@ export function HydrationModal({
                     style={[
                       styles.presetContent,
                       isDisabled && styles.presetContentDisabled,
-                      isThisLoading && styles.presetContentLoading,
+                      isThisLoading && styles.presetContentLoading
                     ]}
                   >
                     <View style={styles.presetIconContainer}>
@@ -242,29 +232,18 @@ export function HydrationModal({
                         selected={isSelected}
                       />
                     </View>
-                    <Text
-                      style={[
-                        styles.presetLabel,
-                        isDisabled && styles.presetLabelDisabled,
-                      ]}
-                    >
+                    <Text style={[styles.presetLabel, isDisabled && styles.presetLabelDisabled]}>
                       {preset.label}
                     </Text>
                     <Text
-                      style={[
-                        styles.presetSublabel,
-                        isDisabled && styles.presetSublabelDisabled,
-                      ]}
+                      style={[styles.presetSublabel, isDisabled && styles.presetSublabelDisabled]}
                     >
                       {preset.sublabel}
                     </Text>
                   </View>
                   {isThisLoading && (
                     <View style={styles.loadingOverlay}>
-                      <ActivityIndicator
-                        color={brandColors.primary}
-                        size="small"
-                      />
+                      <ActivityIndicator color={brandColors.primary} size="small" />
                     </View>
                   )}
                 </>
@@ -275,13 +254,8 @@ export function HydrationModal({
 
         {/* Custom Amount Toggle */}
         <TouchableOpacity
-          style={[
-            styles.customToggle,
-            customDisabled && styles.customToggleDisabled,
-          ]}
-          onPress={() =>
-            !customDisabled && setShowCustomInput(!showCustomInput)
-          }
+          style={[styles.customToggle, customDisabled && styles.customToggleDisabled]}
+          onPress={() => !customDisabled && setShowCustomInput(!showCustomInput)}
           disabled={customDisabled}
           activeOpacity={customDisabled ? 1 : 0.7}
         >
@@ -291,10 +265,7 @@ export function HydrationModal({
             color={customDisabled ? colors.text.tertiary : brandColors.primary}
           />
           <Text
-            style={[
-              styles.customToggleText,
-              customDisabled && styles.customToggleTextDisabled,
-            ]}
+            style={[styles.customToggleText, customDisabled && styles.customToggleTextDisabled]}
           >
             {t("hydration.custom")}
           </Text>
@@ -328,47 +299,47 @@ export function HydrationModal({
 
 const makeHydrationModalStyles = (tokens: any, colors: any, brand: any) => ({
   container: {
-    paddingBottom: toRN(tokens.spacing[4]),
+    paddingBottom: toRN(tokens.spacing[4])
   },
   progressCard: {
     backgroundColor: colors.bg.card,
     padding: toRN(tokens.spacing[4]),
     borderRadius: toRN(tokens.borderRadius.xl),
-    marginBottom: toRN(tokens.spacing[5]),
+    marginBottom: toRN(tokens.spacing[5])
   },
   progressTitle: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.semiBold,
     color: colors.text.primary,
     marginBottom: toRN(tokens.spacing[3]),
-    textAlign: "center" as const,
+    textAlign: "center" as const
   },
   progressBar: {
     height: toRN(tokens.spacing[3]),
     borderRadius: toRN(tokens.borderRadius.md),
     backgroundColor: colors.border.default,
     overflow: "hidden" as const,
-    marginBottom: toRN(tokens.spacing[2]),
+    marginBottom: toRN(tokens.spacing[2])
   },
   progressFill: {
     height: "100%" as const,
     borderRadius: toRN(tokens.borderRadius.md),
-    backgroundColor: brand.primary,
+    backgroundColor: brand.primary
   },
   progressInfo: {
     flexDirection: "row" as const,
     justifyContent: "space-between" as const,
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   progressText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.semiBold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   glassesText: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.regular,
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   targetReachedBadge: {
     marginTop: toRN(tokens.spacing[3]),
@@ -376,23 +347,23 @@ const makeHydrationModalStyles = (tokens: any, colors: any, brand: any) => ({
     paddingHorizontal: toRN(tokens.spacing[4]),
     backgroundColor: colors.feedback.success,
     borderRadius: toRN(tokens.borderRadius.full),
-    alignSelf: "center" as const,
+    alignSelf: "center" as const
   },
   targetReachedText: {
     color: colors.text.onSuccess,
     fontFamily: fontFamily.semiBold,
-    fontSize: toRN(tokens.typography.fontSize.sm),
+    fontSize: toRN(tokens.typography.fontSize.sm)
   },
   sectionTitle: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.semiBold,
     color: colors.text.primary,
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   presetsGrid: {
     flexDirection: "row" as const,
     gap: toRN(tokens.spacing[3]),
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   presetButton: {
     flex: 1,
@@ -404,24 +375,24 @@ const makeHydrationModalStyles = (tokens: any, colors: any, brand: any) => ({
     borderColor: colors.border.default,
     // backgroundColor: colors.bg.card,
     minHeight: 100,
-    justifyContent: "center" as const,
+    justifyContent: "center" as const
   },
   presetButtonSelected: {
     backgroundColor: brand.primary + "10", // 12% opacity for subtle tint
     borderColor: brand.primary,
-    borderWidth: 2,
+    borderWidth: 2
   },
   presetButtonDisabled: {
-    opacity: 0.4,
+    opacity: 0.4
   },
   presetContent: {
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   presetContentDisabled: {
-    opacity: 0.6,
+    opacity: 0.6
   },
   presetContentLoading: {
-    opacity: 0.5,
+    opacity: 0.5
   },
   loadingOverlay: {
     position: "absolute" as const,
@@ -432,57 +403,57 @@ const makeHydrationModalStyles = (tokens: any, colors: any, brand: any) => ({
     justifyContent: "center" as const,
     alignItems: "center" as const,
     backgroundColor: brand.primary + "15", // very subtle overlay
-    borderRadius: toRN(tokens.borderRadius.xl),
+    borderRadius: toRN(tokens.borderRadius.xl)
   },
   presetIconContainer: {
-    marginBottom: toRN(tokens.spacing[2]),
+    marginBottom: toRN(tokens.spacing[2])
   },
   presetLabel: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.semiBold,
     color: colors.text.primary,
-    textAlign: "center" as const,
+    textAlign: "center" as const
   },
 
   presetLabelDisabled: {
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   presetSublabel: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.regular,
     color: colors.text.tertiary,
     textAlign: "center" as const,
-    marginTop: toRN(tokens.spacing[0.5]),
+    marginTop: toRN(tokens.spacing[0.5])
   },
 
   presetSublabelDisabled: {
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   customToggle: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
     justifyContent: "center" as const,
     gap: toRN(tokens.spacing[1]),
-    paddingVertical: toRN(tokens.spacing[2]),
+    paddingVertical: toRN(tokens.spacing[2])
   },
   customToggleText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
-    color: brand.primary,
+    color: brand.primary
   },
   customToggleDisabled: {
-    opacity: 0.5,
+    opacity: 0.5
   },
   customToggleTextDisabled: {
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   customInputContainer: {
     marginTop: toRN(tokens.spacing[3]),
-    gap: toRN(tokens.spacing[3]),
+    gap: toRN(tokens.spacing[3])
   },
   customInput: {
-    marginBottom: 0,
-  },
+    marginBottom: 0
+  }
 });
 
 export default HydrationModal;

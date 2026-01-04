@@ -15,10 +15,7 @@ interface HealthReport {
 
 const buildReasonFromChecks = (checks: HealthCheckResult[] = []): string => {
   const problematic = checks.filter(
-    (check) =>
-      check.status &&
-      check.status !== "ok" &&
-      check.status !== "not_configured",
+    (check) => check.status && check.status !== "ok" && check.status !== "not_configured"
   );
 
   if (problematic.length === 0) {
@@ -37,17 +34,15 @@ type FetchHealthOptions = {
   force?: boolean;
 };
 
-export const fetchBackendHealth = async (
-  options: FetchHealthOptions = {},
-): Promise<void> => {
+export const fetchBackendHealth = async (options: FetchHealthOptions = {}): Promise<void> => {
   const baseUrl = `${resolveApiRootUrl()}/health`;
   const healthUrl = options.force ? `${baseUrl}?force=true` : baseUrl;
 
   try {
     const response = await fetch(healthUrl, {
       headers: {
-        Accept: "application/json",
-      },
+        Accept: "application/json"
+      }
     });
 
     if (!response.ok) {
@@ -55,7 +50,7 @@ export const fetchBackendHealth = async (
         .getState()
         .setBackendStatus(
           response.status >= 500 ? "offline" : "degraded",
-          `Health check failed (HTTP ${response.status})`,
+          `Health check failed (HTTP ${response.status})`
         );
       return;
     }
@@ -69,18 +64,12 @@ export const fetchBackendHealth = async (
       case "degraded":
         useSystemStatusStore
           .getState()
-          .setBackendStatus(
-            "degraded",
-            buildReasonFromChecks(payload.checks ?? []),
-          );
+          .setBackendStatus("degraded", buildReasonFromChecks(payload.checks ?? []));
         break;
       case "critical":
         useSystemStatusStore
           .getState()
-          .setBackendStatus(
-            "offline",
-            buildReasonFromChecks(payload.checks ?? []),
-          );
+          .setBackendStatus("offline", buildReasonFromChecks(payload.checks ?? []));
         break;
       default:
         useSystemStatusStore
@@ -90,9 +79,6 @@ export const fetchBackendHealth = async (
   } catch (error) {
     useSystemStatusStore
       .getState()
-      .setBackendStatus(
-        "offline",
-        error instanceof Error ? error.message : "Network error",
-      );
+      .setBackendStatus("offline", error instanceof Error ? error.message : "Network error");
   }
 };

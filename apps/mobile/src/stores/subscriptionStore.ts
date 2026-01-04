@@ -3,17 +3,20 @@ import {
   subscriptionsService,
   SubscriptionResponse,
   FeaturesResponse,
+  SubscriptionHistoryResponse
 } from "@/services/api/subscriptions";
 import { usePricingStore } from "@/stores/pricingStore";
 import type { PlanFeature } from "@/services/api/subscriptionPlans";
 import { logger } from "@/services/logger";
 
-type SubscriptionPlan = "free" | "starter" | "pro" | "elite";
+// 2-tier system: free + premium
+type SubscriptionPlan = "free" | "premium";
 
 interface SubscriptionState {
   // User's subscription info
   subscription: SubscriptionResponse | null;
   features: FeaturesResponse | null;
+  history: SubscriptionHistoryResponse | null;
 
   // Optimistic plan override (used after purchase before API confirms)
   optimisticPlan: SubscriptionPlan | null;
@@ -21,24 +24,27 @@ interface SubscriptionState {
   // Loading & error states (separate for parallel fetching)
   isLoadingSubscription: boolean;
   isLoadingFeatures: boolean;
+  isLoadingHistory: boolean;
   isLoading: boolean; // Combined loading state for convenience
   error: string | null;
   lastFetchedSubscription: number | null;
   lastFetchedFeatures: number | null;
+  lastFetchedHistory: number | null;
   lastFetched: number | null; // Combined last fetched for backward compatibility
 
   // Actions
   fetchSubscription: () => Promise<void>;
   fetchFeatures: () => Promise<void>;
-  refresh: () => Promise<void>; // Fetch both subscription and features
+  fetchHistory: () => Promise<void>;
+  refresh: () => Promise<void>; // Fetch subscription, features, and history
 
   // Optimistic update for immediate UI feedback after purchase
   setOptimisticPlan: (plan: SubscriptionPlan) => void;
   clearOptimisticPlan: () => void;
 
   // Helper methods
-  getPlan: () => string; // 'free', 'starter', 'pro', 'elite'
-  getTier: () => number; // 0, 1, 2, 3
+  getPlan: () => string; // 'free' or 'premium'
+  getTier: () => number; // 0 (free) or 1 (premium)
   hasFeature: (featureKey: string) => boolean;
   getFeatureValue: (featureKey: string) => any;
   canCreateGoal: (currentGoalCount: number) => boolean;
@@ -52,10 +58,10 @@ interface SubscriptionState {
   // Partner / accountability limits
   hasPartnerFeature: () => boolean; // has social_accountability
   getPartnerLimit: () => number | null; // accountability_partner_limit (null = unlimited, 0 = disabled)
-  canSendPartnerRequest: (
-    acceptedCount: number,
-    pendingSentCount: number,
-  ) => boolean;
+  canSendPartnerRequest: (acceptedCount: number, pendingSentCount: number) => boolean;
+
+  // Subscription history
+  hasEverSubscribed: () => boolean; // Check if user has ever had a paid subscription
 
   clearError: () => void;
   reset: () => void;
@@ -63,12 +69,10 @@ interface SubscriptionState {
 
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
-// Tier mapping for optimistic updates
+// Tier mapping for optimistic updates (2-tier system)
 const PLAN_TIERS: Record<SubscriptionPlan, number> = {
   free: 0,
-  starter: 1,
-  pro: 2,
-  elite: 3,
+  premium: 1
 };
 
 /**
@@ -88,7 +92,7 @@ const PLAN_TIERS: Record<SubscriptionPlan, number> = {
  */
 const getOptimisticFeatureValue = (
   planId: SubscriptionPlan,
-  featureKey: string,
+  featureKey: string
 ): number | boolean | null => {
   const pricingStore = usePricingStore.getState();
   const userTier = PLAN_TIERS[planId];
@@ -113,14 +117,10 @@ const getOptimisticFeatureValue = (
   }
 
   // 1. Try to find feature directly on the user's plan
-  const userPlan = pricingStore.plans.find(
-    (p) => p.id.toLowerCase() === planId.toLowerCase(),
-  );
+  const userPlan = pricingStore.plans.find((p) => p.id.toLowerCase() === planId.toLowerCase());
 
   if (userPlan) {
-    const directFeature = userPlan.features.find(
-      (f) => f.feature_key === featureKey,
-    );
+    const directFeature = userPlan.features.find((f) => f.feature_key === featureKey);
     if (directFeature) {
       // Found directly on user's plan - return value based on is_enabled
       if (!directFeature.is_enabled) {
@@ -166,10 +166,7 @@ const getOptimisticFeatureValue = (
  * Check if user has access to a feature (for optimistic updates).
  * Returns true if user has the feature, false otherwise.
  */
-const hasOptimisticFeature = (
-  planId: SubscriptionPlan,
-  featureKey: string,
-): boolean => {
+const hasOptimisticFeature = (planId: SubscriptionPlan, featureKey: string): boolean => {
   const value = getOptimisticFeatureValue(planId, featureKey);
 
   // false = no access or disabled
@@ -196,13 +193,16 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   // Initial state
   subscription: null,
   features: null,
+  history: null,
   optimisticPlan: null,
   isLoadingSubscription: false,
   isLoadingFeatures: false,
+  isLoadingHistory: false,
   isLoading: false,
   error: null,
   lastFetchedSubscription: null,
   lastFetchedFeatures: null,
+  lastFetchedHistory: null,
   lastFetched: null,
 
   // Actions
@@ -210,10 +210,7 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
     const { lastFetchedSubscription, isLoadingSubscription } = get();
 
     // Check if we have recent data
-    if (
-      lastFetchedSubscription &&
-      Date.now() - lastFetchedSubscription < CACHE_DURATION
-    ) {
+    if (lastFetchedSubscription && Date.now() - lastFetchedSubscription < CACHE_DURATION) {
       return;
     }
 
@@ -235,7 +232,7 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
           isLoading: state.isLoadingFeatures, // Only false if features is also done
           error: null,
           lastFetchedSubscription: now,
-          lastFetched: now,
+          lastFetched: now
         }));
       } else {
         const errorMessage =
@@ -246,17 +243,16 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
       }
     } catch (error) {
       console.log("error", error);
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
 
       logger.error("Failed to fetch subscription", {
-        error: errorMessage,
+        error: errorMessage
       });
 
       set((state) => ({
         isLoadingSubscription: false,
         isLoading: state.isLoadingFeatures, // Only false if features is also done
-        error: errorMessage,
+        error: errorMessage
       }));
     }
   },
@@ -265,10 +261,7 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
     const { lastFetchedFeatures, isLoadingFeatures } = get();
 
     // Check if we have recent data
-    if (
-      lastFetchedFeatures &&
-      Date.now() - lastFetchedFeatures < CACHE_DURATION
-    ) {
+    if (lastFetchedFeatures && Date.now() - lastFetchedFeatures < CACHE_DURATION) {
       return;
     }
 
@@ -290,7 +283,7 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
           isLoading: state.isLoadingSubscription, // Only false if subscription is also done
           error: null,
           lastFetchedFeatures: now,
-          lastFetched: now,
+          lastFetched: now
         }));
       } else {
         const errorMessage =
@@ -300,53 +293,105 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
         throw new Error(errorMessage);
       }
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
 
       logger.error("Failed to fetch features", {
-        error: errorMessage,
+        error: errorMessage
       });
 
       set((state) => ({
         isLoadingFeatures: false,
         isLoading: state.isLoadingSubscription, // Only false if subscription is also done
-        error: errorMessage,
+        error: errorMessage
       }));
     }
   },
 
+  fetchHistory: async () => {
+    const { lastFetchedHistory, isLoadingHistory } = get();
+
+    // Check if we have recent data
+    if (lastFetchedHistory && Date.now() - lastFetchedHistory < CACHE_DURATION) {
+      return;
+    }
+
+    // Prevent multiple simultaneous requests for history
+    if (isLoadingHistory) {
+      return;
+    }
+
+    set({ isLoadingHistory: true, error: null });
+
+    try {
+      const response = await subscriptionsService.getSubscriptionHistory();
+
+      if (response.data) {
+        const now = Date.now();
+        set({
+          history: response.data,
+          isLoadingHistory: false,
+          error: null,
+          lastFetchedHistory: now
+        });
+      } else {
+        const errorMessage =
+          response.error ||
+          response.message ||
+          `Failed to fetch history${response.status ? ` (status: ${response.status})` : ""}`;
+        throw new Error(errorMessage);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      logger.error("Failed to fetch subscription history", {
+        error: errorMessage
+      });
+
+      set({
+        isLoadingHistory: false,
+        error: errorMessage
+      });
+    }
+  },
+
   refresh: async () => {
-    // Fetch both subscription and features, bypassing cache
+    // Fetch subscription, features, and history, bypassing cache
     const now = Date.now();
     set({
       isLoading: true,
       isLoadingSubscription: true,
       isLoadingFeatures: true,
+      isLoadingHistory: true,
       error: null,
       lastFetchedSubscription: null,
       lastFetchedFeatures: null,
-      lastFetched: null,
+      lastFetchedHistory: null,
+      lastFetched: null
     });
 
     try {
-      // Fetch both in parallel
-      const [subscriptionResponse, featuresResponse] = await Promise.all([
+      // Fetch all in parallel
+      const [subscriptionResponse, featuresResponse, historyResponse] = await Promise.all([
         subscriptionsService.getMySubscription(),
         subscriptionsService.getAvailableFeatures(),
+        subscriptionsService.getSubscriptionHistory()
       ]);
 
       if (subscriptionResponse.data && featuresResponse.data) {
         set({
           subscription: subscriptionResponse.data,
           features: featuresResponse.data,
+          history: historyResponse.data || null,
           optimisticPlan: null, // Clear optimistic plan - real data is now available
           isLoading: false,
           isLoadingSubscription: false,
           isLoadingFeatures: false,
+          isLoadingHistory: false,
           error: null,
           lastFetchedSubscription: now,
           lastFetchedFeatures: now,
-          lastFetched: now,
+          lastFetchedHistory: historyResponse.data ? now : null,
+          lastFetched: now
         });
       } else {
         // Handle partial success or failure
@@ -362,30 +407,32 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
         set({
           subscription: subscriptionResponse.data || null,
           features: featuresResponse.data || null,
+          history: historyResponse.data || null,
           isLoading: false,
           isLoadingSubscription: false,
           isLoadingFeatures: false,
+          isLoadingHistory: false,
           lastFetchedSubscription: subscriptionResponse.data ? now : null,
           lastFetchedFeatures: featuresResponse.data ? now : null,
-          lastFetched:
-            subscriptionResponse.data || featuresResponse.data ? now : null,
+          lastFetchedHistory: historyResponse.data ? now : null,
+          lastFetched: subscriptionResponse.data || featuresResponse.data ? now : null
         });
 
         throw new Error(`Failed to fetch: ${errors.join(", ")}`);
       }
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
 
       logger.error("Failed to refresh subscription", {
-        error: errorMessage,
+        error: errorMessage
       });
 
       set({
         isLoading: false,
         isLoadingSubscription: false,
         isLoadingFeatures: false,
-        error: errorMessage,
+        isLoadingHistory: false,
+        error: errorMessage
       });
     }
   },
@@ -397,7 +444,7 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
     set({
       lastFetchedSubscription: null,
       lastFetchedFeatures: null,
-      lastFetched: null,
+      lastFetched: null
     });
   },
 
@@ -466,9 +513,7 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
 
     // Find the feature in features_list to get the actual numeric value
     // features.features[key] only gives boolean (has access), not the value
-    const feature = features.features_list.find(
-      (f) => f.feature_key === featureKey,
-    );
+    const feature = features.features_list.find((f) => f.feature_key === featureKey);
 
     if (feature) {
       // Return the actual feature_value (could be number, null for unlimited, etc.)
@@ -503,9 +548,7 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
 
     // Find the "goals" feature in features_list
     // feature_value = null means unlimited, otherwise it's the limit number
-    const goalsFeature = features.features_list.find(
-      (f) => f.feature_key === "goals",
-    );
+    const goalsFeature = features.features_list.find((f) => f.feature_key === "goals");
 
     if (goalsFeature) {
       // null = unlimited, number = that's the limit
@@ -522,10 +565,7 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
 
     // Use optimistic plan limits if set (from pricingStore if available)
     if (optimisticPlan) {
-      const value = getOptimisticFeatureValue(
-        optimisticPlan,
-        "active_goal_limit",
-      );
+      const value = getOptimisticFeatureValue(optimisticPlan, "active_goal_limit");
       return typeof value === "number" ? value : (value as number | null);
     }
 
@@ -533,7 +573,7 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
 
     // Find the "active_goal_limit" feature in features_list
     const activeGoalFeature = features.features_list.find(
-      (f) => f.feature_key === "active_goal_limit",
+      (f) => f.feature_key === "active_goal_limit"
     );
 
     if (activeGoalFeature) {
@@ -551,17 +591,14 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
 
     // Use optimistic plan limits if set (from pricingStore if available)
     if (optimisticPlan) {
-      const value = getOptimisticFeatureValue(
-        optimisticPlan,
-        "challenge_limit",
-      );
+      const value = getOptimisticFeatureValue(optimisticPlan, "challenge_limit");
       return typeof value === "number" ? value : (value as number | null);
     }
 
     if (!features) return 1; // Default to most restrictive
 
     const challengeFeature = features.features_list.find(
-      (f) => f.feature_key === "challenge_limit",
+      (f) => f.feature_key === "challenge_limit"
     );
 
     if (challengeFeature) {
@@ -593,17 +630,14 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
 
     // Use optimistic plan limits if set (from pricingStore if available)
     if (optimisticPlan) {
-      const value = getOptimisticFeatureValue(
-        optimisticPlan,
-        "accountability_partner_limit",
-      );
+      const value = getOptimisticFeatureValue(optimisticPlan, "accountability_partner_limit");
       return typeof value === "number" ? value : (value as number | null);
     }
 
     if (!features) return 0; // Default to disabled
 
     const partnerFeature = features.features_list.find(
-      (f) => f.feature_key === "accountability_partner_limit",
+      (f) => f.feature_key === "accountability_partner_limit"
     );
 
     if (partnerFeature) {
@@ -629,6 +663,15 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
     return acceptedCount + pendingSentCount < limit;
   },
 
+  // Subscription history - check if user has ever had a paid subscription
+  // This is fetched from the backend and persists even if app is reinstalled
+  hasEverSubscribed: () => {
+    const { history } = get();
+    // If history not loaded yet, default to false (will be updated after fetch)
+    if (!history) return false;
+    return history.has_ever_subscribed;
+  },
+
   clearError: () => {
     set({ error: null });
   },
@@ -637,14 +680,17 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
     set({
       subscription: null,
       features: null,
+      history: null,
       optimisticPlan: null,
       isLoading: false,
       isLoadingSubscription: false,
       isLoadingFeatures: false,
+      isLoadingHistory: false,
       error: null,
       lastFetched: null,
       lastFetchedSubscription: null,
       lastFetchedFeatures: null,
+      lastFetchedHistory: null
     });
-  },
+  }
 }));

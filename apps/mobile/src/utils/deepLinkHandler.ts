@@ -24,7 +24,7 @@ type AuthRedirectType = "signup" | "login";
 async function routeWithAuthCheck(
   authenticatedRoute: string,
   redirectParams?: Record<string, string>,
-  authType: AuthRedirectType = "signup",
+  authType: AuthRedirectType = "signup"
 ): Promise<void> {
   const authenticated = await isUserAuthenticated();
   if (authenticated) {
@@ -32,13 +32,8 @@ async function routeWithAuthCheck(
   } else {
     // Build auth URL with redirect params
     const params = new URLSearchParams(redirectParams || {});
-    const authRoute =
-      authType === "login"
-        ? MOBILE_ROUTES.AUTH.LOGIN
-        : MOBILE_ROUTES.AUTH.SIGNUP;
-    const authUrl = params.toString()
-      ? `${authRoute}?${params.toString()}`
-      : authRoute;
+    const authRoute = authType === "login" ? MOBILE_ROUTES.AUTH.LOGIN : MOBILE_ROUTES.AUTH.SIGNUP;
+    const authUrl = params.toString() ? `${authRoute}?${params.toString()}` : authRoute;
     router.push(authUrl);
   }
 }
@@ -58,11 +53,7 @@ export async function handleDeepLink(url: string): Promise<void> {
     const parsed = Linking.parse(url);
     const { hostname, path, queryParams } = parsed;
 
-    const normalizedPath = path
-      ? path.startsWith("/")
-        ? path
-        : `/${path}`
-      : "/";
+    const normalizedPath = path ? (path.startsWith("/") ? path : `/${path}`) : "/";
 
     // Handle fitnudge.app (production) or localhost/ngrok (development)
     const isProductionDomain = hostname === "fitnudge.app";
@@ -103,9 +94,7 @@ export async function handleDeepLink(url: string): Promise<void> {
       // =====================================================
       case "/reset-password":
         if (queryParams?.token) {
-          router.push(
-            `${MOBILE_ROUTES.AUTH.RESET_PASSWORD}?token=${queryParams.token}`,
-          );
+          router.push(`${MOBILE_ROUTES.AUTH.RESET_PASSWORD}?token=${queryParams.token}`);
         } else {
           router.push(MOBILE_ROUTES.AUTH.RESET_PASSWORD);
         }
@@ -116,13 +105,13 @@ export async function handleDeepLink(url: string): Promise<void> {
           await routeWithAuthCheck(
             `${MOBILE_ROUTES.AUTH.VERIFY_EMAIL}?code=${queryParams.code}`,
             { redirectTo: "verify-email", code: queryParams.code as string },
-            "login",
+            "login"
           );
         } else {
           await routeWithAuthCheck(
             MOBILE_ROUTES.AUTH.VERIFY_EMAIL,
             { redirectTo: "verify-email" },
-            "login",
+            "login"
           );
         }
         break;
@@ -135,9 +124,7 @@ export async function handleDeepLink(url: string): Promise<void> {
       // Always goes to signup (this IS a signup route)
       case "/join":
         if (queryParams?.ref) {
-          router.push(
-            `${MOBILE_ROUTES.AUTH.SIGNUP}?referral=${queryParams.ref}`,
-          );
+          router.push(`${MOBILE_ROUTES.AUTH.SIGNUP}?referral=${queryParams.ref}`);
         } else {
           router.push(MOBILE_ROUTES.AUTH.SIGNUP);
         }
@@ -151,19 +138,19 @@ export async function handleDeepLink(url: string): Promise<void> {
       case "/goal":
       case "/goals":
         if (queryParams?.id) {
-          await routeWithAuthCheck(
-            `${MOBILE_ROUTES.GOALS.DETAILS}?id=${queryParams.id}`,
-            { redirectTo: "goal", goalId: queryParams.id as string },
-          );
+          await routeWithAuthCheck(`${MOBILE_ROUTES.GOALS.DETAILS}?id=${queryParams.id}`, {
+            redirectTo: "goal",
+            goalId: queryParams.id as string
+          });
         } else if (queryParams?.goalId) {
           // Handle goalId param (from push notifications)
-          await routeWithAuthCheck(
-            `${MOBILE_ROUTES.GOALS.DETAILS}?id=${queryParams.goalId}`,
-            { redirectTo: "goal", goalId: queryParams.goalId as string },
-          );
+          await routeWithAuthCheck(`${MOBILE_ROUTES.GOALS.DETAILS}?id=${queryParams.goalId}`, {
+            redirectTo: "goal",
+            goalId: queryParams.goalId as string
+          });
         } else {
           await routeWithAuthCheck(MOBILE_ROUTES.GOALS.LIST, {
-            redirectTo: "goals",
+            redirectTo: "goals"
           });
         }
         break;
@@ -171,13 +158,13 @@ export async function handleDeepLink(url: string): Promise<void> {
       // Profile
       case "/profile":
         if (queryParams?.id) {
-          await routeWithAuthCheck(
-            `${MOBILE_ROUTES.SOCIAL.USER_PROFILE}?id=${queryParams.id}`,
-            { redirectTo: "profile", profileId: queryParams.id as string },
-          );
+          await routeWithAuthCheck(`${MOBILE_ROUTES.SOCIAL.USER_PROFILE}?id=${queryParams.id}`, {
+            redirectTo: "profile",
+            profileId: queryParams.id as string
+          });
         } else {
           await routeWithAuthCheck(MOBILE_ROUTES.PROFILE.MAIN, {
-            redirectTo: "profile",
+            redirectTo: "profile"
           });
         }
         break;
@@ -186,7 +173,7 @@ export async function handleDeepLink(url: string): Promise<void> {
       case "/notification":
       case "/notifications":
         await routeWithAuthCheck(MOBILE_ROUTES.NOTIFICATIONS.TAB, {
-          redirectTo: "notifications",
+          redirectTo: "notifications"
         });
         break;
 
@@ -194,7 +181,7 @@ export async function handleDeepLink(url: string): Promise<void> {
       case "/achievement":
       case "/achievements":
         await routeWithAuthCheck(MOBILE_ROUTES.ACHIEVEMENTS.LIST, {
-          redirectTo: "achievements",
+          redirectTo: "achievements"
         });
         break;
 
@@ -204,22 +191,22 @@ export async function handleDeepLink(url: string): Promise<void> {
       case "/checkin":
         if (queryParams?.goalId) {
           // Goal check-in - route to goal detail screen
-          await routeWithAuthCheck(
-            `${MOBILE_ROUTES.GOALS.DETAILS}?id=${queryParams.goalId}`,
-            { redirectTo: "goal", goalId: queryParams.goalId as string },
-          );
+          await routeWithAuthCheck(`${MOBILE_ROUTES.GOALS.DETAILS}?id=${queryParams.goalId}`, {
+            redirectTo: "goal",
+            goalId: queryParams.goalId as string
+          });
         } else if (queryParams?.challengeId) {
           // Challenge check-in - route to challenge detail screen
           await routeWithAuthCheck(
             MOBILE_ROUTES.CHALLENGES.DETAILS(queryParams.challengeId as string),
             {
               redirectTo: "challenge",
-              challengeId: queryParams.challengeId as string,
-            },
+              challengeId: queryParams.challengeId as string
+            }
           );
         } else {
           await routeWithAuthCheck(MOBILE_ROUTES.MAIN.HOME, {
-            redirectTo: "home",
+            redirectTo: "home"
           });
         }
         break;
@@ -227,23 +214,23 @@ export async function handleDeepLink(url: string): Promise<void> {
       // Challenges - handles /challenge?id=xxx (from plan_ready notifications)
       case "/challenge":
         if (queryParams?.id) {
-          await routeWithAuthCheck(
-            MOBILE_ROUTES.CHALLENGES.DETAILS(queryParams.id as string),
-            { redirectTo: "challenge", challengeId: queryParams.id as string },
-          );
+          await routeWithAuthCheck(MOBILE_ROUTES.CHALLENGES.DETAILS(queryParams.id as string), {
+            redirectTo: "challenge",
+            challengeId: queryParams.id as string
+          });
         } else if (queryParams?.challengeId) {
           // Handle challengeId param (from push notifications)
           await routeWithAuthCheck(
             MOBILE_ROUTES.CHALLENGES.DETAILS(queryParams.challengeId as string),
             {
               redirectTo: "challenge",
-              challengeId: queryParams.challengeId as string,
-            },
+              challengeId: queryParams.challengeId as string
+            }
           );
         } else {
           // No ID provided, go to goals list (challenges are shown there)
           await routeWithAuthCheck(MOBILE_ROUTES.MAIN.GOALS, {
-            redirectTo: "goals",
+            redirectTo: "goals"
           });
         }
         break;
@@ -256,7 +243,7 @@ export async function handleDeepLink(url: string): Promise<void> {
       case "/partner-request":
       case "/partners/received":
         await routeWithAuthCheck(MOBILE_ROUTES.PROFILE.PARTNERS, {
-          redirectTo: "partners",
+          redirectTo: "partners"
         });
         break;
 
@@ -267,25 +254,22 @@ export async function handleDeepLink(url: string): Promise<void> {
           await routeWithAuthCheck(
             MOBILE_ROUTES.PROFILE.PARTNER_DETAIL(
               queryParams.partnerId as string,
-              queryParams.partnershipId as string,
+              queryParams.partnershipId as string
             ),
             {
               redirectTo: "partner",
-              partnerId: queryParams.partnerId as string,
-            },
+              partnerId: queryParams.partnerId as string
+            }
           );
         } else if (queryParams?.partnerId) {
           // Fall back to partner detail with just partnerId
-          await routeWithAuthCheck(
-            `${MOBILE_ROUTES.PROFILE.PARTNERS}/${queryParams.partnerId}`,
-            {
-              redirectTo: "partner",
-              partnerId: queryParams.partnerId as string,
-            },
-          );
+          await routeWithAuthCheck(`${MOBILE_ROUTES.PROFILE.PARTNERS}/${queryParams.partnerId}`, {
+            redirectTo: "partner",
+            partnerId: queryParams.partnerId as string
+          });
         } else {
           await routeWithAuthCheck(MOBILE_ROUTES.PROFILE.PARTNERS, {
-            redirectTo: "partners",
+            redirectTo: "partners"
           });
         }
         break;
@@ -293,7 +277,7 @@ export async function handleDeepLink(url: string): Promise<void> {
       // Partners list
       case "/partners":
         await routeWithAuthCheck(MOBILE_ROUTES.PROFILE.PARTNERS, {
-          redirectTo: "partners",
+          redirectTo: "partners"
         });
         break;
 
@@ -302,24 +286,24 @@ export async function handleDeepLink(url: string): Promise<void> {
       case "/partner-cheer":
       case "/partner-milestone":
         if (queryParams?.goalId) {
-          await routeWithAuthCheck(
-            `${MOBILE_ROUTES.GOALS.DETAILS}?id=${queryParams.goalId}`,
-            { redirectTo: "goal", goalId: queryParams.goalId as string },
-          );
+          await routeWithAuthCheck(`${MOBILE_ROUTES.GOALS.DETAILS}?id=${queryParams.goalId}`, {
+            redirectTo: "goal",
+            goalId: queryParams.goalId as string
+          });
         } else if (queryParams?.partnerId && queryParams?.partnershipId) {
           await routeWithAuthCheck(
             MOBILE_ROUTES.PROFILE.PARTNER_DETAIL(
               queryParams.partnerId as string,
-              queryParams.partnershipId as string,
+              queryParams.partnershipId as string
             ),
             {
               redirectTo: "partner",
-              partnerId: queryParams.partnerId as string,
-            },
+              partnerId: queryParams.partnerId as string
+            }
           );
         } else {
           await routeWithAuthCheck(MOBILE_ROUTES.PROFILE.PARTNERS, {
-            redirectTo: "partners",
+            redirectTo: "partners"
           });
         }
         break;
@@ -335,16 +319,13 @@ export async function handleDeepLink(url: string): Promise<void> {
             MOBILE_ROUTES.CHALLENGES.DETAILS(queryParams.challengeId as string),
             {
               redirectTo: "challenge",
-              challengeId: queryParams.challengeId as string,
-            },
+              challengeId: queryParams.challengeId as string
+            }
           );
         } else {
-          await routeWithAuthCheck(
-            `${MOBILE_ROUTES.GOALS.LIST}?tab=challenges`,
-            {
-              redirectTo: "challenges",
-            },
-          );
+          await routeWithAuthCheck(`${MOBILE_ROUTES.GOALS.LIST}?tab=challenges`, {
+            redirectTo: "challenges"
+          });
         }
         break;
 
@@ -357,16 +338,13 @@ export async function handleDeepLink(url: string): Promise<void> {
             MOBILE_ROUTES.CHALLENGES.DETAILS(queryParams.challengeId as string),
             {
               redirectTo: "challenge",
-              challengeId: queryParams.challengeId as string,
-            },
+              challengeId: queryParams.challengeId as string
+            }
           );
         } else {
-          await routeWithAuthCheck(
-            `${MOBILE_ROUTES.GOALS.LIST}?tab=challenges`,
-            {
-              redirectTo: "challenges",
-            },
-          );
+          await routeWithAuthCheck(`${MOBILE_ROUTES.GOALS.LIST}?tab=challenges`, {
+            redirectTo: "challenges"
+          });
         }
         break;
 
@@ -379,16 +357,13 @@ export async function handleDeepLink(url: string): Promise<void> {
             MOBILE_ROUTES.CHALLENGES.DETAILS(queryParams.challengeId as string),
             {
               redirectTo: "challenge",
-              challengeId: queryParams.challengeId as string,
-            },
+              challengeId: queryParams.challengeId as string
+            }
           );
         } else {
-          await routeWithAuthCheck(
-            `${MOBILE_ROUTES.GOALS.LIST}?tab=challenges`,
-            {
-              redirectTo: "challenges",
-            },
-          );
+          await routeWithAuthCheck(`${MOBILE_ROUTES.GOALS.LIST}?tab=challenges`, {
+            redirectTo: "challenges"
+          });
         }
         break;
 
@@ -403,18 +378,18 @@ export async function handleDeepLink(url: string): Promise<void> {
             MOBILE_ROUTES.PROFILE.RECAP_DETAIL(queryParams.recapId as string),
             {
               redirectTo: "weekly-recap",
-              recapId: queryParams.recapId as string,
-            },
+              recapId: queryParams.recapId as string
+            }
           );
         } else if (queryParams?.goalId) {
           // Legacy - redirect to goal if goalId provided
-          await routeWithAuthCheck(
-            `${MOBILE_ROUTES.GOALS.DETAILS}?id=${queryParams.goalId}`,
-            { redirectTo: "goal", goalId: queryParams.goalId as string },
-          );
+          await routeWithAuthCheck(`${MOBILE_ROUTES.GOALS.DETAILS}?id=${queryParams.goalId}`, {
+            redirectTo: "goal",
+            goalId: queryParams.goalId as string
+          });
         } else {
           await routeWithAuthCheck(MOBILE_ROUTES.PROFILE.WEEKLY_RECAPS, {
-            redirectTo: "weekly-recaps",
+            redirectTo: "weekly-recaps"
           });
         }
         break;
@@ -422,13 +397,13 @@ export async function handleDeepLink(url: string): Promise<void> {
       // Streak milestone
       case "/streak-milestone":
         if (queryParams?.goalId) {
-          await routeWithAuthCheck(
-            `${MOBILE_ROUTES.GOALS.DETAILS}?id=${queryParams.goalId}`,
-            { redirectTo: "goal", goalId: queryParams.goalId as string },
-          );
+          await routeWithAuthCheck(`${MOBILE_ROUTES.GOALS.DETAILS}?id=${queryParams.goalId}`, {
+            redirectTo: "goal",
+            goalId: queryParams.goalId as string
+          });
         } else {
           await routeWithAuthCheck(MOBILE_ROUTES.MAIN.HOME, {
-            redirectTo: "home",
+            redirectTo: "home"
           });
         }
         break;
@@ -436,13 +411,13 @@ export async function handleDeepLink(url: string): Promise<void> {
       // Goal complete
       case "/goal-complete":
         if (queryParams?.goalId) {
-          await routeWithAuthCheck(
-            `${MOBILE_ROUTES.GOALS.DETAILS}?id=${queryParams.goalId}`,
-            { redirectTo: "goal", goalId: queryParams.goalId as string },
-          );
+          await routeWithAuthCheck(`${MOBILE_ROUTES.GOALS.DETAILS}?id=${queryParams.goalId}`, {
+            redirectTo: "goal",
+            goalId: queryParams.goalId as string
+          });
         } else {
           await routeWithAuthCheck(MOBILE_ROUTES.GOALS.LIST, {
-            redirectTo: "goals",
+            redirectTo: "goals"
           });
         }
         break;
@@ -450,14 +425,14 @@ export async function handleDeepLink(url: string): Promise<void> {
       // Subscription notifications - redirect to profile since subscription removed from menu
       case "/subscription":
         await routeWithAuthCheck(MOBILE_ROUTES.PROFILE.MAIN, {
-          redirectTo: "profile",
+          redirectTo: "profile"
         });
         break;
 
       // Social tab (for general social notifications)
       case "/social":
         await routeWithAuthCheck(MOBILE_ROUTES.SOCIAL.FEED, {
-          redirectTo: "social",
+          redirectTo: "social"
         });
         break;
 
@@ -465,14 +440,14 @@ export async function handleDeepLink(url: string): Promise<void> {
       case "/nudges":
       case "/activity":
         await routeWithAuthCheck(MOBILE_ROUTES.PROFILE.ACTIVITY, {
-          redirectTo: "activity",
+          redirectTo: "activity"
         });
         break;
 
       // Inbox/notifications tab
       case "/inbox":
         await routeWithAuthCheck(MOBILE_ROUTES.NOTIFICATIONS.TAB, {
-          redirectTo: "notifications",
+          redirectTo: "notifications"
         });
         break;
 
@@ -482,13 +457,10 @@ export async function handleDeepLink(url: string): Promise<void> {
         if (normalizedPath.startsWith("/challenge/")) {
           const challengeId = normalizedPath.replace("/challenge/", "");
           if (challengeId && challengeId !== "join") {
-            await routeWithAuthCheck(
-              MOBILE_ROUTES.CHALLENGES.DETAILS(challengeId),
-              {
-                redirectTo: "challenge",
-                challengeId,
-              },
-            );
+            await routeWithAuthCheck(MOBILE_ROUTES.CHALLENGES.DETAILS(challengeId), {
+              redirectTo: "challenge",
+              challengeId
+            });
             break;
           }
         }
@@ -497,10 +469,10 @@ export async function handleDeepLink(url: string): Promise<void> {
         if (normalizedPath.startsWith("/goal/")) {
           const goalId = normalizedPath.replace("/goal/", "");
           if (goalId) {
-            await routeWithAuthCheck(
-              `${MOBILE_ROUTES.GOALS.DETAILS}?id=${goalId}`,
-              { redirectTo: "goal", goalId },
-            );
+            await routeWithAuthCheck(`${MOBILE_ROUTES.GOALS.DETAILS}?id=${goalId}`, {
+              redirectTo: "goal",
+              goalId
+            });
             break;
           }
         }
@@ -509,10 +481,10 @@ export async function handleDeepLink(url: string): Promise<void> {
         if (normalizedPath.startsWith("/partner/")) {
           const partnerId = normalizedPath.replace("/partner/", "");
           if (partnerId) {
-            await routeWithAuthCheck(
-              `${MOBILE_ROUTES.PROFILE.PARTNERS}/${partnerId}`,
-              { redirectTo: "partner", partnerId },
-            );
+            await routeWithAuthCheck(`${MOBILE_ROUTES.PROFILE.PARTNERS}/${partnerId}`, {
+              redirectTo: "partner",
+              partnerId
+            });
             break;
           }
         }
@@ -521,17 +493,17 @@ export async function handleDeepLink(url: string): Promise<void> {
         if (normalizedPath.startsWith("/weekly-recap/")) {
           const recapId = normalizedPath.replace("/weekly-recap/", "");
           if (recapId) {
-            await routeWithAuthCheck(
-              MOBILE_ROUTES.PROFILE.RECAP_DETAIL(recapId),
-              { redirectTo: "weekly-recap", recapId },
-            );
+            await routeWithAuthCheck(MOBILE_ROUTES.PROFILE.RECAP_DETAIL(recapId), {
+              redirectTo: "weekly-recap",
+              recapId
+            });
             break;
           }
         }
 
         // Default: home (with auth check)
         await routeWithAuthCheck(MOBILE_ROUTES.MAIN.HOME, {
-          redirectTo: "home",
+          redirectTo: "home"
         });
         break;
     }

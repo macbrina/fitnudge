@@ -8,17 +8,11 @@ import { useStyles } from "@/themes/makeStyles";
 import { lineHeight } from "@/themes/tokens";
 import { router } from "expo-router";
 import { useState } from "react";
-import {
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  Text,
-  View,
-} from "react-native";
+import { Image, KeyboardAvoidingView, Platform, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAlertModal } from "@/contexts/AlertModalContext";
 import { MOBILE_ROUTES } from "@/lib";
+import { ApiError } from "@/services/api/base";
 
 export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState("");
@@ -61,25 +55,27 @@ export default function ForgotPasswordScreen() {
             message: t("auth.forgot_password.success_message"),
             confirmLabel: t("common.done"),
             dismissible: false,
-            variant: "success",
+            variant: "success"
           });
 
           if (confirmed) {
             router.push(MOBILE_ROUTES.AUTH.LOGIN);
           }
         },
-        onError: async (error: any) => {
+        onError: async (error: unknown) => {
           console.error("Forgot password error:", error);
+          const errorMessage =
+            error instanceof ApiError ? error.message : t("auth.forgot_password.error_send_failed");
+
           await showAlert({
             title: t("common.error"),
-            message:
-              error?.error || t("auth.forgot_password.error_send_failed"),
+            message: errorMessage,
             confirmLabel: t("common.ok"),
             dismissible: true,
-            variant: "error",
+            variant: "error"
           });
-        },
-      },
+        }
+      }
     );
   };
 
@@ -93,7 +89,7 @@ export default function ForgotPasswordScreen() {
           style={{ flex: 1 }}
           contentContainerStyle={{
             flexGrow: 1,
-            paddingBottom: insets.bottom,
+            paddingBottom: insets.bottom
           }}
           showsVerticalScrollIndicator={false}
         >
@@ -109,9 +105,7 @@ export default function ForgotPasswordScreen() {
           {/* Title and Subtitle */}
           <View style={styles.titleContainer}>
             <Text style={styles.title}>{t("auth.forgot_password.title")}</Text>
-            <Text style={styles.subtitle}>
-              {t("auth.forgot_password.subtitle")}
-            </Text>
+            <Text style={styles.subtitle}>{t("auth.forgot_password.subtitle")}</Text>
           </View>
 
           {/* Form */}
@@ -160,28 +154,24 @@ export default function ForgotPasswordScreen() {
   );
 }
 
-const makeForgotPasswordScreenStyles = (
-  tokens: any,
-  colors: any,
-  brand: any,
-) => {
+const makeForgotPasswordScreenStyles = (tokens: any, colors: any, brand: any) => {
   return {
     container: {
       flex: 1,
-      backgroundColor: colors.bg.canvas,
+      backgroundColor: colors.bg.canvas
     },
     logoContainer: {
       alignItems: "center" as const,
-      marginBottom: toRN(tokens.spacing[8]),
+      marginBottom: toRN(tokens.spacing[8])
     },
     logoImage: {
       width: 100,
-      height: 100,
+      height: 100
     },
     titleContainer: {
       alignItems: "center" as const,
       marginBottom: toRN(tokens.spacing[8]),
-      paddingHorizontal: toRN(tokens.spacing[6]),
+      paddingHorizontal: toRN(tokens.spacing[6])
     },
     title: {
       fontSize: toRN(tokens.typography.fontSize["3xl"]),
@@ -189,25 +179,22 @@ const makeForgotPasswordScreenStyles = (
       color: colors.text.primary,
       textAlign: "center" as const,
       marginBottom: toRN(tokens.spacing[3]),
-      fontFamily: fontFamily.groteskBold,
+      fontFamily: fontFamily.groteskBold
     },
     subtitle: {
       fontSize: toRN(tokens.typography.fontSize.base),
       color: colors.text.secondary,
       textAlign: "center" as const,
-      lineHeight: lineHeight(
-        tokens.typography.fontSize.base,
-        tokens.typography.lineHeight.relaxed,
-      ),
-      fontFamily: fontFamily.groteskRegular,
+      lineHeight: lineHeight(tokens.typography.fontSize.base, tokens.typography.lineHeight.relaxed),
+      fontFamily: fontFamily.groteskRegular
     },
     form: {
       paddingHorizontal: toRN(tokens.spacing[6]),
-      flex: 1,
+      flex: 1
     },
     backToLoginContainer: {
       alignItems: "center" as const,
-      marginTop: toRN(tokens.spacing[6]),
-    },
+      marginTop: toRN(tokens.spacing[6])
+    }
   };
 };

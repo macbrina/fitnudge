@@ -15,13 +15,7 @@ interface MoodIconProps {
 // Simple mood face icons using SVG paths
 // These are basic representations - replace with custom flaticon SVGs as needed
 
-const MoodTerribleIcon = ({
-  size = 32,
-  color,
-}: {
-  size: number;
-  color: string;
-}) => (
+const MoodTerribleIcon = ({ size = 32, color }: { size: number; color: string }) => (
   <Svg width={size} height={size} viewBox="0 0 295.996 295.996">
     <G>
       <Path
@@ -124,13 +118,7 @@ const MoodBadIcon = ({ size = 32, color }: { size: number; color: string }) => (
   </Svg>
 );
 
-const MoodOkayIcon = ({
-  size = 32,
-  color,
-}: {
-  size: number;
-  color: string;
-}) => (
+const MoodOkayIcon = ({ size = 32, color }: { size: number; color: string }) => (
   <Svg width={size} height={size} viewBox="0 0 295.996 295.996">
     <G>
       <Path
@@ -180,13 +168,7 @@ const MoodOkayIcon = ({
   </Svg>
 );
 
-const MoodGoodIcon = ({
-  size = 32,
-  color,
-}: {
-  size: number;
-  color: string;
-}) => (
+const MoodGoodIcon = ({ size = 32, color }: { size: number; color: string }) => (
   <Svg width={size} height={size} viewBox="0 0 21 21">
     <G id="layer7" transform="translate(78.5 -41.5)">
       <G id="icon-happy">
@@ -229,24 +211,12 @@ const MoodGoodIcon = ({
   </Svg>
 );
 
-const MoodGreatIcon = ({
-  size = 32,
-  color,
-}: {
-  size: number;
-  color: string;
-}) => (
+const MoodGreatIcon = ({ size = 32, color }: { size: number; color: string }) => (
   <Svg height={size} viewBox="0 0 64 64" width={size}>
     <Circle cx="32" cy="32" fill="#ffcd00" r="32" />
     <G fillRule="evenodd">
-      <Path
-        d="m32 64a16 16 0 0 1 -16-16 16 16 0 0 1 16-16h32a32 32 0 0 1 -32 32z"
-        fill="#ffb400"
-      />
-      <Path
-        d="m32 0a16 16 0 0 1 16 16 16 16 0 0 1 -16 16h-32a32 32 0 0 1 32-32z"
-        fill="#ffeb00"
-      />
+      <Path d="m32 64a16 16 0 0 1 -16-16 16 16 0 0 1 16-16h32a32 32 0 0 1 -32 32z" fill="#ffb400" />
+      <Path d="m32 0a16 16 0 0 1 16 16 16 16 0 0 1 -16 16h-32a32 32 0 0 1 32-32z" fill="#ffeb00" />
       <Path
         d="m12 32.002 40-.002a19.9515 19.9515 0 0 1 -6.77 14.9992h-26.4609q-.4679-.4126-.9118-.8565a19.9977 19.9977 0 0 1 -5.8573-14.1407z"
         fill="#46321e"
@@ -272,8 +242,7 @@ export function MoodIcon({ mood, size = 32, color, selected }: MoodIconProps) {
   const { colors, brandColors } = useTheme();
 
   // Use provided color or default based on selection state
-  const iconColor =
-    color || (selected ? brandColors.primary : colors.text.secondary);
+  const iconColor = color || (selected ? brandColors.primary : colors.text.secondary);
 
   switch (mood) {
     case "terrible":
@@ -297,14 +266,8 @@ export const MOODS: { value: MoodType; label: string }[] = [
   { value: "bad", label: "Bad" },
   { value: "okay", label: "Okay" },
   { value: "good", label: "Good" },
-  { value: "great", label: "Great" },
+  { value: "great", label: "Great" }
 ];
 
 // Export individual icons for direct use if needed
-export {
-  MoodTerribleIcon,
-  MoodBadIcon,
-  MoodOkayIcon,
-  MoodGoodIcon,
-  MoodGreatIcon,
-};
+export { MoodTerribleIcon, MoodBadIcon, MoodOkayIcon, MoodGoodIcon, MoodGreatIcon };

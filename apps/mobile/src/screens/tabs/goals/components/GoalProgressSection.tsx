@@ -15,7 +15,7 @@ import {
   useWeekProgress,
   useHabitChain,
   useMoodTrends,
-  progressQueryKeys,
+  progressQueryKeys
 } from "@/hooks/api/useProgressData";
 import { trackingStatsQueryKeys } from "@/hooks/api/useTrackingStats";
 import { trackingStatsService } from "@/services/api/trackingStats";
@@ -52,7 +52,7 @@ export function GoalProgressSection({
   trackingType = "checkin",
   frequency = "daily",
   daysOfWeek,
-  isPartnerView = false,
+  isPartnerView = false
 }: GoalProgressSectionProps) {
   const styles = useStyles(makeGoalProgressSectionStyles);
   const { colors, brandColors } = useTheme();
@@ -70,17 +70,10 @@ export function GoalProgressSection({
       // Prefetch meal/hydration/workout stats based on tracking type
       if (trackingType !== "checkin") {
         queryClient.prefetchQuery({
-          queryKey: trackingStatsQueryKeys.stats(
-            "goal",
-            goalId,
-            trackingType,
-            period,
-          ),
+          queryKey: trackingStatsQueryKeys.stats("goal", goalId, trackingType, period),
           queryFn: () =>
-            trackingStatsService
-              .getStats(goalId, "goal", trackingType, period)
-              .then((r) => r.data),
-          staleTime: 1000 * 60 * 5, // 5 minutes
+            trackingStatsService.getStats(goalId, "goal", trackingType, period).then((r) => r.data),
+          staleTime: 1000 * 60 * 5 // 5 minutes
         });
       }
 
@@ -93,22 +86,17 @@ export function GoalProgressSection({
         queryKey: [...progressQueryKeys.all, "chain", goalId, period],
         queryFn: () =>
           checkInsService
-            .getCheckInsByDateRange(
-              formatLocalDate(startDate),
-              formatLocalDate(endDate),
-              goalId,
-            )
+            .getCheckInsByDateRange(formatLocalDate(startDate), formatLocalDate(endDate), goalId)
             .then((r) => r.data || []),
-        staleTime: 0,
+        staleTime: 0
       });
 
       // Prefetch mood trends for all periods (only for checkin tracking)
       if (trackingType === "checkin") {
         queryClient.prefetchQuery({
           queryKey: progressQueryKeys.moodTrend(goalId, period),
-          queryFn: () =>
-            checkInsService.getMoodTrends(goalId, period).then((r) => r.data),
-          staleTime: 0,
+          queryFn: () => checkInsService.getMoodTrends(goalId, period).then((r) => r.data),
+          staleTime: 0
         });
       }
     });
@@ -116,17 +104,13 @@ export function GoalProgressSection({
 
   // Fetch all progress data for this specific goal
   const { data: streakInfo, isLoading: streakLoading } = useStreakInfo(goalId);
-  const { data: weekProgress, isLoading: weekLoading } =
-    useWeekProgress(goalId);
+  const { data: weekProgress, isLoading: weekLoading } = useWeekProgress(goalId);
   // Use selected period for habit chain
-  const { data: habitChain, isLoading: chainLoading } = useHabitChain(
-    goalId,
-    selectedPeriod,
-  );
+  const { data: habitChain, isLoading: chainLoading } = useHabitChain(goalId, selectedPeriod);
   // Fetch mood trends only for checkin tracking type (mood is captured via check-ins)
   const { data: moodTrend, isLoading: moodLoading } = useMoodTrends(
     trackingType === "checkin" ? goalId : undefined,
-    selectedPeriod,
+    selectedPeriod
   );
 
   const isLoading = streakLoading || weekLoading || chainLoading;
@@ -157,8 +141,7 @@ export function GoalProgressSection({
     return {
       completedDays: completed,
       totalScheduledDays: scheduled,
-      consistencyRate:
-        scheduled > 0 ? Math.round((completed / scheduled) * 100) : 0,
+      consistencyRate: scheduled > 0 ? Math.round((completed / scheduled) * 100) : 0
     };
   }, [habitChain, frequency, daysOfWeek]);
 
@@ -175,24 +158,12 @@ export function GoalProgressSection({
 
         {/* Streak Cards Skeleton */}
         <View style={styles.streakCardsRow}>
-          <SkeletonBox
-            width="48%"
-            height={100}
-            borderRadius={toRN(tokens.borderRadius.xl)}
-          />
-          <SkeletonBox
-            width="48%"
-            height={100}
-            borderRadius={toRN(tokens.borderRadius.xl)}
-          />
+          <SkeletonBox width="48%" height={100} borderRadius={toRN(tokens.borderRadius.xl)} />
+          <SkeletonBox width="48%" height={100} borderRadius={toRN(tokens.borderRadius.xl)} />
         </View>
 
         {/* Additional skeleton */}
-        <SkeletonBox
-          width="100%"
-          height={60}
-          borderRadius={toRN(tokens.borderRadius.md)}
-        />
+        <SkeletonBox width="100%" height={60} borderRadius={toRN(tokens.borderRadius.md)} />
       </Card>
     );
   }
@@ -232,7 +203,7 @@ export function GoalProgressSection({
                 key={period}
                 style={[
                   styles.periodButton,
-                  selectedPeriod === period && styles.periodButtonActive,
+                  selectedPeriod === period && styles.periodButtonActive
                 ]}
                 onPress={() => setSelectedPeriod(period)}
                 activeOpacity={0.7}
@@ -240,7 +211,7 @@ export function GoalProgressSection({
                 <Text
                   style={[
                     styles.periodButtonText,
-                    selectedPeriod === period && styles.periodButtonTextActive,
+                    selectedPeriod === period && styles.periodButtonTextActive
                   ]}
                 >
                   {period} {t("goals.progress.days") || "days"}
@@ -268,14 +239,13 @@ export function GoalProgressSection({
                         ? colors.feedback.success
                         : consistencyRate >= 50
                           ? brandColors.primary
-                          : colors.feedback.warning,
-                  },
+                          : colors.feedback.warning
+                  }
                 ]}
               />
             </View>
             <Text style={styles.consistencySubtext}>
-              {completedDays} {t("goals.progress.of") || "of"}{" "}
-              {totalScheduledDays}{" "}
+              {completedDays} {t("goals.progress.of") || "of"} {totalScheduledDays}{" "}
               {frequency === "weekly"
                 ? t("goals.scheduled_days") || "scheduled days"
                 : t("goals.progress.days") || "days"}{" "}
@@ -308,11 +278,7 @@ export function GoalProgressSection({
 
           {/* Mood Trend - only for checkin tracking type */}
           {trackingType === "checkin" && (
-            <MoodTrendMini
-              data={moodTrend || []}
-              days={selectedPeriod}
-              isLoading={moodLoading}
-            />
+            <MoodTrendMini data={moodTrend || []} days={selectedPeriod} isLoading={moodLoading} />
           )}
         </>
       )}
@@ -320,30 +286,26 @@ export function GoalProgressSection({
   );
 }
 
-const makeGoalProgressSectionStyles = (
-  tokens: any,
-  colors: any,
-  brand: any,
-) => ({
+const makeGoalProgressSectionStyles = (tokens: any, colors: any, brand: any) => ({
   container: {
     padding: toRN(tokens.spacing[5]),
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   header: {
     flexDirection: "row" as const,
     justifyContent: "space-between" as const,
     alignItems: "center" as const,
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   sectionTitle: {
     fontSize: toRN(tokens.typography.fontSize.xl),
     fontFamily: fontFamily.groteskBold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   streakCardsRow: {
     flexDirection: "row" as const,
     gap: toRN(tokens.spacing[3]),
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   // Period Selector styles
   periodSelector: {
@@ -352,14 +314,14 @@ const makeGoalProgressSectionStyles = (
     marginBottom: toRN(tokens.spacing[4]),
     backgroundColor: colors.bg.muted,
     borderRadius: toRN(tokens.borderRadius.full),
-    padding: toRN(tokens.spacing[1]),
+    padding: toRN(tokens.spacing[1])
   },
   periodButton: {
     flex: 1,
     paddingVertical: toRN(tokens.spacing[2]),
     paddingHorizontal: toRN(tokens.spacing[3]),
     borderRadius: toRN(tokens.borderRadius.full),
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   periodButtonActive: {
     backgroundColor: colors.bg.card,
@@ -367,54 +329,54 @@ const makeGoalProgressSectionStyles = (
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
-    elevation: 2,
+    elevation: 2
   },
   periodButtonText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.groteskMedium,
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   periodButtonTextActive: {
     color: brand.primary,
-    fontFamily: fontFamily.groteskSemiBold,
+    fontFamily: fontFamily.groteskSemiBold
   },
   // Consistency Card styles (renamed from completionRate)
   consistencyCard: {
     marginBottom: toRN(tokens.spacing[4]),
     padding: toRN(tokens.spacing[4]),
     backgroundColor: colors.bg.muted,
-    borderRadius: toRN(tokens.borderRadius.lg),
+    borderRadius: toRN(tokens.borderRadius.lg)
   },
   consistencyHeader: {
     flexDirection: "row" as const,
     justifyContent: "space-between" as const,
     alignItems: "center" as const,
-    marginBottom: toRN(tokens.spacing[2]),
+    marginBottom: toRN(tokens.spacing[2])
   },
   consistencyLabel: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.groteskSemiBold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   consistencyValue: {
     fontSize: toRN(tokens.typography.fontSize.xl),
     fontFamily: fontFamily.groteskBold,
-    color: brand.primary,
+    color: brand.primary
   },
   consistencySubtext: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.groteskMedium,
     color: colors.text.tertiary,
-    marginTop: toRN(tokens.spacing[2]),
+    marginTop: toRN(tokens.spacing[2])
   },
   progressBarBg: {
     height: toRN(tokens.spacing[2]),
     backgroundColor: colors.bg.card,
     borderRadius: toRN(tokens.borderRadius.full),
-    overflow: "hidden" as const,
+    overflow: "hidden" as const
   },
   progressBarFill: {
     height: "100%",
-    borderRadius: toRN(tokens.borderRadius.full),
-  },
+    borderRadius: toRN(tokens.borderRadius.full)
+  }
 });

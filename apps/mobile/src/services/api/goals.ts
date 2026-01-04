@@ -55,6 +55,17 @@ export interface UpdateGoalRequest {
   status?: GoalStatus;
 }
 
+/**
+ * Restricted edit request for user-facing goal edits.
+ * Only allows fields that don't affect the AI-generated plan.
+ */
+export interface EditGoalRequest {
+  title?: string;
+  description?: string;
+  days_of_week?: number[]; // ADD only - cannot remove existing days
+  reminder_times?: string[];
+}
+
 // Goal Type Suggestion Types
 export interface GoalTypeSuggestionRequest {
   goal_type: GoalType | "mixed";
@@ -118,11 +129,19 @@ export class GoalsService extends BaseApiService {
     return this.post<Goal>(ROUTES.GOALS.CREATE, goal);
   }
 
-  async updateGoal(
-    goalId: string,
-    updates: UpdateGoalRequest,
-  ): Promise<ApiResponse<Goal>> {
+  async updateGoal(goalId: string, updates: UpdateGoalRequest): Promise<ApiResponse<Goal>> {
     return this.put<Goal>(ROUTES.GOALS.UPDATE(goalId), updates);
+  }
+
+  /**
+   * Edit goal with restricted fields (user-facing).
+   * Only allows changes that don't affect the AI-generated plan:
+   * - title, description: Safe (plan was based on original, user is warned)
+   * - days_of_week: ADD only, cannot remove existing days
+   * - reminder_times: Just notification preferences
+   */
+  async editGoal(goalId: string, edits: EditGoalRequest): Promise<ApiResponse<Goal>> {
+    return this.patch<Goal>(`${ROUTES.GOALS.GET(goalId)}/edit`, edits);
   }
 
   async deleteGoal(goalId: string): Promise<ApiResponse> {
@@ -134,16 +153,11 @@ export class GoalsService extends BaseApiService {
   }
 
   async createGoalFromTemplate(templateId: string): Promise<ApiResponse<Goal>> {
-    return this.post<Goal>(
-      `${ROUTES.GOALS.TEMPLATES}/${templateId}/create`,
-      {},
-    );
+    return this.post<Goal>(`${ROUTES.GOALS.TEMPLATES}/${templateId}/create`, {});
   }
 
   async getGoalStats(goalId?: string): Promise<ApiResponse<GoalStats>> {
-    const endpoint = goalId
-      ? ROUTES.GOALS.GET_STATS(goalId)
-      : ROUTES.GOALS.STATS;
+    const endpoint = goalId ? ROUTES.GOALS.GET_STATS(goalId) : ROUTES.GOALS.STATS;
     return this.get<GoalStats>(endpoint);
   }
 
@@ -167,9 +181,7 @@ export class GoalsService extends BaseApiService {
     return this.post<Goal>(ROUTES.GOALS.DUPLICATE_GOAL(goalId), {});
   }
 
-  async getGoalsByCategory(
-    category: Goal["category"],
-  ): Promise<ApiResponse<Goal[]>> {
+  async getGoalsByCategory(category: Goal["category"]): Promise<ApiResponse<Goal[]>> {
     return this.get<Goal[]>(ROUTES.GOALS.GET_GOALS_BY_CATEGORY(category));
   }
 
@@ -185,11 +197,11 @@ export class GoalsService extends BaseApiService {
    * Get AI-powered goal suggestions based on goal type
    */
   async getSuggestionsByType(
-    request: GoalTypeSuggestionRequest,
+    request: GoalTypeSuggestionRequest
   ): Promise<ApiResponse<GoalTypeSuggestionResponse>> {
     return this.post<GoalTypeSuggestionResponse>(
       `${ROUTES.GOALS.LIST}/suggestions-by-type`,
-      request,
+      request
     );
   }
 }

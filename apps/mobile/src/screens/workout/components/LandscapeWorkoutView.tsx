@@ -47,7 +47,7 @@ export function LandscapeWorkoutView({
   onSkipNext,
   onMarkDone,
   onExitLandscape,
-  onShowHelp,
+  onShowHelp
 }: LandscapeWorkoutViewProps) {
   const styles = useStyles(makeStyles);
   const { colors, brandColors } = useTheme();
@@ -89,10 +89,7 @@ export function LandscapeWorkoutView({
 
       {/* Progress bar at top */}
       <View
-        style={[
-          styles.progressBarContainer,
-          { paddingTop: insets.top || toRN(tokens.spacing[2]) },
-        ]}
+        style={[styles.progressBarContainer, { paddingTop: insets.top || toRN(tokens.spacing[2]) }]}
       >
         {Array.from({ length: totalExercisesCount }).map((_, index) => (
           <View
@@ -100,7 +97,7 @@ export function LandscapeWorkoutView({
             style={[
               styles.progressSegment,
               index < overallExerciseIndex && styles.progressSegmentComplete,
-              index === overallExerciseIndex && styles.progressSegmentActive,
+              index === overallExerciseIndex && styles.progressSegmentActive
             ]}
           />
         ))}
@@ -111,10 +108,9 @@ export function LandscapeWorkoutView({
         style={[
           styles.exitButton,
           {
-            top:
-              (insets.top || toRN(tokens.spacing[2])) + toRN(tokens.spacing[6]),
-            right: insets.right || toRN(tokens.spacing[4]),
-          },
+            top: (insets.top || toRN(tokens.spacing[2])) + toRN(tokens.spacing[6]),
+            right: insets.right || toRN(tokens.spacing[4])
+          }
         ]}
         onPress={onExitLandscape}
       >
@@ -123,10 +119,7 @@ export function LandscapeWorkoutView({
 
       {/* Left side - Play/Pause button */}
       <TouchableOpacity
-        style={[
-          styles.playPauseButton,
-          { left: insets.left || toRN(tokens.spacing[4]) },
-        ]}
+        style={[styles.playPauseButton, { left: insets.left || toRN(tokens.spacing[4]) }]}
         onPress={onTogglePause}
       >
         <Ionicons name={isPaused ? "play" : "pause"} size={32} color="white" />
@@ -134,17 +127,10 @@ export function LandscapeWorkoutView({
 
       {/* Right side - Skip button */}
       <TouchableOpacity
-        style={[
-          styles.skipButton,
-          { right: insets.right || toRN(tokens.spacing[4]) },
-        ]}
+        style={[styles.skipButton, { right: insets.right || toRN(tokens.spacing[4]) }]}
         onPress={onSkipNext}
       >
-        <Ionicons
-          name="play-skip-forward"
-          size={28}
-          color={colors.text.primary}
-        />
+        <Ionicons name="play-skip-forward" size={28} color={colors.text.primary} />
       </TouchableOpacity>
 
       {/* Bottom left - Exercise name and count */}
@@ -153,8 +139,8 @@ export function LandscapeWorkoutView({
           styles.bottomLeftInfo,
           {
             left: insets.left || toRN(tokens.spacing[4]),
-            bottom: insets.bottom || toRN(tokens.spacing[4]),
-          },
+            bottom: insets.bottom || toRN(tokens.spacing[4])
+          }
         ]}
       >
         <Text style={styles.exerciseName}>{exerciseName}</Text>
@@ -172,8 +158,8 @@ export function LandscapeWorkoutView({
           styles.bottomRightInfo,
           {
             right: insets.right || toRN(tokens.spacing[4]),
-            bottom: insets.bottom || toRN(tokens.spacing[4]),
-          },
+            bottom: insets.bottom || toRN(tokens.spacing[4])
+          }
         ]}
       >
         {isTimed ? (
@@ -191,26 +177,26 @@ export function LandscapeWorkoutView({
 const makeStyles = (tokens: any, colors: any, brand: any) => ({
   container: {
     flex: 1,
-    backgroundColor: colors.bg.canvas,
+    backgroundColor: colors.bg.canvas
   },
 
   // Full-screen Video
   backgroundVideo: {
     ...StyleSheet.absoluteFillObject,
     width: "100%",
-    height: "100%",
+    height: "100%"
   },
   videoPlaceholder: {
     ...StyleSheet.absoluteFillObject,
     alignItems: "center" as const,
     justifyContent: "center" as const,
-    backgroundColor: colors.bg.muted,
+    backgroundColor: colors.bg.muted
   },
   pauseIconContainer: {
     ...StyleSheet.absoluteFillObject,
     alignItems: "center" as const,
     justifyContent: "center" as const,
-    backgroundColor: "transparent",
+    backgroundColor: "transparent"
   },
 
   // Progress bar
@@ -223,20 +209,20 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     paddingHorizontal: toRN(tokens.spacing[4]),
     paddingBottom: toRN(tokens.spacing[2]),
     gap: toRN(4),
-    zIndex: 10,
+    zIndex: 10
   },
   progressSegment: {
     flex: 1,
     height: toRN(4),
     backgroundColor: "rgba(0,0,0,0.2)",
-    borderRadius: toRN(2),
+    borderRadius: toRN(2)
   },
   progressSegmentComplete: {
-    backgroundColor: colors.text.primary,
+    backgroundColor: colors.text.primary
   },
   progressSegmentActive: {
     backgroundColor: colors.text.primary,
-    opacity: 0.6,
+    opacity: 0.6
   },
 
   // Exit button (top right)
@@ -248,7 +234,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: colors.bg.muted,
     alignItems: "center" as const,
     justifyContent: "center" as const,
-    zIndex: 10,
+    zIndex: 10
   },
 
   // Play/Pause button (left center)
@@ -262,7 +248,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: brand.primary,
     alignItems: "center" as const,
     justifyContent: "center" as const,
-    zIndex: 10,
+    zIndex: 10
   },
 
   // Skip button (right center)
@@ -276,7 +262,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: colors.bg.muted,
     alignItems: "center" as const,
     justifyContent: "center" as const,
-    zIndex: 10,
+    zIndex: 10
   },
 
   // Bottom left info
@@ -285,45 +271,45 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     flexDirection: "row" as const,
     alignItems: "center" as const,
     gap: toRN(tokens.spacing[2]),
-    zIndex: 10,
+    zIndex: 10
   },
   exerciseName: {
     fontSize: toRN(tokens.typography.fontSize.xl),
     fontFamily: fontFamily.groteskBold,
     color: colors.text.primary,
-    textTransform: "capitalize" as const,
+    textTransform: "capitalize" as const
   },
   helpButton: {
-    padding: toRN(2),
+    padding: toRN(2)
   },
   exerciseCount: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.medium,
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
 
   // Bottom right info
   bottomRightInfo: {
     position: "absolute" as const,
     alignItems: "flex-end" as const,
-    zIndex: 10,
+    zIndex: 10
   },
   timerText: {
     fontSize: toRN(56),
     fontFamily: fontFamily.groteskBold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   doneButton: {
     backgroundColor: brand.primary,
     paddingVertical: toRN(tokens.spacing[3]),
     paddingHorizontal: toRN(tokens.spacing[6]),
-    borderRadius: toRN(tokens.borderRadius.full),
+    borderRadius: toRN(tokens.borderRadius.full)
   },
   doneButtonText: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.semiBold,
-    color: "white",
-  },
+    color: "white"
+  }
 });
 
 export default LandscapeWorkoutView;

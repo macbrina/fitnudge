@@ -16,7 +16,7 @@ import {
   useCheckIns,
   useCreateCheckIn,
   useFeed,
-  useCreatePost,
+  useCreatePost
 } from "../../hooks/api";
 
 /**
@@ -62,10 +62,7 @@ export default function ModularApiExample() {
     try {
       const response = await userService.getCurrentUser();
       if (response.data) {
-        Alert.alert(
-          "User Info",
-          `Name: ${response.data.name}\nPlan: ${response.data.plan}`,
-        );
+        Alert.alert("User Info", `Name: ${response.data.name}\nPlan: ${response.data.plan}`);
       }
     } catch (error) {
       Alert.alert("Error", "Failed to get user");
@@ -123,7 +120,7 @@ export default function ModularApiExample() {
         category: "fitness",
         frequency: "daily",
         target_days: 7,
-        reminder_times: ["07:00"],
+        reminder_times: ["07:00"]
       });
       Alert.alert("Success", "Goal created with React Query!");
     } catch (error) {
@@ -142,7 +139,7 @@ export default function ModularApiExample() {
         goal_id: goals.data[0].id,
         check_in_date: new Date().toISOString().split("T")[0],
         completed: true,
-        notes: "Great workout today!",
+        notes: "Great workout today!"
       });
       Alert.alert("Success", "Check-in created with React Query!");
     } catch (error) {
@@ -154,7 +151,7 @@ export default function ModularApiExample() {
     try {
       await createPostMutation.mutateAsync({
         content: "Just completed my daily workout! 💪 #fitness #motivation",
-        is_public: true,
+        is_public: true
       });
       Alert.alert("Success", "Post created with React Query!");
     } catch (error) {
@@ -185,7 +182,7 @@ export default function ModularApiExample() {
           fontSize: 16,
           fontWeight: "bold",
           marginTop: 20,
-          marginBottom: 10,
+          marginBottom: 10
         }}
       >
         React Query Hooks:
@@ -221,27 +218,21 @@ export default function ModularApiExample() {
           fontSize: 16,
           fontWeight: "bold",
           marginTop: 20,
-          marginBottom: 10,
+          marginBottom: 10
         }}
       >
         Live Data:
       </Text>
 
-      <Text style={{ marginBottom: 5 }}>
-        User: {currentUser?.data?.name || "Not logged in"}
-      </Text>
+      <Text style={{ marginBottom: 5 }}>User: {currentUser?.data?.name || "Not logged in"}</Text>
 
       <Text style={{ marginBottom: 5 }}>
         Goals: {goalsLoading ? "Loading..." : goals?.data?.length || 0}
       </Text>
 
-      <Text style={{ marginBottom: 5 }}>
-        Check-ins: {checkIns?.data?.length || 0}
-      </Text>
+      <Text style={{ marginBottom: 5 }}>Check-ins: {checkIns?.data?.length || 0}</Text>
 
-      <Text style={{ marginBottom: 5 }}>
-        Feed Posts: {feed?.data?.length || 0}
-      </Text>
+      <Text style={{ marginBottom: 5 }}>Feed Posts: {feed?.data?.length || 0}</Text>
 
       {/* Status Indicators */}
       <Text
@@ -249,7 +240,7 @@ export default function ModularApiExample() {
           fontSize: 16,
           fontWeight: "bold",
           marginTop: 20,
-          marginBottom: 10,
+          marginBottom: 10
         }}
       >
         Status:

@@ -1,12 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  Animated,
-  StyleSheet,
-  StatusBar,
-} from "react-native";
+import { View, Text, TouchableOpacity, Animated, StyleSheet, StatusBar } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Speech from "expo-speech";
 import { useStyles } from "@/themes";
@@ -42,7 +35,7 @@ export function ReadyCountdown({
   onSkip,
   onClose,
   onHelp,
-  coachVoiceEnabled = true,
+  coachVoiceEnabled = true
 }: ReadyCountdownProps) {
   const insets = useSafeAreaInsets();
   const styles = useStyles(makeStyles);
@@ -62,26 +55,26 @@ export function ReadyCountdown({
         Animated.timing(scaleAnim, {
           toValue: 1.1,
           duration: 100,
-          useNativeDriver: true,
+          useNativeDriver: true
         }),
         Animated.timing(opacityAnim, {
           toValue: 0.8,
           duration: 100,
-          useNativeDriver: true,
-        }),
+          useNativeDriver: true
+        })
       ]),
       Animated.parallel([
         Animated.timing(scaleAnim, {
           toValue: 1,
           duration: 200,
-          useNativeDriver: true,
+          useNativeDriver: true
         }),
         Animated.timing(opacityAnim, {
           toValue: 1,
           duration: 200,
-          useNativeDriver: true,
-        }),
-      ]),
+          useNativeDriver: true
+        })
+      ])
     ]).start();
   }, [timeRemaining]);
 
@@ -93,7 +86,7 @@ export function ReadyCountdown({
       hasSpokenRef.current = true;
       Speech.speak(`Ready to go. ${exerciseName}`, {
         rate: 0.9,
-        pitch: 1.0,
+        pitch: 1.0
       });
     }
   }, [coachVoiceEnabled, exerciseName]);
@@ -130,8 +123,8 @@ export function ReadyCountdown({
             styles.countdownNumber,
             {
               transform: [{ scale: scaleAnim }],
-              opacity: opacityAnim,
-            },
+              opacity: opacityAnim
+            }
           ]}
         >
           {timeRemaining}
@@ -141,7 +134,7 @@ export function ReadyCountdown({
         <Text style={styles.exerciseLabel}>
           {t("workout.exercise_count", {
             current: exerciseNumber,
-            total: totalExercises,
+            total: totalExercises
           })}
         </Text>
 
@@ -166,13 +159,13 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
   // Full screen absolute overlay
   fullScreenOverlay: {
     ...StyleSheet.absoluteFillObject,
-    zIndex: 100,
+    zIndex: 100
   },
 
   // Semi-transparent background overlay
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(30, 30, 30, 0.85)",
+    backgroundColor: "rgba(30, 30, 30, 0.85)"
   },
 
   // Header
@@ -180,7 +173,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     flexDirection: "row" as const,
     alignItems: "center" as const,
     paddingHorizontal: toRN(tokens.spacing[4]),
-    zIndex: 10,
+    zIndex: 10
   },
   closeButton: {
     width: toRN(40),
@@ -188,7 +181,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     borderRadius: toRN(20),
     backgroundColor: "rgba(60, 60, 60, 0.8)",
     alignItems: "center" as const,
-    justifyContent: "center" as const,
+    justifyContent: "center" as const
   },
 
   // Main content - centered
@@ -197,7 +190,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     alignItems: "center" as const,
     justifyContent: "center" as const,
     paddingHorizontal: toRN(tokens.spacing[4]),
-    zIndex: 5,
+    zIndex: 5
   },
   readyLabel: {
     fontSize: toRN(tokens.typography.fontSize.xl),
@@ -208,7 +201,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     textTransform: "uppercase" as const,
     textShadowColor: "rgba(0,0,0,0.4)",
     textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
+    textShadowRadius: 4
   },
   countdownNumber: {
     fontSize: toRN(120),
@@ -217,14 +210,14 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     lineHeight: toRN(130),
     textShadowColor: "rgba(0,0,0,0.4)",
     textShadowOffset: { width: 0, height: 4 },
-    textShadowRadius: 8,
+    textShadowRadius: 8
   },
   exerciseLabel: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.medium,
     color: "rgba(255,255,255,0.85)",
     marginTop: toRN(tokens.spacing[4]),
-    marginBottom: toRN(tokens.spacing[2]),
+    marginBottom: toRN(tokens.spacing[2])
   },
   exerciseName: {
     fontSize: toRN(tokens.typography.fontSize.xl),
@@ -235,7 +228,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     paddingHorizontal: toRN(tokens.spacing[6]),
     textShadowColor: "rgba(0,0,0,0.3)",
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    textShadowRadius: 2
   },
 
   // Start button
@@ -251,11 +244,11 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 6,
-    zIndex: 10,
+    zIndex: 10
   },
   startButtonText: {
     color: "#1a1a1a",
     fontSize: toRN(tokens.typography.fontSize.lg),
-    fontFamily: fontFamily.semiBold,
-  },
+    fontFamily: fontFamily.semiBold
+  }
 });

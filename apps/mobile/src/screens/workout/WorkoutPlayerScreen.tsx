@@ -1,24 +1,8 @@
-import React, {
-  useState,
-  useEffect,
-  useCallback,
-  useRef,
-  useMemo,
-} from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  ActivityIndicator,
-  Animated,
-  Vibration,
-} from "react-native";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { View, Text, TouchableOpacity, ActivityIndicator, Animated, Vibration } from "react-native";
 import Video, { ResizeMode } from "react-native-video";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as ScreenOrientation from "expo-screen-orientation";
 import * as Speech from "expo-speech";
@@ -39,7 +23,7 @@ import {
   LandscapeWorkoutView,
   MusicVoiceModal,
   CompletionFlow,
-  WorkoutCompletingScreen,
+  WorkoutCompletingScreen
 } from "./components";
 import type { CompletedSessionResponse } from "@/services/api/workoutSessions";
 import { workoutSessionsService } from "@/services/api/workoutSessions";
@@ -50,7 +34,7 @@ import { useWorkoutMusic } from "@/hooks/api/useWorkoutMusic";
 import {
   useAudioPreferences,
   useUpdateAudioPreferences,
-  useAudioPreferencesCache,
+  useAudioPreferencesCache
 } from "@/hooks/api/useAudioPreferences";
 
 // Need to import StyleSheet for absoluteFillObject
@@ -76,12 +60,11 @@ export function WorkoutPlayerScreen() {
   const entityId = goalId || challengeId || "";
 
   // Fetch the workout plan based on entity type
-  const { data: goalPlanData, isLoading: goalPlanLoading } = useGoalPlan(
-    goalId,
-    !!goalId,
+  const { data: goalPlanData, isLoading: goalPlanLoading } = useGoalPlan(goalId, !!goalId);
+  const { data: challengePlanData, isLoading: challengePlanLoading } = useChallengePlan(
+    challengeId,
+    isChallenge
   );
-  const { data: challengePlanData, isLoading: challengePlanLoading } =
-    useChallengePlan(challengeId, isChallenge);
 
   const planData = isChallenge ? challengePlanData : goalPlanData;
   const planLoading = isChallenge ? challengePlanLoading : goalPlanLoading;
@@ -97,7 +80,7 @@ export function WorkoutPlayerScreen() {
     startSession,
     saveProgress,
     completeSession,
-    submitFeedback,
+    submitFeedback
   } = useWorkoutSession(entityId, isChallenge);
 
   // Workout timer hook
@@ -138,7 +121,7 @@ export function WorkoutPlayerScreen() {
     skipRest,
     resumeFromProgress,
     workoutStats,
-    getNextExerciseInfo,
+    getNextExerciseInfo
   } = useWorkoutTimer(planData?.plan?.structured_data);
 
   // State for screens
@@ -149,8 +132,7 @@ export function WorkoutPlayerScreen() {
   const [isLandscape, setIsLandscape] = useState(false);
   const [showMusicModal, setShowMusicModal] = useState(false);
   const [showExerciseDetail, setShowExerciseDetail] = useState(false);
-  const [completionData, setCompletionData] =
-    useState<CompletedSessionResponse | null>(null);
+  const [completionData, setCompletionData] = useState<CompletedSessionResponse | null>(null);
 
   // Track if user manually paused before opening modals
   const wasManuallyPausedRef = useRef(false);
@@ -182,7 +164,7 @@ export function WorkoutPlayerScreen() {
     setPlaylist,
     playTrack: playMusicTrack,
     speakCountdown,
-    speakCoachPhrase,
+    speakCoachPhrase
   } = useWorkoutAudio({
     autoPlay: false,
     // Map API response to hook's expected format (handle null -> undefined)
@@ -190,10 +172,9 @@ export function WorkoutPlayerScreen() {
       ? {
           ...savedAudioPrefs,
           preferred_music_app: savedAudioPrefs.preferred_music_app ?? undefined,
-          last_played_track_id:
-            savedAudioPrefs.last_played_track_id ?? undefined,
+          last_played_track_id: savedAudioPrefs.last_played_track_id ?? undefined
         }
-      : undefined,
+      : undefined
   });
 
   // Track if we should auto-play music when playlist becomes available
@@ -217,12 +198,7 @@ export function WorkoutPlayerScreen() {
       shouldAutoPlayMusicRef.current = false;
       playMusic();
     }
-  }, [
-    musicPlaylist.length,
-    audioPreferences.music_enabled,
-    hasStarted,
-    playMusic,
-  ]);
+  }, [musicPlaylist.length, audioPreferences.music_enabled, hasStarted, playMusic]);
 
   // Animation refs
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -232,15 +208,11 @@ export function WorkoutPlayerScreen() {
     try {
       if (isLandscape) {
         // Switch back to portrait
-        await ScreenOrientation.lockAsync(
-          ScreenOrientation.OrientationLock.PORTRAIT_UP,
-        );
+        await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
         setIsLandscape(false);
       } else {
         // Switch to landscape - use LANDSCAPE to allow both directions
-        await ScreenOrientation.lockAsync(
-          ScreenOrientation.OrientationLock.LANDSCAPE,
-        );
+        await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
         setIsLandscape(true);
       }
     } catch (error) {
@@ -252,9 +224,7 @@ export function WorkoutPlayerScreen() {
   // Reset orientation when leaving screen
   useEffect(() => {
     return () => {
-      ScreenOrientation.lockAsync(
-        ScreenOrientation.OrientationLock.PORTRAIT_UP,
-      ).catch(() => {});
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
     };
   }, []);
 
@@ -296,7 +266,7 @@ export function WorkoutPlayerScreen() {
     showExerciseCountdown,
     phase,
     isCurrentExerciseTimed,
-    speakCountdown,
+    speakCountdown
   ]);
 
   // Track previous phase to detect transition to rest
@@ -305,11 +275,7 @@ export function WorkoutPlayerScreen() {
   // Play ding and speak "Next {duration} {name}" when transitioning to rest phase
   useEffect(() => {
     // Check if we just transitioned to rest phase
-    if (
-      phase === "rest" &&
-      prevPhaseRef.current !== "rest" &&
-      prevPhaseRef.current !== null
-    ) {
+    if (phase === "rest" && prevPhaseRef.current !== "rest" && prevPhaseRef.current !== null) {
       // Play ding sound when entering rest
       playDing();
 
@@ -369,8 +335,8 @@ export function WorkoutPlayerScreen() {
             completion_percentage: progress,
             exercises_completed: globalIndex,
             sets_completed: globalIndex,
-            paused_duration_seconds: workoutStats.pausedDurationSeconds,
-          },
+            paused_duration_seconds: workoutStats.pausedDurationSeconds
+          }
         }).catch((error) => console.error("Failed to save progress:", error));
       }
     },
@@ -383,8 +349,8 @@ export function WorkoutPlayerScreen() {
       currentSetIndex,
       currentRound,
       progress,
-      workoutStats.pausedDurationSeconds,
-    ],
+      workoutStats.pausedDurationSeconds
+    ]
   );
 
   // Handle workout start
@@ -407,12 +373,11 @@ export function WorkoutPlayerScreen() {
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 200, // Faster animation
-      useNativeDriver: true,
+      useNativeDriver: true
     }).start();
 
     // Start session in backend (fire and forget - don't block UI)
-    const totalExercises =
-      warmUpExercises.length + exercises.length + coolDownExercises.length;
+    const totalExercises = warmUpExercises.length + exercises.length + coolDownExercises.length;
     // Total sets includes warmup, workout (with rounds), and cooldown
     const warmupSets = warmUpExercises.length;
     const workoutSets = exercises.reduce((sum, ex) => sum + (ex.sets || 3), 0);
@@ -424,7 +389,7 @@ export function WorkoutPlayerScreen() {
       challenge_id: isChallenge ? entityId : undefined,
       plan_id: planData?.plan?.id,
       exercises_total: totalExercises,
-      sets_total: totalSetsCount,
+      sets_total: totalSetsCount
     })
       .then((session) => setSessionId(session.id))
       .catch((error) => console.error("Failed to start session:", error));
@@ -441,7 +406,7 @@ export function WorkoutPlayerScreen() {
     coolDownExercises,
     audioPreferences.music_enabled,
     musicPlaylist.length,
-    playMusic,
+    playMusic
   ]);
 
   // Handle resume from saved progress
@@ -455,7 +420,7 @@ export function WorkoutPlayerScreen() {
         phase: saved.current_phase,
         currentExerciseIndex: saved.current_exercise_index,
         currentSet: saved.current_set,
-        currentRound: saved.current_round,
+        currentRound: saved.current_round
       });
 
       // Start music if enabled and playlist is ready
@@ -471,7 +436,7 @@ export function WorkoutPlayerScreen() {
       Animated.timing(fadeAnim, {
         toValue: 1,
         duration: 300,
-        useNativeDriver: true,
+        useNativeDriver: true
       }).start();
     }
   }, [
@@ -480,7 +445,7 @@ export function WorkoutPlayerScreen() {
     fadeAnim,
     audioPreferences.music_enabled,
     musicPlaylist.length,
-    playMusic,
+    playMusic
   ]);
 
   // Handle close/exit - show exit confirmation (auto-pause like modals)
@@ -524,7 +489,7 @@ export function WorkoutPlayerScreen() {
     isMusicPlaying,
     audioPreferences.music_volume,
     setMusicVolume,
-    router,
+    router
   ]);
 
   // Handle resume from exit modal (restore state like closing a modal)
@@ -582,7 +547,7 @@ export function WorkoutPlayerScreen() {
       Speech.stop(); // Stop any ongoing speech
       handleJumpToExercise(index);
     },
-    [handleJumpToExercise],
+    [handleJumpToExercise]
   );
 
   // Handle next exercise - save progress for crash protection
@@ -599,11 +564,9 @@ export function WorkoutPlayerScreen() {
           completion_percentage: progress,
           exercises_completed: workoutStats.exercisesCompleted,
           sets_completed: workoutStats.setsCompleted,
-          paused_duration_seconds: workoutStats.pausedDurationSeconds,
-        },
-      }).catch((error) =>
-        console.error("Failed to save progress on next:", error),
-      );
+          paused_duration_seconds: workoutStats.pausedDurationSeconds
+        }
+      }).catch((error) => console.error("Failed to save progress on next:", error));
     }
     skipToNext();
   }, [
@@ -615,7 +578,7 @@ export function WorkoutPlayerScreen() {
     currentRound,
     progress,
     workoutStats,
-    skipToNext,
+    skipToNext
   ]);
 
   // Handle previous exercise - save progress for crash protection
@@ -632,11 +595,9 @@ export function WorkoutPlayerScreen() {
           completion_percentage: progress,
           exercises_completed: workoutStats.exercisesCompleted,
           sets_completed: workoutStats.setsCompleted,
-          paused_duration_seconds: workoutStats.pausedDurationSeconds,
-        },
-      }).catch((error) =>
-        console.error("Failed to save progress on prev:", error),
-      );
+          paused_duration_seconds: workoutStats.pausedDurationSeconds
+        }
+      }).catch((error) => console.error("Failed to save progress on prev:", error));
     }
     skipToPrevious();
   }, [
@@ -648,7 +609,7 @@ export function WorkoutPlayerScreen() {
     currentRound,
     progress,
     workoutStats,
-    skipToPrevious,
+    skipToPrevious
   ]);
 
   // Handle quit - show feedback screen (progress saved there when user confirms)
@@ -673,8 +634,8 @@ export function WorkoutPlayerScreen() {
             completion_percentage: progress,
             exercises_completed: workoutStats.exercisesCompleted,
             sets_completed: workoutStats.setsCompleted,
-            paused_duration_seconds: workoutStats.pausedDurationSeconds,
-          },
+            paused_duration_seconds: workoutStats.pausedDurationSeconds
+          }
         }).catch((error) => console.error("Failed to save progress:", error));
       }
 
@@ -688,7 +649,7 @@ export function WorkoutPlayerScreen() {
         exercises_completed: workoutStats.exercisesCompleted,
         completion_percentage: progress,
         time_spent_seconds: workoutStats.totalDurationSeconds,
-        current_exercise_name: currentExercise?.name,
+        current_exercise_name: currentExercise?.name
       }).catch((error) => console.error("Failed to submit feedback:", error));
 
       // Go back immediately without waiting
@@ -708,8 +669,8 @@ export function WorkoutPlayerScreen() {
       currentExerciseIndex,
       currentSetIndex,
       currentRound,
-      currentExercise,
-    ],
+      currentExercise
+    ]
   );
 
   // Handle quit without feedback - save progress in background and exit immediately
@@ -726,8 +687,8 @@ export function WorkoutPlayerScreen() {
           completion_percentage: progress,
           exercises_completed: workoutStats.exercisesCompleted,
           sets_completed: workoutStats.setsCompleted,
-          paused_duration_seconds: workoutStats.pausedDurationSeconds,
-        },
+          paused_duration_seconds: workoutStats.pausedDurationSeconds
+        }
       }).catch((error) => console.error("Failed to save progress:", error));
     }
 
@@ -742,7 +703,7 @@ export function WorkoutPlayerScreen() {
     currentSetIndex,
     currentRound,
     progress,
-    workoutStats,
+    workoutStats
   ]);
 
   // Handle resume from feedback screen
@@ -788,7 +749,7 @@ export function WorkoutPlayerScreen() {
     pauseWorkout,
     playMusic,
     pauseMusic,
-    audioPreferences.music_enabled,
+    audioPreferences.music_enabled
   ]);
 
   // ========== MODAL AUTO-PAUSE HANDLERS ==========
@@ -809,13 +770,7 @@ export function WorkoutPlayerScreen() {
     }
 
     setShowMusicModal(true);
-  }, [
-    isPaused,
-    pauseWorkout,
-    isMusicPlaying,
-    audioPreferences.music_volume,
-    setMusicVolume,
-  ]);
+  }, [isPaused, pauseWorkout, isMusicPlaying, audioPreferences.music_volume, setMusicVolume]);
 
   // Close music modal - restore state
   const handleCloseMusicModal = useCallback(() => {
@@ -854,13 +809,7 @@ export function WorkoutPlayerScreen() {
     }
 
     setShowExerciseDetail(true);
-  }, [
-    isPaused,
-    pauseWorkout,
-    isMusicPlaying,
-    audioPreferences.music_volume,
-    setMusicVolume,
-  ]);
+  }, [isPaused, pauseWorkout, isMusicPlaying, audioPreferences.music_volume, setMusicVolume]);
 
   // Close exercise detail modal - restore state
   const handleCloseExerciseDetail = useCallback(() => {
@@ -889,7 +838,7 @@ export function WorkoutPlayerScreen() {
       // Update local state immediately (no backend call)
       updateAudioPreferences(updates);
     },
-    [updateAudioPreferences],
+    [updateAudioPreferences]
   );
 
   // Save audio preferences to backend (called when Done is clicked)
@@ -909,8 +858,8 @@ export function WorkoutPlayerScreen() {
             exercises_completed: workoutStats.exercisesCompleted,
             exercises_skipped: workoutStats.exercisesSkipped,
             sets_completed: workoutStats.setsCompleted,
-            paused_duration_seconds: workoutStats.pausedDurationSeconds,
-          },
+            paused_duration_seconds: workoutStats.pausedDurationSeconds
+          }
         });
 
         // Store completion data for CompletionFlow
@@ -928,11 +877,11 @@ export function WorkoutPlayerScreen() {
             longest_streak: 0,
             milestone_target: 7,
             days_until_milestone: 7,
-            workout_dates_this_week: [],
+            workout_dates_this_week: []
           },
           workout_number_today: 1,
           is_practice: false,
-          can_add_reflection: false, // Don't show reflection if API failed
+          can_add_reflection: false // Don't show reflection if API failed
         });
       }
     }
@@ -979,11 +928,9 @@ export function WorkoutPlayerScreen() {
           completion_percentage: progress,
           exercises_completed: 0,
           sets_completed: 0,
-          paused_duration_seconds: 0,
-        },
-      }).catch((error) =>
-        console.error("Failed to save initial progress:", error),
-      );
+          paused_duration_seconds: 0
+        }
+      }).catch((error) => console.error("Failed to save initial progress:", error));
     }
   }, [
     showReadyCountdown,
@@ -994,7 +941,7 @@ export function WorkoutPlayerScreen() {
     currentSetIndex,
     currentRound,
     progress,
-    playDing,
+    playDing
   ]);
 
   // Auto-start or auto-resume when plan loads
@@ -1015,8 +962,8 @@ export function WorkoutPlayerScreen() {
           completion_percentage: 0,
           exercises_completed: 0,
           sets_completed: 0,
-          paused_duration_seconds: 0,
-        },
+          paused_duration_seconds: 0
+        }
       }).catch((error) => console.error("Failed to reset progress:", error));
 
       // Use the existing session but start workout from beginning
@@ -1027,7 +974,7 @@ export function WorkoutPlayerScreen() {
       Animated.timing(fadeAnim, {
         toValue: 1,
         duration: 200,
-        useNativeDriver: true,
+        useNativeDriver: true
       }).start();
       return;
     }
@@ -1054,7 +1001,7 @@ export function WorkoutPlayerScreen() {
     restart,
     saveProgress,
     startWorkout,
-    fadeAnim,
+    fadeAnim
   ]);
 
   // Format time as MM:SS
@@ -1089,19 +1036,17 @@ export function WorkoutPlayerScreen() {
             longest_streak: 0,
             milestone_target: 7,
             days_until_milestone: 7,
-            workout_dates_this_week: [],
+            workout_dates_this_week: []
           },
           workout_number_today: completionData.workout_number_today || 1,
           is_practice: completionData.is_practice || false,
-          can_add_reflection: completionData.can_add_reflection || false,
+          can_add_reflection: completionData.can_add_reflection || false
         }}
         dayNumber={dayNumber}
         onComplete={(feedback) => {
           // Update feedback if provided
           if (feedback && sessionId) {
-            workoutSessionsService
-              .updateFeedback(sessionId, feedback)
-              .catch(console.error);
+            workoutSessionsService.updateFeedback(sessionId, feedback).catch(console.error);
           }
           router.back();
         }}
@@ -1113,7 +1058,7 @@ export function WorkoutPlayerScreen() {
             challenge_id: isChallenge ? entityId : undefined,
             mood: data.mood,
             notes: data.notes,
-            photo_url: data.photo_url,
+            photo_url: data.photo_url
           });
         }}
       />
@@ -1128,16 +1073,14 @@ export function WorkoutPlayerScreen() {
   // Get current exercise for display (even during ready countdown)
   // When resuming, currentExercise is already set to the resumed position
   const displayExercise = showReadyCountdown
-    ? currentExercise ||
-      (warmUpExercises.length > 0 ? warmUpExercises[0] : exercises[0])
+    ? currentExercise || (warmUpExercises.length > 0 ? warmUpExercises[0] : exercises[0])
     : currentExercise;
 
   // Get next exercise name for header
   const getNextExerciseNameForHeader = () => {
     if (showReadyCountdown) {
       if (warmUpExercises.length > 1) return warmUpExercises[1]?.name;
-      if (warmUpExercises.length === 1 && exercises.length > 0)
-        return exercises[0]?.name;
+      if (warmUpExercises.length === 1 && exercises.length > 0) return exercises[0]?.name;
       if (exercises.length > 1) return exercises[1]?.name;
       return null;
     }
@@ -1195,9 +1138,7 @@ export function WorkoutPlayerScreen() {
           ? warmUpExercises.length +
             ((nextInfo.round || currentRound) - 1) * exercises.length +
             nextInfo.exerciseIndex
-          : warmUpExercises.length +
-            exercises.length * maxSets +
-            nextInfo.exerciseIndex
+          : warmUpExercises.length + exercises.length * maxSets + nextInfo.exerciseIndex
       : overallExerciseIndex;
 
     // 1-based display index for "NEXT X/Y" label
@@ -1255,7 +1196,7 @@ export function WorkoutPlayerScreen() {
               style={[
                 styles.progressSegment,
                 index < overallExerciseIndex && styles.progressSegmentComplete,
-                index === overallExerciseIndex && styles.progressSegmentActive,
+                index === overallExerciseIndex && styles.progressSegmentActive
               ]}
             />
           ))}
@@ -1264,10 +1205,7 @@ export function WorkoutPlayerScreen() {
         {/* Header */}
         <View style={styles.workoutHeader}>
           {!showReadyCountdown && (
-            <TouchableOpacity
-              onPress={handleClose}
-              style={styles.closeButtonCircle}
-            >
+            <TouchableOpacity onPress={handleClose} style={styles.closeButtonCircle}>
               <Ionicons name="close" size={24} color={colors.text.primary} />
             </TouchableOpacity>
           )}
@@ -1288,21 +1226,11 @@ export function WorkoutPlayerScreen() {
         {/* Side controls (expand, music) - hidden during ready countdown */}
         {!showReadyCountdown && (
           <View style={styles.sideControls}>
-            <TouchableOpacity
-              style={styles.sideIconButton}
-              onPress={toggleLandscape}
-            >
+            <TouchableOpacity style={styles.sideIconButton} onPress={toggleLandscape}>
               <Ionicons name="expand" size={20} color={colors.text.primary} />
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.sideIconButton}
-              onPress={handleOpenMusicModal}
-            >
-              <Ionicons
-                name="musical-note"
-                size={20}
-                color={colors.text.primary}
-              />
+            <TouchableOpacity style={styles.sideIconButton} onPress={handleOpenMusicModal}>
+              <Ionicons name="musical-note" size={20} color={colors.text.primary} />
             </TouchableOpacity>
           </View>
         )}
@@ -1343,17 +1271,13 @@ export function WorkoutPlayerScreen() {
         {/* Bottom panel (black background) - hidden during ready countdown */}
         {!showReadyCountdown && (
           <View
-            style={[
-              styles.bottomPanel,
-              { paddingBottom: insets.bottom + toRN(tokens.spacing[4]) },
-            ]}
+            style={[styles.bottomPanel, { paddingBottom: insets.bottom + toRN(tokens.spacing[4]) }]}
           >
             {/* Phase label */}
             <Text style={styles.phaseLabel}>
               {phase === "warmup" && t("workout.phase.warm_up", "WARM UP")}
               {phase === "workout" && t("workout.phase.work", "WORKOUT")}
-              {phase === "cooldown" &&
-                t("workout.phase.cool_down", "COOL DOWN")}
+              {phase === "cooldown" && t("workout.phase.cool_down", "COOL DOWN")}
             </Text>
 
             {/* Exercise name with help */}
@@ -1361,15 +1285,8 @@ export function WorkoutPlayerScreen() {
               <Text style={styles.bottomExerciseName} numberOfLines={2}>
                 {currentExercise?.name || ""}
               </Text>
-              <TouchableOpacity
-                style={styles.helpIcon}
-                onPress={handleOpenExerciseDetail}
-              >
-                <Ionicons
-                  name="help-circle-outline"
-                  size={20}
-                  color="rgba(255,255,255,0.6)"
-                />
+              <TouchableOpacity style={styles.helpIcon} onPress={handleOpenExerciseDetail}>
+                <Ionicons name="help-circle-outline" size={20} color="rgba(255,255,255,0.6)" />
               </TouchableOpacity>
             </View>
 
@@ -1378,7 +1295,7 @@ export function WorkoutPlayerScreen() {
               <Text style={styles.roundLabel}>
                 {t("workout.round_of", "Round {{current}}/{{total}}", {
                   current: currentRound,
-                  total: maxSets,
+                  total: maxSets
                 })}
               </Text>
             )}
@@ -1386,24 +1303,17 @@ export function WorkoutPlayerScreen() {
             {/* Timer or Done button */}
             {isCurrentExerciseTimed ? (
               <View style={styles.timerDisplay}>
-                <Text style={styles.timerText}>
-                  {formatTime(timeRemaining)}
-                </Text>
+                <Text style={styles.timerText}>{formatTime(timeRemaining)}</Text>
               </View>
             ) : (
               <View style={styles.repDisplay}>
                 <Text style={styles.repText}>
                   {t("workout.do_reps", "Do {{count}} reps", {
-                    count: (currentExercise as WorkoutExercise)?.reps || 10,
+                    count: (currentExercise as WorkoutExercise)?.reps || 10
                   })}
                 </Text>
-                <TouchableOpacity
-                  style={styles.doneButton}
-                  onPress={markExerciseDone}
-                >
-                  <Text style={styles.doneButtonText}>
-                    {t("workout.done", "Done")}
-                  </Text>
+                <TouchableOpacity style={styles.doneButton} onPress={markExerciseDone}>
+                  <Text style={styles.doneButtonText}>{t("workout.done", "Done")}</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -1412,25 +1322,15 @@ export function WorkoutPlayerScreen() {
             <View style={styles.controlsContainer}>
               {/* Previous button - hidden when at first exercise */}
               {overallExerciseIndex > 0 ? (
-                <TouchableOpacity
-                  style={styles.navButton}
-                  onPress={handlePrevious}
-                >
+                <TouchableOpacity style={styles.navButton} onPress={handlePrevious}>
                   <Ionicons name="play-skip-back" size={28} color="white" />
                 </TouchableOpacity>
               ) : (
                 <View style={styles.navButtonPlaceholder} />
               )}
 
-              <TouchableOpacity
-                style={styles.pauseButton}
-                onPress={handleWorkoutPlayPause}
-              >
-                <Ionicons
-                  name={isPaused ? "play" : "pause"}
-                  size={32}
-                  color="white"
-                />
+              <TouchableOpacity style={styles.pauseButton} onPress={handleWorkoutPlayPause}>
+                <Ionicons name={isPaused ? "play" : "pause"} size={32} color="white" />
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.navButton} onPress={handleNext}>
@@ -1506,28 +1406,28 @@ export function WorkoutPlayerScreen() {
 const makeStyles = (tokens: any, colors: any, brand: any) => ({
   container: {
     flex: 1,
-    backgroundColor: colors.bg.canvas,
+    backgroundColor: colors.bg.canvas
   },
   restContainer: {
     flex: 1,
-    backgroundColor: "#007AFF",
+    backgroundColor: "#007AFF"
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center" as const,
     alignItems: "center" as const,
-    backgroundColor: colors.bg.canvas,
+    backgroundColor: colors.bg.canvas
   },
   loadingText: {
     marginTop: toRN(tokens.spacing[4]),
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.medium,
-    color: colors.text.secondary,
+    color: colors.text.secondary
   },
 
   // Active Workout
   workoutContainer: {
-    flex: 1,
+    flex: 1
   },
 
   // Progress bar
@@ -1535,20 +1435,20 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     flexDirection: "row" as const,
     paddingHorizontal: toRN(tokens.spacing[4]),
     paddingTop: toRN(tokens.spacing[2]),
-    gap: toRN(4),
+    gap: toRN(4)
   },
   progressSegment: {
     flex: 1,
     height: toRN(4),
     backgroundColor: colors.border.subtle,
-    borderRadius: toRN(2),
+    borderRadius: toRN(2)
   },
   progressSegmentComplete: {
-    backgroundColor: brand.primary,
+    backgroundColor: brand.primary
   },
   progressSegmentActive: {
     backgroundColor: brand.primary,
-    opacity: 0.6,
+    opacity: 0.6
   },
 
   // Workout header
@@ -1556,7 +1456,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     flexDirection: "row" as const,
     alignItems: "center" as const,
     paddingHorizontal: toRN(tokens.spacing[4]),
-    paddingVertical: toRN(tokens.spacing[3]),
+    paddingVertical: toRN(tokens.spacing[3])
   },
   closeButtonCircle: {
     width: toRN(40),
@@ -1564,28 +1464,28 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     borderRadius: toRN(20),
     backgroundColor: colors.bg.secondary,
     alignItems: "center" as const,
-    justifyContent: "center" as const,
+    justifyContent: "center" as const
   },
   headerCenter: {
     flex: 1,
     alignItems: "center" as const,
-    paddingHorizontal: toRN(tokens.spacing[2]),
+    paddingHorizontal: toRN(tokens.spacing[2])
   },
   currentExerciseName: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.groteskBold,
     color: colors.text.primary,
-    textTransform: "capitalize" as const,
+    textTransform: "capitalize" as const
   },
   nextExerciseLabel: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.medium,
     color: colors.text.tertiary,
-    marginTop: toRN(2),
+    marginTop: toRN(2)
   },
   headerRight: {
     width: toRN(40),
-    alignItems: "flex-end" as const,
+    alignItems: "flex-end" as const
   },
 
   // Side controls (expand, music, chevron)
@@ -1594,7 +1494,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     right: toRN(tokens.spacing[4]),
     top: toRN(130),
     gap: toRN(tokens.spacing[3]),
-    zIndex: 5,
+    zIndex: 5
   },
   sideIconButton: {
     width: toRN(36),
@@ -1602,7 +1502,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     borderRadius: toRN(18),
     backgroundColor: colors.bg.muted,
     alignItems: "center" as const,
-    justifyContent: "center" as const,
+    justifyContent: "center" as const
   },
 
   // Video display
@@ -1614,15 +1514,15 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     borderRadius: toRN(tokens.borderRadius.xl),
     overflow: "hidden" as const,
     justifyContent: "center" as const,
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   exerciseVideo: {
     width: "100%",
-    height: "100%",
+    height: "100%"
   },
   videoPlaceholder: {
     alignItems: "center" as const,
-    justifyContent: "center" as const,
+    justifyContent: "center" as const
   },
   pauseIconContainer: {
     position: "absolute" as const,
@@ -1631,7 +1531,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     right: 0,
     bottom: 0,
     alignItems: "center" as const,
-    justifyContent: "center" as const,
+    justifyContent: "center" as const
   },
 
   // Bottom panel
@@ -1641,7 +1541,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     borderTopRightRadius: toRN(tokens.borderRadius.xl),
     paddingHorizontal: toRN(tokens.spacing[5]),
     paddingTop: toRN(tokens.spacing[4]),
-    paddingBottom: toRN(tokens.spacing[6]),
+    paddingBottom: toRN(tokens.spacing[6])
   },
   phaseLabel: {
     fontSize: toRN(tokens.typography.fontSize.xs),
@@ -1650,14 +1550,14 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     textTransform: "uppercase" as const,
     letterSpacing: 2,
     textAlign: "center" as const,
-    marginBottom: toRN(tokens.spacing[1]),
+    marginBottom: toRN(tokens.spacing[1])
   },
   exerciseNameRow: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
     justifyContent: "center" as const,
     marginBottom: toRN(tokens.spacing[1]),
-    paddingHorizontal: toRN(tokens.spacing[2]),
+    paddingHorizontal: toRN(tokens.spacing[2])
   },
   bottomExerciseName: {
     fontSize: toRN(tokens.typography.fontSize.lg),
@@ -1665,53 +1565,53 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     color: "white",
     textTransform: "capitalize" as const,
     textAlign: "center" as const,
-    flexShrink: 1,
+    flexShrink: 1
   },
   helpIcon: {
     marginLeft: toRN(tokens.spacing[2]),
     padding: toRN(4),
-    flexShrink: 0,
+    flexShrink: 0
   },
   roundLabel: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
     color: "rgba(255,255,255,0.6)",
     textAlign: "center" as const,
-    marginBottom: toRN(tokens.spacing[2]),
+    marginBottom: toRN(tokens.spacing[2])
   },
 
   // Timer display
   timerDisplay: {
     alignItems: "center" as const,
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   timerText: {
     fontSize: toRN(56),
     fontFamily: fontFamily.groteskBold,
-    color: "white",
+    color: "white"
   },
 
   // Rep display
   repDisplay: {
     alignItems: "center" as const,
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   repText: {
     fontSize: toRN(tokens.typography.fontSize.xl),
     fontFamily: fontFamily.semiBold,
     color: "white",
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   doneButton: {
     backgroundColor: brand.primary,
     paddingVertical: toRN(tokens.spacing[3]),
     paddingHorizontal: toRN(tokens.spacing[8]),
-    borderRadius: toRN(tokens.borderRadius.full),
+    borderRadius: toRN(tokens.borderRadius.full)
   },
   doneButtonText: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.semiBold,
-    color: "white",
+    color: "white"
   },
 
   // Controls
@@ -1719,7 +1619,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     flexDirection: "row" as const,
     alignItems: "center" as const,
     justifyContent: "center" as const,
-    gap: toRN(tokens.spacing[6]),
+    gap: toRN(tokens.spacing[6])
   },
   navButton: {
     width: toRN(50),
@@ -1727,11 +1627,11 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     borderRadius: toRN(25),
     backgroundColor: "rgba(255,255,255,0.1)",
     alignItems: "center" as const,
-    justifyContent: "center" as const,
+    justifyContent: "center" as const
   },
   navButtonPlaceholder: {
     width: toRN(50),
-    height: toRN(50),
+    height: toRN(50)
   },
   pauseButton: {
     width: toRN(70),
@@ -1739,8 +1639,8 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     borderRadius: toRN(35),
     backgroundColor: brand.primary,
     alignItems: "center" as const,
-    justifyContent: "center" as const,
-  },
+    justifyContent: "center" as const
+  }
 });
 const StyleSheet = RNStyleSheet;
 

@@ -9,14 +9,9 @@ import {
   Easing,
   Share,
   StatusBar,
-  StyleSheet,
+  StyleSheet
 } from "react-native";
-import Svg, {
-  Defs,
-  LinearGradient as SvgLinearGradient,
-  Stop,
-  Rect,
-} from "react-native-svg";
+import Svg, { Defs, LinearGradient as SvgLinearGradient, Stop, Rect } from "react-native-svg";
 import { useStyles } from "@/themes";
 import { useTheme } from "@/themes";
 import { tokens } from "@/themes/tokens";
@@ -28,7 +23,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { DailyMotivation } from "@/services/api";
 import {
   useShareDailyMotivation,
-  useRegenerateDailyMotivation,
+  useRegenerateDailyMotivation
 } from "@/hooks/api/useDailyMotivations";
 import { useSubscriptionStore } from "@/stores/subscriptionStore";
 import { getContrastingTextColor } from "@/utils/helper";
@@ -64,7 +59,7 @@ export function DailyMotivationModal({
   visible,
   motivation: initialMotivation,
   onClose,
-  onRegenerateComplete,
+  onRegenerateComplete
 }: DailyMotivationModalProps) {
   const styles = useStyles(makeDailyMotivationModalStyles);
   const { colors } = useTheme();
@@ -88,7 +83,7 @@ export function DailyMotivationModal({
 
   // Check if user has unlimited_text_motivation feature
   const hasUnlimitedMotivation = useSubscriptionStore((state) =>
-    state.hasFeature("unlimited_text_motivation"),
+    state.hasFeature("unlimited_text_motivation")
   );
 
   // Animation values - starts off-screen at the bottom
@@ -102,14 +97,14 @@ export function DailyMotivationModal({
         damping: 20,
         mass: 1,
         stiffness: 120,
-        useNativeDriver: true,
+        useNativeDriver: true
       }).start();
     } else {
       Animated.timing(translateY, {
         toValue: screenHeight,
         duration: 300,
         easing: Easing.in(Easing.ease),
-        useNativeDriver: true,
+        useNativeDriver: true
       }).start();
     }
   }, [visible, translateY, screenHeight]);
@@ -118,7 +113,7 @@ export function DailyMotivationModal({
     try {
       const result = await Share.share({
         message: `${motivation.message}\n\n- ${t("home.daily_motivation_share_footer")}`,
-        title: t("home.daily_motivation_share_title"),
+        title: t("home.daily_motivation_share_title")
       });
 
       // Only increment share count if sharing was successful
@@ -143,7 +138,7 @@ export function DailyMotivationModal({
       onError: (error) => {
         console.error("Error regenerating motivation:", error);
         // You might want to show an error toast here
-      },
+      }
     });
   };
 
@@ -157,15 +152,10 @@ export function DailyMotivationModal({
   const textColor = getContrastingTextColor(gradientColors);
   const buttonTextColor = textColor; // Use same color for buttons
   const closeButtonBg =
-    textColor === "#000000"
-      ? "rgba(0, 0, 0, 0.15)"
-      : "rgba(255, 255, 255, 0.2)";
+    textColor === "#000000" ? "rgba(0, 0, 0, 0.15)" : "rgba(255, 255, 255, 0.2)";
   const actionButtonBg =
-    textColor === "#000000"
-      ? "rgba(0, 0, 0, 0.15)"
-      : "rgba(255, 255, 255, 0.2)";
-  const actionBarBg =
-    textColor === "#000000" ? "rgba(255, 255, 255, 0.3)" : "rgba(0, 0, 0, 0.3)";
+    textColor === "#000000" ? "rgba(0, 0, 0, 0.15)" : "rgba(255, 255, 255, 0.2)";
+  const actionBarBg = textColor === "#000000" ? "rgba(255, 255, 255, 0.3)" : "rgba(0, 0, 0, 0.3)";
 
   return (
     <Modal
@@ -182,27 +172,19 @@ export function DailyMotivationModal({
         style={[
           styles.modalContainer,
           {
-            transform: [{ translateY }],
-          },
+            transform: [{ translateY }]
+          }
         ]}
       >
         {/* Gradient Background using SVG */}
         <View style={styles.gradientContainer}>
           <Svg
             width={Dimensions.get("window").width}
-            height={
-              Dimensions.get("window").height + insets.top + insets.bottom
-            }
+            height={Dimensions.get("window").height + insets.top + insets.bottom}
             style={StyleSheet.absoluteFill}
           >
             <Defs>
-              <SvgLinearGradient
-                id="backgroundGradient"
-                x1="0%"
-                y1="0%"
-                x2="100%"
-                y2="100%"
-              >
+              <SvgLinearGradient id="backgroundGradient" x1="0%" y1="0%" x2="100%" y2="100%">
                 {gradientColors.map((color, index) => (
                   <Stop
                     key={index}
@@ -222,8 +204,8 @@ export function DailyMotivationModal({
               styles.closeButton,
               {
                 top: insets.top + toRN(tokens.spacing[4]),
-                backgroundColor: closeButtonBg,
-              },
+                backgroundColor: closeButtonBg
+              }
             ]}
             onPress={onClose}
             accessibilityLabel={t("common.close")}
@@ -242,13 +224,11 @@ export function DailyMotivationModal({
               styles.contentContainer,
               {
                 paddingTop: insets.top + toRN(tokens.spacing[20]),
-                paddingBottom: insets.bottom + toRN(tokens.spacing[20]),
-              },
+                paddingBottom: insets.bottom + toRN(tokens.spacing[20])
+              }
             ]}
           >
-            <Text style={[styles.motivationText, { color: textColor }]}>
-              {motivation.message}
-            </Text>
+            <Text style={[styles.motivationText, { color: textColor }]}>{motivation.message}</Text>
           </View>
 
           {/* Bottom Action Bar */}
@@ -257,8 +237,8 @@ export function DailyMotivationModal({
               styles.actionBar,
               {
                 paddingBottom: insets.bottom + toRN(tokens.spacing[4]),
-                backgroundColor: actionBarBg,
-              },
+                backgroundColor: actionBarBg
+              }
             ]}
           >
             {hasUnlimitedMotivation && (
@@ -266,7 +246,7 @@ export function DailyMotivationModal({
                 style={[
                   styles.actionButton,
                   { backgroundColor: actionButtonBg },
-                  isRegenerating && styles.actionButtonDisabled,
+                  isRegenerating && styles.actionButtonDisabled
                 ]}
                 onPress={handleRegenerate}
                 disabled={isRegenerating}
@@ -278,9 +258,7 @@ export function DailyMotivationModal({
                   size={toRN(tokens.typography.fontSize.xl)}
                   color={buttonTextColor}
                 />
-                <Text
-                  style={[styles.actionButtonText, { color: buttonTextColor }]}
-                >
+                <Text style={[styles.actionButtonText, { color: buttonTextColor }]}>
                   {isRegenerating
                     ? t("home.generating_motivation")
                     : t("home.generate_another_motivation")}
@@ -298,9 +276,7 @@ export function DailyMotivationModal({
                 size={toRN(tokens.typography.fontSize.xl)}
                 color={buttonTextColor}
               />
-              <Text
-                style={[styles.actionButtonText, { color: buttonTextColor }]}
-              >
+              <Text style={[styles.actionButtonText, { color: buttonTextColor }]}>
                 {t("common.share")}
               </Text>
             </TouchableOpacity>
@@ -311,11 +287,7 @@ export function DailyMotivationModal({
   );
 }
 
-const makeDailyMotivationModalStyles = (
-  tokens: any,
-  colors: any,
-  brand: any,
-) => ({
+const makeDailyMotivationModalStyles = (tokens: any, colors: any, brand: any) => ({
   modalContainer: {
     flex: 1,
     width: "100%",
@@ -324,7 +296,7 @@ const makeDailyMotivationModalStyles = (
     top: 0,
     left: 0,
     right: 0,
-    bottom: 0,
+    bottom: 0
   },
   gradientContainer: {
     flex: 1,
@@ -333,7 +305,7 @@ const makeDailyMotivationModalStyles = (
     justifyContent: "center",
     alignItems: "center",
     position: "relative",
-    overflow: "hidden",
+    overflow: "hidden"
   },
   closeButton: {
     position: "absolute",
@@ -344,14 +316,14 @@ const makeDailyMotivationModalStyles = (
     borderRadius: toRN(tokens.borderRadius.full),
     // backgroundColor is set dynamically based on text color
     justifyContent: "center",
-    alignItems: "center",
+    alignItems: "center"
   },
   contentContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: toRN(tokens.spacing[6]),
-    width: "100%",
+    width: "100%"
   },
   motivationText: {
     fontSize: toRN(tokens.typography.fontSize["3xl"]),
@@ -361,7 +333,7 @@ const makeDailyMotivationModalStyles = (
     lineHeight: toRN(tokens.typography.fontSize["3xl"]) * 1.4,
     textShadowColor: "rgba(0, 0, 0, 0.1)",
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    textShadowRadius: 2
   },
   actionBar: {
     position: "absolute",
@@ -373,7 +345,7 @@ const makeDailyMotivationModalStyles = (
     alignItems: "center",
     gap: toRN(tokens.spacing[3]),
     paddingHorizontal: toRN(tokens.spacing[6]),
-    paddingVertical: toRN(tokens.spacing[4]),
+    paddingVertical: toRN(tokens.spacing[4])
     // backgroundColor is set dynamically based on text color
   },
   actionButton: {
@@ -384,14 +356,14 @@ const makeDailyMotivationModalStyles = (
     paddingHorizontal: toRN(tokens.spacing[6]),
     borderRadius: toRN(tokens.borderRadius.full),
     // backgroundColor is set dynamically based on text color
-    gap: toRN(tokens.spacing[2]),
+    gap: toRN(tokens.spacing[2])
   },
   actionButtonDisabled: {
-    opacity: 0.6,
+    opacity: 0.6
   },
   actionButtonText: {
     fontSize: toRN(tokens.typography.fontSize.base),
-    fontFamily: fontFamily.semiBold,
+    fontFamily: fontFamily.semiBold
     // color is set dynamically based on gradient luminance
-  },
+  }
 });

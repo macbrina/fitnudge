@@ -17,7 +17,7 @@ import { AppState, AppStateStatus } from "react-native";
 import type {
   RealtimeChannel,
   RealtimePostgresChangesPayload,
-  REALTIME_SUBSCRIBE_STATES,
+  REALTIME_SUBSCRIBE_STATES
 } from "@supabase/supabase-js";
 import { logger } from "@/services/logger";
 import { handleAutoLogout } from "@/utils/authUtils";
@@ -32,7 +32,7 @@ import {
   actionablePlansQueryKeys,
   partnersQueryKeys,
   nudgesQueryKeys,
-  challengeInvitesQueryKeys,
+  challengeInvitesQueryKeys
 } from "@/hooks/api/queryKeys";
 import { notificationHistoryQueryKeys } from "@/hooks/api/useNotificationHistory";
 import { dailyMotivationsQueryKeys } from "@/hooks/api/useDailyMotivations";
@@ -90,7 +90,7 @@ const REALTIME_TABLES = [
   "likes",
   "follows",
   // Social nudges (partner nudges, cheers, etc.)
-  "social_nudges",
+  "social_nudges"
 ] as const;
 
 type RealtimeTable = (typeof REALTIME_TABLES)[number];
@@ -146,7 +146,7 @@ const TABLE_QUERY_KEY_MAP: Record<RealtimeTable, readonly string[]> = {
   likes: ["social", "likes"],
   follows: ["social", "follows"],
   // Social nudges (partner nudges, cheers, etc.)
-  social_nudges: nudgesQueryKeys.all,
+  social_nudges: nudgesQueryKeys.all
 };
 
 class RealtimeService {
@@ -188,7 +188,7 @@ class RealtimeService {
 
     this.appStateSubscription = AppState.addEventListener(
       "change",
-      this.handleAppStateChange.bind(this),
+      this.handleAppStateChange.bind(this)
     );
 
     console.log("[Realtime] 📱 AppState listener initialized");
@@ -204,9 +204,7 @@ class RealtimeService {
 
     // Only act when transitioning TO active (foreground)
     if (nextAppState === "active" && previousState !== "active") {
-      console.log(
-        `[Realtime] 📱 App came to foreground (was: ${previousState})`,
-      );
+      console.log(`[Realtime] 📱 App came to foreground (was: ${previousState})`);
 
       // Check if we have a user and should be connected
       if (this.currentUserId) {
@@ -214,9 +212,7 @@ class RealtimeService {
         const isHealthy = await this.checkConnectionHealth();
 
         if (!isHealthy) {
-          console.log(
-            "[Realtime] 🔄 Connection unhealthy after foreground, reconnecting...",
-          );
+          console.log("[Realtime] 🔄 Connection unhealthy after foreground, reconnecting...");
           await this.reconnectAfterBackground();
         } else {
           console.log("[Realtime] ✅ Connection healthy after foreground");
@@ -252,9 +248,7 @@ class RealtimeService {
     // If less than half the channels are joined, consider unhealthy
     const healthyThreshold = Math.ceil(this.channels.size / 2);
     if (joinedCount < healthyThreshold) {
-      console.log(
-        `[Realtime] ⚠️ Only ${joinedCount}/${this.channels.size} channels joined`,
-      );
+      console.log(`[Realtime] ⚠️ Only ${joinedCount}/${this.channels.size} channels joined`);
       return false;
     }
 
@@ -262,7 +256,7 @@ class RealtimeService {
     const timeSinceHeartbeat = Date.now() - this.lastHeartbeat;
     if (timeSinceHeartbeat > this.STALE_CONNECTION_THRESHOLD_MS) {
       console.log(
-        `[Realtime] ⚠️ Connection stale: ${Math.round(timeSinceHeartbeat / 1000)}s since last heartbeat`,
+        `[Realtime] ⚠️ Connection stale: ${Math.round(timeSinceHeartbeat / 1000)}s since last heartbeat`
       );
       return false;
     }
@@ -310,19 +304,13 @@ class RealtimeService {
 
       if (__DEV__ && activeChannels < this.channels.size) {
         console.log(
-          `[Realtime] 💓 Heartbeat: ${activeChannels}/${this.channels.size} channels active`,
+          `[Realtime] 💓 Heartbeat: ${activeChannels}/${this.channels.size} channels active`
         );
       }
 
       // If all channels have disconnected, attempt reconnect
-      if (
-        activeChannels === 0 &&
-        this.channels.size > 0 &&
-        this.currentUserId
-      ) {
-        console.log(
-          "[Realtime] 💔 All channels disconnected, attempting reconnect...",
-        );
+      if (activeChannels === 0 && this.channels.size > 0 && this.currentUserId) {
+        console.log("[Realtime] 💔 All channels disconnected, attempting reconnect...");
         this.reconnectAfterBackground();
       }
     }, this.HEARTBEAT_INTERVAL_MS);
@@ -349,7 +337,7 @@ class RealtimeService {
       predicate: (query) =>
         Array.isArray(query.queryKey) &&
         query.queryKey[0] === "partners" &&
-        query.queryKey[1] === "dashboard",
+        query.queryKey[1] === "dashboard"
     });
 
     // Force immediate refetch if requested
@@ -359,7 +347,7 @@ class RealtimeService {
           Array.isArray(query.queryKey) &&
           query.queryKey[0] === "partners" &&
           query.queryKey[1] === "dashboard",
-        type: "active",
+        type: "active"
       });
     }
   }
@@ -397,39 +385,34 @@ class RealtimeService {
           if (parts.length === 3) {
             const payload = JSON.parse(atob(parts[1]));
             console.log(
-              `[Realtime] 🔑 Setting session for user: ${payload.sub?.substring(0, 8)}...`,
+              `[Realtime] 🔑 Setting session for user: ${payload.sub?.substring(0, 8)}...`
             );
           }
         } catch (decodeErr) {
-          console.warn(
-            "[Realtime]   - Failed to decode JWT payload:",
-            decodeErr,
-          );
+          console.warn("[Realtime]   - Failed to decode JWT payload:", decodeErr);
         }
 
         const { error } = await supabase.auth.setSession({
           access_token: accessToken,
-          refresh_token: refreshToken || "",
+          refresh_token: refreshToken || ""
         });
 
         if (error) {
           console.error("[Realtime] ❌ Failed to set session:", error.message);
           // Without a valid session, RLS won't work - user won't receive their events
           console.warn(
-            "[Realtime] ⚠️ Continuing without session - realtime events may not work for this user",
+            "[Realtime] ⚠️ Continuing without session - realtime events may not work for this user"
           );
         } else {
           console.log("[Realtime] ✅ Session set successfully for RLS");
         }
       } else {
-        console.warn(
-          "[Realtime] ⚠️ No access token available - realtime RLS filtering won't work",
-        );
+        console.warn("[Realtime] ⚠️ No access token available - realtime RLS filtering won't work");
       }
     } catch (error) {
       console.error(
         "[Realtime] ❌ Session setup error:",
-        error instanceof Error ? error.message : error,
+        error instanceof Error ? error.message : error
       );
     }
 
@@ -439,7 +422,7 @@ class RealtimeService {
 
     // Subscribe to all Realtime-enabled tables
     const subscriptionPromises = REALTIME_TABLES.map((table) =>
-      this.subscribeToTable(table, userId),
+      this.subscribeToTable(table, userId)
     );
     await Promise.allSettled(subscriptionPromises);
 
@@ -461,18 +444,16 @@ class RealtimeService {
       this.reconnectAttempts = 0;
       this.startHeartbeat(); // Start heartbeat to detect stale connections
       console.log(
-        `[Realtime] ✅ Connected: ${this.successfulTables.size}/${REALTIME_TABLES.length} tables`,
+        `[Realtime] ✅ Connected: ${this.successfulTables.size}/${REALTIME_TABLES.length} tables`
       );
     } else if (this.successfulTables.size > 0) {
       this.isConnected = true;
       this.reconnectAttempts = 0;
       this.startHeartbeat(); // Start heartbeat even for partial connections
       console.log(
-        `[Realtime] ⚠️ Partial: ${this.successfulTables.size}/${REALTIME_TABLES.length} tables`,
+        `[Realtime] ⚠️ Partial: ${this.successfulTables.size}/${REALTIME_TABLES.length} tables`
       );
-      console.log(
-        `   Failed/Pending: ${Array.from(this.failedTables).join(", ")}`,
-      );
+      console.log(`   Failed/Pending: ${Array.from(this.failedTables).join(", ")}`);
 
       // Schedule retry for failed/pending tables
       if (this.failedTables.size > 0) {
@@ -483,7 +464,7 @@ class RealtimeService {
       if (retryCount < MAX_START_RETRIES) {
         const delay = RETRY_DELAY_MS * 2 ** retryCount;
         console.warn(
-          `[Realtime] ⚠️ Failed to connect, retrying in ${delay / 1000}s... (attempt ${retryCount + 1}/${MAX_START_RETRIES})`,
+          `[Realtime] ⚠️ Failed to connect, retrying in ${delay / 1000}s... (attempt ${retryCount + 1}/${MAX_START_RETRIES})`
         );
 
         // Clear any failed channels before retry
@@ -494,7 +475,7 @@ class RealtimeService {
         return this.start(userId, retryCount + 1);
       } else {
         console.error(
-          `[Realtime] ❌ Failed after ${MAX_START_RETRIES} retries: 0/${REALTIME_TABLES.length} tables - Check connection`,
+          `[Realtime] ❌ Failed after ${MAX_START_RETRIES} retries: 0/${REALTIME_TABLES.length} tables - Check connection`
         );
         // Schedule a background reconnect attempt
         this.scheduleReconnect(userId);
@@ -510,7 +491,7 @@ class RealtimeService {
     const BACKGROUND_RETRY_DELAY = 30000; // 30 seconds
 
     console.log(
-      `[Realtime] 🔄 Scheduling background reconnect in ${BACKGROUND_RETRY_DELAY / 1000}s...`,
+      `[Realtime] 🔄 Scheduling background reconnect in ${BACKGROUND_RETRY_DELAY / 1000}s...`
     );
 
     if (this.reconnectTimeout) {
@@ -537,13 +518,13 @@ class RealtimeService {
 
     if (this.partialRetryAttempts >= this.MAX_PARTIAL_RETRIES) {
       console.log(
-        `[Realtime] ⚠️ Max partial retries (${this.MAX_PARTIAL_RETRIES}) reached for failed tables`,
+        `[Realtime] ⚠️ Max partial retries (${this.MAX_PARTIAL_RETRIES}) reached for failed tables`
       );
       return;
     }
 
     console.log(
-      `[Realtime] 🔄 Retrying failed tables in ${PARTIAL_RETRY_DELAY / 1000}s... (attempt ${this.partialRetryAttempts + 1}/${this.MAX_PARTIAL_RETRIES})`,
+      `[Realtime] 🔄 Retrying failed tables in ${PARTIAL_RETRY_DELAY / 1000}s... (attempt ${this.partialRetryAttempts + 1}/${this.MAX_PARTIAL_RETRIES})`
     );
 
     if (this.partialRetryTimeout) {
@@ -563,7 +544,7 @@ class RealtimeService {
       }
 
       console.log(
-        `[Realtime] 🔄 Retrying ${failedTablesList.length} failed tables: ${failedTablesList.slice(0, 5).join(", ")}${failedTablesList.length > 5 ? "..." : ""}`,
+        `[Realtime] 🔄 Retrying ${failedTablesList.length} failed tables: ${failedTablesList.slice(0, 5).join(", ")}${failedTablesList.length > 5 ? "..." : ""}`
       );
 
       // Remove from failed set before retrying (will be re-added if fails again)
@@ -575,7 +556,7 @@ class RealtimeService {
       const retryPromises = failedTablesList.map((table) =>
         this.subscribeToTable(table, userId).catch(() => {
           // Error logged in subscribeToTable
-        }),
+        })
       );
       await Promise.allSettled(retryPromises);
 
@@ -592,20 +573,18 @@ class RealtimeService {
       // Check if still have failed tables
       if (this.failedTables.size > 0) {
         console.log(
-          `[Realtime] ⚠️ Still ${this.failedTables.size} pending: ${Array.from(this.failedTables).slice(0, 5).join(", ")}${this.failedTables.size > 5 ? "..." : ""}`,
+          `[Realtime] ⚠️ Still ${this.failedTables.size} pending: ${Array.from(this.failedTables).slice(0, 5).join(", ")}${this.failedTables.size > 5 ? "..." : ""}`
         );
         // Schedule another retry if under max
         if (this.partialRetryAttempts < this.MAX_PARTIAL_RETRIES) {
           this.schedulePartialRetry(userId);
         } else {
           console.log(
-            `[Realtime] ⚠️ Max retries reached. Connected: ${this.successfulTables.size}/${REALTIME_TABLES.length} tables`,
+            `[Realtime] ⚠️ Max retries reached. Connected: ${this.successfulTables.size}/${REALTIME_TABLES.length} tables`
           );
         }
       } else {
-        console.log(
-          `[Realtime] ✅ All ${REALTIME_TABLES.length} tables now connected`,
-        );
+        console.log(`[Realtime] ✅ All ${REALTIME_TABLES.length} tables now connected`);
         this.partialRetryAttempts = 0;
       }
     }, PARTIAL_RETRY_DELAY);
@@ -623,7 +602,7 @@ class RealtimeService {
       if (accessToken && supabase) {
         await supabase.auth.setSession({
           access_token: accessToken,
-          refresh_token: refreshToken || "",
+          refresh_token: refreshToken || ""
         });
         console.log("[Realtime] 🔄 Refreshed Supabase auth session");
       }
@@ -653,7 +632,7 @@ class RealtimeService {
         this.failedTables.add(table);
         console.error(
           `[Realtime] ❌ Cannot subscribe to ${table}: Supabase client is not initialized.\n` +
-            `   Check that EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY are set.`,
+            `   Check that EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY are set.`
         );
         return;
       }
@@ -662,16 +641,14 @@ class RealtimeService {
       if (typeof supabase.channel !== "function") {
         this.failedTables.add(table);
         const clientType = typeof supabase;
-        const clientKeys = supabase
-          ? Object.keys(supabase).slice(0, 10).join(", ")
-          : "N/A";
+        const clientKeys = supabase ? Object.keys(supabase).slice(0, 10).join(", ") : "N/A";
         const channelType = typeof supabase.channel;
         console.error(
           `[Realtime] ❌ Cannot subscribe to ${table}: supabase.channel is not a function.\n` +
             `   Client type: ${clientType}\n` +
             `   Channel type: ${channelType}\n` +
             `   Available keys: ${clientKeys}...\n` +
-            `   This usually means the Supabase client wasn't initialized correctly.`,
+            `   This usually means the Supabase client wasn't initialized correctly.`
         );
         return;
       }
@@ -679,8 +656,8 @@ class RealtimeService {
       const channel = supabase.channel(channelName, {
         config: {
           broadcast: { self: true },
-          presence: { key: userId },
-        },
+          presence: { key: userId }
+        }
       });
 
       // Listen for postgres changes
@@ -692,7 +669,7 @@ class RealtimeService {
           {
             event: "*", // Listen to INSERT, UPDATE, DELETE
             schema: "public",
-            table: table,
+            table: table
             // No filter here - we filter in the handler
           },
           (payload: RealtimePostgresChangesPayload<any>) => {
@@ -701,7 +678,7 @@ class RealtimeService {
             // With RLS enabled, even REPLICA IDENTITY FULL doesn't include user_id in DELETE events
             // So we trust the backend and process all events we receive
             this.handleTableChange(table, payload);
-          },
+          }
         )
         .subscribe((status: `${REALTIME_SUBSCRIBE_STATES}`, err?: any) => {
           if (status === "SUBSCRIBED") {
@@ -721,7 +698,7 @@ class RealtimeService {
     } catch (error) {
       console.error(
         `[Realtime] Failed to subscribe to ${table}:`,
-        error instanceof Error ? error.message : error,
+        error instanceof Error ? error.message : error
       );
     }
   }
@@ -750,7 +727,7 @@ class RealtimeService {
     // Notification history - instant UI updates for new notifications
     "notification_history",
     // Social nudges - partner activity updates
-    "social_nudges",
+    "social_nudges"
   ]);
 
   /**
@@ -764,7 +741,7 @@ class RealtimeService {
    */
   private async handleTableChange(
     table: RealtimeTable,
-    payload: RealtimePostgresChangesPayload<any>,
+    payload: RealtimePostgresChangesPayload<any>
   ) {
     // Log changes (minimal for performance)
     if (__DEV__) {
@@ -772,21 +749,14 @@ class RealtimeService {
       const newData = payload.new as any;
       const oldData = payload.old as any;
       const identifier =
-        newData?.id ||
-        oldData?.id ||
-        newData?.user_id ||
-        oldData?.user_id ||
-        "N/A";
+        newData?.id || oldData?.id || newData?.user_id || oldData?.user_id || "N/A";
       console.log(`[Realtime] 📡 ${table} ${payload.eventType}`, {
-        id: identifier,
+        id: identifier
       });
     }
 
     // CRITICAL: Handle user status changes (ban/suspend/delete)
-    if (
-      table === "users" &&
-      (payload.eventType === "UPDATE" || payload.eventType === "DELETE")
-    ) {
+    if (table === "users" && (payload.eventType === "UPDATE" || payload.eventType === "DELETE")) {
       await this.handleUserStatusChange(payload);
       return; // Specific handler fully handles this
     }
@@ -890,7 +860,7 @@ class RealtimeService {
    */
   private handleGenericTableChange(
     table: RealtimeTable,
-    payload: RealtimePostgresChangesPayload<any>,
+    payload: RealtimePostgresChangesPayload<any>
   ) {
     if (!this.queryClient) return;
 
@@ -905,25 +875,20 @@ class RealtimeService {
 
     if (payload.eventType === "DELETE") {
       // DELETE: Only id is available, invalidate queries to refetch
-      console.log(
-        `[Realtime] 🗑️ DELETE on ${table}, invalidating queries:`,
-        baseQueryKey,
-      );
+      console.log(`[Realtime] 🗑️ DELETE on ${table}, invalidating queries:`, baseQueryKey);
       this.queryClient.invalidateQueries({
-        queryKey: baseQueryKey,
+        queryKey: baseQueryKey
       });
 
       // Invalidate AND refetch home dashboard since it aggregates data
-      console.log(
-        `[Realtime] 🏠 Invalidating home dashboard for ${table} DELETE`,
-      );
+      console.log(`[Realtime] 🏠 Invalidating home dashboard for ${table} DELETE`);
       this.queryClient.invalidateQueries({
-        queryKey: homeDashboardQueryKeys.dashboard(),
+        queryKey: homeDashboardQueryKeys.dashboard()
       });
       // Force refetch to ensure UI updates immediately
       this.queryClient.refetchQueries({
         queryKey: homeDashboardQueryKeys.dashboard(),
-        type: "active",
+        type: "active"
       });
 
       // Invalidate partner dashboards for tables that affect partner view
@@ -939,67 +904,55 @@ class RealtimeService {
       }
     } else if (payload.eventType === "UPDATE") {
       // UPDATE: Full record available, try optimistic update then invalidate
-      console.log(
-        `[Realtime] ✏️ UPDATE on ${table}, updating cache:`,
-        newRecord?.id,
-      );
+      console.log(`[Realtime] ✏️ UPDATE on ${table}, updating cache:`, newRecord?.id);
 
       // For list queries, try to update the item in place
-      this.queryClient.setQueriesData(
-        { queryKey: baseQueryKey },
-        (oldData: any) => {
-          if (!oldData) return oldData;
+      this.queryClient.setQueriesData({ queryKey: baseQueryKey }, (oldData: any) => {
+        if (!oldData) return oldData;
 
-          // Handle array data (list queries)
-          if (Array.isArray(oldData)) {
-            const index = oldData.findIndex(
-              (item: any) => item?.id === newRecord?.id,
-            );
-            if (index !== -1) {
-              const updated = [...oldData];
-              updated[index] = { ...updated[index], ...newRecord };
-              return updated;
-            }
+        // Handle array data (list queries)
+        if (Array.isArray(oldData)) {
+          const index = oldData.findIndex((item: any) => item?.id === newRecord?.id);
+          if (index !== -1) {
+            const updated = [...oldData];
+            updated[index] = { ...updated[index], ...newRecord };
+            return updated;
           }
+        }
 
-          // Handle { data: [...] } format
-          if (oldData?.data && Array.isArray(oldData.data)) {
-            const index = oldData.data.findIndex(
-              (item: any) => item?.id === newRecord?.id,
-            );
-            if (index !== -1) {
-              const updatedData = [...oldData.data];
-              updatedData[index] = { ...updatedData[index], ...newRecord };
-              return { ...oldData, data: updatedData };
-            }
+        // Handle { data: [...] } format
+        if (oldData?.data && Array.isArray(oldData.data)) {
+          const index = oldData.data.findIndex((item: any) => item?.id === newRecord?.id);
+          if (index !== -1) {
+            const updatedData = [...oldData.data];
+            updatedData[index] = { ...updatedData[index], ...newRecord };
+            return { ...oldData, data: updatedData };
           }
+        }
 
-          // Handle single object (detail queries)
-          if (oldData?.id === newRecord?.id) {
-            return { ...oldData, ...newRecord };
-          }
+        // Handle single object (detail queries)
+        if (oldData?.id === newRecord?.id) {
+          return { ...oldData, ...newRecord };
+        }
 
-          return oldData;
-        },
-      );
+        return oldData;
+      });
 
       // Also invalidate to ensure computed fields are fresh
       this.queryClient.invalidateQueries({
-        queryKey: baseQueryKey,
+        queryKey: baseQueryKey
       });
 
       // Invalidate AND refetch home dashboard for aggregate updates
       // Important for: goal archived, status changes, etc.
-      console.log(
-        `[Realtime] 🏠 Invalidating home dashboard for ${table} UPDATE`,
-      );
+      console.log(`[Realtime] 🏠 Invalidating home dashboard for ${table} UPDATE`);
       this.queryClient.invalidateQueries({
-        queryKey: homeDashboardQueryKeys.dashboard(),
+        queryKey: homeDashboardQueryKeys.dashboard()
       });
       // Force refetch to ensure UI updates immediately
       this.queryClient.refetchQueries({
         queryKey: homeDashboardQueryKeys.dashboard(),
-        type: "active", // Only refetch if query is currently active (component mounted)
+        type: "active" // Only refetch if query is currently active (component mounted)
       });
 
       // Invalidate partner dashboards for tables that affect partner view
@@ -1012,9 +965,7 @@ class RealtimeService {
         table === "challenge_check_ins" ||
         table === "challenge_participants"
       ) {
-        console.log(
-          `[Realtime] 👥 Invalidating partner dashboards for ${table} UPDATE`,
-        );
+        console.log(`[Realtime] 👥 Invalidating partner dashboards for ${table} UPDATE`);
         this.invalidatePartnerDashboards();
       }
     } else if (payload.eventType === "INSERT") {
@@ -1032,26 +983,24 @@ class RealtimeService {
 
       if (__DEV__) {
         console.log(
-          `[Realtime] ➕ INSERT on ${table}: invalidating queries (id: ${newRecord?.id})`,
+          `[Realtime] ➕ INSERT on ${table}: invalidating queries (id: ${newRecord?.id})`
         );
       }
 
       // Invalidate to trigger refetch with fresh data
       this.queryClient.invalidateQueries({
-        queryKey: baseQueryKey,
+        queryKey: baseQueryKey
       });
 
       // Invalidate AND refetch home dashboard for new items
-      console.log(
-        `[Realtime] 🏠 Invalidating home dashboard for ${table} INSERT`,
-      );
+      console.log(`[Realtime] 🏠 Invalidating home dashboard for ${table} INSERT`);
       this.queryClient.invalidateQueries({
-        queryKey: homeDashboardQueryKeys.dashboard(),
+        queryKey: homeDashboardQueryKeys.dashboard()
       });
       // Force refetch to ensure UI updates immediately
       this.queryClient.refetchQueries({
         queryKey: homeDashboardQueryKeys.dashboard(),
-        type: "active",
+        type: "active"
       });
 
       // Invalidate partner dashboards for tables that affect partner view
@@ -1075,18 +1024,15 @@ class RealtimeService {
   private handleNewAchievement(payload: RealtimePostgresChangesPayload<any>) {
     const newAchievement = payload.new as any;
 
-    console.log(
-      `[Realtime] 🏆 New achievement unlocked:`,
-      newAchievement?.achievement_type_id,
-    );
+    console.log(`[Realtime] 🏆 New achievement unlocked:`, newAchievement?.achievement_type_id);
 
     // Invalidate achievements cache to fetch the new badge
     if (this.queryClient) {
       this.queryClient.invalidateQueries({
-        queryKey: achievementsQueryKeys.myAchievements(),
+        queryKey: achievementsQueryKeys.myAchievements()
       });
       this.queryClient.invalidateQueries({
-        queryKey: achievementsQueryKeys.stats(),
+        queryKey: achievementsQueryKeys.stats()
       });
     }
   }
@@ -1101,9 +1047,7 @@ class RealtimeService {
    * - cancelled: User keeps plan until expiry (handled by backend)
    * - past_due/pending: Uncertain, rely on backend
    */
-  private handleSubscriptionChange(
-    payload: RealtimePostgresChangesPayload<any>,
-  ) {
+  private handleSubscriptionChange(payload: RealtimePostgresChangesPayload<any>) {
     const oldRecord = payload.old as any;
     const newRecord = payload.new as any;
     const newStatus = newRecord?.status;
@@ -1113,7 +1057,7 @@ class RealtimeService {
       oldStatus: oldRecord?.status,
       newStatus: newStatus,
       oldPlan: oldRecord?.plan,
-      newPlan: newPlan,
+      newPlan: newPlan
     });
 
     // Refresh subscription store to get latest subscription & features
@@ -1128,7 +1072,7 @@ class RealtimeService {
         // Active subscription - user gets the plan
         if (currentUser.plan !== newPlan) {
           console.log(
-            `[Realtime]   📝 Subscription active, updating plan: ${currentUser.plan} → ${newPlan}`,
+            `[Realtime]   📝 Subscription active, updating plan: ${currentUser.plan} → ${newPlan}`
           );
           useAuthStore.getState().updateUser({ plan: newPlan });
         }
@@ -1136,7 +1080,7 @@ class RealtimeService {
         // Expired subscription - user goes back to free
         if (currentUser.plan !== "free") {
           console.log(
-            `[Realtime]   📝 Subscription expired, downgrading to free: ${currentUser.plan} → free`,
+            `[Realtime]   📝 Subscription expired, downgrading to free: ${currentUser.plan} → free`
           );
           useAuthStore.getState().updateUser({ plan: "free" });
         }
@@ -1150,22 +1094,20 @@ class RealtimeService {
     // This ensures we get the authoritative plan from the backend
     if (this.queryClient) {
       this.queryClient.invalidateQueries({
-        queryKey: ["user", "current"],
+        queryKey: ["user", "current"]
       });
 
       // Also invalidate partner dashboard queries
       // This ensures that when viewing a partner's dashboard, premium access status updates
       this.queryClient.invalidateQueries({
-        queryKey: partnersQueryKeys.all,
+        queryKey: partnersQueryKeys.all
       });
 
       // Force refetch active partner queries
       this.invalidatePartnerDashboards();
     }
 
-    console.log(
-      `[Realtime]   ✅ Triggered subscription, user & partner refresh`,
-    );
+    console.log(`[Realtime]   ✅ Triggered subscription, user & partner refresh`);
   }
 
   /**
@@ -1173,9 +1115,7 @@ class RealtimeService {
    * - CRITICAL: Force logout if user is banned/suspended/disabled/deleted
    * - Update auth store if plan or other fields changed
    */
-  private async handleUserStatusChange(
-    payload: RealtimePostgresChangesPayload<any>,
-  ) {
+  private async handleUserStatusChange(payload: RealtimePostgresChangesPayload<any>) {
     const oldRecord = payload.old as any;
     const newRecord = payload.new as any;
 
@@ -1191,13 +1131,8 @@ class RealtimeService {
     const newStatus = newRecord?.status;
 
     // Check if user was active and is now disabled/suspended
-    if (
-      oldStatus === "active" &&
-      (newStatus === "disabled" || newStatus === "suspended")
-    ) {
-      console.log(
-        `[Realtime] 🚨 User status changed to ${newStatus}, forcing logout`,
-      );
+    if (oldStatus === "active" && (newStatus === "disabled" || newStatus === "suspended")) {
+      console.log(`[Realtime] 🚨 User status changed to ${newStatus}, forcing logout`);
 
       // Force logout immediately
       await handleAutoLogout(newStatus as "disabled" | "suspended");
@@ -1221,7 +1156,7 @@ class RealtimeService {
       // This ensures premium access checks are updated in partner views
       if (this.queryClient) {
         this.queryClient.invalidateQueries({
-          queryKey: partnersQueryKeys.all,
+          queryKey: partnersQueryKeys.all
         });
         this.invalidatePartnerDashboards();
       }
@@ -1230,7 +1165,7 @@ class RealtimeService {
     // Invalidate user query for any user update
     if (this.queryClient) {
       this.queryClient.invalidateQueries({
-        queryKey: ["user", "current"],
+        queryKey: ["user", "current"]
       });
 
       // If any user's status changed, also invalidate partner queries
@@ -1238,14 +1173,14 @@ class RealtimeService {
       // Other users viewing their dashboard will get updated data
       if (oldStatus !== newStatus) {
         console.log(
-          `[Realtime] 👥 User status changed (${oldStatus} → ${newStatus}), invalidating partner queries`,
+          `[Realtime] 👥 User status changed (${oldStatus} → ${newStatus}), invalidating partner queries`
         );
         this.queryClient.invalidateQueries({
-          queryKey: partnersQueryKeys.all,
+          queryKey: partnersQueryKeys.all
         });
         this.queryClient.refetchQueries({
           queryKey: partnersQueryKeys.list(),
-          type: "active",
+          type: "active"
         });
         this.invalidatePartnerDashboards();
       }
@@ -1258,9 +1193,7 @@ class RealtimeService {
    * - UPDATE: Update existing check-in in cache
    * - INSERT: Only add if not already in cache (avoid dupes from optimistic updates)
    */
-  private handleChallengeCheckInsChange(
-    payload: RealtimePostgresChangesPayload<any>,
-  ) {
+  private handleChallengeCheckInsChange(payload: RealtimePostgresChangesPayload<any>) {
     const oldRecord = payload.old as any;
     const newRecord = payload.new as any;
     const challengeId = newRecord?.challenge_id || oldRecord?.challenge_id;
@@ -1273,42 +1206,38 @@ class RealtimeService {
         // Remove from cache directly for immediate feedback
         const queryKeys = [
           challengesQueryKeys.checkIns(challengeId),
-          challengesQueryKeys.myCheckIns(challengeId),
+          challengesQueryKeys.myCheckIns(challengeId)
         ];
 
         for (const queryKey of queryKeys) {
           this.queryClient.setQueryData(queryKey, (old: any) => {
             if (!old?.data) return old;
-            const filtered = old.data.filter(
-              (ci: ChallengeCheckIn) => ci.id !== oldRecord?.id,
-            );
-            console.log(
-              `[Realtime]   ✅ Removed check-in from cache: ${oldRecord?.id}`,
-            );
+            const filtered = old.data.filter((ci: ChallengeCheckIn) => ci.id !== oldRecord?.id);
+            console.log(`[Realtime]   ✅ Removed check-in from cache: ${oldRecord?.id}`);
             return { ...old, data: filtered };
           });
         }
 
         // Invalidate related queries to refetch updated totals
         this.queryClient.invalidateQueries({
-          queryKey: challengesQueryKeys.detail(challengeId),
+          queryKey: challengesQueryKeys.detail(challengeId)
         });
         this.queryClient.invalidateQueries({
-          queryKey: challengesQueryKeys.leaderboard(challengeId),
+          queryKey: challengesQueryKeys.leaderboard(challengeId)
         });
       } else {
         // Fallback: no challenge_id, invalidate all
         console.log(
-          `[Realtime]   ⚠️ No challenge_id in DELETE payload, invalidating all challenges`,
+          `[Realtime]   ⚠️ No challenge_id in DELETE payload, invalidating all challenges`
         );
         this.queryClient.invalidateQueries({
-          queryKey: challengesQueryKeys.all,
+          queryKey: challengesQueryKeys.all
         });
       }
 
       // Invalidate home dashboard so TodaysActionsCard updates
       this.queryClient.invalidateQueries({
-        queryKey: homeDashboardQueryKeys.dashboard(),
+        queryKey: homeDashboardQueryKeys.dashboard()
       });
 
       // Invalidate partner dashboards
@@ -1318,14 +1247,14 @@ class RealtimeService {
         // Update existing check-in in cache
         const queryKeys = [
           challengesQueryKeys.checkIns(challengeId),
-          challengesQueryKeys.myCheckIns(challengeId),
+          challengesQueryKeys.myCheckIns(challengeId)
         ];
 
         for (const queryKey of queryKeys) {
           this.queryClient.setQueryData(queryKey, (old: any) => {
             if (!old?.data) return old;
             const updated = old.data.map((ci: ChallengeCheckIn) =>
-              ci.id === newRecord?.id ? { ...ci, ...newRecord } : ci,
+              ci.id === newRecord?.id ? { ...ci, ...newRecord } : ci
             );
             return { ...old, data: updated };
           });
@@ -1333,13 +1262,13 @@ class RealtimeService {
       } else {
         // Fallback: no challenge_id, invalidate all
         this.queryClient.invalidateQueries({
-          queryKey: challengesQueryKeys.all,
+          queryKey: challengesQueryKeys.all
         });
       }
 
       // Invalidate home dashboard so TodaysActionsCard updates
       this.queryClient.invalidateQueries({
-        queryKey: homeDashboardQueryKeys.dashboard(),
+        queryKey: homeDashboardQueryKeys.dashboard()
       });
 
       // Invalidate partner dashboards
@@ -1354,7 +1283,7 @@ class RealtimeService {
           | undefined;
 
         const alreadyExists = existingData?.data?.some(
-          (ci) => ci.id === newRecord?.id || ci.id?.startsWith?.("temp-"),
+          (ci) => ci.id === newRecord?.id || ci.id?.startsWith?.("temp-")
         );
 
         if (!alreadyExists) {
@@ -1371,21 +1300,21 @@ class RealtimeService {
 
         // Always invalidate to get fresh totals
         this.queryClient.invalidateQueries({
-          queryKey: challengesQueryKeys.detail(challengeId),
+          queryKey: challengesQueryKeys.detail(challengeId)
         });
         this.queryClient.invalidateQueries({
-          queryKey: challengesQueryKeys.leaderboard(challengeId),
+          queryKey: challengesQueryKeys.leaderboard(challengeId)
         });
       } else {
         // Fallback: no challenge_id, invalidate all
         this.queryClient.invalidateQueries({
-          queryKey: challengesQueryKeys.all,
+          queryKey: challengesQueryKeys.all
         });
       }
 
       // Invalidate home dashboard so TodaysActionsCard shows new pending check-ins
       this.queryClient.invalidateQueries({
-        queryKey: homeDashboardQueryKeys.dashboard(),
+        queryKey: homeDashboardQueryKeys.dashboard()
       });
 
       // Invalidate partner dashboards
@@ -1397,9 +1326,7 @@ class RealtimeService {
    * Handle challenge participants changes (points, progress_data updates)
    * This is triggered when points are recalculated after check-in add/delete
    */
-  private handleChallengeParticipantsChange(
-    payload: RealtimePostgresChangesPayload<any>,
-  ) {
+  private handleChallengeParticipantsChange(payload: RealtimePostgresChangesPayload<any>) {
     const newRecord = payload.new as any;
     const oldRecord = payload.old as any;
     const challengeId = newRecord?.challenge_id || oldRecord?.challenge_id;
@@ -1409,22 +1336,22 @@ class RealtimeService {
     if (challengeId) {
       // Invalidate participants query
       this.queryClient.invalidateQueries({
-        queryKey: challengesQueryKeys.participants(challengeId),
+        queryKey: challengesQueryKeys.participants(challengeId)
       });
 
       // Also invalidate challenge detail (to get updated my_progress, my_rank)
       this.queryClient.invalidateQueries({
-        queryKey: challengesQueryKeys.detail(challengeId),
+        queryKey: challengesQueryKeys.detail(challengeId)
       });
 
       // Leaderboard depends on participants
       this.queryClient.invalidateQueries({
-        queryKey: challengesQueryKeys.leaderboard(challengeId),
+        queryKey: challengesQueryKeys.leaderboard(challengeId)
       });
     } else {
       // Fallback: challenge_id not in payload (REPLICA IDENTITY not set)
       this.queryClient.invalidateQueries({
-        queryKey: challengesQueryKeys.all,
+        queryKey: challengesQueryKeys.all
       });
     }
   }
@@ -1434,9 +1361,7 @@ class RealtimeService {
    * This cache is maintained by DB triggers and contains pre-calculated user stats.
    * When it updates, we need to refresh the home dashboard to show new streak/stats.
    */
-  private handleUserStatsCacheChange(
-    payload: RealtimePostgresChangesPayload<any>,
-  ) {
+  private handleUserStatsCacheChange(payload: RealtimePostgresChangesPayload<any>) {
     if (!this.queryClient) return;
 
     // The user_stats_cache is updated by triggers whenever:
@@ -1450,12 +1375,12 @@ class RealtimeService {
 
     // Invalidate home dashboard to pick up new stats
     this.queryClient.invalidateQueries({
-      queryKey: homeDashboardQueryKeys.dashboard(),
+      queryKey: homeDashboardQueryKeys.dashboard()
     });
 
     // Also invalidate progress queries that might depend on this data
     this.queryClient.invalidateQueries({
-      queryKey: ["progress"],
+      queryKey: ["progress"]
     });
 
     // Invalidate partner dashboards - user stats affect partner's view of this user
@@ -1464,7 +1389,7 @@ class RealtimeService {
 
     // Invalidate user stats cache query key for direct access
     this.queryClient.invalidateQueries({
-      queryKey: ["userStatsCache"],
+      queryKey: ["userStatsCache"]
     });
   }
 
@@ -1472,37 +1397,32 @@ class RealtimeService {
    * Handle goal_statistics table changes
    * Updated by triggers when check-ins for a goal are created/updated/deleted
    */
-  private handleGoalStatisticsChange(
-    payload: RealtimePostgresChangesPayload<any>,
-  ) {
+  private handleGoalStatisticsChange(payload: RealtimePostgresChangesPayload<any>) {
     if (!this.queryClient) return;
 
     const newRecord = payload.new as any;
     const oldRecord = payload.old as any;
     const goalId = newRecord?.goal_id || oldRecord?.goal_id;
 
-    console.log(
-      `[Realtime] 📊 Goal statistics ${payload.eventType}`,
-      goalId ? { goalId } : {},
-    );
+    console.log(`[Realtime] 📊 Goal statistics ${payload.eventType}`, goalId ? { goalId } : {});
 
     // Invalidate progress queries for this specific goal
     if (goalId) {
       // Invalidate streak info for this goal
       this.queryClient.invalidateQueries({
-        queryKey: progressQueryKeys.streak(goalId),
+        queryKey: progressQueryKeys.streak(goalId)
       });
 
       // Invalidate habit chain for this goal
       this.queryClient.invalidateQueries({
         queryKey: [...progressQueryKeys.all, "chain", goalId],
-        exact: false,
+        exact: false
       });
     }
 
     // Also invalidate general progress queries
     this.queryClient.invalidateQueries({
-      queryKey: progressQueryKeys.all,
+      queryKey: progressQueryKeys.all
     });
 
     // Invalidate partner dashboards - goal stats affect partner's view
@@ -1513,9 +1433,7 @@ class RealtimeService {
    * Handle challenge_statistics table changes
    * Updated by triggers when challenge_check_ins are created/updated/deleted
    */
-  private handleChallengeStatisticsChange(
-    payload: RealtimePostgresChangesPayload<any>,
-  ) {
+  private handleChallengeStatisticsChange(payload: RealtimePostgresChangesPayload<any>) {
     if (!this.queryClient) return;
 
     const newRecord = payload.new as any;
@@ -1524,30 +1442,30 @@ class RealtimeService {
 
     console.log(
       `[Realtime] 🏆 Challenge statistics ${payload.eventType}`,
-      challengeId ? { challengeId } : {},
+      challengeId ? { challengeId } : {}
     );
 
     // Invalidate challenge queries for this specific challenge
     if (challengeId) {
       // Invalidate challenge details
       this.queryClient.invalidateQueries({
-        queryKey: challengesQueryKeys.detail(challengeId),
+        queryKey: challengesQueryKeys.detail(challengeId)
       });
 
       // Invalidate leaderboard for this challenge
       this.queryClient.invalidateQueries({
-        queryKey: challengesQueryKeys.leaderboard(challengeId),
+        queryKey: challengesQueryKeys.leaderboard(challengeId)
       });
     }
 
     // Also invalidate general challenge queries
     this.queryClient.invalidateQueries({
-      queryKey: challengesQueryKeys.all,
+      queryKey: challengesQueryKeys.all
     });
 
     // Invalidate partner dashboard (if viewing partner's challenges)
     this.queryClient.invalidateQueries({
-      queryKey: partnersQueryKeys.all,
+      queryKey: partnersQueryKeys.all
     });
   }
 
@@ -1555,9 +1473,7 @@ class RealtimeService {
    * Handle accountability_partners changes
    * Smart cache updates to avoid duplicates and UI flashes
    */
-  private handleAccountabilityPartnersChange(
-    payload: RealtimePostgresChangesPayload<any>,
-  ) {
+  private handleAccountabilityPartnersChange(payload: RealtimePostgresChangesPayload<any>) {
     if (!this.queryClient) return;
 
     const newRecord = payload.new as any;
@@ -1569,7 +1485,7 @@ class RealtimeService {
       // Remove from all partner caches directly (no refetch needed)
       // This prevents the UI flash where deleted items briefly reappear
       console.log(`[Realtime] 👥 Partner DELETE detected, updating caches`, {
-        partnershipId,
+        partnershipId
       });
 
       // Remove from partners list
@@ -1577,7 +1493,7 @@ class RealtimeService {
         if (!old?.data) return old;
         return {
           ...old,
-          data: old.data.filter((p: any) => p.id !== partnershipId),
+          data: old.data.filter((p: any) => p.id !== partnershipId)
         };
       });
 
@@ -1586,7 +1502,7 @@ class RealtimeService {
         if (!old?.data) return old;
         return {
           ...old,
-          data: old.data.filter((p: any) => p.id !== partnershipId),
+          data: old.data.filter((p: any) => p.id !== partnershipId)
         };
       });
 
@@ -1595,7 +1511,7 @@ class RealtimeService {
         if (!old?.data) return old;
         return {
           ...old,
-          data: old.data.filter((p: any) => p.id !== partnershipId),
+          data: old.data.filter((p: any) => p.id !== partnershipId)
         };
       });
 
@@ -1604,42 +1520,40 @@ class RealtimeService {
         if (!old?.data) return old;
         return {
           ...old,
-          data: old.data.filter((p: any) => p.id !== partnershipId),
+          data: old.data.filter((p: any) => p.id !== partnershipId)
         };
       });
 
       // Force refetch partners list to ensure UI updates
       this.queryClient.refetchQueries({
         queryKey: partnersQueryKeys.list(),
-        type: "active",
+        type: "active"
       });
 
       // Force invalidate and refetch ALL search/suggested queries
       // Note: Supabase DELETE events don't include full old record data by default
       // (only includes primary key unless REPLICA IDENTITY FULL is enabled)
       // So we must invalidate all search queries to get fresh data from server
-      console.log(
-        `[Realtime] 👥 Partner DELETE - invalidating all search/suggested queries`,
-      );
+      console.log(`[Realtime] 👥 Partner DELETE - invalidating all search/suggested queries`);
 
       // Invalidate ALL search queries (forces refetch with fresh data from server)
       this.queryClient.invalidateQueries({
-        queryKey: ["partners", "search"],
+        queryKey: ["partners", "search"]
       });
 
       // Invalidate suggested queries
       this.queryClient.invalidateQueries({
-        queryKey: partnersQueryKeys.suggestedInfinite(),
+        queryKey: partnersQueryKeys.suggestedInfinite()
       });
 
       // Force immediate refetch if screens are active
       this.queryClient.refetchQueries({
         queryKey: ["partners", "search"],
-        type: "active",
+        type: "active"
       });
       this.queryClient.refetchQueries({
         queryKey: partnersQueryKeys.suggestedInfinite(),
-        type: "active",
+        type: "active"
       });
 
       // Invalidate all dashboard caches
@@ -1651,24 +1565,16 @@ class RealtimeService {
       if (status === "accepted") {
         // FIRST: Get partner info from pending/sent caches BEFORE we remove them
         // The realtime payload doesn't include joined data (partner name, avatar, etc.)
-        const pendingData = this.queryClient.getQueryData(
-          partnersQueryKeys.pending(),
-        ) as any;
-        const sentData = this.queryClient.getQueryData(
-          partnersQueryKeys.sent(),
-        ) as any;
+        const pendingData = this.queryClient.getQueryData(partnersQueryKeys.pending()) as any;
+        const sentData = this.queryClient.getQueryData(partnersQueryKeys.sent()) as any;
 
-        const existingFromPending = pendingData?.data?.find(
-          (p: any) => p.id === partnershipId,
-        );
-        const existingFromSent = sentData?.data?.find(
-          (p: any) => p.id === partnershipId,
-        );
+        const existingFromPending = pendingData?.data?.find((p: any) => p.id === partnershipId);
+        const existingFromSent = sentData?.data?.find((p: any) => p.id === partnershipId);
 
         // Merge: preserved partner info + realtime data (realtime takes precedence for status)
         const mergedRecord = {
           ...(existingFromPending || existingFromSent || {}),
-          ...newRecord,
+          ...newRecord
         };
 
         console.log(`[Realtime] 👥 Partner accepted - merging data`, {
@@ -1676,42 +1582,37 @@ class RealtimeService {
           hasFromPending: !!existingFromPending,
           hasFromSent: !!existingFromSent,
           mergedHasPartner: !!mergedRecord?.partner,
-          partnerName: mergedRecord?.partner?.name || "MISSING",
+          partnerName: mergedRecord?.partner?.name || "MISSING"
         });
 
         // THEN: Remove from pending/sent caches
-        this.queryClient.setQueryData(
-          partnersQueryKeys.pending(),
-          (old: any) => {
-            if (!old?.data) return old;
-            return {
-              ...old,
-              data: old.data.filter((p: any) => p.id !== partnershipId),
-            };
-          },
-        );
+        this.queryClient.setQueryData(partnersQueryKeys.pending(), (old: any) => {
+          if (!old?.data) return old;
+          return {
+            ...old,
+            data: old.data.filter((p: any) => p.id !== partnershipId)
+          };
+        });
 
         this.queryClient.setQueryData(partnersQueryKeys.sent(), (old: any) => {
           if (!old?.data) return old;
           return {
             ...old,
-            data: old.data.filter((p: any) => p.id !== partnershipId),
+            data: old.data.filter((p: any) => p.id !== partnershipId)
           };
         });
 
         // FINALLY: Add to partners list with preserved partner info
         this.queryClient.setQueryData(partnersQueryKeys.list(), (old: any) => {
           if (!old?.data) return { data: [mergedRecord] };
-          const existingInList = old.data.find(
-            (p: any) => p.id === partnershipId,
-          );
+          const existingInList = old.data.find((p: any) => p.id === partnershipId);
           if (existingInList) {
             // Update existing - preserve partner info
             return {
               ...old,
               data: old.data.map((p: any) =>
-                p.id === partnershipId ? { ...p, ...mergedRecord } : p,
-              ),
+                p.id === partnershipId ? { ...p, ...mergedRecord } : p
+              )
             };
           }
           return { ...old, data: [...old.data, mergedRecord] };
@@ -1726,7 +1627,7 @@ class RealtimeService {
         // Capture reference for use in callbacks
         const qc = this.queryClient;
         const searchQueryState = qc.getQueriesData({
-          queryKey: ["partners", "search"],
+          queryKey: ["partners", "search"]
         });
 
         searchQueryState.forEach(([key]: [any, any]) => {
@@ -1741,11 +1642,11 @@ class RealtimeService {
                     ? {
                         ...user,
                         request_status: "accepted" as const,
-                        is_partner: true,
+                        is_partner: true
                       }
-                    : user,
-                ),
-              })),
+                    : user
+                )
+              }))
             };
           });
         });
@@ -1762,47 +1663,42 @@ class RealtimeService {
                   ? {
                       ...user,
                       request_status: "accepted" as const,
-                      is_partner: true,
+                      is_partner: true
                     }
-                  : user,
-              ),
-            })),
+                  : user
+              )
+            }))
           };
         });
       } else if (status === "rejected") {
         // Remove from pending (receiver's view)
-        this.queryClient.setQueryData(
-          partnersQueryKeys.pending(),
-          (old: any) => {
-            if (!old?.data) return old;
-            return {
-              ...old,
-              data: old.data.filter((p: any) => p.id !== partnershipId),
-            };
-          },
-        );
+        this.queryClient.setQueryData(partnersQueryKeys.pending(), (old: any) => {
+          if (!old?.data) return old;
+          return {
+            ...old,
+            data: old.data.filter((p: any) => p.id !== partnershipId)
+          };
+        });
 
         // Remove from sent (sender's view)
         this.queryClient.setQueryData(partnersQueryKeys.sent(), (old: any) => {
           if (!old?.data) return old;
           return {
             ...old,
-            data: old.data.filter((p: any) => p.id !== partnershipId),
+            data: old.data.filter((p: any) => p.id !== partnershipId)
           };
         });
       }
 
       // Invalidate to refresh full data (but cache is already updated)
       this.queryClient.invalidateQueries({
-        queryKey: partnersQueryKeys.all,
+        queryKey: partnersQueryKeys.all
       });
 
       // CRITICAL: Invalidate partner dashboards on any UPDATE
       // The backend touches updated_at when a user's goals/challenges change
       // This triggers realtime events to partners so their dashboards refresh
-      console.log(
-        "[Realtime] 👥 Partnership UPDATE - invalidating partner dashboards",
-      );
+      console.log("[Realtime] 👥 Partnership UPDATE - invalidating partner dashboards");
       this.invalidatePartnerDashboards();
     } else if (payload.eventType === "INSERT") {
       // For INSERT, force refetch to ensure UI updates immediately
@@ -1815,7 +1711,7 @@ class RealtimeService {
         partnershipId: partnershipId?.substring(0, 8),
         userId: newUserId?.substring(0, 8),
         partnerId: newPartnerId?.substring(0, 8),
-        status: newStatus,
+        status: newStatus
       });
 
       // For pending requests (status='pending'), add to the correct cache immediately
@@ -1825,57 +1721,50 @@ class RealtimeService {
 
         // Only add to pending cache if current user is the RECIPIENT (partner_user_id)
         if (newPartnerId === currentUserId) {
-          console.log(
-            `[Realtime] 👥 Adding to pending cache (I am recipient)`,
-            { partnershipId: partnershipId?.substring(0, 8) },
-          );
-          this.queryClient.setQueryData(
-            partnersQueryKeys.pending(),
-            (old: any) => {
-              if (!old?.data) return { data: [newRecord] };
-              const exists = old.data.some((p: any) => p.id === partnershipId);
-              if (exists) return old;
-              return { ...old, data: [newRecord, ...old.data] };
-            },
-          );
+          console.log(`[Realtime] 👥 Adding to pending cache (I am recipient)`, {
+            partnershipId: partnershipId?.substring(0, 8)
+          });
+          this.queryClient.setQueryData(partnersQueryKeys.pending(), (old: any) => {
+            if (!old?.data) return { data: [newRecord] };
+            const exists = old.data.some((p: any) => p.id === partnershipId);
+            if (exists) return old;
+            return { ...old, data: [newRecord, ...old.data] };
+          });
         }
 
         // Only add to sent cache if current user is the SENDER (user_id)
         if (newUserId === currentUserId) {
           console.log(`[Realtime] 👥 Adding to sent cache (I am sender)`, {
-            partnershipId: partnershipId?.substring(0, 8),
+            partnershipId: partnershipId?.substring(0, 8)
           });
-          this.queryClient.setQueryData(
-            partnersQueryKeys.sent(),
-            (old: any) => {
-              if (!old?.data) return { data: [newRecord] };
-              const exists = old.data.some((p: any) => p.id === partnershipId);
-              if (exists) return old;
-              return { ...old, data: [newRecord, ...old.data] };
-            },
-          );
+          this.queryClient.setQueryData(partnersQueryKeys.sent(), (old: any) => {
+            if (!old?.data) return { data: [newRecord] };
+            const exists = old.data.some((p: any) => p.id === partnershipId);
+            if (exists) return old;
+            return { ...old, data: [newRecord, ...old.data] };
+          });
         }
       }
 
       // Invalidate and refetch to get full partner info (name, avatar, etc.)
       this.queryClient.invalidateQueries({
-        queryKey: partnersQueryKeys.all,
+        queryKey: partnersQueryKeys.all
       });
 
       // Force refetch to get complete data with joins
       this.queryClient.refetchQueries({
         queryKey: partnersQueryKeys.pending(),
-        type: "all",
+        type: "all"
       });
 
       this.queryClient.refetchQueries({
         queryKey: partnersQueryKeys.sent(),
-        type: "all",
+        type: "all"
       });
 
       this.queryClient.refetchQueries({
         queryKey: partnersQueryKeys.list(),
-        type: "all",
+        type: "all"
       });
     }
   }
@@ -1884,9 +1773,7 @@ class RealtimeService {
    * Handle notification_history changes
    * Invalidate notification queries when new notifications arrive or are updated
    */
-  private handleNotificationHistoryChange(
-    payload: RealtimePostgresChangesPayload<any>,
-  ) {
+  private handleNotificationHistoryChange(payload: RealtimePostgresChangesPayload<any>) {
     if (!this.queryClient) return;
 
     const newRecord = payload.new as any;
@@ -1897,7 +1784,7 @@ class RealtimeService {
     console.log(`[Realtime] 🔔 Notification history ${payload.eventType}`, {
       id: notificationId?.substring(0, 8),
       type: notificationType,
-      userId: userId?.substring(0, 8),
+      userId: userId?.substring(0, 8)
     });
 
     if (payload.eventType === "INSERT") {
@@ -1914,9 +1801,9 @@ class RealtimeService {
           // Prepend to first page
           return {
             ...old,
-            pages: [[newRecord, ...firstPage], ...old.pages.slice(1)],
+            pages: [[newRecord, ...firstPage], ...old.pages.slice(1)]
           };
-        },
+        }
       );
 
       // Also update the unread count query cache directly
@@ -1927,22 +1814,22 @@ class RealtimeService {
           const exists = old.some((n: any) => n.id === newRecord?.id);
           if (exists) return old;
           return [newRecord, ...old];
-        },
+        }
       );
 
       // Force refetch unread count immediately (for tab badge)
       this.queryClient.refetchQueries({
-        queryKey: notificationHistoryQueryKeys.unreadCount(),
+        queryKey: notificationHistoryQueryKeys.unreadCount()
       });
 
       // Force refetch notification list immediately
       this.queryClient.refetchQueries({
-        queryKey: notificationHistoryQueryKeys.list(),
+        queryKey: notificationHistoryQueryKeys.list()
       });
 
       // Also invalidate to ensure all notification data is fresh
       this.queryClient.invalidateQueries({
-        queryKey: notificationHistoryQueryKeys.all,
+        queryKey: notificationHistoryQueryKeys.all
       });
     } else if (payload.eventType === "UPDATE") {
       // Notification was updated (e.g., opened_at set)
@@ -1954,12 +1841,10 @@ class RealtimeService {
           return {
             ...old,
             pages: old.pages.map((page: any[]) =>
-              page.map((n: any) =>
-                n.id === newRecord?.id ? { ...n, ...newRecord } : n,
-              ),
-            ),
+              page.map((n: any) => (n.id === newRecord?.id ? { ...n, ...newRecord } : n))
+            )
           };
-        },
+        }
       );
 
       // Also update in unread count query
@@ -1967,16 +1852,14 @@ class RealtimeService {
         notificationHistoryQueryKeys.unreadCount(),
         (old: any[] | undefined) => {
           if (!old) return old;
-          return old.map((n: any) =>
-            n.id === newRecord?.id ? { ...n, ...newRecord } : n,
-          );
-        },
+          return old.map((n: any) => (n.id === newRecord?.id ? { ...n, ...newRecord } : n));
+        }
       );
 
       // Refetch unread count if opened_at changed
       if (newRecord?.opened_at) {
         this.queryClient.refetchQueries({
-          queryKey: notificationHistoryQueryKeys.unreadCount(),
+          queryKey: notificationHistoryQueryKeys.unreadCount()
         });
       }
     } else if (payload.eventType === "DELETE") {
@@ -1988,11 +1871,9 @@ class RealtimeService {
           if (!old?.pages) return old;
           return {
             ...old,
-            pages: old.pages.map((page: any[]) =>
-              page.filter((n: any) => n.id !== oldRecord?.id),
-            ),
+            pages: old.pages.map((page: any[]) => page.filter((n: any) => n.id !== oldRecord?.id))
           };
-        },
+        }
       );
 
       // Also remove from unread count query
@@ -2001,12 +1882,12 @@ class RealtimeService {
         (old: any[] | undefined) => {
           if (!old) return old;
           return old.filter((n: any) => n.id !== oldRecord?.id);
-        },
+        }
       );
 
       // Refetch unread count
       this.queryClient.refetchQueries({
-        queryKey: notificationHistoryQueryKeys.unreadCount(),
+        queryKey: notificationHistoryQueryKeys.unreadCount()
       });
     }
   }
@@ -2015,34 +1896,29 @@ class RealtimeService {
    * Handle social_nudges changes (partner nudges, cheers, etc.)
    * Updates the partner activity / nudges cache for instant UI updates
    */
-  private handleSocialNudgesChange(
-    payload: RealtimePostgresChangesPayload<any>,
-  ) {
+  private handleSocialNudgesChange(payload: RealtimePostgresChangesPayload<any>) {
     if (!this.queryClient) return;
 
     const newRecord = payload.new as any;
     const oldRecord = payload.old as any;
     const nudgeId = newRecord?.id || oldRecord?.id;
 
-    console.log(
-      `[Realtime] 💬 Social nudge ${payload.eventType}`,
-      nudgeId ? { id: nudgeId } : {},
-    );
+    console.log(`[Realtime] 💬 Social nudge ${payload.eventType}`, nudgeId ? { id: nudgeId } : {});
 
     if (payload.eventType === "INSERT") {
       // New nudge received - force refetch for immediate UI update
       this.queryClient.refetchQueries({
-        queryKey: nudgesQueryKeys.list(),
+        queryKey: nudgesQueryKeys.list()
       });
 
       // Also refetch unread count
       this.queryClient.refetchQueries({
-        queryKey: nudgesQueryKeys.unreadCount(),
+        queryKey: nudgesQueryKeys.unreadCount()
       });
 
       // Invalidate all nudge queries
       this.queryClient.invalidateQueries({
-        queryKey: nudgesQueryKeys.all,
+        queryKey: nudgesQueryKeys.all
       });
     } else if (payload.eventType === "UPDATE") {
       // Nudge was updated (e.g., marked as read)
@@ -2051,30 +1927,23 @@ class RealtimeService {
         if (!old?.data) return old;
         return {
           ...old,
-          data: old.data.map((n: any) =>
-            n.id === newRecord?.id ? { ...n, ...newRecord } : n,
-          ),
+          data: old.data.map((n: any) => (n.id === newRecord?.id ? { ...n, ...newRecord } : n))
         };
       });
 
       // Also update in filtered lists
-      this.queryClient.setQueryData(
-        nudgesQueryKeys.listFiltered(false),
-        (old: any) => {
-          if (!old?.data) return old;
-          return {
-            ...old,
-            data: old.data.map((n: any) =>
-              n.id === newRecord?.id ? { ...n, ...newRecord } : n,
-            ),
-          };
-        },
-      );
+      this.queryClient.setQueryData(nudgesQueryKeys.listFiltered(false), (old: any) => {
+        if (!old?.data) return old;
+        return {
+          ...old,
+          data: old.data.map((n: any) => (n.id === newRecord?.id ? { ...n, ...newRecord } : n))
+        };
+      });
 
       // Refresh unread count if is_read changed
       if (newRecord?.is_read !== oldRecord?.is_read) {
         this.queryClient.refetchQueries({
-          queryKey: nudgesQueryKeys.unreadCount(),
+          queryKey: nudgesQueryKeys.unreadCount()
         });
       }
     } else if (payload.eventType === "DELETE") {
@@ -2083,7 +1952,7 @@ class RealtimeService {
         if (!old?.data) return old;
         return {
           ...old,
-          data: old.data.filter((n: any) => n.id !== oldRecord?.id),
+          data: old.data.filter((n: any) => n.id !== oldRecord?.id)
         };
       });
 
@@ -2091,13 +1960,13 @@ class RealtimeService {
         if (!old?.data) return old;
         return {
           ...old,
-          data: old.data.filter((n: any) => n.id !== oldRecord?.id),
+          data: old.data.filter((n: any) => n.id !== oldRecord?.id)
         };
       });
 
       // Invalidate all nudge queries
       this.queryClient.invalidateQueries({
-        queryKey: nudgesQueryKeys.all,
+        queryKey: nudgesQueryKeys.all
       });
     }
   }
@@ -2112,7 +1981,7 @@ class RealtimeService {
    */
   private handleSummaryTableChange(
     table: RealtimeTable,
-    payload: RealtimePostgresChangesPayload<any>,
+    payload: RealtimePostgresChangesPayload<any>
   ) {
     if (!this.queryClient) return;
 
@@ -2124,46 +1993,46 @@ class RealtimeService {
     // Invalidate tracking stats for the specific entity
     if (goalId) {
       this.queryClient.invalidateQueries({
-        queryKey: trackingStatsQueryKeys.entity("goal", goalId),
+        queryKey: trackingStatsQueryKeys.entity("goal", goalId)
       });
       // Also invalidate progress data (streak, habit chain, week progress)
       this.queryClient.invalidateQueries({
-        queryKey: progressQueryKeys.streak(goalId),
+        queryKey: progressQueryKeys.streak(goalId)
       });
       this.queryClient.invalidateQueries({
-        queryKey: progressQueryKeys.weekProgress(goalId),
+        queryKey: progressQueryKeys.weekProgress(goalId)
       });
       this.queryClient.invalidateQueries({
-        queryKey: [...progressQueryKeys.all, "chain", goalId],
+        queryKey: [...progressQueryKeys.all, "chain", goalId]
       });
     }
 
     if (challengeId) {
       this.queryClient.invalidateQueries({
-        queryKey: trackingStatsQueryKeys.entity("challenge", challengeId),
+        queryKey: trackingStatsQueryKeys.entity("challenge", challengeId)
       });
       // Also invalidate progress data for challenges
       this.queryClient.invalidateQueries({
-        queryKey: progressQueryKeys.streak(challengeId),
+        queryKey: progressQueryKeys.streak(challengeId)
       });
       this.queryClient.invalidateQueries({
-        queryKey: progressQueryKeys.weekProgress(challengeId),
+        queryKey: progressQueryKeys.weekProgress(challengeId)
       });
       this.queryClient.invalidateQueries({
-        queryKey: [...progressQueryKeys.all, "chain", challengeId],
+        queryKey: [...progressQueryKeys.all, "chain", challengeId]
       });
     }
 
     // If no specific entity, invalidate all tracking stats
     if (!goalId && !challengeId) {
       this.queryClient.invalidateQueries({
-        queryKey: trackingStatsQueryKeys.all,
+        queryKey: trackingStatsQueryKeys.all
       });
     }
 
     // Always invalidate home dashboard
     this.queryClient.invalidateQueries({
-      queryKey: homeDashboardQueryKeys.dashboard(),
+      queryKey: homeDashboardQueryKeys.dashboard()
     });
   }
 
@@ -2171,9 +2040,7 @@ class RealtimeService {
    * Handle challenge leaderboard changes
    * Leaderboard is updated after check-ins affect points/rankings
    */
-  private handleChallengeLeaderboardChange(
-    payload: RealtimePostgresChangesPayload<any>,
-  ) {
+  private handleChallengeLeaderboardChange(payload: RealtimePostgresChangesPayload<any>) {
     const newRecord = payload.new as any;
     const oldRecord = payload.old as any;
     const challengeId = newRecord?.challenge_id || oldRecord?.challenge_id;
@@ -2183,18 +2050,18 @@ class RealtimeService {
     if (challengeId) {
       // Invalidate specific leaderboard query
       this.queryClient.invalidateQueries({
-        queryKey: challengesQueryKeys.leaderboard(challengeId),
+        queryKey: challengesQueryKeys.leaderboard(challengeId)
       });
 
       // Also update challenge detail for my_rank
       this.queryClient.invalidateQueries({
-        queryKey: challengesQueryKeys.detail(challengeId),
+        queryKey: challengesQueryKeys.detail(challengeId)
       });
     } else {
       // Fallback: challenge_id not in payload (REPLICA IDENTITY not set)
       // Invalidate all challenge queries to ensure UI stays in sync
       this.queryClient.invalidateQueries({
-        queryKey: challengesQueryKeys.all,
+        queryKey: challengesQueryKeys.all
       });
     }
   }
@@ -2227,12 +2094,12 @@ class RealtimeService {
 
       // Remove specific detail cache
       this.queryClient.removeQueries({
-        queryKey: challengesQueryKeys.detail(oldRecord?.id),
+        queryKey: challengesQueryKeys.detail(oldRecord?.id)
       });
 
       // Invalidate home dashboard (TodaysActionsCard uses this)
       this.queryClient.invalidateQueries({
-        queryKey: homeDashboardQueryKeys.dashboard(),
+        queryKey: homeDashboardQueryKeys.dashboard()
       });
 
       // Invalidate partner dashboards
@@ -2242,7 +2109,7 @@ class RealtimeService {
       this.queryClient.setQueryData(challengesQueryKeys.list(), (old: any) => {
         if (!old?.data) return old;
         const updated = old.data.map((c: any) =>
-          c.id === newRecord?.id ? { ...c, ...newRecord } : c,
+          c.id === newRecord?.id ? { ...c, ...newRecord } : c
         );
         return { ...old, data: updated };
       });
@@ -2251,44 +2118,42 @@ class RealtimeService {
       this.queryClient.setQueryData(challengesQueryKeys.my(), (old: any) => {
         if (!old?.data) return old;
         const updated = old.data.map((c: any) =>
-          c.id === newRecord?.id ? { ...c, ...newRecord } : c,
+          c.id === newRecord?.id ? { ...c, ...newRecord } : c
         );
         return { ...old, data: updated };
       });
 
       // Invalidate detail to get fresh computed fields
       this.queryClient.invalidateQueries({
-        queryKey: challengesQueryKeys.detail(challengeId),
+        queryKey: challengesQueryKeys.detail(challengeId)
       });
 
       // Invalidate home dashboard (TodaysActionsCard uses this)
       this.queryClient.invalidateQueries({
-        queryKey: homeDashboardQueryKeys.dashboard(),
+        queryKey: homeDashboardQueryKeys.dashboard()
       });
 
       // Invalidate partner dashboards
-      console.log(
-        `[Realtime] 👥 Invalidating partner dashboards for challenges UPDATE`,
-      );
+      console.log(`[Realtime] 👥 Invalidating partner dashboards for challenges UPDATE`);
       this.invalidatePartnerDashboards();
     } else if (payload.eventType === "INSERT") {
       // For new challenges, invalidate all challenge queries
       this.queryClient.invalidateQueries({
-        queryKey: challengesQueryKeys.all,
+        queryKey: challengesQueryKeys.all
       });
       this.queryClient.invalidateQueries({
-        queryKey: challengesQueryKeys.list(),
+        queryKey: challengesQueryKeys.list()
       });
       this.queryClient.invalidateQueries({
-        queryKey: challengesQueryKeys.my(),
+        queryKey: challengesQueryKeys.my()
       });
       this.queryClient.invalidateQueries({
-        queryKey: challengesQueryKeys.public(),
+        queryKey: challengesQueryKeys.public()
       });
 
       // Invalidate home dashboard so TodaysActionsCard shows new pending check-ins
       this.queryClient.invalidateQueries({
-        queryKey: homeDashboardQueryKeys.dashboard(),
+        queryKey: homeDashboardQueryKeys.dashboard()
       });
 
       // Invalidate partner dashboards
@@ -2303,13 +2168,13 @@ class RealtimeService {
   private handleReconnect() {
     // Only reconnect if we have very few successful subscriptions
     const successfulCount = Array.from(this.channels.values()).filter(
-      (channel) => channel.state === "joined",
+      (channel) => channel.state === "joined"
     ).length;
 
     // If we have some successful subscriptions, don't reconnect globally
     if (successfulCount > 0) {
       console.log(
-        `[Realtime] Some subscriptions working (${successfulCount}), skipping global reconnect`,
+        `[Realtime] Some subscriptions working (${successfulCount}), skipping global reconnect`
       );
       return;
     }
@@ -2321,7 +2186,7 @@ class RealtimeService {
         "\n  1. Check if Supabase is running: supabase status",
         "\n  2. Verify Realtime is enabled in config.toml",
         "\n  3. Ensure migration ran: supabase db push --local",
-        "\n  4. For local dev, restart: supabase stop && supabase start",
+        "\n  4. For local dev, restart: supabase stop && supabase start"
       );
       return;
     }
@@ -2330,7 +2195,7 @@ class RealtimeService {
     this.reconnectAttempts++;
 
     console.log(
-      `[Realtime] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`,
+      `[Realtime] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`
     );
 
     if (this.reconnectTimeout) {
@@ -2429,7 +2294,7 @@ class RealtimeService {
     return {
       isConnected: this.isConnected,
       channelCount: this.channels.size,
-      reconnectAttempts: this.reconnectAttempts,
+      reconnectAttempts: this.reconnectAttempts
     };
   }
 }

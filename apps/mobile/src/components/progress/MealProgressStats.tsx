@@ -26,7 +26,7 @@ interface MealProgressStatsProps {
 export function MealProgressStats({
   entityId,
   entityType = "goal",
-  period = 30,
+  period = 30
 }: MealProgressStatsProps) {
   const { t } = useTranslation();
   const styles = useStyles(makeStyles);
@@ -48,9 +48,7 @@ export function MealProgressStats({
     <View style={styles.container}>
       <View style={styles.header}>
         <Ionicons name="restaurant" size={18} color={brandColors.primary} />
-        <Text style={styles.title}>
-          {t("progress.meal_stats") || "Meal Stats"}
-        </Text>
+        <Text style={styles.title}>{t("progress.meal_stats") || "Meal Stats"}</Text>
         <Text style={styles.period}>
           {t("progress.last_days", { days: period }) || `Last ${period} days`}
         </Text>
@@ -60,46 +58,32 @@ export function MealProgressStats({
         {/* Total Meals */}
         <View style={styles.statItem}>
           <Text style={styles.statValue}>{stats.total_meals_logged}</Text>
-          <Text style={styles.statLabel}>
-            {t("progress.meals_logged") || "Meals Logged"}
-          </Text>
+          <Text style={styles.statLabel}>{t("progress.meals_logged") || "Meals Logged"}</Text>
         </View>
 
         {/* This Week */}
         <View style={styles.statItem}>
           <Text style={styles.statValue}>{stats.meals_this_week}</Text>
-          <Text style={styles.statLabel}>
-            {t("progress.this_week") || "This Week"}
-          </Text>
+          <Text style={styles.statLabel}>{t("progress.this_week") || "This Week"}</Text>
         </View>
 
         {/* Avg Calories */}
         <View style={styles.statItem}>
-          <Text style={styles.statValue}>
-            {Math.round(stats.avg_calories_per_day)}
-          </Text>
-          <Text style={styles.statLabel}>
-            {t("progress.avg_calories") || "Avg Cal/Day"}
-          </Text>
+          <Text style={styles.statValue}>{Math.round(stats.avg_calories_per_day)}</Text>
+          <Text style={styles.statLabel}>{t("progress.avg_calories") || "Avg Cal/Day"}</Text>
         </View>
 
         {/* Avg Protein */}
         <View style={styles.statItem}>
-          <Text style={styles.statValue}>
-            {Math.round(stats.avg_protein_per_day)}g
-          </Text>
-          <Text style={styles.statLabel}>
-            {t("progress.avg_protein") || "Avg Protein/Day"}
-          </Text>
+          <Text style={styles.statValue}>{Math.round(stats.avg_protein_per_day)}g</Text>
+          <Text style={styles.statLabel}>{t("progress.avg_protein") || "Avg Protein/Day"}</Text>
         </View>
       </View>
 
       {/* Health Rating Distribution */}
       {stats.total_meals_logged > 0 && (
         <View style={styles.healthDistribution}>
-          <Text style={styles.healthTitle}>
-            {t("progress.meal_quality") || "Meal Quality"}
-          </Text>
+          <Text style={styles.healthTitle}>{t("progress.meal_quality") || "Meal Quality"}</Text>
 
           {/* Distribution Bar */}
           <View style={styles.distributionBar}>
@@ -108,7 +92,7 @@ export function MealProgressStats({
                 style={[
                   styles.barSegment,
                   styles.barHealthy,
-                  { width: `${stats.healthy_meal_percentage}%` },
+                  { width: `${stats.healthy_meal_percentage}%` }
                 ]}
               />
             )}
@@ -117,7 +101,7 @@ export function MealProgressStats({
                 style={[
                   styles.barSegment,
                   styles.barOkay,
-                  { width: `${stats.okay_meal_percentage}%` },
+                  { width: `${stats.okay_meal_percentage}%` }
                 ]}
               />
             )}
@@ -126,7 +110,7 @@ export function MealProgressStats({
                 style={[
                   styles.barSegment,
                   styles.barUnhealthy,
-                  { width: `${stats.unhealthy_meal_percentage}%` },
+                  { width: `${stats.unhealthy_meal_percentage}%` }
                 ]}
               />
             )}
@@ -164,109 +148,109 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     marginBottom: toRN(tokens.spacing[4]),
     padding: toRN(tokens.spacing[4]),
     backgroundColor: colors.bg.muted,
-    borderRadius: toRN(tokens.borderRadius.lg),
+    borderRadius: toRN(tokens.borderRadius.lg)
   },
   header: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
     gap: toRN(tokens.spacing[2]),
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   title: {
     flex: 1,
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.semiBold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   period: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.regular,
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   statsGrid: {
     flexDirection: "row" as const,
     flexWrap: "wrap" as const,
     justifyContent: "space-between" as const,
-    rowGap: toRN(tokens.spacing[3]),
+    rowGap: toRN(tokens.spacing[3])
   },
   statItem: {
     width: "48%",
     padding: toRN(tokens.spacing[3]),
     backgroundColor: colors.bg.card,
     borderRadius: toRN(tokens.borderRadius.md),
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   statValue: {
     fontSize: toRN(tokens.typography.fontSize.xl),
     fontFamily: fontFamily.bold,
-    color: brand.primary,
+    color: brand.primary
   },
   statLabel: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.regular,
     color: colors.text.tertiary,
     marginTop: toRN(tokens.spacing[1]),
-    textAlign: "center" as const,
+    textAlign: "center" as const
   },
   // Health Distribution
   healthDistribution: {
     marginTop: toRN(tokens.spacing[3]),
     paddingTop: toRN(tokens.spacing[3]),
     borderTopWidth: 1,
-    borderTopColor: colors.border.subtle,
+    borderTopColor: colors.border.subtle
   },
   healthTitle: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.semiBold,
     color: colors.text.primary,
-    marginBottom: toRN(tokens.spacing[2]),
+    marginBottom: toRN(tokens.spacing[2])
   },
   distributionBar: {
     flexDirection: "row" as const,
     height: toRN(12),
     borderRadius: toRN(6),
     overflow: "hidden" as const,
-    backgroundColor: colors.bg.tertiary,
+    backgroundColor: colors.bg.tertiary
   },
   barSegment: {
-    height: "100%" as const,
+    height: "100%" as const
   },
   barHealthy: {
-    backgroundColor: "#22C55E", // Green
+    backgroundColor: "#22C55E" // Green
   },
   barOkay: {
-    backgroundColor: "#F59E0B", // Amber
+    backgroundColor: "#F59E0B" // Amber
   },
   barUnhealthy: {
-    backgroundColor: "#EF4444", // Red
+    backgroundColor: "#EF4444" // Red
   },
   legend: {
     flexDirection: "row" as const,
     justifyContent: "space-between" as const,
-    marginTop: toRN(tokens.spacing[2]),
+    marginTop: toRN(tokens.spacing[2])
   },
   legendItem: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    gap: toRN(tokens.spacing[1]),
+    gap: toRN(tokens.spacing[1])
   },
   legendDot: {
     width: toRN(8),
     height: toRN(8),
-    borderRadius: toRN(4),
+    borderRadius: toRN(4)
   },
   dotHealthy: {
-    backgroundColor: "#22C55E",
+    backgroundColor: "#22C55E"
   },
   dotOkay: {
-    backgroundColor: "#F59E0B",
+    backgroundColor: "#F59E0B"
   },
   dotUnhealthy: {
-    backgroundColor: "#EF4444",
+    backgroundColor: "#EF4444"
   },
   legendText: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.medium,
-    color: colors.text.tertiary,
-  },
+    color: colors.text.tertiary
+  }
 });

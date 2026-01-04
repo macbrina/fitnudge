@@ -5,7 +5,7 @@ import { userService } from "@/services/api/user";
 export const referralQueryKeys = {
   all: ["referral"] as const,
   code: () => [...referralQueryKeys.all, "code"] as const,
-  referrals: () => [...referralQueryKeys.all, "list"] as const,
+  referrals: () => [...referralQueryKeys.all, "list"] as const
 } as const;
 
 /**
@@ -15,7 +15,7 @@ export const useReferralCode = () => {
   return useQuery({
     queryKey: referralQueryKeys.code(),
     queryFn: () => userService.getReferralCode(),
-    staleTime: 24 * 60 * 60 * 1000, // 24 hours - referral code rarely changes
+    staleTime: 24 * 60 * 60 * 1000 // 24 hours - referral code rarely changes
   });
 };
 
@@ -26,6 +26,6 @@ export const useMyReferrals = () => {
   return useQuery({
     queryKey: referralQueryKeys.referrals(),
     queryFn: () => userService.getMyReferrals(),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000 // 5 minutes
   });
 };

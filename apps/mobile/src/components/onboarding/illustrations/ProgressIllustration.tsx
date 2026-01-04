@@ -8,7 +8,7 @@ import Svg, {
   LinearGradient,
   Stop,
   Text,
-  Image,
+  Image
 } from "react-native-svg";
 
 interface ProgressIllustrationProps {
@@ -18,7 +18,7 @@ interface ProgressIllustrationProps {
 
 export const ProgressIllustration: React.FC<ProgressIllustrationProps> = ({
   width = 280,
-  height = 280,
+  height = 280
 }) => {
   return (
     <Svg width={width} height={height} viewBox="0 0 280 280">
@@ -30,14 +30,7 @@ export const ProgressIllustration: React.FC<ProgressIllustrationProps> = ({
       </Defs>
 
       {/* Purple rounded rectangle background */}
-      <Rect
-        x="40"
-        y="40"
-        width="200"
-        height="200"
-        fill="url(#purpleGradient)"
-        rx="20"
-      />
+      <Rect x="40" y="40" width="200" height="200" fill="url(#purpleGradient)" rx="20" />
 
       {/* Progress Image - Centered */}
       <Image

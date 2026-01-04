@@ -367,6 +367,23 @@ class GoalUpdate(BaseModel):
     completion_reason: Optional[str] = None
 
 
+class GoalEditRequest(BaseModel):
+    """
+    Restricted model for user-facing goal edits.
+
+    Only allows editing fields that don't affect the AI-generated plan:
+    - title: Safe to change (warning shown to user that plan was based on original)
+    - description: Safe to change (warning shown to user that plan was based on original)
+    - days_of_week: Can ADD days, but cannot REMOVE existing days
+    - reminder_times: Just notification preferences, safe to change
+    """
+
+    title: Optional[str] = None
+    description: Optional[str] = None
+    days_of_week: Optional[List[int]] = None  # ADD only - validated in endpoint
+    reminder_times: Optional[List[str]] = None
+
+
 class GoalResponse(BaseModel):
     id: str
     title: str
@@ -731,6 +748,21 @@ async def create_goal(
         },
     )
 
+    # Check achievements in background (non-blocking) - e.g., "first_goal" badge
+    try:
+        from app.services.tasks import check_achievements_task
+
+        check_achievements_task.delay(
+            user_id=user_id,
+            source_type="goal",
+            source_id=goal_id,
+        )
+    except Exception as e:
+        logger.warning(
+            f"Failed to queue achievement check for goal creation: {e}",
+            {"user_id": user_id, "goal_id": goal_id},
+        )
+
     return result.data[0]
 
 
@@ -1013,6 +1045,155 @@ async def update_goal(
 
     await social_accountability_service.notify_partners_of_data_change(
         user_id, "goal_updated"
+    )
+
+    return result.data[0]
+
+
+@router.patch("/{goal_id}/edit", response_model=GoalResponse)
+async def edit_goal(
+    goal_id: str,
+    edit_data: GoalEditRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Edit goal with restricted fields.
+
+    This endpoint is for user-facing edits and only allows changes that
+    don't invalidate the AI-generated plan:
+
+    - title: Allowed (plan was based on original, user is warned)
+    - description: Allowed (plan was based on original, user is warned)
+    - days_of_week: Can ADD days only, cannot REMOVE existing days
+    - reminder_times: Allowed (just notification preferences)
+
+    Fields NOT allowed to be edited:
+    - category: Plan is category-specific
+    - frequency: Affects streaks and plan schedule
+    - target_days: Derived from frequency
+    - goal_type, tracking_type, etc.: Core plan attributes
+    """
+    from app.core.database import get_supabase_client
+
+    supabase = get_supabase_client()
+    user_id = current_user["id"]
+
+    # Check if goal exists and belongs to user
+    existing_goal = (
+        supabase.table("goals")
+        .select("*")
+        .eq("id", goal_id)
+        .eq("user_id", user_id)
+        .maybe_single()
+        .execute()
+    )
+
+    if not existing_goal or not existing_goal.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Goal not found"
+        )
+
+    current_goal = existing_goal.data
+    update_data = {}
+
+    # Title validation
+    if edit_data.title is not None:
+        title = edit_data.title.strip()
+        if len(title) < 3:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Title must be at least 3 characters",
+            )
+        if len(title) > 100:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Title must be 100 characters or less",
+            )
+        update_data["title"] = title
+
+    # Description validation
+    if edit_data.description is not None:
+        description = edit_data.description.strip()
+        if len(description) > 500:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Description must be 500 characters or less",
+            )
+        update_data["description"] = description
+
+    # Days of week validation - ADD only, no REMOVE
+    if edit_data.days_of_week is not None:
+        current_days = set(current_goal.get("days_of_week") or [])
+        new_days = set(edit_data.days_of_week)
+
+        # Validate day values are valid (0-6)
+        if not all(0 <= day <= 6 for day in new_days):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Days of week must be between 0 (Sunday) and 6 (Saturday)",
+            )
+
+        # Check for removed days
+        removed_days = current_days - new_days
+        if removed_days:
+            day_names = {
+                0: "Sunday",
+                1: "Monday",
+                2: "Tuesday",
+                3: "Wednesday",
+                4: "Thursday",
+                5: "Friday",
+                6: "Saturday",
+            }
+            removed_names = [day_names[d] for d in sorted(removed_days)]
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot remove scheduled days: {', '.join(removed_names)}. You can only add new days.",
+            )
+
+        # Only update if there are changes (new days added)
+        if new_days != current_days:
+            update_data["days_of_week"] = sorted(list(new_days))
+            # Also update target_days to match (for weekly goals)
+            if current_goal.get("frequency") == "weekly":
+                update_data["target_days"] = len(new_days)
+
+    # Reminder times validation
+    if edit_data.reminder_times is not None:
+        import re
+
+        time_pattern = re.compile(r"^([01]?[0-9]|2[0-3]):[0-5][0-9]$")
+        for time_str in edit_data.reminder_times:
+            if not time_pattern.match(time_str):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid time format: {time_str}. Use HH:MM format (e.g., 09:00)",
+                )
+        update_data["reminder_times"] = edit_data.reminder_times
+
+    # If nothing to update, return current goal
+    if not update_data:
+        return current_goal
+
+    # Update the goal
+    result = supabase.table("goals").update(update_data).eq("id", goal_id).execute()
+
+    if not result.data:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update goal",
+        )
+
+    # Notify partners of the goal update
+    from app.services.social_accountability_service import social_accountability_service
+
+    await social_accountability_service.notify_partners_of_data_change(
+        user_id, "goal_updated"
+    )
+
+    logger.info(
+        f"Goal {goal_id} edited by user {user_id}",
+        {"goal_id": goal_id, "updated_fields": list(update_data.keys())},
     )
 
     return result.data[0]

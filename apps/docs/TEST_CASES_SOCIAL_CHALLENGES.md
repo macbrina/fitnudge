@@ -95,16 +95,15 @@ This document contains test cases for verifying the social and challenge feature
 
 ### 3.1 Join Challenge
 
-| Test ID | Test Case                        | Steps                                                       | Expected Result                                     |
-| ------- | -------------------------------- | ----------------------------------------------------------- | --------------------------------------------------- |
-| CH-001  | Join public challenge            | 1. View public challenge<br>2. Tap Join                     | Successfully joined, added to participants          |
-| CH-002  | Cannot join after start date     | 1. Try to join challenge that has started                   | Error: "Challenge has already started"              |
-| CH-003  | Cannot join after join deadline  | 1. Try to join after join_deadline                          | Error: "Join deadline has passed"                   |
-| CH-004  | Cannot join ended challenge      | 1. Try to join ended challenge                              | Error: "Challenge has ended"                        |
-| CH-005  | Challenge join limit (Free)      | 1. As Free user, join 1 challenge<br>2. Try to join another | Error: "You can only join 1 challenge(s) at a time" |
-| CH-006  | Challenge join limit (Starter)   | 1. As Starter, join 2 challenges<br>2. Try to join third    | Error: "You can only join 2 challenge(s) at a time" |
-| CH-007  | Challenge join limit (Pro/Elite) | 1. As Pro, join 3 challenges<br>2. Try to join fourth       | Error: "You can only join 3 challenge(s) at a time" |
-| CH-008  | Cannot join own challenge        | 1. Create challenge<br>2. Try to join it                    | Error or already a participant                      |
+| Test ID | Test Case                       | Steps                                                       | Expected Result                                     |
+| ------- | ------------------------------- | ----------------------------------------------------------- | --------------------------------------------------- |
+| CH-001  | Join public challenge           | 1. View public challenge<br>2. Tap Join                     | Successfully joined, added to participants          |
+| CH-002  | Cannot join after start date    | 1. Try to join challenge that has started                   | Error: "Challenge has already started"              |
+| CH-003  | Cannot join after join deadline | 1. Try to join after join_deadline                          | Error: "Join deadline has passed"                   |
+| CH-004  | Cannot join ended challenge     | 1. Try to join ended challenge                              | Error: "Challenge has ended"                        |
+| CH-005  | Challenge join limit (Free)     | 1. As Free user, join 1 challenge<br>2. Try to join another | Error: "You can only join 1 challenge(s) at a time" |
+| CH-006  | Challenge join limit (Premium)  | 1. As Premium, join many challenges                         | Unlimited joins (Premium feature)                   |
+| CH-008  | Cannot join own challenge       | 1. Create challenge<br>2. Try to join it                    | Error or already a participant                      |
 
 ### 3.2 Leave Challenge
 
@@ -150,11 +149,11 @@ This document contains test cases for verifying the social and challenge feature
 
 ### 4.1 Activate Goal
 
-| Test ID | Test Case                        | Steps                                                       | Expected Result                |
-| ------- | -------------------------------- | ----------------------------------------------------------- | ------------------------------ |
-| GA-001  | Activate inactive goal           | 1. View inactive goal<br>2. Tap Activate                    | Goal becomes active            |
-| GA-002  | Activate respects combined limit | 1. Have max active goals + challenges<br>2. Try to activate | Error with limit message       |
-| GA-003  | Activate unarchives goal         | 1. Activate archived goal                                   | Goal unarchived and activated  |
+| Test ID | Test Case                        | Steps                                                       | Expected Result               |
+| ------- | -------------------------------- | ----------------------------------------------------------- | ----------------------------- |
+| GA-001  | Activate inactive goal           | 1. View inactive goal<br>2. Tap Activate                    | Goal becomes active           |
+| GA-002  | Activate respects combined limit | 1. Have max active goals + challenges<br>2. Try to activate | Error with limit message      |
+| GA-003  | Activate unarchives goal         | 1. Activate archived goal                                   | Goal unarchived and activated |
 
 ### 4.2 Deactivate Goal
 
@@ -178,19 +177,19 @@ This document contains test cases for verifying the social and challenge feature
 
 ### 5.1 Create Challenge
 
-| Test ID | Test Case                          | Steps                                                            | Expected Result                          |
-| ------- | ---------------------------------- | ---------------------------------------------------------------- | ---------------------------------------- |
-| CC-001  | Create challenge successfully      | 1. Navigate to Challenges<br>2. Tap Create<br>3. Fill in details | Challenge created, user is first member  |
-| CC-002  | Challenge requires all fields      | 1. Try to create without title                                   | Validation error shown                   |
-| CC-003  | Challenge respects active limit    | 1. At max active limit<br>2. Try to create challenge             | Error: Active limit reached              |
-| CC-004  | AI generates plan for challenge    | 1. Create challenge<br>2. Check actionable_plans                 | Plan created with challenge_id           |
+| Test ID | Test Case                       | Steps                                                            | Expected Result                         |
+| ------- | ------------------------------- | ---------------------------------------------------------------- | --------------------------------------- |
+| CC-001  | Create challenge successfully   | 1. Navigate to Challenges<br>2. Tap Create<br>3. Fill in details | Challenge created, user is first member |
+| CC-002  | Challenge requires all fields   | 1. Try to create without title                                   | Validation error shown                  |
+| CC-003  | Challenge respects active limit | 1. At max active limit<br>2. Try to create challenge             | Error: Active limit reached             |
+| CC-004  | AI generates plan for challenge | 1. Create challenge<br>2. Check actionable_plans                 | Plan created with challenge_id          |
 
 ### 5.2 Feature Access
 
-| Test ID | Test Case                          | Steps                                  | Expected Result                          |
-| ------- | ---------------------------------- | -------------------------------------- | ---------------------------------------- |
-| CC-010  | Free user cannot create challenges | 1. As Free user, try to create         | Option not visible or feature gate error |
-| CC-011  | Starter can create challenges      | 1. As Starter, create challenge        | Challenge created successfully           |
+| Test ID | Test Case                          | Steps                           | Expected Result                          |
+| ------- | ---------------------------------- | ------------------------------- | ---------------------------------------- |
+| CC-010  | Free user cannot create challenges | 1. As Free user, try to create  | Option not visible or feature gate error |
+| CC-011  | Starter can create challenges      | 1. As Starter, create challenge | Challenge created successfully           |
 
 ---
 
@@ -198,28 +197,26 @@ This document contains test cases for verifying the social and challenge feature
 
 ### 6.1 Goal Creation Limits
 
-| Test ID | Test Case              | Steps                                                    | Expected Result           |
-| ------- | ---------------------- | -------------------------------------------------------- | ------------------------- |
-| FL-001  | Free: 1 goal limit     | 1. As Free, create 1 goal<br>2. Try to create second     | Error: Goal limit reached |
-| FL-002  | Starter: 3 goals limit | 1. As Starter, create 3 goals<br>2. Try to create fourth | Error: Goal limit reached |
-| FL-003  | Pro/Elite: Unlimited   | 1. As Pro, create many goals                             | No limit enforced         |
+| Test ID | Test Case          | Steps                                                | Expected Result           |
+| ------- | ------------------ | ---------------------------------------------------- | ------------------------- |
+| FL-001  | Free: 1 goal limit | 1. As Free, create 1 goal<br>2. Try to create second | Error: Goal limit reached |
+| FL-002  | Premium: Unlimited | 1. As Premium, create many goals                     | No limit enforced         |
 
 ### 6.2 Active Goal/Challenge Limits
 
-| Test ID | Test Case               | Steps                                                         | Expected Result                |
-| ------- | ----------------------- | ------------------------------------------------------------- | ------------------------------ |
-| FL-010  | Free: 1 active item     | 1. As Free, activate 1 goal<br>2. Try to activate another     | Error: Active limit reached    |
-| FL-011  | Starter: 2 active items | 1. As Starter, have 2 active<br>2. Try to activate third      | Error: Active limit reached    |
-| FL-012  | Combined counting       | 1. Have 1 active goal + 1 created challenge<br>2. Count total | Both count toward active limit |
+| Test ID | Test Case                 | Steps                                                         | Expected Result                |
+| ------- | ------------------------- | ------------------------------------------------------------- | ------------------------------ |
+| FL-010  | Free: 1 active item       | 1. As Free, activate 1 goal<br>2. Try to activate another     | Error: Active limit reached    |
+| FL-011  | Premium: Unlimited active | 1. As Premium, activate multiple goals                        | No limit enforced              |
+| FL-012  | Combined counting         | 1. Have 1 active goal + 1 created challenge<br>2. Count total | Both count toward active limit |
 
 ### 6.3 Challenge Join Limits
 
-| Test ID | Test Case                      | Steps                                                  | Expected Result                   |
-| ------- | ------------------------------ | ------------------------------------------------------ | --------------------------------- |
-| FL-020  | Free: 1 joined challenge       | 1. As Free, join 1 challenge<br>2. Try to join another | Error: Join limit reached         |
-| FL-021  | Starter: 2 joined challenges   | 1. As Starter, join 2<br>2. Try third                  | Error: Join limit reached         |
-| FL-022  | Pro/Elite: 3 joined challenges | 1. As Pro, join 3<br>2. Try fourth                     | Error: Join limit reached         |
-| FL-023  | Own challenges don't count     | 1. Create 1 challenge<br>2. Join another               | Join succeeds (own doesn't count) |
+| Test ID | Test Case                  | Steps                                                  | Expected Result                   |
+| ------- | -------------------------- | ------------------------------------------------------ | --------------------------------- |
+| FL-020  | Free: 1 joined challenge   | 1. As Free, join 1 challenge<br>2. Try to join another | Error: Join limit reached         |
+| FL-021  | Premium: Unlimited joins   | 1. As Premium, join multiple challenges                | No limit enforced                 |
+| FL-022  | Own challenges don't count | 1. Create 1 challenge<br>2. Join another               | Join succeeds (own doesn't count) |
 
 ### 6.4 Dynamic Feature Access
 
@@ -314,9 +311,7 @@ This document contains test cases for verifying the social and challenge feature
 1. **Backend running** with Celery worker
 2. **Test users** with different subscription plans:
    - Free user
-   - Starter user
-   - Pro user
-   - Elite user
+   - Premium user
 3. **Test data**:
    - Goals with various states (active, inactive, archived)
    - Challenges (public, with participants, ended)
@@ -339,6 +334,6 @@ poetry run celery -A celery_worker worker --beat --loglevel=info
 
 ## Notes
 
-- Tests marked with specific plan requirements (Free, Starter, Pro, Elite) require logging in as that subscription tier
+- Tests marked with specific plan requirements (Free, Premium) require logging in as that subscription tier
 - Challenge lifecycle tests (CL-\*) require waiting for Celery beat schedule or manual task invocation
 - Time-based tests may need to manipulate dates in the database for testing

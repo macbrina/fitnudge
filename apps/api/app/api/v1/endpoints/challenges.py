@@ -226,6 +226,31 @@ class ChallengeParticipantResponse(BaseModel):
     completed_at: Optional[str]
 
 
+class ChallengeEditRequest(BaseModel):
+    """
+    Restricted model for creator-only challenge edits.
+    
+    Only allows editing when status === 'upcoming':
+    - title: Safe to change (plan was based on original, user is warned)
+    - description: Safe to change (plan was based on original, user is warned)
+    - join_deadline: Can only EXTEND (>= original, >= now)
+    - max_participants: Can only INCREASE (>= current participants_count)
+    - reminder_times: Just notification preferences, safe to change
+    
+    Fields NOT allowed to be edited:
+    - category, frequency, challenge_type: Plan is based on these
+    - duration, target_checkins: Core challenge parameters
+    - days_of_week: Affects all participants' schedules
+    - start_date, end_date: Participants have planned around these
+    - is_public: Could cause issues if changed after people found it
+    """
+    title: Optional[str] = None
+    description: Optional[str] = None
+    join_deadline: Optional[date] = None  # Extend only
+    max_participants: Optional[int] = None  # Increase only
+    reminder_times: Optional[List[str]] = None
+
+
 @router.post("/", response_model=ChallengeResponse, status_code=status.HTTP_201_CREATED)
 async def create_challenge(
     challenge_data: ChallengeCreate,
@@ -559,6 +584,21 @@ async def join_challenge(
             user_id, "challenge_joined"
         )
 
+        # Check achievements in background (non-blocking) - e.g., "first_challenge" badge
+        try:
+            from app.services.tasks import check_achievements_task
+
+            check_achievements_task.delay(
+                user_id=user_id,
+                source_type="challenge",
+                source_id=challenge_id,
+            )
+        except Exception as e:
+            logger.warning(
+                f"Failed to queue achievement check for challenge join: {e}",
+                {"user_id": user_id, "challenge_id": challenge_id},
+            )
+
         return participant
 
     except ValueError as e:
@@ -683,6 +723,209 @@ async def get_challenge_participants(
     result.sort(key=lambda x: (x["rank"] is None, x["rank"] or 0))
 
     return result
+
+
+@router.patch("/{challenge_id}/edit", response_model=ChallengeDetailResponse)
+async def edit_challenge(
+    challenge_id: str,
+    edit_data: ChallengeEditRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Edit challenge with restricted fields.
+    
+    Only the CREATOR can edit a challenge, and only when status === 'upcoming'.
+    
+    Allowed edits:
+    - title: Allowed (plan was based on original, user is warned)
+    - description: Allowed (plan was based on original, user is warned)
+    - join_deadline: Can only EXTEND (>= original deadline, >= now)
+    - max_participants: Can only INCREASE (>= current participants_count)
+    - reminder_times: Allowed (just notification preferences)
+    
+    Returns 403 if:
+    - User is not the creator
+    - Challenge status is not 'upcoming'
+    """
+    from app.core.database import get_supabase_client
+    from datetime import datetime as dt
+
+    supabase = get_supabase_client()
+    user_id = current_user["id"]
+
+    # Get the challenge
+    challenge_result = (
+        supabase.table("challenges")
+        .select("*")
+        .eq("id", challenge_id)
+        .maybe_single()
+        .execute()
+    )
+
+    if not challenge_result or not challenge_result.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Challenge not found"
+        )
+
+    challenge = challenge_result.data
+
+    # Check if user is the creator
+    if challenge.get("created_by") != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the challenge creator can edit this challenge"
+        )
+
+    # Check if challenge is still 'upcoming'
+    if challenge.get("status") != "upcoming":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot edit challenge with status '{challenge.get('status')}'. Only 'upcoming' challenges can be edited."
+        )
+
+    update_data = {}
+
+    # Title validation
+    if edit_data.title is not None:
+        title = edit_data.title.strip()
+        if len(title) < 3:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Title must be at least 3 characters"
+            )
+        if len(title) > 100:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Title must be 100 characters or less"
+            )
+        update_data["title"] = title
+
+    # Description validation
+    if edit_data.description is not None:
+        description = edit_data.description.strip()
+        if len(description) > 500:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Description must be 500 characters or less"
+            )
+        update_data["description"] = description
+
+    # Join deadline validation - can only EXTEND
+    if edit_data.join_deadline is not None:
+        today = dt.now().date()
+        
+        # Can't set deadline in the past
+        if edit_data.join_deadline < today:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Join deadline cannot be in the past"
+            )
+        
+        # Get original deadline
+        original_deadline_str = challenge.get("join_deadline")
+        if original_deadline_str:
+            if isinstance(original_deadline_str, str):
+                original_deadline = dt.fromisoformat(original_deadline_str.replace("Z", "+00:00")).date()
+            else:
+                original_deadline = original_deadline_str
+            
+            # Can only extend, not shorten
+            if edit_data.join_deadline < original_deadline:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Join deadline can only be extended. Original deadline: {original_deadline}"
+                )
+        
+        # Ensure join deadline is before start date
+        start_date_str = challenge.get("start_date")
+        if start_date_str:
+            if isinstance(start_date_str, str):
+                start_date = dt.fromisoformat(start_date_str.replace("Z", "+00:00")).date()
+            else:
+                start_date = start_date_str
+            
+            if edit_data.join_deadline >= start_date:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Join deadline must be before start date ({start_date})"
+                )
+        
+        update_data["join_deadline"] = edit_data.join_deadline.isoformat()
+
+    # Max participants validation - can only INCREASE
+    if edit_data.max_participants is not None:
+        if edit_data.max_participants < 2:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Max participants must be at least 2"
+            )
+        
+        # Get current participants count
+        participants_result = (
+            supabase.table("challenge_participants")
+            .select("id", count="exact")
+            .eq("challenge_id", challenge_id)
+            .execute()
+        )
+        current_count = participants_result.count or 0
+        
+        if edit_data.max_participants < current_count:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot set max participants below current count ({current_count})"
+            )
+        
+        # Check original max_participants
+        original_max = challenge.get("max_participants")
+        if original_max is not None and edit_data.max_participants < original_max:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Max participants can only be increased. Original limit: {original_max}"
+            )
+        
+        update_data["max_participants"] = edit_data.max_participants
+
+    # Reminder times validation
+    if edit_data.reminder_times is not None:
+        import re
+        time_pattern = re.compile(r"^([01]?[0-9]|2[0-3]):[0-5][0-9]$")
+        for time_str in edit_data.reminder_times:
+            if not time_pattern.match(time_str):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid time format: {time_str}. Use HH:MM format (e.g., 09:00)"
+                )
+        update_data["reminder_times"] = edit_data.reminder_times
+
+    # If nothing to update, return current challenge
+    if not update_data:
+        # Return the challenge with detail fields
+        return await get_challenge(challenge_id, current_user)
+
+    # Update the challenge
+    result = supabase.table("challenges").update(update_data).eq("id", challenge_id).execute()
+
+    if not result.data:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update challenge"
+        )
+
+    # Notify partners of the challenge update
+    from app.services.social_accountability_service import social_accountability_service
+
+    await social_accountability_service.notify_partners_of_data_change(
+        user_id, "challenge_updated"
+    )
+
+    logger.info(
+        f"Challenge {challenge_id} edited by creator {user_id}",
+        {"challenge_id": challenge_id, "updated_fields": list(update_data.keys())}
+    )
+
+    # Return full challenge details
+    return await get_challenge(challenge_id, current_user)
 
 
 @router.post("/{challenge_id}/update-progress")
@@ -2138,6 +2381,21 @@ async def join_challenge_via_invite(
         await social_accountability_service.notify_partners_of_data_change(
             user_id, "challenge_joined"
         )
+
+        # Check achievements in background (non-blocking) - e.g., "first_challenge" badge
+        try:
+            from app.services.tasks import check_achievements_task
+
+            check_achievements_task.delay(
+                user_id=user_id,
+                source_type="challenge",
+                source_id=challenge["id"],
+            )
+        except Exception as e:
+            logger.warning(
+                f"Failed to queue achievement check for challenge join via invite: {e}",
+                {"user_id": user_id, "challenge_id": challenge["id"]},
+            )
 
         return {
             "message": "Successfully joined the challenge!",

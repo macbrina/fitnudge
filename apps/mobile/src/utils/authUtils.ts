@@ -4,17 +4,13 @@ import { router } from "expo-router";
 import { MOBILE_ROUTES } from "@/lib/routes";
 import { storageUtil } from "./storageUtil";
 
-export type LogoutReason =
-  | "not_found"
-  | "disabled"
-  | "suspended"
-  | "expired_session";
+export type LogoutReason = "not_found" | "disabled" | "suspended" | "expired_session";
 
 const statusMessages: Record<LogoutReason, string> = {
   not_found: "Account not found or invalid credentials.",
   disabled: "Your account has been disabled. Please contact support.",
   suspended: "Your account has been suspended. Please contact support.",
-  expired_session: "Session expired. Please login again.",
+  expired_session: "Session expired. Please login again."
 };
 
 // Guard to prevent multiple simultaneous logout calls
@@ -60,9 +56,7 @@ async function performLogout(reason: LogoutReason): Promise<string> {
   // If user wasn't authenticated, this is likely a login failure
   // Don't clear storage or trigger logout flow
   if (!wasAuthenticated) {
-    console.log(
-      `[Auth] Skipping logout for unauthenticated user (reason: ${reason})`,
-    );
+    console.log(`[Auth] Skipping logout for unauthenticated user (reason: ${reason})`);
     return statusMessages[reason];
   }
 

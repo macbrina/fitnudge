@@ -119,7 +119,7 @@ async def get_available_features(current_user: dict = Depends(get_current_user))
 class SyncSubscriptionRequest(BaseModel):
     """Request body for syncing subscription from RevenueCat"""
 
-    tier: str  # 'free', 'starter', 'pro', 'elite'
+    tier: str  # 'free', 'premium'
     is_active: bool
     expires_at: Optional[str] = None
     will_renew: bool = False
@@ -149,12 +149,10 @@ async def sync_subscription(
     user_id = current_user["id"]
     current_db_plan = current_user.get("plan", "free")
 
-    # Map tier to plan ID
+    # Map tier to plan ID (2-tier system: free + premium)
     tier_to_plan = {
         "free": "free",
-        "starter": "starter",
-        "pro": "pro",
-        "elite": "elite",
+        "premium": "premium",
     }
     revenuecat_plan = tier_to_plan.get(sync_data.tier, "free")
 
@@ -271,6 +269,66 @@ async def sync_subscription(
             }
 
         return {"synced": False, "message": "Already free", "plan": "free"}
+
+
+# ====================
+# Subscription History
+# ====================
+
+
+class SubscriptionHistoryResponse(BaseModel):
+    """Response for subscription history check"""
+
+    has_ever_subscribed: bool
+    subscription_count: int
+    first_subscription_date: Optional[str] = None
+    last_subscription_date: Optional[str] = None
+
+
+@router.get("/history", response_model=SubscriptionHistoryResponse)
+async def get_subscription_history(current_user: dict = Depends(get_current_user)):
+    """
+    Check if user has ever had a paid subscription.
+
+    This is used for exit offer eligibility - users who have previously subscribed
+    (even if now expired/cancelled) should not see the exit offer discount.
+    """
+    from app.core.database import get_supabase_client
+
+    supabase = get_supabase_client()
+    user_id = current_user["id"]
+
+    # Get all subscription records for user (not just active ones)
+    result = (
+        supabase.table("subscriptions")
+        .select("id, plan, status, created_at, purchase_date")
+        .eq("user_id", user_id)
+        .neq("plan", "free")  # Only count paid subscriptions
+        .order("created_at", desc=False)
+        .execute()
+    )
+
+    subscriptions = result.data or []
+    subscription_count = len(subscriptions)
+
+    if subscription_count > 0:
+        first_sub = subscriptions[0]
+        last_sub = subscriptions[-1]
+        return {
+            "has_ever_subscribed": True,
+            "subscription_count": subscription_count,
+            "first_subscription_date": first_sub.get("purchase_date")
+            or first_sub.get("created_at"),
+            "last_subscription_date": last_sub.get("purchase_date")
+            or last_sub.get("created_at"),
+        }
+
+    return {
+        "has_ever_subscribed": False,
+        "subscription_count": 0,
+        "first_subscription_date": None,
+        "last_subscription_date": None,
+    }
 
 
 # Note: All IAP verification, webhooks, and product fetching is handled by RevenueCat.

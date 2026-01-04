@@ -1,10 +1,5 @@
 import React, { useState } from "react";
-import {
-  TouchableOpacity,
-  Text,
-  ActivityIndicator,
-  Animated,
-} from "react-native";
+import { TouchableOpacity, Text, ActivityIndicator, Animated } from "react-native";
 import { useStyles, useTheme } from "@/themes";
 import { tokens } from "@/themes/tokens";
 import { toRN } from "@/lib/units";
@@ -36,7 +31,7 @@ export function CheerButton({
   onSuccess,
   size = "md",
   showLabel = false,
-  style,
+  style
 }: CheerButtonProps) {
   const styles = useStyles(makeStyles);
   const { colors } = useTheme();
@@ -55,13 +50,13 @@ export function CheerButton({
       Animated.spring(scaleAnim, {
         toValue: 1.3,
         friction: 3,
-        useNativeDriver: true,
+        useNativeDriver: true
       }),
       Animated.spring(scaleAnim, {
         toValue: 1,
         friction: 3,
-        useNativeDriver: true,
-      }),
+        useNativeDriver: true
+      })
     ]).start();
   };
 
@@ -75,7 +70,7 @@ export function CheerButton({
         recipientId,
         goalId,
         challengeId,
-        emoji: "🎉",
+        emoji: "🎉"
       });
 
       setHasCheered(true);
@@ -100,9 +95,9 @@ export function CheerButton({
           width: showLabel ? undefined : buttonSize,
           height: buttonSize,
           paddingHorizontal: showLabel ? toRN(tokens.spacing[3]) : 0,
-          backgroundColor: hasCheered ? "#FEF3C7" : colors.bg.muted,
+          backgroundColor: hasCheered ? "#FEF3C7" : colors.bg.muted
         },
-        style,
+        style
       ]}
     >
       {isSending ? (
@@ -113,12 +108,7 @@ export function CheerButton({
             <Ionicons name={iconName} size={iconSize} color={iconColor} />
           </Animated.View>
           {showLabel && (
-            <Text
-              style={[
-                styles.label,
-                { color: hasCheered ? "#F59E0B" : colors.text.secondary },
-              ]}
-            >
+            <Text style={[styles.label, { color: hasCheered ? "#F59E0B" : colors.text.secondary }]}>
               {hasCheered ? t("social.cheered") : t("social.cheer")}
             </Text>
           )}
@@ -134,12 +124,12 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     alignItems: "center" as const,
     justifyContent: "center" as const,
     gap: toRN(tokens.spacing[1]),
-    borderRadius: toRN(tokens.borderRadius.full),
+    borderRadius: toRN(tokens.borderRadius.full)
   },
   label: {
     fontSize: toRN(tokens.typography.fontSize.sm),
-    fontFamily: fontFamily.medium,
-  },
+    fontFamily: fontFamily.medium
+  }
 });
 
 export default CheerButton;

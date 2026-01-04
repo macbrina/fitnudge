@@ -37,12 +37,8 @@ if (supabaseUrl.includes("localhost")) {
 }
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn(
-    "[Supabase] Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_ANON_KEY",
-  );
-  console.warn(
-    "[Supabase] Realtime features will not work without valid credentials",
-  );
+  console.warn("[Supabase] Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_ANON_KEY");
+  console.warn("[Supabase] Realtime features will not work without valid credentials");
 }
 
 // Only create client if we have valid credentials
@@ -76,14 +72,14 @@ if (supabaseUrl && supabaseAnonKey) {
             if (__DEV__) {
               console.log(`[Supabase] removeItem called for ${key}`);
             }
-          },
+          }
         },
         // Don't auto-refresh sessions (handled by backend API)
         autoRefreshToken: false,
         // Don't persist session (handled by TokenManager)
         persistSession: false,
         // Detect session from URL (for OAuth redirects)
-        detectSessionInUrl: false,
+        detectSessionInUrl: false
       },
       realtime: {
         // Explicitly provide WebSocket for React Native
@@ -91,7 +87,7 @@ if (supabaseUrl && supabaseAnonKey) {
         constructor: WebSocket,
         // Realtime-specific configuration
         params: {
-          eventsPerSecond: 10, // Rate limit for events
+          eventsPerSecond: 10 // Rate limit for events
           // NOTE: DO NOT hardcode apikey here - it overrides the user's JWT token
           // After calling setSession(), Supabase uses the access_token for RLS
           // Hardcoding apikey here breaks RLS-filtered realtime events
@@ -103,16 +99,16 @@ if (supabaseUrl && supabaseAnonKey) {
         // Reconnect settings
         reconnectAfterMs: (tries: number) => {
           return [1000, 2000, 5000, 10000][tries - 1] || 10000;
-        },
+        }
       },
       global: {
         headers: {
           // Add custom headers for debugging
           "X-Client-Info": "fitnudge-mobile",
           // apikey header is used for authentication (anon key is a JWT)
-          apikey: supabaseAnonKey,
-        },
-      },
+          apikey: supabaseAnonKey
+        }
+      }
     });
 
     // Verify the client was created successfully

@@ -80,18 +80,16 @@ class TrackingStatsService extends BaseApiService {
     entityId: string,
     entityType: "goal" | "challenge",
     trackingType: TrackingType,
-    period: number = 30,
+    period: number = 30
   ): Promise<ApiResponse<TrackingStatsResponse>> {
     const params = new URLSearchParams({
       entity_id: entityId,
       entity_type: entityType,
       tracking_type: trackingType,
-      period: period.toString(),
+      period: period.toString()
     });
 
-    return this.get<TrackingStatsResponse>(
-      `/tracking-stats?${params.toString()}`,
-    );
+    return this.get<TrackingStatsResponse>(`/tracking-stats?${params.toString()}`);
   }
 }
 

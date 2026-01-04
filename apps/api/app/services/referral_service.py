@@ -55,7 +55,7 @@ async def get_subscriber_info(user_id: str) -> Optional[dict]:
 async def grant_promotional_access(
     user_id: str,
     bonus_days: int = 3,
-    entitlement_id: str = "pro_access",
+    entitlement_id: str = "premium_access",
 ) -> bool:
     """Grant promotional entitlement via RevenueCat API
 
@@ -66,7 +66,7 @@ async def grant_promotional_access(
     Args:
         user_id: The RevenueCat app user ID (usually same as our user ID)
         bonus_days: Number of days to grant/extend
-        entitlement_id: The entitlement to grant (default: pro_access)
+        entitlement_id: The entitlement to grant (default: premium_access)
 
     Returns:
         True if successful, False otherwise
@@ -159,18 +159,21 @@ async def grant_promotional_access(
 
 
 async def process_referral_bonus(new_user_id: str, referrer_user_id: str) -> bool:
-    """Grant bonus to both referrer and referred user
+    """Grant referral bonus to the referrer when referred user subscribes
+
+    This is triggered when a referred user makes their first subscription purchase.
+    The referrer gets bonus days as a reward for bringing in a paying customer.
 
     Bonuses:
-    - New user: +3 days (on top of their 3-day trial = 6 days total)
     - Referrer: +7 days (extends their current subscription/trial)
+    - New user: No bonus needed - they're already a paying subscriber!
 
     Args:
-        new_user_id: The newly registered user's ID
+        new_user_id: The user who subscribed (was referred)
         referrer_user_id: The ID of the user who referred them
 
     Returns:
-        True if bonuses were granted successfully
+        True if bonus was granted successfully
     """
     supabase = get_supabase_client()
 
@@ -190,14 +193,10 @@ async def process_referral_bonus(new_user_id: str, referrer_user_id: str) -> boo
         return False
 
     try:
-        # Grant +3 days to new user (extends their 3-day trial to 6 days)
-        new_user_success = await grant_promotional_access(
-            new_user_id, bonus_days=3, entitlement_id="pro_access"
-        )
-
         # Grant +7 days to referrer (extends their current subscription)
+        # The referred user is already paying, so they don't need bonus days
         referrer_success = await grant_promotional_access(
-            referrer_user_id, bonus_days=7, entitlement_id="pro_access"
+            referrer_user_id, bonus_days=7, entitlement_id="premium_access"
         )
 
         # Mark bonus as granted (prevent double-granting)
@@ -206,16 +205,15 @@ async def process_referral_bonus(new_user_id: str, referrer_user_id: str) -> boo
         ).eq("id", new_user_id).execute()
 
         logger.info(
-            "Processed referral bonus",
+            "Processed referral bonus on subscription",
             {
-                "new_user_id": new_user_id,
+                "subscriber_id": new_user_id,
                 "referrer_user_id": referrer_user_id,
-                "new_user_bonus_days": 3 if new_user_success else 0,
                 "referrer_bonus_days": 7 if referrer_success else 0,
             },
         )
 
-        return new_user_success and referrer_success
+        return referrer_success
 
     except Exception as e:
         logger.error(

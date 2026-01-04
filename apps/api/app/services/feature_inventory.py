@@ -30,21 +30,17 @@ class FeatureStatus(Enum):
 
 
 class FeatureAccess(Enum):
-    """Feature access level"""
+    """Feature access level (2-tier system: free + premium)"""
 
     FREE = "free"
-    STARTER = "starter"
-    PRO = "pro"
-    ELITE = "elite"  # formerly COACH_PLUS
+    PREMIUM = "premium"
     ALL = "all"  # Available to all plans
 
 
-# Plan tier hierarchy (higher number = higher tier)
+# Plan tier hierarchy (2-tier system: free + premium)
 PLAN_TIERS = {
     "free": 0,
-    "starter": 1,
-    "pro": 2,
-    "elite": 3,  # formerly elite
+    "premium": 1,
 }
 
 # Cache for database features
@@ -123,28 +119,18 @@ def _fetch_features_from_database() -> Dict[str, Dict[str, Any]]:
         for feature_key, feature_data in features.items():
             plans = feature_data["plans"]
 
-            # Determine access based on which plans have this feature
+            # Determine access based on which plans have this feature (2-tier system)
             if "free" in plans:
-                # If free plan has it, check if all plans have it
-                if all(p in plans for p in ["free", "starter", "pro", "elite"]):
+                # If free plan has it, check if premium also has it
+                if "premium" in plans:
                     feature_data["access"] = [FeatureAccess.ALL]
                 else:
                     feature_data["access"] = [FeatureAccess.FREE]
-                    if "starter" in plans:
-                        feature_data["access"].append(FeatureAccess.STARTER)
-                    if "pro" in plans:
-                        feature_data["access"].append(FeatureAccess.PRO)
-                    if "elite" in plans:
-                        feature_data["access"].append(FeatureAccess.ELITE)
             else:
-                # Build access list based on which plans have it
+                # Only premium has access
                 feature_data["access"] = []
-                if "starter" in plans:
-                    feature_data["access"].append(FeatureAccess.STARTER)
-                if "pro" in plans:
-                    feature_data["access"].append(FeatureAccess.PRO)
-                if "elite" in plans:
-                    feature_data["access"].append(FeatureAccess.ELITE)
+                if "premium" in plans:
+                    feature_data["access"].append(FeatureAccess.PREMIUM)
 
             # Determine status based on is_enabled
             if feature_data["is_enabled"]:
@@ -224,7 +210,7 @@ def get_features_for_plan(plan: str) -> List[Dict[str, Any]]:
     Get all implemented features available for a subscription plan.
 
     Args:
-        plan: User's subscription plan (free, starter, pro, elite)
+        plan: User's subscription plan (free or premium)
 
     Returns:
         List of feature definitions available to this plan
@@ -340,18 +326,16 @@ def get_plan_restrictions(plan: str) -> List[str]:
 
     # Feature restrictions based on plan
     if plan.lower() == "free":
-        restrictions.append("Advanced analytics are only available on Pro/Elite plans.")
+        restrictions.append("Advanced features are only available with Premium.")
 
     return restrictions
 
 
 def _plan_to_access(plan: str) -> FeatureAccess:
-    """Convert plan string to FeatureAccess enum"""
+    """Convert plan string to FeatureAccess enum (2-tier system)"""
     mapping = {
         "free": FeatureAccess.FREE,
-        "starter": FeatureAccess.STARTER,
-        "pro": FeatureAccess.PRO,
-        "elite": FeatureAccess.ELITE,
+        "premium": FeatureAccess.PREMIUM,
     }
     return mapping.get(plan.lower(), FeatureAccess.FREE)
 
@@ -427,23 +411,20 @@ def _get_goal_limit_for_plan(plan: str) -> Optional[int]:
     features = _get_cached_features()
     plan_lower = plan.lower()
 
-    # Check for unlimited_goals feature for pro/coach+
-    if plan_lower in ["pro", "elite"]:
-        if "unlimited_goals" in features:
-            return None
+    # Premium has unlimited goals
+    if plan_lower == "premium":
+        return None
 
     # Look for "goals" feature with feature_value for this plan's tier
     goals_feature = features.get("goals", {})
     if goals_feature.get("feature_value"):
         return goals_feature["feature_value"]
 
-    # Fallback: Check based on plan tier
-    # Free = 1, Starter = 3, Pro/Elite = unlimited
+    # Fallback: Check based on plan tier (2-tier system)
+    # Free = 1, Premium = unlimited
     defaults = {
         "free": 1,
-        "starter": 3,
-        "pro": None,
-        "elite": None,
+        "premium": None,
     }
     return defaults.get(plan_lower, 1)
 

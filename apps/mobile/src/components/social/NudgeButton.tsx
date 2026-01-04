@@ -30,7 +30,7 @@ export function NudgeButton({
   onSuccess,
   size = "md",
   showLabel = true,
-  style,
+  style
 }: NudgeButtonProps) {
   const styles = useStyles(makeStyles);
   const { brandColors } = useTheme();
@@ -48,7 +48,7 @@ export function NudgeButton({
       message: t("social.send_nudge_message", { name: recipientName }),
       variant: "info",
       confirmLabel: t("social.send_nudge"),
-      cancelLabel: t("common.cancel"),
+      cancelLabel: t("common.cancel")
     });
 
     if (!confirmed) return;
@@ -59,25 +59,24 @@ export function NudgeButton({
         type: "nudge",
         goalId,
         challengeId,
-        partnershipId,
+        partnershipId
       });
 
       showAlert({
         title: t("social.nudge_sent_title"),
         message: t("social.nudge_sent_message", { name: recipientName }),
         variant: "success",
-        confirmLabel: t("common.ok"),
+        confirmLabel: t("common.ok")
       });
 
       onSuccess?.();
     } catch (error: any) {
-      const errorMessage =
-        error?.response?.data?.detail || t("social.nudge_error");
+      const errorMessage = error?.response?.data?.detail || t("social.nudge_error");
       showAlert({
         title: t("common.error"),
         message: errorMessage,
         variant: "error",
-        confirmLabel: t("common.ok"),
+        confirmLabel: t("common.ok")
       });
     }
   };
@@ -93,20 +92,16 @@ export function NudgeButton({
         {
           width: showLabel ? undefined : buttonSize,
           height: buttonSize,
-          paddingHorizontal: showLabel ? toRN(tokens.spacing[3]) : 0,
+          paddingHorizontal: showLabel ? toRN(tokens.spacing[3]) : 0
         },
-        style,
+        style
       ]}
     >
       {isSending ? (
         <ActivityIndicator size="small" color={brandColors.primary} />
       ) : (
         <>
-          <Ionicons
-            name="hand-left-outline"
-            size={iconSize}
-            color={brandColors.primary}
-          />
+          <Ionicons name="hand-left-outline" size={iconSize} color={brandColors.primary} />
           {showLabel && <Text style={styles.label}>{t("social.nudge")}</Text>}
         </>
       )}
@@ -121,13 +116,13 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     justifyContent: "center" as const,
     gap: toRN(tokens.spacing[1]),
     backgroundColor: `${brand.primary}15`,
-    borderRadius: toRN(tokens.borderRadius.full),
+    borderRadius: toRN(tokens.borderRadius.full)
   },
   label: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
-    color: brand.primary,
-  },
+    color: brand.primary
+  }
 });
 
 export default NudgeButton;

@@ -1,12 +1,5 @@
 import React from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  Modal,
-  Animated,
-  ScrollView,
-} from "react-native";
+import { View, Text, TouchableOpacity, Modal, Animated, ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStyles, useTheme } from "@/themes";
 import { tokens } from "@/themes/tokens";
@@ -107,7 +100,7 @@ export function BottomMenuSheet({
   infoLink,
   onClose,
   cancelLabel = "Cancel",
-  showCancel = true,
+  showCancel = true
 }: BottomMenuSheetProps) {
   const styles = useStyles(makeBottomMenuSheetStyles);
   const { colors, brandColors } = useTheme();
@@ -124,14 +117,14 @@ export function BottomMenuSheet({
         Animated.timing(fadeAnim, {
           toValue: 1,
           duration: 200,
-          useNativeDriver: true,
+          useNativeDriver: true
         }),
         Animated.spring(slideAnim, {
           toValue: 0,
           damping: 20,
           stiffness: 200,
-          useNativeDriver: true,
-        }),
+          useNativeDriver: true
+        })
       ]).start();
     } else {
       // Reset for next open
@@ -146,13 +139,13 @@ export function BottomMenuSheet({
       Animated.timing(fadeAnim, {
         toValue: 0,
         duration: 150,
-        useNativeDriver: true,
+        useNativeDriver: true
       }),
       Animated.timing(slideAnim, {
         toValue: 400,
         duration: 150,
-        useNativeDriver: true,
-      }),
+        useNativeDriver: true
+      })
     ]).start(() => {
       onClose();
     });
@@ -166,13 +159,13 @@ export function BottomMenuSheet({
       Animated.timing(fadeAnim, {
         toValue: 0,
         duration: 150,
-        useNativeDriver: true,
+        useNativeDriver: true
       }),
       Animated.timing(slideAnim, {
         toValue: 400,
         duration: 150,
-        useNativeDriver: true,
-      }),
+        useNativeDriver: true
+      })
     ]).start(() => {
       onClose();
       option.onPress();
@@ -193,11 +186,7 @@ export function BottomMenuSheet({
     return (
       <TouchableOpacity
         key={option.id}
-        style={[
-          styles.option,
-          isLast && styles.optionLast,
-          isDisabled && styles.optionDisabled,
-        ]}
+        style={[styles.option, isLast && styles.optionLast, isDisabled && styles.optionDisabled]}
         onPress={() => handleOptionPress(option)}
         activeOpacity={isDisabled ? 1 : 0.7}
         disabled={isDisabled}
@@ -207,7 +196,7 @@ export function BottomMenuSheet({
             style={[
               styles.iconContainer,
               isDestructive && styles.iconContainerDestructive,
-              isDisabled && styles.iconContainerDisabled,
+              isDisabled && styles.iconContainerDisabled
             ]}
           >
             <Ionicons
@@ -228,17 +217,14 @@ export function BottomMenuSheet({
             style={[
               styles.optionLabel,
               isDestructive && styles.optionLabelDestructive,
-              isDisabled && styles.optionLabelDisabled,
+              isDisabled && styles.optionLabelDisabled
             ]}
           >
             {option.label}
           </Text>
           {option.description && (
             <Text
-              style={[
-                styles.optionDescription,
-                isDisabled && styles.optionDescriptionDisabled,
-              ]}
+              style={[styles.optionDescription, isDisabled && styles.optionDescriptionDisabled]}
             >
               {option.description}
             </Text>
@@ -250,7 +236,7 @@ export function BottomMenuSheet({
 
   // Convert flat options to single section if needed
   const effectiveSections: BottomMenuSection[] = sections || [
-    { id: "default", options: options || [] },
+    { id: "default", options: options || [] }
   ];
 
   return (
@@ -275,8 +261,8 @@ export function BottomMenuSheet({
             styles.container,
             {
               paddingBottom: insets.bottom + toRN(tokens.spacing[4]),
-              transform: [{ translateY: slideAnim }],
-            },
+              transform: [{ translateY: slideAnim }]
+            }
           ]}
         >
           {/* Drag Handle Indicator */}
@@ -301,9 +287,7 @@ export function BottomMenuSheet({
               >
                 <Text style={styles.infoLinkLabel}>{infoLink.label}</Text>
                 {infoLink.description && (
-                  <Text style={styles.infoLinkDescription}>
-                    {infoLink.description}
-                  </Text>
+                  <Text style={styles.infoLinkDescription}>{infoLink.description}</Text>
                 )}
               </TouchableOpacity>
             )}
@@ -317,10 +301,7 @@ export function BottomMenuSheet({
                 {/* Section options */}
                 <View style={styles.sectionContainer}>
                   {section.options.map((option, optionIndex) =>
-                    renderOption(
-                      option,
-                      optionIndex === section.options.length - 1,
-                    ),
+                    renderOption(option, optionIndex === section.options.length - 1)
                   )}
                 </View>
               </View>
@@ -329,11 +310,7 @@ export function BottomMenuSheet({
 
           {/* Cancel Button */}
           {showCancel && (
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={handleClose}
-              activeOpacity={0.7}
-            >
+            <TouchableOpacity style={styles.cancelButton} onPress={handleClose} activeOpacity={0.7}>
               <Text style={styles.cancelText}>{cancelLabel}</Text>
             </TouchableOpacity>
           )}
@@ -346,7 +323,7 @@ export function BottomMenuSheet({
 const makeBottomMenuSheetStyles = (tokens: any, colors: any, brand: any) => ({
   overlay: {
     flex: 1,
-    justifyContent: "flex-end" as const,
+    justifyContent: "flex-end" as const
   },
   backdrop: {
     position: "absolute" as const,
@@ -354,27 +331,27 @@ const makeBottomMenuSheetStyles = (tokens: any, colors: any, brand: any) => ({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: "rgba(0, 0, 0, 0.5)"
   },
   backdropTouchable: {
-    flex: 1,
+    flex: 1
   },
   container: {
     backgroundColor: colors.bg.card,
     borderTopLeftRadius: toRN(tokens.borderRadius["2xl"]),
     borderTopRightRadius: toRN(tokens.borderRadius["2xl"]),
-    maxHeight: "80%",
+    maxHeight: "80%"
   },
   dragHandleContainer: {
     alignItems: "center" as const,
     paddingTop: toRN(tokens.spacing[3]),
-    paddingBottom: toRN(tokens.spacing[2]),
+    paddingBottom: toRN(tokens.spacing[2])
   },
   dragHandle: {
     width: 36,
     height: 4,
     backgroundColor: colors.border.default,
-    borderRadius: 2,
+    borderRadius: 2
   },
   title: {
     fontSize: toRN(tokens.typography.fontSize.lg),
@@ -382,10 +359,10 @@ const makeBottomMenuSheetStyles = (tokens: any, colors: any, brand: any) => ({
     color: colors.text.primary,
     textAlign: "center" as const,
     paddingHorizontal: toRN(tokens.spacing[6]),
-    paddingBottom: toRN(tokens.spacing[3]),
+    paddingBottom: toRN(tokens.spacing[3])
   },
   scrollView: {
-    flexGrow: 0,
+    flexGrow: 0
   },
 
   // Info Link (Why am I seeing this?)
@@ -394,18 +371,18 @@ const makeBottomMenuSheetStyles = (tokens: any, colors: any, brand: any) => ({
     marginHorizontal: toRN(tokens.spacing[4]),
     marginBottom: toRN(tokens.spacing[3]),
     padding: toRN(tokens.spacing[4]),
-    borderRadius: toRN(tokens.borderRadius.xl),
+    borderRadius: toRN(tokens.borderRadius.xl)
   },
   infoLinkLabel: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.semiBold,
     color: brand.primary,
-    marginBottom: toRN(tokens.spacing[1]),
+    marginBottom: toRN(tokens.spacing[1])
   },
   infoLinkDescription: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
-    color: colors.text.secondary,
+    color: colors.text.secondary
   },
 
   // Section
@@ -413,10 +390,10 @@ const makeBottomMenuSheetStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: colors.bg.muted,
     marginHorizontal: toRN(tokens.spacing[4]),
     borderRadius: toRN(tokens.borderRadius.xl),
-    overflow: "hidden" as const,
+    overflow: "hidden" as const
   },
   sectionSeparator: {
-    height: toRN(tokens.spacing[3]),
+    height: toRN(tokens.spacing[3])
   },
 
   // Option
@@ -426,13 +403,13 @@ const makeBottomMenuSheetStyles = (tokens: any, colors: any, brand: any) => ({
     paddingVertical: toRN(tokens.spacing[3.5] || tokens.spacing[3]),
     paddingHorizontal: toRN(tokens.spacing[4]),
     borderBottomWidth: 1,
-    borderBottomColor: colors.border.default + "30",
+    borderBottomColor: colors.border.default + "30"
   },
   optionLast: {
-    borderBottomWidth: 0,
+    borderBottomWidth: 0
   },
   optionDisabled: {
-    opacity: 0.5,
+    opacity: 0.5
   },
 
   // Icon container (circle background like Facebook)
@@ -443,38 +420,38 @@ const makeBottomMenuSheetStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: colors.bg.surface,
     alignItems: "center" as const,
     justifyContent: "center" as const,
-    marginRight: toRN(tokens.spacing[3]),
+    marginRight: toRN(tokens.spacing[3])
   },
   iconContainerDestructive: {
-    backgroundColor: colors.feedback.error + "15",
+    backgroundColor: colors.feedback.error + "15"
   },
   iconContainerDisabled: {
-    backgroundColor: colors.bg.muted,
+    backgroundColor: colors.bg.muted
   },
 
   // Option content
   optionContent: {
-    flex: 1,
+    flex: 1
   },
   optionLabel: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.medium,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   optionLabelDestructive: {
-    color: colors.feedback.error,
+    color: colors.feedback.error
   },
   optionLabelDisabled: {
-    color: colors.text.muted,
+    color: colors.text.muted
   },
   optionDescription: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
     color: colors.text.tertiary,
-    marginTop: toRN(tokens.spacing[0.5] || 2),
+    marginTop: toRN(tokens.spacing[0.5] || 2)
   },
   optionDescriptionDisabled: {
-    color: colors.text.muted,
+    color: colors.text.muted
   },
 
   // Cancel button
@@ -484,11 +461,11 @@ const makeBottomMenuSheetStyles = (tokens: any, colors: any, brand: any) => ({
     paddingVertical: toRN(tokens.spacing[3.5] || tokens.spacing[3]),
     alignItems: "center" as const,
     backgroundColor: colors.bg.muted,
-    borderRadius: toRN(tokens.borderRadius.xl),
+    borderRadius: toRN(tokens.borderRadius.xl)
   },
   cancelText: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.semiBold,
-    color: colors.text.secondary,
-  },
+    color: colors.text.secondary
+  }
 });

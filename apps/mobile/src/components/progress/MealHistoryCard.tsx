@@ -24,25 +24,19 @@ interface MealHistoryCardProps {
 }
 
 // Meal type icons and labels
-const MEAL_TYPE_INFO: Record<
-  MealType,
-  { icon: keyof typeof Ionicons.glyphMap; label: string }
-> = {
+const MEAL_TYPE_INFO: Record<MealType, { icon: keyof typeof Ionicons.glyphMap; label: string }> = {
   breakfast: { icon: "sunny-outline", label: "Breakfast" },
   lunch: { icon: "restaurant-outline", label: "Lunch" },
   dinner: { icon: "moon-outline", label: "Dinner" },
   snack: { icon: "cafe-outline", label: "Snack" },
-  other: { icon: "fast-food-outline", label: "Other" },
+  other: { icon: "fast-food-outline", label: "Other" }
 };
 
 // Health rating colors and labels
-const HEALTH_RATING_INFO: Record<
-  HealthRating,
-  { color: string; label: string }
-> = {
+const HEALTH_RATING_INFO: Record<HealthRating, { color: string; label: string }> = {
   healthy: { color: "#22C55E", label: "Healthy" },
   okay: { color: "#F59E0B", label: "Okay" },
-  unhealthy: { color: "#EF4444", label: "Unhealthy" },
+  unhealthy: { color: "#EF4444", label: "Unhealthy" }
 };
 
 export function MealHistoryCard({ meal, onPhotoPress }: MealHistoryCardProps) {
@@ -51,9 +45,7 @@ export function MealHistoryCard({ meal, onPhotoPress }: MealHistoryCardProps) {
   const { colors, brandColors } = useTheme();
 
   const mealTypeInfo = MEAL_TYPE_INFO[meal.meal_type] || MEAL_TYPE_INFO.other;
-  const healthRatingInfo = meal.health_rating
-    ? HEALTH_RATING_INFO[meal.health_rating]
-    : null;
+  const healthRatingInfo = meal.health_rating ? HEALTH_RATING_INFO[meal.health_rating] : null;
 
   // Format time (e.g., "8:30 AM")
   const formattedTime = meal.logged_time ? formatTime(meal.logged_time) : null;
@@ -67,19 +59,11 @@ export function MealHistoryCard({ meal, onPhotoPress }: MealHistoryCardProps) {
           onPress={() => onPhotoPress?.(meal.photo_url!)}
           activeOpacity={0.8}
         >
-          <Image
-            source={{ uri: meal.photo_url }}
-            style={styles.photo}
-            resizeMode="cover"
-          />
+          <Image source={{ uri: meal.photo_url }} style={styles.photo} resizeMode="cover" />
         </TouchableOpacity>
       ) : (
         <View style={styles.noPhotoContainer}>
-          <Ionicons
-            name={mealTypeInfo.icon}
-            size={24}
-            color={colors.text.tertiary}
-          />
+          <Ionicons name={mealTypeInfo.icon} size={24} color={colors.text.tertiary} />
         </View>
       )}
 
@@ -88,16 +72,10 @@ export function MealHistoryCard({ meal, onPhotoPress }: MealHistoryCardProps) {
         {/* Header: Meal type + time */}
         <View style={styles.header}>
           <View style={styles.mealTypeRow}>
-            <Ionicons
-              name={mealTypeInfo.icon}
-              size={14}
-              color={brandColors.primary}
-            />
+            <Ionicons name={mealTypeInfo.icon} size={14} color={brandColors.primary} />
             <Text style={styles.mealTypeText}>{mealTypeInfo.label}</Text>
           </View>
-          {formattedTime && (
-            <Text style={styles.timeText}>{formattedTime}</Text>
-          )}
+          {formattedTime && <Text style={styles.timeText}>{formattedTime}</Text>}
         </View>
 
         {/* Meal name */}
@@ -131,10 +109,7 @@ export function MealHistoryCard({ meal, onPhotoPress }: MealHistoryCardProps) {
             <>
               <Text style={styles.statDivider}>•</Text>
               <View
-                style={[
-                  styles.healthBadge,
-                  { backgroundColor: healthRatingInfo.color + "20" },
-                ]}
+                style={[styles.healthBadge, { backgroundColor: healthRatingInfo.color + "20" }]}
               >
                 {/* <View
                   style={[
@@ -142,9 +117,7 @@ export function MealHistoryCard({ meal, onPhotoPress }: MealHistoryCardProps) {
                     { backgroundColor: healthRatingInfo.color },
                   ]}
                 /> */}
-                <Text
-                  style={[styles.healthText, { color: healthRatingInfo.color }]}
-                >
+                <Text style={[styles.healthText, { color: healthRatingInfo.color }]}>
                   {healthRatingInfo.label}
                 </Text>
               </View>
@@ -176,18 +149,18 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     padding: toRN(tokens.spacing[3]),
     marginBottom: toRN(tokens.spacing[2]),
     borderWidth: 1,
-    borderColor: colors.border.subtle,
+    borderColor: colors.border.subtle
   },
   photoContainer: {
     width: toRN(60),
     height: toRN(60),
     borderRadius: toRN(tokens.borderRadius.md),
     overflow: "hidden" as const,
-    marginRight: toRN(tokens.spacing[3]),
+    marginRight: toRN(tokens.spacing[3])
   },
   photo: {
     width: "100%" as const,
-    height: "100%" as const,
+    height: "100%" as const
   },
   noPhotoContainer: {
     width: toRN(60),
@@ -196,59 +169,59 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: colors.bg.muted,
     alignItems: "center" as const,
     justifyContent: "center" as const,
-    marginRight: toRN(tokens.spacing[3]),
+    marginRight: toRN(tokens.spacing[3])
   },
   content: {
     flex: 1,
-    justifyContent: "center" as const,
+    justifyContent: "center" as const
   },
   header: {
     flexDirection: "row" as const,
     justifyContent: "space-between" as const,
     alignItems: "center" as const,
-    marginBottom: toRN(tokens.spacing[1]),
+    marginBottom: toRN(tokens.spacing[1])
   },
   mealTypeRow: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    gap: toRN(tokens.spacing[1]),
+    gap: toRN(tokens.spacing[1])
   },
   mealTypeText: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.medium,
-    color: brand.primary,
+    color: brand.primary
   },
   timeText: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.regular,
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   mealName: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.semiBold,
     color: colors.text.primary,
-    marginBottom: toRN(tokens.spacing[0.5]),
+    marginBottom: toRN(tokens.spacing[0.5])
   },
   description: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.regular,
     color: colors.text.secondary,
-    marginBottom: toRN(tokens.spacing[1]),
+    marginBottom: toRN(tokens.spacing[1])
   },
   statsRow: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    flexWrap: "wrap" as const,
+    flexWrap: "wrap" as const
   },
   statText: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.regular,
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   statDivider: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     color: colors.text.tertiary,
-    marginHorizontal: toRN(tokens.spacing[1]),
+    marginHorizontal: toRN(tokens.spacing[1])
   },
   healthBadge: {
     flexDirection: "row" as const,
@@ -256,17 +229,17 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     paddingHorizontal: toRN(tokens.spacing[1.5]),
     paddingVertical: toRN(2),
     borderRadius: toRN(tokens.borderRadius.full),
-    gap: toRN(tokens.spacing[0.5]),
+    gap: toRN(tokens.spacing[0.5])
   },
   healthDot: {
     width: toRN(6),
     height: toRN(6),
-    borderRadius: toRN(3),
+    borderRadius: toRN(3)
   },
   healthText: {
     fontSize: toRN(tokens.typography.fontSize.xs),
-    fontFamily: fontFamily.medium,
-  },
+    fontFamily: fontFamily.medium
+  }
 });
 
 export default MealHistoryCard;

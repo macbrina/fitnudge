@@ -5,17 +5,9 @@ import React, {
   useEffect,
   useMemo,
   useRef,
-  useState,
+  useState
 } from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Animated,
-  Easing,
-  Modal,
-} from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing, Modal } from "react-native";
 import { useTheme } from "@/themes";
 import { useStyles } from "@/themes/makeStyles";
 import { toRN } from "@/lib/units";
@@ -29,7 +21,7 @@ type AlertSize = "sm" | "md" | "lg";
 const SIZE_CONFIG: Record<AlertSize, number> = {
   sm: 260,
   md: 300,
-  lg: 340,
+  lg: 340
 };
 
 export interface AlertOptions {
@@ -60,18 +52,14 @@ interface AlertRequest extends AlertOptions {
 interface AlertModalContextValue {
   showAlert: (options: AlertOptions) => Promise<boolean>;
   showConfirm: (options: AlertOptions) => Promise<boolean>;
-  showToast: (
-    options: Omit<AlertOptions, "showCancel"> & { duration?: number },
-  ) => void;
+  showToast: (options: Omit<AlertOptions, "showCancel"> & { duration?: number }) => void;
   dismiss: () => void;
   // Internal state for AlertOverlay
   currentAlert: AlertRequest | null;
   handleResolve: (result: boolean) => void;
 }
 
-const AlertModalContext = createContext<AlertModalContextValue | undefined>(
-  undefined,
-);
+const AlertModalContext = createContext<AlertModalContextValue | undefined>(undefined);
 
 const DEFAULT_OPTIONS: AlertOptions = {
   title: "",
@@ -83,7 +71,7 @@ const DEFAULT_OPTIONS: AlertOptions = {
   cancelLabel: "Cancel",
   showCancel: false,
   showCloseIcon: false,
-  dismissible: true,
+  dismissible: true
 };
 
 const variantConfig: Record<
@@ -115,7 +103,7 @@ const variantConfig: Record<
     accentColor: ({ brandColors }) => brandColors.primary,
     textColor: ({ colors }) => colors.text.primary,
     confirmColor: ({ brandColors }) => brandColors.primary,
-    confirmTextColor: () => "#ffffff",
+    confirmTextColor: () => "#ffffff"
   },
   warning: {
     icon: "warning",
@@ -123,7 +111,7 @@ const variantConfig: Record<
     accentColor: ({ colors }) => colors.bg.warning,
     textColor: ({ colors }) => colors.text.primary,
     confirmColor: ({ colors }) => colors.bg.warning,
-    confirmTextColor: ({ colors }) => colors.text.primary,
+    confirmTextColor: ({ colors }) => colors.text.primary
   },
   error: {
     icon: "close-circle",
@@ -131,7 +119,7 @@ const variantConfig: Record<
     accentColor: ({ colors }) => colors.feedback.error,
     textColor: ({ colors }) => colors.text.primary,
     confirmColor: ({ colors }) => colors.feedback.error,
-    confirmTextColor: () => "#ffffff",
+    confirmTextColor: () => "#ffffff"
   },
   info: {
     icon: "information-circle",
@@ -139,8 +127,8 @@ const variantConfig: Record<
     accentColor: ({ brandColors }) => brandColors.primary,
     textColor: ({ colors }) => colors.text.primary,
     confirmColor: ({ brandColors }) => brandColors.primary,
-    confirmTextColor: () => "#ffffff",
-  },
+    confirmTextColor: () => "#ffffff"
+  }
 };
 
 const makeStyles = (tokens: any, colors: any, brandColors: any) => ({
@@ -150,7 +138,7 @@ const makeStyles = (tokens: any, colors: any, brandColors: any) => ({
     justifyContent: "center" as const,
     alignItems: "center" as const,
     paddingHorizontal: toRN(tokens.spacing[6]),
-    zIndex: 9999,
+    zIndex: 9999
   },
   // Base card style - maxWidth is applied dynamically based on size prop
   card: {
@@ -167,7 +155,7 @@ const makeStyles = (tokens: any, colors: any, brandColors: any) => ({
     shadowRadius: 24,
     elevation: 16,
     position: "relative" as const,
-    overflow: "visible" as const,
+    overflow: "visible" as const
   },
   closeIconButton: {
     position: "absolute" as const,
@@ -181,12 +169,12 @@ const makeStyles = (tokens: any, colors: any, brandColors: any) => ({
     borderColor: colors.border.default,
     alignItems: "center" as const,
     justifyContent: "center" as const,
-    zIndex: 10,
+    zIndex: 10
   },
   illustrationContainer: {
     alignItems: "center" as const,
     justifyContent: "center" as const,
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   title: {
     fontSize: toRN(tokens.typography.fontSize.lg),
@@ -194,7 +182,7 @@ const makeStyles = (tokens: any, colors: any, brandColors: any) => ({
     fontFamily: fontFamily.groteskSemiBold,
     textAlign: "center" as const,
     marginBottom: toRN(tokens.spacing[1]),
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   message: {
     fontSize: toRN(tokens.typography.fontSize.sm),
@@ -202,21 +190,21 @@ const makeStyles = (tokens: any, colors: any, brandColors: any) => ({
     textAlign: "center" as const, // Default, overridden dynamically
     color: colors.text.secondary,
     fontFamily: fontFamily.regular,
-    marginBottom: toRN(tokens.spacing[5]),
+    marginBottom: toRN(tokens.spacing[5])
   },
   messageLeft: {
-    textAlign: "left" as const,
+    textAlign: "left" as const
   },
   messageRight: {
-    textAlign: "right" as const,
+    textAlign: "right" as const
   },
   contentContainer: {
-    marginBottom: toRN(tokens.spacing[5]),
+    marginBottom: toRN(tokens.spacing[5])
   },
   buttonRow: {
     flexDirection: "column" as const,
     gap: toRN(tokens.spacing[2]),
-    width: "100%",
+    width: "100%"
   },
   button: {
     width: "100%",
@@ -225,15 +213,15 @@ const makeStyles = (tokens: any, colors: any, brandColors: any) => ({
     paddingHorizontal: toRN(tokens.spacing[4]),
     minHeight: 44,
     alignItems: "center" as const,
-    justifyContent: "center" as const,
+    justifyContent: "center" as const
   },
   cancelButton: {
-    backgroundColor: colors.bg.secondary,
+    backgroundColor: colors.bg.secondary
   },
   buttonText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
-    fontFamily: fontFamily.semiBold,
-  },
+    fontFamily: fontFamily.semiBold
+  }
 });
 
 interface AlertOverlayProps {
@@ -265,9 +253,7 @@ interface AlertOverlayProps {
  * </Modal>
  * ```
  */
-export const AlertOverlay: React.FC<AlertOverlayProps> = ({
-  visible = true,
-}) => {
+export const AlertOverlay: React.FC<AlertOverlayProps> = ({ visible = true }) => {
   const context = useContext(AlertModalContext);
   const { tokens, colors, brandColors } = useTheme();
   const styles = useStyles(makeStyles);
@@ -287,15 +273,15 @@ export const AlertOverlay: React.FC<AlertOverlayProps> = ({
           toValue: 1,
           duration: 180,
           easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
+          useNativeDriver: true
         }),
         Animated.spring(translateY, {
           toValue: 0,
           damping: 12,
           mass: 0.6,
           stiffness: 150,
-          useNativeDriver: true,
-        }),
+          useNativeDriver: true
+        })
       ]).start();
     }
   }, [currentAlert, visible, opacity, translateY]);
@@ -311,8 +297,7 @@ export const AlertOverlay: React.FC<AlertOverlayProps> = ({
   const confirmTextColor = variantStyle.confirmTextColor
     ? variantStyle.confirmTextColor({ colors, brandColors })
     : "#ffffff";
-  const iconColor =
-    currentAlert.iconColor ?? variantStyle.accentColor({ colors, brandColors });
+  const iconColor = currentAlert.iconColor ?? variantStyle.accentColor({ colors, brandColors });
 
   const handleBackdropPress = () => {
     if (currentAlert.dismissible) {
@@ -332,8 +317,8 @@ export const AlertOverlay: React.FC<AlertOverlayProps> = ({
           styles.card,
           {
             maxWidth: SIZE_CONFIG[currentAlert.size ?? "md"],
-            transform: [{ translateY }],
-          },
+            transform: [{ translateY }]
+          }
         ]}
       >
         {currentAlert.showCloseIcon && (
@@ -353,7 +338,7 @@ export const AlertOverlay: React.FC<AlertOverlayProps> = ({
               borderRadius: 26,
               backgroundColor: variantStyle.illustrationColor,
               alignItems: "center",
-              justifyContent: "center",
+              justifyContent: "center"
             }}
           >
             <Ionicons
@@ -368,8 +353,8 @@ export const AlertOverlay: React.FC<AlertOverlayProps> = ({
           style={[
             styles.title,
             {
-              color: variantStyle.textColor({ colors, brandColors }),
-            },
+              color: variantStyle.textColor({ colors, brandColors })
+            }
           ]}
         >
           {currentAlert.title}
@@ -384,7 +369,7 @@ export const AlertOverlay: React.FC<AlertOverlayProps> = ({
               style={[
                 styles.message,
                 currentAlert.messageAlign === "left" && styles.messageLeft,
-                currentAlert.messageAlign === "right" && styles.messageRight,
+                currentAlert.messageAlign === "right" && styles.messageRight
               ]}
             >
               {currentAlert.message}
@@ -397,8 +382,8 @@ export const AlertOverlay: React.FC<AlertOverlayProps> = ({
             style={[
               styles.button,
               {
-                backgroundColor: confirmColor,
-              },
+                backgroundColor: confirmColor
+              }
             ]}
             onPress={() => handleResolve(true)}
           >
@@ -406,8 +391,8 @@ export const AlertOverlay: React.FC<AlertOverlayProps> = ({
               style={[
                 styles.buttonText,
                 {
-                  color: confirmTextColor,
-                },
+                  color: confirmTextColor
+                }
               ]}
             >
               {currentAlert.confirmLabel}
@@ -429,9 +414,7 @@ export const AlertOverlay: React.FC<AlertOverlayProps> = ({
   );
 };
 
-export const AlertModalProvider: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => {
+export const AlertModalProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [queue, setQueue] = useState<AlertRequest[]>([]);
   const [currentAlert, setCurrentAlert] = useState<AlertRequest | null>(null);
   const [visible, setVisible] = useState(false);
@@ -473,16 +456,13 @@ export const AlertModalProvider: React.FC<{ children: React.ReactNode }> = ({
   const enqueueAlert = useCallback((options: AlertOptions) => {
     return new Promise<boolean>((resolve) => {
       const id = Math.random().toString(36).slice(2);
-      setQueue((prev) => [
-        ...prev,
-        { ...DEFAULT_OPTIONS, ...options, id, resolve },
-      ]);
+      setQueue((prev) => [...prev, { ...DEFAULT_OPTIONS, ...options, id, resolve }]);
     });
   }, []);
 
   const showAlert = useCallback(
     (options: AlertOptions) => enqueueAlert({ ...options, showCancel: false }),
-    [enqueueAlert],
+    [enqueueAlert]
   );
 
   const showConfirm = useCallback(
@@ -491,9 +471,9 @@ export const AlertModalProvider: React.FC<{ children: React.ReactNode }> = ({
         ...options,
         showCancel: true,
         showCloseIcon: true,
-        dismissible: false,
+        dismissible: false
       }),
-    [enqueueAlert],
+    [enqueueAlert]
   );
 
   const showToast = useCallback(
@@ -502,10 +482,10 @@ export const AlertModalProvider: React.FC<{ children: React.ReactNode }> = ({
         ...options,
         showCancel: false,
         dismissible: true,
-        autoCloseMs: options.autoCloseMs ?? options.duration ?? 2400,
+        autoCloseMs: options.autoCloseMs ?? options.duration ?? 2400
       });
     },
-    [enqueueAlert],
+    [enqueueAlert]
   );
 
   const dismiss = useCallback(() => {
@@ -522,7 +502,7 @@ export const AlertModalProvider: React.FC<{ children: React.ReactNode }> = ({
       currentAlert.resolve(result);
       setVisible(false);
     },
-    [currentAlert],
+    [currentAlert]
   );
 
   const value = useMemo<AlertModalContextValue>(
@@ -533,27 +513,16 @@ export const AlertModalProvider: React.FC<{ children: React.ReactNode }> = ({
       dismiss,
       // Expose for AlertOverlay
       currentAlert: visible ? currentAlert : null,
-      handleResolve,
+      handleResolve
     }),
-    [
-      showAlert,
-      showConfirm,
-      showToast,
-      dismiss,
-      currentAlert,
-      visible,
-      handleResolve,
-    ],
+    [showAlert, showConfirm, showToast, dismiss, currentAlert, visible, handleResolve]
   );
 
   return (
     <AlertModalContext.Provider value={value}>
       {children}
       {/* Global Alert Modal - automatically shows alerts without needing AlertOverlay */}
-      <AlertModal
-        alert={visible ? currentAlert : null}
-        onResolve={handleResolve}
-      />
+      <AlertModal alert={visible ? currentAlert : null} onResolve={handleResolve} />
     </AlertModalContext.Provider>
   );
 };
@@ -581,15 +550,15 @@ const AlertModal: React.FC<{
           toValue: 1,
           duration: 180,
           easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
+          useNativeDriver: true
         }),
         Animated.spring(translateY, {
           toValue: 0,
           damping: 12,
           mass: 0.6,
           stiffness: 150,
-          useNativeDriver: true,
-        }),
+          useNativeDriver: true
+        })
       ]).start();
     }
   }, [alert, opacity, translateY]);
@@ -604,8 +573,7 @@ const AlertModal: React.FC<{
   const confirmTextColor = variantStyle.confirmTextColor
     ? variantStyle.confirmTextColor({ colors, brandColors })
     : "#ffffff";
-  const iconColor =
-    alert.iconColor ?? variantStyle.accentColor({ colors, brandColors });
+  const iconColor = alert.iconColor ?? variantStyle.accentColor({ colors, brandColors });
 
   const handleBackdropPress = () => {
     if (alert.dismissible) {
@@ -636,8 +604,8 @@ const AlertModal: React.FC<{
             styles.card,
             {
               maxWidth: SIZE_CONFIG[alert.size ?? "md"],
-              transform: [{ translateY }],
-            },
+              transform: [{ translateY }]
+            }
           ]}
         >
           {alert.showCloseIcon && (
@@ -657,14 +625,10 @@ const AlertModal: React.FC<{
                 borderRadius: 26,
                 backgroundColor: variantStyle.illustrationColor,
                 alignItems: "center",
-                justifyContent: "center",
+                justifyContent: "center"
               }}
             >
-              <Ionicons
-                name={alert.iconName ?? variantStyle.icon}
-                size={26}
-                color={iconColor}
-              />
+              <Ionicons name={alert.iconName ?? variantStyle.icon} size={26} color={iconColor} />
             </View>
           </View>
 
@@ -672,8 +636,8 @@ const AlertModal: React.FC<{
             style={[
               styles.title,
               {
-                color: variantStyle.textColor({ colors, brandColors }),
-              },
+                color: variantStyle.textColor({ colors, brandColors })
+              }
             ]}
           >
             {alert.title}
@@ -688,7 +652,7 @@ const AlertModal: React.FC<{
                 style={[
                   styles.message,
                   alert.messageAlign === "left" && styles.messageLeft,
-                  alert.messageAlign === "right" && styles.messageRight,
+                  alert.messageAlign === "right" && styles.messageRight
                 ]}
               >
                 {alert.message}
@@ -701,8 +665,8 @@ const AlertModal: React.FC<{
               style={[
                 styles.button,
                 {
-                  backgroundColor: confirmColor,
-                },
+                  backgroundColor: confirmColor
+                }
               ]}
               onPress={() => onResolve(true)}
             >
@@ -710,8 +674,8 @@ const AlertModal: React.FC<{
                 style={[
                   styles.buttonText,
                   {
-                    color: confirmTextColor,
-                  },
+                    color: confirmTextColor
+                  }
                 ]}
               >
                 {alert.confirmLabel}
@@ -722,9 +686,7 @@ const AlertModal: React.FC<{
                 style={[styles.button, styles.cancelButton]}
                 onPress={() => onResolve(false)}
               >
-                <Text
-                  style={[styles.buttonText, { color: colors.text.primary }]}
-                >
+                <Text style={[styles.buttonText, { color: colors.text.primary }]}>
                   {alert.cancelLabel}
                 </Text>
               </TouchableOpacity>
@@ -736,10 +698,7 @@ const AlertModal: React.FC<{
   );
 };
 
-export const useAlertModal = (): Omit<
-  AlertModalContextValue,
-  "currentAlert" | "handleResolve"
-> => {
+export const useAlertModal = (): Omit<AlertModalContextValue, "currentAlert" | "handleResolve"> => {
   const context = useContext(AlertModalContext);
   if (!context) {
     throw new Error("useAlertModal must be used within an AlertModalProvider");

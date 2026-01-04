@@ -46,7 +46,7 @@ class TaskQueue:
             goal_id: The goal ID to generate a plan for
             goal_data: The goal data dictionary
             user_profile: Optional user profile for personalization
-            user_plan: User's subscription plan (free, starter, pro, elite)
+            user_plan: User's subscription plan (free, premium)
             background_tasks: FastAPI BackgroundTasks instance (optional)
             activation_context: Context for activating goal when plan is ready
                 - can_activate: Whether user has room for more active goals

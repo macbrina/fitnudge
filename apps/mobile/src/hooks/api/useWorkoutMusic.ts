@@ -29,7 +29,7 @@ export function useWorkoutMusic() {
     // Music rarely changes, cache for 24 hours
     staleTime: 24 * 60 * 60 * 1000, // 24 hours
     gcTime: 7 * 24 * 60 * 60 * 1000, // 7 days
-    placeholderData: [],
+    placeholderData: []
   });
 }
 
@@ -45,7 +45,7 @@ export function usePrefetchWorkoutMusic() {
     return queryClient.prefetchQuery({
       queryKey: WORKOUT_MUSIC_QUERY_KEY,
       queryFn: () => workoutMusicService.getAll(),
-      staleTime: 24 * 60 * 60 * 1000,
+      staleTime: 24 * 60 * 60 * 1000
     });
   };
 
@@ -61,10 +61,7 @@ export function useWorkoutMusicCache() {
   const queryClient = useQueryClient();
 
   const getCached = (): WorkoutMusicTrack[] | null => {
-    return (
-      queryClient.getQueryData<WorkoutMusicTrack[]>(WORKOUT_MUSIC_QUERY_KEY) ??
-      null
-    );
+    return queryClient.getQueryData<WorkoutMusicTrack[]>(WORKOUT_MUSIC_QUERY_KEY) ?? null;
   };
 
   return { getCached };

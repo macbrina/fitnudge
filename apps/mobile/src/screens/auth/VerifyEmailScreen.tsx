@@ -19,18 +19,18 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 
 const makeVerifyEmailScreenStyles = (tokens: any, colors: any, brand: any) => ({
   container: {
     flex: 1,
-    backgroundColor: colors.bg.canvas,
+    backgroundColor: colors.bg.canvas
   },
   titleContainer: {
     alignItems: "center" as const,
     marginBottom: toRN(tokens.spacing[8]),
-    paddingHorizontal: toRN(tokens.spacing[6]),
+    paddingHorizontal: toRN(tokens.spacing[6])
   },
   title: {
     fontSize: toRN(tokens.typography.fontSize["3xl"]),
@@ -38,34 +38,31 @@ const makeVerifyEmailScreenStyles = (tokens: any, colors: any, brand: any) => ({
     color: colors.text.primary,
     textAlign: "center" as const,
     marginBottom: toRN(tokens.spacing[3]),
-    fontFamily: fontFamily.groteskBold,
+    fontFamily: fontFamily.groteskBold
   },
   subtitle: {
     fontSize: toRN(tokens.typography.fontSize.base),
     color: colors.text.secondary,
     textAlign: "center" as const,
-    lineHeight: lineHeight(
-      tokens.typography.fontSize.base,
-      tokens.typography.lineHeight.relaxed,
-    ),
-    fontFamily: fontFamily.groteskRegular,
+    lineHeight: lineHeight(tokens.typography.fontSize.base, tokens.typography.lineHeight.relaxed),
+    fontFamily: fontFamily.groteskRegular
   },
   emailText: {
     fontWeight: tokens.typography.fontWeight.semibold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   form: {
     paddingHorizontal: toRN(tokens.spacing[6]),
-    flex: 1,
+    flex: 1
   },
   codeContainer: {
-    marginBottom: toRN(tokens.spacing[6]),
+    marginBottom: toRN(tokens.spacing[6])
   },
   codeInputContainer: {
     flexDirection: "row" as const,
     justifyContent: "space-between" as const,
     gap: toRN(tokens.spacing[3]),
-    marginBottom: toRN(tokens.spacing[2]),
+    marginBottom: toRN(tokens.spacing[2])
   },
   codeInput: {
     flex: 1,
@@ -78,50 +75,50 @@ const makeVerifyEmailScreenStyles = (tokens: any, colors: any, brand: any) => ({
     textAlign: "center" as const,
     backgroundColor: colors.bg.card,
     color: colors.text.primary,
-    fontFamily: fontFamily.groteskBold,
+    fontFamily: fontFamily.groteskBold
   },
   codeInputFocused: {
-    borderColor: brand.primary,
+    borderColor: brand.primary
   },
   codeInputError: {
-    borderColor: colors.feedback.error,
+    borderColor: colors.feedback.error
   },
   errorText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     color: colors.feedback.error,
     marginTop: toRN(tokens.spacing[2]),
     fontFamily: fontFamily.groteskRegular,
-    textAlign: "center" as const,
+    textAlign: "center" as const
   },
   verifyButton: {
     backgroundColor: brand.primary,
     borderRadius: toRN(tokens.borderRadius.lg),
     paddingVertical: toRN(tokens.spacing[4]),
-    marginBottom: toRN(tokens.spacing[6]),
+    marginBottom: toRN(tokens.spacing[6])
   },
   resendContainer: {
     alignItems: "center" as const,
-    marginTop: toRN(tokens.spacing[4]),
+    marginTop: toRN(tokens.spacing[4])
   },
   resendText: {
     fontSize: toRN(tokens.typography.fontSize.base),
     color: colors.text.secondary,
     fontFamily: fontFamily.groteskRegular,
     marginBottom: toRN(tokens.spacing[2]),
-    textAlign: "center" as const,
+    textAlign: "center" as const
   },
   resendButton: {
-    padding: toRN(tokens.spacing[2]),
+    padding: toRN(tokens.spacing[2])
   },
   resendButtonText: {
     fontSize: toRN(tokens.typography.fontSize.base),
     color: brand.primary,
     fontWeight: tokens.typography.fontWeight.semibold,
-    fontFamily: fontFamily.groteskSemiBold,
+    fontFamily: fontFamily.groteskSemiBold
   },
   resendButtonDisabled: {
-    opacity: 0.5,
-  },
+    opacity: 0.5
+  }
 });
 
 export default function VerifyEmailScreen() {
@@ -194,7 +191,7 @@ export default function VerifyEmailScreen() {
     try {
       const response = await verifyEmailMutation.mutateAsync({
         code: codeToVerify,
-        email: user?.email,
+        email: user?.email
       });
 
       if (response.data) {
@@ -202,15 +199,14 @@ export default function VerifyEmailScreen() {
         useAuthStore.getState().updateUser({ email_verified: true });
 
         capture("email_verified", {
-          user_id: user?.id,
+          user_id: user?.id
         });
 
         // Get redirect URL based on onboarding status
         const redirectUrl = await getRedirection();
         router.replace(redirectUrl);
       } else {
-        const errorMessage =
-          response.error || t("auth.verify_email.error_invalid_code");
+        const errorMessage = response.error || t("auth.verify_email.error_invalid_code");
         setError(errorMessage);
         // Clear the code input on error
         setCode(["", "", "", "", "", ""]);
@@ -240,16 +236,14 @@ export default function VerifyEmailScreen() {
     if (resendCountdown > 0) return;
 
     try {
-      const response = await resendVerificationMutation.mutateAsync(
-        user?.email,
-      );
+      const response = await resendVerificationMutation.mutateAsync(user?.email);
 
       if (response.data) {
         showToast({
           title: t("auth.verify_email.success_title"),
           message: t("auth.verify_email.success_message"),
           variant: "success",
-          duration: 2000,
+          duration: 2000
         });
 
         // Start countdown (2 minutes between requests)
@@ -268,7 +262,7 @@ export default function VerifyEmailScreen() {
           title: t("auth.verify_email.error_title"),
           message: response.error || t("auth.verify_email.error_resend_failed"),
           variant: "error",
-          confirmLabel: t("common.ok"),
+          confirmLabel: t("common.ok")
         });
       }
     } catch (error: any) {
@@ -280,7 +274,7 @@ export default function VerifyEmailScreen() {
         title: t("auth.verify_email.error_title"),
         message: errorMessage,
         variant: "error",
-        confirmLabel: t("common.ok"),
+        confirmLabel: t("common.ok")
       });
     }
   };
@@ -309,8 +303,7 @@ export default function VerifyEmailScreen() {
           <View style={styles.titleContainer}>
             <Text style={styles.title}>{t("auth.verify_email.title")}</Text>
             <Text style={styles.subtitle}>
-              {t("auth.verify_email.subtitle")}{" "}
-              <Text style={styles.emailText}>{user?.email}</Text>
+              {t("auth.verify_email.subtitle")} <Text style={styles.emailText}>{user?.email}</Text>
             </Text>
           </View>
 
@@ -326,15 +319,12 @@ export default function VerifyEmailScreen() {
                     }}
                     style={[
                       styles.codeInput,
-                      (focusedIndex === index || digit) &&
-                        styles.codeInputFocused,
-                      error && styles.codeInputError,
+                      (focusedIndex === index || digit) && styles.codeInputFocused,
+                      error && styles.codeInputError
                     ]}
                     value={digit}
                     onChangeText={(value) => handleCodeChange(index, value)}
-                    onKeyPress={({ nativeEvent }) =>
-                      handleKeyPress(index, nativeEvent.key)
-                    }
+                    onKeyPress={({ nativeEvent }) => handleKeyPress(index, nativeEvent.key)}
                     onFocus={() => setFocusedIndex(index)}
                     onBlur={() => setFocusedIndex(null)}
                     keyboardType="numeric"
@@ -354,9 +344,7 @@ export default function VerifyEmailScreen() {
                   : t("auth.verify_email.verify_button")
               }
               onPress={() => handleVerify()}
-              disabled={
-                verifyEmailMutation.isPending || code.join("").length !== 6
-              }
+              disabled={verifyEmailMutation.isPending || code.join("").length !== 6}
               loading={verifyEmailMutation.isPending}
             />
 
@@ -368,14 +356,11 @@ export default function VerifyEmailScreen() {
               </Text>
               <TouchableOpacity
                 onPress={handleResend}
-                disabled={
-                  resendCountdown > 0 || resendVerificationMutation.isPending
-                }
+                disabled={resendCountdown > 0 || resendVerificationMutation.isPending}
                 style={[
                   styles.resendButton,
-                  (resendCountdown > 0 ||
-                    resendVerificationMutation.isPending) &&
-                    styles.resendButtonDisabled,
+                  (resendCountdown > 0 || resendVerificationMutation.isPending) &&
+                    styles.resendButtonDisabled
                 ]}
               >
                 <Text style={styles.resendButtonText}>

@@ -21,7 +21,7 @@ export const fontFamily = {
   groteskRegular: "Nunito-Regular",
   groteskMedium: "Nunito-Medium",
   groteskSemiBold: "Nunito-SemiBold",
-  groteskBold: "Nunito-Bold",
+  groteskBold: "Nunito-Bold"
 };
 
 // Helper function to get font family based on weight
@@ -40,7 +40,7 @@ export const getFontFamily = (
     | "groteskRegular"
     | "groteskMedium"
     | "groteskSemiBold"
-    | "groteskBold" = "regular",
+    | "groteskBold" = "regular"
 ) => {
   return fontFamily[weight as keyof typeof fontFamily];
 };
@@ -61,9 +61,9 @@ export const getFontStyle = (
     | "groteskRegular"
     | "groteskMedium"
     | "groteskSemiBold"
-    | "groteskBold" = "regular",
+    | "groteskBold" = "regular"
 ) => {
   return {
-    fontFamily: getFontFamily(weight as keyof typeof fontFamily),
+    fontFamily: getFontFamily(weight as keyof typeof fontFamily)
   };
 };

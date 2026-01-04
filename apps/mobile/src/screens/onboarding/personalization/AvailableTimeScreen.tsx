@@ -8,6 +8,7 @@ import { lineHeight } from "@/themes/tokens";
 import { useTheme } from "@/themes";
 import PersonalizationLayout from "./PersonalizationLayout";
 import { useOnboardingStore } from "@/stores/onboardingStore";
+import { AVAILABLE_TIMES } from "@/constants/personalization";
 
 interface AvailableTimeScreenProps {
   onContinue: (availableTime: string) => void;
@@ -16,35 +17,14 @@ interface AvailableTimeScreenProps {
   totalSteps: number;
 }
 
-const TIME_OPTIONS = [
-  {
-    id: "less_30min",
-    label: "onboarding.personalization.available_time.less_30min.title",
-  },
-  {
-    id: "30-60min",
-    label: "onboarding.personalization.available_time.30-60min.title",
-  },
-  {
-    id: "1-2hrs",
-    label: "onboarding.personalization.available_time.1-2hrs.title",
-  },
-  {
-    id: "flexible",
-    label: "onboarding.personalization.available_time.flexible.title",
-  },
-];
-
 export default function AvailableTimeScreen({
   onContinue,
   onBack,
   currentStep,
-  totalSteps,
+  totalSteps
 }: AvailableTimeScreenProps) {
   const { available_time } = useOnboardingStore();
-  const [selectedTime, setSelectedTime] = useState<string>(
-    available_time || "",
-  );
+  const [selectedTime, setSelectedTime] = useState<string>(available_time || "");
   const { t } = useTranslation();
   const styles = useStyles(makeStyles);
   const { brandColors } = useTheme();
@@ -68,40 +48,32 @@ export default function AvailableTimeScreen({
       canContinue={!!selectedTime}
     >
       <View style={styles.content}>
-        <Text style={styles.title}>
-          {t("onboarding.personalization.available_time.title")}
-        </Text>
+        <Text style={styles.title}>{t("onboarding.personalization.available_time.title")}</Text>
 
         <Text style={styles.subtitle}>
           {t("onboarding.personalization.available_time.subtitle")}
         </Text>
 
         <View style={styles.optionsContainer}>
-          {TIME_OPTIONS.map((option) => {
-            const isSelected = selectedTime === option.id;
+          {AVAILABLE_TIMES.map((option) => {
+            const isSelected = selectedTime === option.value;
             return (
               <TouchableOpacity
-                key={option.id}
-                onPress={() => setSelectedTime(option.id)}
+                key={option.value}
+                onPress={() => setSelectedTime(option.value)}
                 activeOpacity={0.7}
                 style={[
                   styles.optionCard,
-                  isSelected && [
-                    styles.optionCardSelected,
-                    { borderColor: brandColors.primary },
-                  ],
+                  isSelected && [styles.optionCardSelected, { borderColor: brandColors.primary }]
                 ]}
               >
                 <Text
                   style={[
                     styles.optionLabel,
-                    isSelected && [
-                      styles.optionLabelSelected,
-                      { color: brandColors.primary },
-                    ],
+                    isSelected && [styles.optionLabelSelected, { color: brandColors.primary }]
                   ]}
                 >
-                  {t(option.label)}
+                  {t(option.onboardingLabelKey)}
                 </Text>
               </TouchableOpacity>
             );
@@ -116,7 +88,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => {
   return {
     content: {
       flex: 1,
-      paddingTop: toRN(tokens.spacing[2]),
+      paddingTop: toRN(tokens.spacing[2])
     },
     title: {
       fontSize: toRN(tokens.typography.fontSize["2xl"]),
@@ -124,23 +96,17 @@ const makeStyles = (tokens: any, colors: any, brand: any) => {
       color: colors.text.primary,
       marginBottom: toRN(tokens.spacing[2]),
       fontFamily: fontFamily.groteskBold,
-      lineHeight: lineHeight(
-        tokens.typography.fontSize["2xl"],
-        tokens.typography.lineHeight.tight,
-      ),
+      lineHeight: lineHeight(tokens.typography.fontSize["2xl"], tokens.typography.lineHeight.tight)
     },
     subtitle: {
       fontSize: toRN(tokens.typography.fontSize.base),
       color: colors.text.secondary,
       marginBottom: toRN(tokens.spacing[6]),
       fontFamily: fontFamily.groteskRegular,
-      lineHeight: lineHeight(
-        tokens.typography.fontSize.base,
-        tokens.typography.lineHeight.relaxed,
-      ),
+      lineHeight: lineHeight(tokens.typography.fontSize.base, tokens.typography.lineHeight.relaxed)
     },
     optionsContainer: {
-      gap: toRN(tokens.spacing[3]),
+      gap: toRN(tokens.spacing[3])
     },
     optionCard: {
       backgroundColor: colors.bg.muted,
@@ -148,17 +114,17 @@ const makeStyles = (tokens: any, colors: any, brand: any) => {
       paddingVertical: toRN(tokens.spacing[5]),
       paddingHorizontal: toRN(tokens.spacing[5]),
       borderWidth: 2,
-      borderColor: colors.border.subtle,
+      borderColor: colors.border.subtle
     },
     optionCardSelected: {
-      backgroundColor: brand.primary + "08",
+      backgroundColor: brand.primary + "08"
     },
     optionLabel: {
       fontSize: toRN(tokens.typography.fontSize.lg),
       fontWeight: tokens.typography.fontWeight.semibold,
       color: colors.text.primary,
-      fontFamily: fontFamily.groteskSemiBold,
+      fontFamily: fontFamily.groteskSemiBold
     },
-    optionLabelSelected: {},
+    optionLabelSelected: {}
   };
 };

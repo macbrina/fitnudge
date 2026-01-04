@@ -17,7 +17,7 @@ import { createMMKV } from "react-native-mmkv";
 // Initialize MMKV storage for React Query cache
 // MMKV is ~30x faster than AsyncStorage for this use case
 const queryStorage = createMMKV({
-  id: "react-query-cache",
+  id: "react-query-cache"
 });
 
 /**
@@ -34,7 +34,7 @@ const mmkvStorageAdapter = {
   },
   removeItem: (key: string): void => {
     queryStorage.remove(key);
-  },
+  }
 };
 
 /**
@@ -46,7 +46,7 @@ export const queryPersister: Persister = createSyncStoragePersister({
   // Throttle writes to avoid excessive disk I/O
   throttleTime: 1000,
   // Key used to store the entire dehydrated cache
-  key: "REACT_QUERY_OFFLINE_CACHE",
+  key: "REACT_QUERY_OFFLINE_CACHE"
 });
 
 /**
@@ -73,13 +73,13 @@ export const queryClient = new QueryClient({
       retry: 3,
       retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
       // Don't refetch when window regains focus (we handle this manually in RealtimeContext)
-      refetchOnWindowFocus: false,
+      refetchOnWindowFocus: false
     },
     mutations: {
       // Fail fast for mutations - optimistic updates handle instant feedback
-      retry: 1,
-    },
-  },
+      retry: 1
+    }
+  }
 });
 
 /**

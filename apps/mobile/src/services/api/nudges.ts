@@ -1,12 +1,7 @@
 import { BaseApiService, ApiResponse } from "./base";
 import { ROUTES } from "@/lib/routes";
 
-export type NudgeType =
-  | "nudge"
-  | "cheer"
-  | "milestone"
-  | "competitive"
-  | "custom";
+export type NudgeType = "nudge" | "cheer" | "milestone" | "competitive" | "custom";
 
 export interface Nudge {
   id: string;
@@ -50,7 +45,7 @@ class NudgesService extends BaseApiService {
   async getNudges(
     unreadOnly: boolean = false,
     limit: number = 50,
-    offset: number = 0,
+    offset: number = 0
   ): Promise<ApiResponse<Nudge[]>> {
     const params = new URLSearchParams();
     if (unreadOnly) params.append("unread_only", "true");
@@ -63,10 +58,7 @@ class NudgesService extends BaseApiService {
   /**
    * Get nudges sent by the current user
    */
-  async getSentNudges(
-    limit: number = 50,
-    offset: number = 0,
-  ): Promise<ApiResponse<Nudge[]>> {
+  async getSentNudges(limit: number = 50, offset: number = 0): Promise<ApiResponse<Nudge[]>> {
     const params = new URLSearchParams();
     params.append("limit", limit.toString());
     params.append("offset", offset.toString());
@@ -92,30 +84,20 @@ class NudgesService extends BaseApiService {
    * Mark a nudge as read
    */
   async markAsRead(nudgeId: string): Promise<ApiResponse<{ message: string }>> {
-    return this.patch<{ message: string }>(
-      ROUTES.NUDGES.MARK_READ(nudgeId),
-      {},
-    );
+    return this.patch<{ message: string }>(ROUTES.NUDGES.MARK_READ(nudgeId), {});
   }
 
   /**
    * Mark all nudges as read
    */
-  async markAllAsRead(): Promise<
-    ApiResponse<{ message: string; count: number }>
-  > {
-    return this.patch<{ message: string; count: number }>(
-      ROUTES.NUDGES.MARK_ALL_READ,
-      {},
-    );
+  async markAllAsRead(): Promise<ApiResponse<{ message: string; count: number }>> {
+    return this.patch<{ message: string; count: number }>(ROUTES.NUDGES.MARK_ALL_READ, {});
   }
 
   /**
    * Delete a nudge (only allowed by sender)
    */
-  async deleteNudge(
-    nudgeId: string,
-  ): Promise<ApiResponse<{ message: string }>> {
+  async deleteNudge(nudgeId: string): Promise<ApiResponse<{ message: string }>> {
     return this.delete<{ message: string }>(ROUTES.NUDGES.DELETE(nudgeId));
   }
 }

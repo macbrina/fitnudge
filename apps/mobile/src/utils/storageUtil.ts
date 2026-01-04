@@ -37,6 +37,7 @@ export const STORAGE_KEYS = {
   LAST_ACTIVE: "last_active",
   APP_VERSION: "app_version",
   FIRST_LAUNCH: "first_launch",
+  DISMISSED_UPDATE_VERSION: "dismissed_update_version",
 
   // Goals and fitness data
   GOALS_DATA: "goals_data",
@@ -53,7 +54,7 @@ export const STORAGE_KEYS = {
 
   // Cache keys
   API_CACHE: "api_cache",
-  IMAGES_CACHE: "images_cache",
+  IMAGES_CACHE: "images_cache"
 } as const;
 
 class StorageUtil {
@@ -63,7 +64,7 @@ class StorageUtil {
       // Don't save null or undefined values
       if (value === null || value === undefined) {
         console.warn(
-          `Attempted to save null/undefined value for key: ${key}. Use removeItem instead.`,
+          `Attempted to save null/undefined value for key: ${key}. Use removeItem instead.`
         );
         return;
       }
@@ -123,10 +124,7 @@ class StorageUtil {
         );
         await notificationService.clearAllNotificationData();
       } catch (notificationError) {
-        console.warn(
-          "[StorageUtil] Failed to clear notification data:",
-          notificationError,
-        );
+        console.warn("[StorageUtil] Failed to clear notification data:", notificationError);
       }
 
       const keysToRemove = [
@@ -169,7 +167,7 @@ class StorageUtil {
 
         // Cache
         STORAGE_KEYS.API_CACHE,
-        STORAGE_KEYS.IMAGES_CACHE,
+        STORAGE_KEYS.IMAGES_CACHE
       ];
 
       await AsyncStorage.multiRemove(keysToRemove);
@@ -181,7 +179,7 @@ class StorageUtil {
           key.startsWith("cache_") ||
           key.startsWith("offline_") ||
           key.startsWith("user_pref_") ||
-          key.startsWith("secure_"),
+          key.startsWith("secure_")
       );
 
       if (dynamicKeys.length > 0) {
@@ -204,7 +202,7 @@ class StorageUtil {
     try {
       const keysToRemove = [
         STORAGE_KEYS.AUTH_TOKEN,
-        STORAGE_KEYS.REFRESH_TOKEN,
+        STORAGE_KEYS.REFRESH_TOKEN
         // Note: USER_DATA is kept for offline UI purposes (will be refreshed on login)
         // Note: NOTIFICATION_PREFERENCES are user preferences and should persist
       ];
@@ -279,16 +277,12 @@ class StorageUtil {
   }
 
   // Cache operations
-  async setCacheItem(
-    key: string,
-    value: any,
-    ttl: number = 3600000,
-  ): Promise<void> {
+  async setCacheItem(key: string, value: any, ttl: number = 3600000): Promise<void> {
     try {
       const cacheData = {
         value,
         timestamp: Date.now(),
-        ttl,
+        ttl
       };
       await this.setObject(`cache_${key}`, cacheData);
     } catch (error) {
