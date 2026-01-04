@@ -8,6 +8,7 @@ import { lineHeight } from "@/themes/tokens";
 import { useTheme } from "@/themes";
 import PersonalizationLayout from "./PersonalizationLayout";
 import { useOnboardingStore } from "@/stores/onboardingStore";
+import { CURRENT_FREQUENCIES } from "@/constants/personalization";
 
 interface CurrentHabitsScreenProps {
   onContinue: (currentFrequency: string) => void;
@@ -16,39 +17,14 @@ interface CurrentHabitsScreenProps {
   totalSteps: number;
 }
 
-const FREQUENCY_OPTIONS = [
-  {
-    id: "never",
-    label: "onboarding.personalization.current_habits.never.title",
-  },
-  {
-    id: "1-2x_week",
-    label: "onboarding.personalization.current_habits.1-2x_week.title",
-  },
-  {
-    id: "3-4x_week",
-    label: "onboarding.personalization.current_habits.3-4x_week.title",
-  },
-  {
-    id: "5+_week",
-    label: "onboarding.personalization.current_habits.5+_week.title",
-  },
-  {
-    id: "daily",
-    label: "onboarding.personalization.current_habits.daily.title",
-  },
-];
-
 export default function CurrentHabitsScreen({
   onContinue,
   onBack,
   currentStep,
-  totalSteps,
+  totalSteps
 }: CurrentHabitsScreenProps) {
   const { current_frequency } = useOnboardingStore();
-  const [selectedFrequency, setSelectedFrequency] = useState<string>(
-    current_frequency || "",
-  );
+  const [selectedFrequency, setSelectedFrequency] = useState<string>(current_frequency || "");
   const { t } = useTranslation();
   const styles = useStyles(makeStyles);
   const { brandColors } = useTheme();
@@ -72,40 +48,32 @@ export default function CurrentHabitsScreen({
       canContinue={!!selectedFrequency}
     >
       <View style={styles.content}>
-        <Text style={styles.title}>
-          {t("onboarding.personalization.current_habits.title")}
-        </Text>
+        <Text style={styles.title}>{t("onboarding.personalization.current_habits.title")}</Text>
 
         <Text style={styles.subtitle}>
           {t("onboarding.personalization.current_habits.subtitle")}
         </Text>
 
         <View style={styles.optionsContainer}>
-          {FREQUENCY_OPTIONS.map((option) => {
-            const isSelected = selectedFrequency === option.id;
+          {CURRENT_FREQUENCIES.map((option) => {
+            const isSelected = selectedFrequency === option.value;
             return (
               <TouchableOpacity
-                key={option.id}
-                onPress={() => setSelectedFrequency(option.id)}
+                key={option.value}
+                onPress={() => setSelectedFrequency(option.value)}
                 activeOpacity={0.7}
                 style={[
                   styles.optionCard,
-                  isSelected && [
-                    styles.optionCardSelected,
-                    { borderColor: brandColors.primary },
-                  ],
+                  isSelected && [styles.optionCardSelected, { borderColor: brandColors.primary }]
                 ]}
               >
                 <Text
                   style={[
                     styles.optionLabel,
-                    isSelected && [
-                      styles.optionLabelSelected,
-                      { color: brandColors.primary },
-                    ],
+                    isSelected && [styles.optionLabelSelected, { color: brandColors.primary }]
                   ]}
                 >
-                  {t(option.label)}
+                  {t(option.onboardingLabelKey)}
                 </Text>
               </TouchableOpacity>
             );
@@ -120,7 +88,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => {
   return {
     content: {
       flex: 1,
-      paddingTop: toRN(tokens.spacing[2]),
+      paddingTop: toRN(tokens.spacing[2])
     },
     title: {
       fontSize: toRN(tokens.typography.fontSize["2xl"]),
@@ -128,23 +96,17 @@ const makeStyles = (tokens: any, colors: any, brand: any) => {
       color: colors.text.primary,
       marginBottom: toRN(tokens.spacing[2]),
       fontFamily: fontFamily.groteskBold,
-      lineHeight: lineHeight(
-        tokens.typography.fontSize["2xl"],
-        tokens.typography.lineHeight.tight,
-      ),
+      lineHeight: lineHeight(tokens.typography.fontSize["2xl"], tokens.typography.lineHeight.tight)
     },
     subtitle: {
       fontSize: toRN(tokens.typography.fontSize.base),
       color: colors.text.secondary,
       marginBottom: toRN(tokens.spacing[6]),
       fontFamily: fontFamily.groteskRegular,
-      lineHeight: lineHeight(
-        tokens.typography.fontSize.base,
-        tokens.typography.lineHeight.relaxed,
-      ),
+      lineHeight: lineHeight(tokens.typography.fontSize.base, tokens.typography.lineHeight.relaxed)
     },
     optionsContainer: {
-      gap: toRN(tokens.spacing[3]),
+      gap: toRN(tokens.spacing[3])
     },
     optionCard: {
       backgroundColor: colors.bg.muted,
@@ -152,17 +114,17 @@ const makeStyles = (tokens: any, colors: any, brand: any) => {
       paddingVertical: toRN(tokens.spacing[5]),
       paddingHorizontal: toRN(tokens.spacing[5]),
       borderWidth: 2,
-      borderColor: colors.border.subtle,
+      borderColor: colors.border.subtle
     },
     optionCardSelected: {
-      backgroundColor: brand.primary + "08",
+      backgroundColor: brand.primary + "08"
     },
     optionLabel: {
       fontSize: toRN(tokens.typography.fontSize.lg),
       fontWeight: tokens.typography.fontWeight.semibold,
       color: colors.text.primary,
-      fontFamily: fontFamily.groteskSemiBold,
+      fontFamily: fontFamily.groteskSemiBold
     },
-    optionLabelSelected: {},
+    optionLabelSelected: {}
   };
 };

@@ -27,10 +27,7 @@ const formatTimeRemaining = (seconds: number): string => {
   return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
 };
 
-export function FloatingOfferButton({
-  onPress,
-  discountPercent = 50,
-}: FloatingOfferButtonProps) {
+export function FloatingOfferButton({ onPress, discountPercent = 50 }: FloatingOfferButtonProps) {
   const styles = useStyles(makeFloatingOfferButtonStyles);
   const { brandColors } = useTheme();
   const { isActive, getTimeRemaining, clearExitOffer } = useExitOfferStore();
@@ -51,15 +48,15 @@ export function FloatingOfferButton({
           toValue: 1.03,
           duration: 1200,
           easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
+          useNativeDriver: true
         }),
         Animated.timing(pulseAnim, {
           toValue: 1,
           duration: 1200,
           easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ]),
+          useNativeDriver: true
+        })
+      ])
     );
     pulse.start();
 
@@ -77,29 +74,29 @@ export function FloatingOfferButton({
           toValue: 1,
           duration: 150,
           easing: Easing.linear,
-          useNativeDriver: true,
+          useNativeDriver: true
         }),
         Animated.timing(giftRotateAnim, {
           toValue: -1,
           duration: 150,
           easing: Easing.linear,
-          useNativeDriver: true,
+          useNativeDriver: true
         }),
         Animated.timing(giftRotateAnim, {
           toValue: 1,
           duration: 150,
           easing: Easing.linear,
-          useNativeDriver: true,
+          useNativeDriver: true
         }),
         Animated.timing(giftRotateAnim, {
           toValue: 0,
           duration: 150,
           easing: Easing.linear,
-          useNativeDriver: true,
+          useNativeDriver: true
         }),
         // Pause between wiggles
-        Animated.delay(2000),
-      ]),
+        Animated.delay(2000)
+      ])
     );
 
     // Bounce animation
@@ -109,16 +106,16 @@ export function FloatingOfferButton({
           toValue: -3,
           duration: 200,
           easing: Easing.out(Easing.ease),
-          useNativeDriver: true,
+          useNativeDriver: true
         }),
         Animated.timing(giftBounceAnim, {
           toValue: 0,
           duration: 200,
           easing: Easing.in(Easing.ease),
-          useNativeDriver: true,
+          useNativeDriver: true
         }),
-        Animated.delay(2000),
-      ]),
+        Animated.delay(2000)
+      ])
     );
 
     wiggle.start();
@@ -157,7 +154,7 @@ export function FloatingOfferButton({
   // Interpolate rotation
   const giftRotation = giftRotateAnim.interpolate({
     inputRange: [-1, 0, 1],
-    outputRange: ["-15deg", "0deg", "15deg"],
+    outputRange: ["-15deg", "0deg", "15deg"]
   });
 
   return (
@@ -165,25 +162,18 @@ export function FloatingOfferButton({
       style={[
         styles.container,
         {
-          transform: [{ scale: pulseAnim }],
-        },
+          transform: [{ scale: pulseAnim }]
+        }
       ]}
     >
-      <TouchableOpacity
-        style={styles.button}
-        onPress={onPress}
-        activeOpacity={0.9}
-      >
+      <TouchableOpacity style={styles.button} onPress={onPress} activeOpacity={0.9}>
         {/* Animated Gift Icon */}
         <Animated.View
           style={[
             styles.iconContainer,
             {
-              transform: [
-                { rotate: giftRotation },
-                { translateY: giftBounceAnim },
-              ],
-            },
+              transform: [{ rotate: giftRotation }, { translateY: giftBounceAnim }]
+            }
           ]}
         >
           <Text style={styles.giftEmoji}>🎁</Text>
@@ -201,25 +191,19 @@ export function FloatingOfferButton({
         {/* Timer */}
         <View style={styles.timerContainer}>
           <Ionicons name="time" size={16} color="rgba(255,255,255,0.9)" />
-          <Text style={styles.timerText}>
-            {formatTimeRemaining(timeRemaining)}
-          </Text>
+          <Text style={styles.timerText}>{formatTimeRemaining(timeRemaining)}</Text>
         </View>
       </TouchableOpacity>
     </Animated.View>
   );
 }
 
-const makeFloatingOfferButtonStyles = (
-  tokens: any,
-  colors: any,
-  brand: any,
-) => ({
+const makeFloatingOfferButtonStyles = (tokens: any, colors: any, brand: any) => ({
   container: {
     position: "absolute" as const,
     bottom: toRN(tokens.spacing[28]),
     right: 0, // Clipped to right edge
-    zIndex: 100,
+    zIndex: 100
   },
   button: {
     flexDirection: "row" as const,
@@ -238,49 +222,49 @@ const makeFloatingOfferButtonStyles = (
     shadowOffset: { width: -4, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 10,
-    elevation: 12,
+    elevation: 12
   },
   iconContainer: {
-    marginRight: toRN(tokens.spacing[2]),
+    marginRight: toRN(tokens.spacing[2])
   },
   giftEmoji: {
-    fontSize: 22,
+    fontSize: 22
   },
   discountBadge: {
     flexDirection: "row" as const,
-    alignItems: "baseline" as const,
+    alignItems: "baseline" as const
   },
   discountText: {
     fontSize: toRN(tokens.typography.fontSize["2xl"]),
     fontWeight: "800" as const,
     fontFamily: fontFamily.groteskBold,
-    color: "#FFFFFF",
+    color: "#FFFFFF"
   },
   offText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontWeight: "700" as const,
     fontFamily: fontFamily.groteskBold,
     color: "rgba(255,255,255,0.9)",
-    marginLeft: 2,
+    marginLeft: 2
   },
   divider: {
     width: 1,
     height: 24,
     backgroundColor: "rgba(255,255,255,0.3)",
-    marginHorizontal: toRN(tokens.spacing[3]),
+    marginHorizontal: toRN(tokens.spacing[3])
   },
   timerContainer: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    gap: toRN(tokens.spacing[1]),
+    gap: toRN(tokens.spacing[1])
   },
   timerText: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontWeight: "700" as const,
     fontFamily: fontFamily.groteskBold,
     color: "#FFFFFF",
-    letterSpacing: 1,
-  },
+    letterSpacing: 1
+  }
 });
 
 export default FloatingOfferButton;

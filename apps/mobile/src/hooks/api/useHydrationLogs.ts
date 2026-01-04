@@ -4,21 +4,18 @@ import {
   HydrationLog,
   CreateHydrationLogRequest,
   DailyHydrationSummary,
-  HYDRATION_PRESETS,
+  HYDRATION_PRESETS
 } from "@/services/api/hydrationLogs";
 import { homeDashboardQueryKeys } from "./useHomeDashboard";
 import { trackingStatsQueryKeys } from "./useTrackingStats";
 import { progressQueryKeys } from "./useProgressData";
-import type {
-  TrackingStatsResponse,
-  HydrationStats,
-} from "@/services/api/trackingStats";
+import type { TrackingStatsResponse, HydrationStats } from "@/services/api/trackingStats";
 import {
   cancelProgressQueries,
   snapshotProgressData,
   optimisticallyUpdateProgress,
   rollbackProgressData,
-  ProgressOptimisticContext,
+  ProgressOptimisticContext
 } from "./progressOptimisticUpdates";
 
 // Period options that GoalProgressSection uses
@@ -27,20 +24,11 @@ const PERIOD_OPTIONS = [7, 30, 90] as const;
 // Query keys
 export const hydrationLogsQueryKeys = {
   all: ["hydrationLogs"] as const,
-  list: (params?: {
-    logged_date?: string;
-    goal_id?: string;
-    challenge_id?: string;
-  }) => [...hydrationLogsQueryKeys.all, "list", params] as const,
+  list: (params?: { logged_date?: string; goal_id?: string; challenge_id?: string }) =>
+    [...hydrationLogsQueryKeys.all, "list", params] as const,
   dailySummary: (date: string, goalId?: string, challengeId?: string) =>
-    [
-      ...hydrationLogsQueryKeys.all,
-      "dailySummary",
-      date,
-      goalId,
-      challengeId,
-    ] as const,
-  presets: () => [...hydrationLogsQueryKeys.all, "presets"] as const,
+    [...hydrationLogsQueryKeys.all, "dailySummary", date, goalId, challengeId] as const,
+  presets: () => [...hydrationLogsQueryKeys.all, "presets"] as const
 };
 
 /**
@@ -72,24 +60,17 @@ export function useLogHydration() {
       // Also cancel tracking stats queries for instant updates
       if (newLog.goal_id) {
         await queryClient.cancelQueries({
-          queryKey: trackingStatsQueryKeys.entity("goal", newLog.goal_id),
+          queryKey: trackingStatsQueryKeys.entity("goal", newLog.goal_id)
         });
         // Cancel progress queries for instant progress section updates
         await cancelProgressQueries(queryClient, newLog.goal_id, "goal");
       }
       if (newLog.challenge_id) {
         await queryClient.cancelQueries({
-          queryKey: trackingStatsQueryKeys.entity(
-            "challenge",
-            newLog.challenge_id,
-          ),
+          queryKey: trackingStatsQueryKeys.entity("challenge", newLog.challenge_id)
         });
         // Cancel progress queries for challenges too
-        await cancelProgressQueries(
-          queryClient,
-          newLog.challenge_id,
-          "challenge",
-        );
+        await cancelProgressQueries(queryClient, newLog.challenge_id, "challenge");
       }
 
       // Snapshot current data for potential rollback
@@ -97,41 +78,25 @@ export function useLogHydration() {
         hydrationLogsQueryKeys.list({
           logged_date: logDate,
           goal_id: newLog.goal_id,
-          challenge_id: newLog.challenge_id,
-        }),
+          challenge_id: newLog.challenge_id
+        })
       );
 
       const previousSummary = queryClient.getQueryData(
-        hydrationLogsQueryKeys.dailySummary(
-          logDate,
-          newLog.goal_id,
-          newLog.challenge_id,
-        ),
+        hydrationLogsQueryKeys.dailySummary(logDate, newLog.goal_id, newLog.challenge_id)
       );
 
       // Snapshot tracking stats for all periods (for rollback)
-      const previousTrackingStats: Map<
-        string,
-        TrackingStatsResponse | undefined
-      > = new Map();
-      const entityType = newLog.goal_id
-        ? "goal"
-        : newLog.challenge_id
-          ? "challenge"
-          : null;
+      const previousTrackingStats: Map<string, TrackingStatsResponse | undefined> = new Map();
+      const entityType = newLog.goal_id ? "goal" : newLog.challenge_id ? "challenge" : null;
       const entityId = newLog.goal_id || newLog.challenge_id;
 
       if (entityType && entityId) {
         for (const period of PERIOD_OPTIONS) {
-          const queryKey = trackingStatsQueryKeys.stats(
-            entityType,
-            entityId,
-            "hydration",
-            period,
-          );
+          const queryKey = trackingStatsQueryKeys.stats(entityType, entityId, "hydration", period);
           previousTrackingStats.set(
             `${entityType}-${entityId}-${period}`,
-            queryClient.getQueryData<TrackingStatsResponse>(queryKey),
+            queryClient.getQueryData<TrackingStatsResponse>(queryKey)
           );
         }
       }
@@ -145,7 +110,7 @@ export function useLogHydration() {
         logged_at: new Date().toISOString(),
         goal_id: newLog.goal_id,
         challenge_id: newLog.challenge_id,
-        created_at: new Date().toISOString(),
+        created_at: new Date().toISOString()
       };
 
       // Immediately add to cache
@@ -153,21 +118,17 @@ export function useLogHydration() {
         hydrationLogsQueryKeys.list({
           logged_date: logDate,
           goal_id: newLog.goal_id,
-          challenge_id: newLog.challenge_id,
+          challenge_id: newLog.challenge_id
         }),
         (old: HydrationLog[] | undefined) => {
           if (!old) return [optimisticLog];
           return [...old, optimisticLog];
-        },
+        }
       );
 
       // Optimistically update the daily summary
       queryClient.setQueryData(
-        hydrationLogsQueryKeys.dailySummary(
-          logDate,
-          newLog.goal_id,
-          newLog.challenge_id,
-        ),
+        hydrationLogsQueryKeys.dailySummary(logDate, newLog.goal_id, newLog.challenge_id),
         (old: DailyHydrationSummary | undefined) => {
           if (!old) {
             return {
@@ -176,7 +137,7 @@ export function useLogHydration() {
               log_count: 1,
               goal_id: newLog.goal_id,
               challenge_id: newLog.challenge_id,
-              progress_percentage: 0,
+              progress_percentage: 0
             };
           }
           const newTotal = old.total_amount_ml + newLog.amount_ml;
@@ -185,39 +146,29 @@ export function useLogHydration() {
             ...old,
             total_amount_ml: newTotal,
             log_count: old.log_count + 1,
-            progress_percentage: Math.min(100, (newTotal / targetMl) * 100),
+            progress_percentage: Math.min(100, (newTotal / targetMl) * 100)
           };
-        },
+        }
       );
 
       // Snapshot and optimistically update progress data (streak, week, chain)
       let previousProgressData: ProgressOptimisticContext | undefined;
       if (newLog.goal_id) {
-        previousProgressData = snapshotProgressData(
-          queryClient,
-          newLog.goal_id,
-          logDate,
-          "goal",
-        );
+        previousProgressData = snapshotProgressData(queryClient, newLog.goal_id, logDate, "goal");
         optimisticallyUpdateProgress(queryClient, newLog.goal_id, logDate);
       } else if (newLog.challenge_id) {
         previousProgressData = snapshotProgressData(
           queryClient,
           newLog.challenge_id,
           logDate,
-          "challenge",
+          "challenge"
         );
       }
 
       // Optimistically update tracking stats (HydrationProgressStats)
       if (entityType && entityId) {
         for (const period of PERIOD_OPTIONS) {
-          const queryKey = trackingStatsQueryKeys.stats(
-            entityType,
-            entityId,
-            "hydration",
-            period,
-          );
+          const queryKey = trackingStatsQueryKeys.stats(entityType, entityId, "hydration", period);
           queryClient.setQueryData<TrackingStatsResponse>(queryKey, (old) => {
             if (!old?.hydration) return old;
 
@@ -230,21 +181,12 @@ export function useLogHydration() {
             // Recalculate average (approximate - actual server will be accurate)
             const daysWithLogs =
               hydration.total_intake_ml > 0
-                ? Math.max(
-                    1,
-                    Math.ceil(
-                      hydration.total_intake_ml / hydration.avg_daily_intake_ml,
-                    ),
-                  )
+                ? Math.max(1, Math.ceil(hydration.total_intake_ml / hydration.avg_daily_intake_ml))
                 : 0;
-            const newAvgDaily =
-              daysWithLogs > 0
-                ? newTotalIntake / daysWithLogs
-                : newLog.amount_ml;
+            const newAvgDaily = daysWithLogs > 0 ? newTotalIntake / daysWithLogs : newLog.amount_ml;
 
             // Check if today just hit the target
-            const wasTargetHitToday =
-              hydration.intake_today_ml >= hydration.daily_target_ml;
+            const wasTargetHitToday = hydration.intake_today_ml >= hydration.daily_target_ml;
             const isTargetHitNow = newIntakeToday >= hydration.daily_target_ml;
             const newDaysTargetHit =
               !wasTargetHitToday && isTargetHitNow && isToday
@@ -257,13 +199,12 @@ export function useLogHydration() {
               intake_today_ml: newIntakeToday,
               avg_daily_intake_ml: Math.round(newAvgDaily),
               days_target_hit: newDaysTargetHit,
-              target_hit_percentage:
-                Math.round((newDaysTargetHit / period) * 100 * 10) / 10,
+              target_hit_percentage: Math.round((newDaysTargetHit / period) * 100 * 10) / 10
             };
 
             return {
               ...old,
-              hydration: updatedHydration,
+              hydration: updatedHydration
             };
           });
         }
@@ -278,7 +219,7 @@ export function useLogHydration() {
         logDate,
         optimisticId: optimisticLog.id,
         entityType,
-        entityId,
+        entityId
       };
     },
 
@@ -292,29 +233,21 @@ export function useLogHydration() {
             hydrationLogsQueryKeys.list({
               logged_date: logDate,
               goal_id: newLog.goal_id,
-              challenge_id: newLog.challenge_id,
+              challenge_id: newLog.challenge_id
             }),
-            context.previousLogs,
+            context.previousLogs
           );
         }
 
         if (context.previousSummary !== undefined) {
           queryClient.setQueryData(
-            hydrationLogsQueryKeys.dailySummary(
-              logDate,
-              newLog.goal_id,
-              newLog.challenge_id,
-            ),
-            context.previousSummary,
+            hydrationLogsQueryKeys.dailySummary(logDate, newLog.goal_id, newLog.challenge_id),
+            context.previousSummary
           );
         }
 
         // Rollback tracking stats
-        if (
-          context.previousTrackingStats &&
-          context.entityType &&
-          context.entityId
-        ) {
+        if (context.previousTrackingStats && context.entityType && context.entityId) {
           for (const period of PERIOD_OPTIONS) {
             const key = `${context.entityType}-${context.entityId}-${period}`;
             const previousValue = context.previousTrackingStats.get(key);
@@ -324,9 +257,9 @@ export function useLogHydration() {
                   context.entityType,
                   context.entityId,
                   "hydration",
-                  period,
+                  period
                 ),
-                previousValue,
+                previousValue
               );
             }
           }
@@ -351,14 +284,14 @@ export function useLogHydration() {
         hydrationLogsQueryKeys.list({
           logged_date: logDate,
           goal_id: variables.goal_id,
-          challenge_id: variables.challenge_id,
+          challenge_id: variables.challenge_id
         }),
         (old: HydrationLog[] | undefined) => {
           if (!old) return [realLog];
           // Filter out temp items and add real one
           const filtered = old.filter((log) => !log.id?.startsWith?.("temp-"));
           return [...filtered, realLog];
-        },
+        }
       );
 
       // Invalidate summary to get accurate server calculation
@@ -366,60 +299,57 @@ export function useLogHydration() {
         queryKey: hydrationLogsQueryKeys.dailySummary(
           logDate,
           variables.goal_id,
-          variables.challenge_id,
-        ),
+          variables.challenge_id
+        )
       });
 
       // Invalidate home dashboard for check-in auto-completion
       queryClient.invalidateQueries({
-        queryKey: homeDashboardQueryKeys.dashboard(),
+        queryKey: homeDashboardQueryKeys.dashboard()
       });
 
       // If associated with a goal or challenge, invalidate related queries
       if (realLog.goal_id) {
         queryClient.invalidateQueries({
-          queryKey: ["goals", realLog.goal_id],
+          queryKey: ["goals", realLog.goal_id]
         });
         queryClient.invalidateQueries({ queryKey: ["checkins"] });
         // Invalidate tracking stats for hydration progress display
         queryClient.invalidateQueries({
-          queryKey: trackingStatsQueryKeys.entity("goal", realLog.goal_id),
+          queryKey: trackingStatsQueryKeys.entity("goal", realLog.goal_id)
         });
         // Invalidate progress data (streak, habit chain, week progress) for instant UI update
         queryClient.invalidateQueries({
-          queryKey: progressQueryKeys.streak(realLog.goal_id),
+          queryKey: progressQueryKeys.streak(realLog.goal_id)
         });
         queryClient.invalidateQueries({
-          queryKey: progressQueryKeys.weekProgress(realLog.goal_id),
+          queryKey: progressQueryKeys.weekProgress(realLog.goal_id)
         });
         queryClient.invalidateQueries({
-          queryKey: [...progressQueryKeys.all, "chain", realLog.goal_id],
+          queryKey: [...progressQueryKeys.all, "chain", realLog.goal_id]
         });
       }
       if (realLog.challenge_id) {
         queryClient.invalidateQueries({
-          queryKey: ["challenges", realLog.challenge_id],
+          queryKey: ["challenges", realLog.challenge_id]
         });
         queryClient.invalidateQueries({ queryKey: ["challengeCheckins"] });
         // Invalidate tracking stats for hydration progress display
         queryClient.invalidateQueries({
-          queryKey: trackingStatsQueryKeys.entity(
-            "challenge",
-            realLog.challenge_id,
-          ),
+          queryKey: trackingStatsQueryKeys.entity("challenge", realLog.challenge_id)
         });
         // Invalidate progress data for challenges too
         queryClient.invalidateQueries({
-          queryKey: progressQueryKeys.streak(realLog.challenge_id),
+          queryKey: progressQueryKeys.streak(realLog.challenge_id)
         });
         queryClient.invalidateQueries({
-          queryKey: progressQueryKeys.weekProgress(realLog.challenge_id),
+          queryKey: progressQueryKeys.weekProgress(realLog.challenge_id)
         });
         queryClient.invalidateQueries({
-          queryKey: [...progressQueryKeys.all, "chain", realLog.challenge_id],
+          queryKey: [...progressQueryKeys.all, "chain", realLog.challenge_id]
         });
       }
-    },
+    }
   });
 }
 
@@ -430,19 +360,13 @@ export function useLogGlass() {
   const logHydration = useLogHydration();
 
   return useMutation({
-    mutationFn: async ({
-      goalId,
-      challengeId,
-    }: {
-      goalId?: string;
-      challengeId?: string;
-    }) => {
+    mutationFn: async ({ goalId, challengeId }: { goalId?: string; challengeId?: string }) => {
       return logHydration.mutateAsync({
         amount_ml: HYDRATION_PRESETS.glass,
         goal_id: goalId,
-        challenge_id: challengeId,
+        challenge_id: challengeId
       });
-    },
+    }
   });
 }
 
@@ -453,19 +377,13 @@ export function useLogBottle() {
   const logHydration = useLogHydration();
 
   return useMutation({
-    mutationFn: async ({
-      goalId,
-      challengeId,
-    }: {
-      goalId?: string;
-      challengeId?: string;
-    }) => {
+    mutationFn: async ({ goalId, challengeId }: { goalId?: string; challengeId?: string }) => {
       return logHydration.mutateAsync({
         amount_ml: HYDRATION_PRESETS.bottle,
         goal_id: goalId,
-        challenge_id: challengeId,
+        challenge_id: challengeId
       });
-    },
+    }
   });
 }
 
@@ -491,7 +409,7 @@ export function useHydrationLogs(params?: {
       }
       return response.data as HydrationLog[];
     },
-    enabled,
+    enabled
   });
 }
 
@@ -505,41 +423,34 @@ export function useTodaysHydrationLogs(goalId?: string, challengeId?: string) {
     logged_date: today,
     goal_id: goalId,
     challenge_id: challengeId,
-    enabled: !!(goalId || challengeId),
+    enabled: !!(goalId || challengeId)
   });
 }
 
 /**
  * Hook to get daily hydration summary
  */
-export function useDailyHydrationSummary(
-  date: string,
-  goalId?: string,
-  challengeId?: string,
-) {
+export function useDailyHydrationSummary(date: string, goalId?: string, challengeId?: string) {
   return useQuery({
     queryKey: hydrationLogsQueryKeys.dailySummary(date, goalId, challengeId),
     queryFn: async () => {
-      const response = await hydrationLogsService.getDailyHydrationSummary(
-        date,
-        { goal_id: goalId, challenge_id: challengeId },
-      );
+      const response = await hydrationLogsService.getDailyHydrationSummary(date, {
+        goal_id: goalId,
+        challenge_id: challengeId
+      });
       if (response.error) {
         throw new Error(response.error);
       }
       return response.data as DailyHydrationSummary;
     },
-    enabled: !!date,
+    enabled: !!date
   });
 }
 
 /**
  * Hook to get today's hydration summary
  */
-export function useTodaysHydrationSummary(
-  goalId?: string,
-  challengeId?: string,
-) {
+export function useTodaysHydrationSummary(goalId?: string, challengeId?: string) {
   const today = new Date().toISOString().split("T")[0];
   return useDailyHydrationSummary(today, goalId, challengeId);
 }
@@ -564,7 +475,7 @@ export function useDeleteHydrationLog() {
 
       // Get all cached hydration log lists
       const queriesData = queryClient.getQueriesData<HydrationLog[]>({
-        queryKey: hydrationLogsQueryKeys.all,
+        queryKey: hydrationLogsQueryKeys.all
       });
 
       // Find the log being deleted to update summary
@@ -579,13 +490,10 @@ export function useDeleteHydrationLog() {
       // Remove the hydration log from all cached lists
       queriesData.forEach(([queryKey, oldData]) => {
         if (Array.isArray(oldData)) {
-          queryClient.setQueryData(
-            queryKey,
-            (old: HydrationLog[] | undefined) => {
-              if (!old) return old;
-              return old.filter((log) => log.id !== logId);
-            },
-          );
+          queryClient.setQueryData(queryKey, (old: HydrationLog[] | undefined) => {
+            if (!old) return old;
+            return old.filter((log) => log.id !== logId);
+          });
         }
       });
 
@@ -593,25 +501,18 @@ export function useDeleteHydrationLog() {
       if (deletedLog) {
         const logDate = deletedLog.logged_date;
         queryClient.setQueryData(
-          hydrationLogsQueryKeys.dailySummary(
-            logDate,
-            deletedLog.goal_id,
-            deletedLog.challenge_id,
-          ),
+          hydrationLogsQueryKeys.dailySummary(logDate, deletedLog.goal_id, deletedLog.challenge_id),
           (old: DailyHydrationSummary | undefined) => {
             if (!old) return old;
-            const newTotal = Math.max(
-              0,
-              old.total_amount_ml - deletedLog!.amount_ml,
-            );
+            const newTotal = Math.max(0, old.total_amount_ml - deletedLog!.amount_ml);
             const targetMl = old.target_ml || 2000;
             return {
               ...old,
               total_amount_ml: newTotal,
               log_count: Math.max(0, old.log_count - 1),
-              progress_percentage: Math.min(100, (newTotal / targetMl) * 100),
+              progress_percentage: Math.min(100, (newTotal / targetMl) * 100)
             };
-          },
+          }
         );
       }
 
@@ -628,7 +529,7 @@ export function useDeleteHydrationLog() {
     onSuccess: () => {
       // Invalidate to ensure fresh data from server
       queryClient.invalidateQueries({ queryKey: hydrationLogsQueryKeys.all });
-    },
+    }
   });
 }
 

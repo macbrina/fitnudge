@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Dimensions,
-  ActivityIndicator,
+  ActivityIndicator
 } from "react-native";
 import Video, { ResizeMode } from "react-native-video";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -41,7 +41,7 @@ export function ExerciseDetailModal({
   visible,
   exerciseId,
   exerciseData,
-  onClose,
+  onClose
 }: ExerciseDetailModalProps) {
   const styles = useStyles(makeExerciseDetailModalStyles);
   const { colors, brandColors } = useTheme();
@@ -54,7 +54,7 @@ export function ExerciseDetailModal({
   const {
     data: exercise,
     isLoading,
-    error,
+    error
   } = useExerciseDetails(exerciseId, visible && !!exerciseId);
 
   // Reset video state when modal opens with new exercise
@@ -100,21 +100,13 @@ export function ExerciseDetailModal({
         borderRadius={toRN(tokens.borderRadius.md)}
         style={{ marginBottom: toRN(tokens.spacing[4]) }}
       />
-      <SkeletonBox
-        width="100%"
-        height={100}
-        borderRadius={toRN(tokens.borderRadius.lg)}
-      />
+      <SkeletonBox width="100%" height={100} borderRadius={toRN(tokens.borderRadius.lg)} />
     </View>
   );
 
   const renderErrorState = () => (
     <View style={styles.errorContainer}>
-      <Ionicons
-        name="alert-circle-outline"
-        size={48}
-        color={colors.text.tertiary}
-      />
+      <Ionicons name="alert-circle-outline" size={48} color={colors.text.tertiary} />
       <Text style={styles.errorText}>{t("exercises.error_loading")}</Text>
       <TouchableOpacity style={styles.retryButton} onPress={onClose}>
         <Text style={styles.retryButtonText}>{t("common.close")}</Text>
@@ -130,7 +122,7 @@ export function ExerciseDetailModal({
         style={styles.scrollView}
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingBottom: insets.bottom + toRN(tokens.spacing[4]) },
+          { paddingBottom: insets.bottom + toRN(tokens.spacing[4]) }
         ]}
         showsVerticalScrollIndicator={false}
       >
@@ -141,9 +133,7 @@ export function ExerciseDetailModal({
               {!videoLoaded && (
                 <View style={styles.videoLoadingContainer}>
                   <ActivityIndicator size="large" color={brandColors.primary} />
-                  <Text style={styles.videoLoadingText}>
-                    {t("exercises.loading_demo")}
-                  </Text>
+                  <Text style={styles.videoLoadingText}>{t("exercises.loading_demo")}</Text>
                 </View>
               )}
               <Video
@@ -163,14 +153,8 @@ export function ExerciseDetailModal({
             </View>
           ) : (
             <View style={styles.noVideoContainer}>
-              <Ionicons
-                name="barbell-outline"
-                size={48}
-                color={colors.text.tertiary}
-              />
-              <Text style={styles.noVideoText}>
-                {t("exercises.no_demo_available")}
-              </Text>
+              <Ionicons name="barbell-outline" size={48} color={colors.text.tertiary} />
+              <Text style={styles.noVideoText}>{t("exercises.no_demo_available")}</Text>
             </View>
           )}
         </View>
@@ -186,32 +170,20 @@ export function ExerciseDetailModal({
             <View style={styles.workoutInfoCard}>
               {exerciseData.sets && (
                 <View style={styles.workoutInfoItem}>
-                  <Text style={styles.workoutInfoValue}>
-                    {exerciseData.sets}
-                  </Text>
-                  <Text style={styles.workoutInfoLabel}>
-                    {t("workout.sets")}
-                  </Text>
+                  <Text style={styles.workoutInfoValue}>{exerciseData.sets}</Text>
+                  <Text style={styles.workoutInfoLabel}>{t("workout.sets")}</Text>
                 </View>
               )}
               {exerciseData.reps && (
                 <View style={styles.workoutInfoItem}>
-                  <Text style={styles.workoutInfoValue}>
-                    {exerciseData.reps}
-                  </Text>
-                  <Text style={styles.workoutInfoLabel}>
-                    {t("workout.reps")}
-                  </Text>
+                  <Text style={styles.workoutInfoValue}>{exerciseData.reps}</Text>
+                  <Text style={styles.workoutInfoLabel}>{t("workout.reps")}</Text>
                 </View>
               )}
               {exerciseData.work_duration_seconds && (
                 <View style={styles.workoutInfoItem}>
-                  <Text style={styles.workoutInfoValue}>
-                    {exerciseData.work_duration_seconds}s
-                  </Text>
-                  <Text style={styles.workoutInfoLabel}>
-                    {t("workout.work")}
-                  </Text>
+                  <Text style={styles.workoutInfoValue}>{exerciseData.work_duration_seconds}s</Text>
+                  <Text style={styles.workoutInfoLabel}>{t("workout.work")}</Text>
                 </View>
               )}
               {exerciseData.rest_between_sets_seconds && (
@@ -219,9 +191,7 @@ export function ExerciseDetailModal({
                   <Text style={styles.workoutInfoValue}>
                     {exerciseData.rest_between_sets_seconds}s
                   </Text>
-                  <Text style={styles.workoutInfoLabel}>
-                    {t("workout.rest")}
-                  </Text>
+                  <Text style={styles.workoutInfoLabel}>{t("workout.rest")}</Text>
                 </View>
               )}
             </View>
@@ -239,11 +209,7 @@ export function ExerciseDetailModal({
           )}
           {exercise.equipment && (
             <View style={styles.chip}>
-              <Ionicons
-                name="barbell-outline"
-                size={14}
-                color={colors.text.secondary}
-              />
+              <Ionicons name="barbell-outline" size={14} color={colors.text.secondary} />
               <Text style={styles.chipText}>{exercise.equipment}</Text>
             </View>
           )}
@@ -252,18 +218,12 @@ export function ExerciseDetailModal({
               style={[
                 styles.chip,
                 {
-                  backgroundColor:
-                    getDifficultyColor(exercise.difficulty) + "15",
-                  borderColor: getDifficultyColor(exercise.difficulty) + "30",
-                },
+                  backgroundColor: getDifficultyColor(exercise.difficulty) + "15",
+                  borderColor: getDifficultyColor(exercise.difficulty) + "30"
+                }
               ]}
             >
-              <Text
-                style={[
-                  styles.chipText,
-                  { color: getDifficultyColor(exercise.difficulty) },
-                ]}
-              >
+              <Text style={[styles.chipText, { color: getDifficultyColor(exercise.difficulty) }]}>
                 {exercise.difficulty}
               </Text>
             </View>
@@ -274,11 +234,7 @@ export function ExerciseDetailModal({
         <View style={styles.infoSection}>
           <View style={styles.infoRow}>
             <View style={styles.infoItem}>
-              <Ionicons
-                name="body-outline"
-                size={18}
-                color={colors.text.tertiary}
-              />
+              <Ionicons name="body-outline" size={18} color={colors.text.tertiary} />
               <View>
                 <Text style={styles.infoLabel}>{t("exercises.body_part")}</Text>
                 <Text style={styles.infoValue}>
@@ -287,11 +243,7 @@ export function ExerciseDetailModal({
               </View>
             </View>
             <View style={styles.infoItem}>
-              <Ionicons
-                name="albums-outline"
-                size={18}
-                color={colors.text.tertiary}
-              />
+              <Ionicons name="albums-outline" size={18} color={colors.text.tertiary} />
               <View>
                 <Text style={styles.infoLabel}>{t("exercises.category")}</Text>
                 <Text style={styles.infoValue}>
@@ -305,9 +257,7 @@ export function ExerciseDetailModal({
         {/* Description */}
         {exercise.description && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
-              {t("exercises.description")}
-            </Text>
+            <Text style={styles.sectionTitle}>{t("exercises.description")}</Text>
             <Text style={styles.descriptionText}>{exercise.description}</Text>
           </View>
         )}
@@ -315,16 +265,12 @@ export function ExerciseDetailModal({
         {/* Instructions */}
         {exercise.instructions && exercise.instructions.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
-              {t("exercises.how_to_perform")}
-            </Text>
+            <Text style={styles.sectionTitle}>{t("exercises.how_to_perform")}</Text>
             <View style={styles.instructionsList}>
               {exercise.instructions.map((instruction, index) => (
                 <View key={index} style={styles.instructionItem}>
                   <View style={styles.instructionNumber}>
-                    <Text style={styles.instructionNumberText}>
-                      {index + 1}
-                    </Text>
+                    <Text style={styles.instructionNumberText}>{index + 1}</Text>
                   </View>
                   <Text style={styles.instructionText}>{instruction}</Text>
                 </View>
@@ -334,21 +280,18 @@ export function ExerciseDetailModal({
         )}
 
         {/* Secondary Muscles */}
-        {exercise.secondary_muscles &&
-          exercise.secondary_muscles.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>
-                {t("exercises.also_works")}
-              </Text>
-              <View style={styles.secondaryMusclesRow}>
-                {exercise.secondary_muscles.map((muscle, index) => (
-                  <View key={index} style={styles.secondaryMuscleChip}>
-                    <Text style={styles.secondaryMuscleText}>{muscle}</Text>
-                  </View>
-                ))}
-              </View>
+        {exercise.secondary_muscles && exercise.secondary_muscles.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>{t("exercises.also_works")}</Text>
+            <View style={styles.secondaryMusclesRow}>
+              {exercise.secondary_muscles.map((muscle, index) => (
+                <View key={index} style={styles.secondaryMuscleChip}>
+                  <Text style={styles.secondaryMuscleText}>{muscle}</Text>
+                </View>
+              ))}
             </View>
-          )}
+          </View>
+        )}
 
         {/* Focus Cues - from plan data */}
         {exerciseData?.focus_cues && exerciseData.focus_cues.length > 0 && (
@@ -358,11 +301,7 @@ export function ExerciseDetailModal({
               {exerciseData.focus_cues.map((cue, index) => (
                 <View key={index} style={styles.focusCueItem}>
                   <View style={styles.focusCueIcon}>
-                    <Ionicons
-                      name="checkmark-circle"
-                      size={18}
-                      color={colors.feedback.success}
-                    />
+                    <Ionicons name="checkmark-circle" size={18} color={colors.feedback.success} />
                   </View>
                   <Text style={styles.focusCueText}>{cue}</Text>
                 </View>
@@ -406,14 +345,10 @@ export function ExerciseDetailModal({
   );
 }
 
-const makeExerciseDetailModalStyles = (
-  tokens: any,
-  colors: any,
-  brand: any,
-) => ({
+const makeExerciseDetailModalStyles = (tokens: any, colors: any, brand: any) => ({
   container: {
     flex: 1,
-    backgroundColor: colors.bg.canvas,
+    backgroundColor: colors.bg.canvas
   },
   header: {
     flexDirection: "row" as const,
@@ -422,7 +357,7 @@ const makeExerciseDetailModalStyles = (
     paddingHorizontal: toRN(tokens.spacing[4]),
     paddingVertical: toRN(tokens.spacing[3]),
     borderBottomWidth: 1,
-    borderBottomColor: colors.border.subtle,
+    borderBottomColor: colors.border.subtle
   },
   closeButton: {
     width: toRN(40),
@@ -430,7 +365,7 @@ const makeExerciseDetailModalStyles = (
     borderRadius: toRN(tokens.borderRadius.full),
     backgroundColor: colors.bg.muted,
     alignItems: "center" as const,
-    justifyContent: "center" as const,
+    justifyContent: "center" as const
   },
   headerTitle: {
     flex: 1,
@@ -438,24 +373,24 @@ const makeExerciseDetailModalStyles = (
     fontFamily: fontFamily.semiBold,
     color: colors.text.primary,
     textAlign: "center" as const,
-    marginHorizontal: toRN(tokens.spacing[3]),
+    marginHorizontal: toRN(tokens.spacing[3])
   },
   headerSpacer: {
-    width: toRN(40),
+    width: toRN(40)
   },
   content: {
     flex: 1,
-    padding: toRN(tokens.spacing[4]),
+    padding: toRN(tokens.spacing[4])
   },
   scrollView: {
-    flex: 1,
+    flex: 1
   },
   scrollContent: {
-    padding: toRN(tokens.spacing[4]),
+    padding: toRN(tokens.spacing[4])
   },
   // Video Section
   videoSection: {
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   videoContainer: {
     width: "100%",
@@ -463,7 +398,7 @@ const makeExerciseDetailModalStyles = (
     borderRadius: toRN(tokens.borderRadius.xl),
     backgroundColor: colors.bg.muted,
     overflow: "hidden" as const,
-    position: "relative" as const,
+    position: "relative" as const
   },
   videoLoadingContainer: {
     position: "absolute" as const,
@@ -473,20 +408,20 @@ const makeExerciseDetailModalStyles = (
     bottom: 0,
     alignItems: "center" as const,
     justifyContent: "center" as const,
-    zIndex: 1,
+    zIndex: 1
   },
   videoLoadingText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
     color: colors.text.tertiary,
-    marginTop: toRN(tokens.spacing[2]),
+    marginTop: toRN(tokens.spacing[2])
   },
   video: {
     width: "100%",
-    height: "100%",
+    height: "100%"
   },
   videoHidden: {
-    opacity: 0,
+    opacity: 0
   },
   noVideoContainer: {
     width: "100%",
@@ -495,12 +430,12 @@ const makeExerciseDetailModalStyles = (
     backgroundColor: colors.bg.muted,
     alignItems: "center" as const,
     justifyContent: "center" as const,
-    gap: toRN(tokens.spacing[2]),
+    gap: toRN(tokens.spacing[2])
   },
   noVideoText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   // Exercise Name
   exerciseName: {
@@ -508,7 +443,7 @@ const makeExerciseDetailModalStyles = (
     fontFamily: fontFamily.bold,
     color: colors.text.primary,
     textTransform: "capitalize" as const,
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   // Workout Info Card
   workoutInfoCard: {
@@ -519,29 +454,29 @@ const makeExerciseDetailModalStyles = (
     padding: toRN(tokens.spacing[4]),
     marginBottom: toRN(tokens.spacing[4]),
     borderWidth: 1,
-    borderColor: brand.primary + "20",
+    borderColor: brand.primary + "20"
   },
   workoutInfoItem: {
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   workoutInfoValue: {
     fontSize: toRN(tokens.typography.fontSize.xl),
     fontFamily: fontFamily.bold,
-    color: brand.primary,
+    color: brand.primary
   },
   workoutInfoLabel: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.medium,
     color: colors.text.secondary,
     textTransform: "uppercase" as const,
-    marginTop: 2,
+    marginTop: 2
   },
   // Chips
   chipsRow: {
     flexDirection: "row" as const,
     flexWrap: "wrap" as const,
     gap: toRN(tokens.spacing[2]),
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   chip: {
     flexDirection: "row" as const,
@@ -552,17 +487,17 @@ const makeExerciseDetailModalStyles = (
     borderRadius: toRN(tokens.borderRadius.full),
     backgroundColor: colors.bg.muted,
     borderWidth: 1,
-    borderColor: colors.border.subtle,
+    borderColor: colors.border.subtle
   },
   primaryChip: {
     backgroundColor: brand.primary + "15",
-    borderColor: brand.primary + "30",
+    borderColor: brand.primary + "30"
   },
   chipText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
     color: colors.text.secondary,
-    textTransform: "capitalize" as const,
+    textTransform: "capitalize" as const
   },
   // Info Section
   infoSection: {
@@ -571,17 +506,17 @@ const makeExerciseDetailModalStyles = (
     padding: toRN(tokens.spacing[4]),
     marginBottom: toRN(tokens.spacing[4]),
     borderWidth: 1,
-    borderColor: colors.border.subtle,
+    borderColor: colors.border.subtle
   },
   infoRow: {
     flexDirection: "row" as const,
-    justifyContent: "space-between" as const,
+    justifyContent: "space-between" as const
   },
   infoItem: {
     flex: 1,
     flexDirection: "row" as const,
     alignItems: "flex-start" as const,
-    gap: toRN(tokens.spacing[2]),
+    gap: toRN(tokens.spacing[2])
   },
   infoLabel: {
     fontSize: toRN(tokens.typography.fontSize.xs),
@@ -589,38 +524,38 @@ const makeExerciseDetailModalStyles = (
     color: colors.text.tertiary,
     textTransform: "uppercase" as const,
     letterSpacing: 0.5,
-    marginBottom: 2,
+    marginBottom: 2
   },
   infoValue: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.semiBold,
     color: colors.text.primary,
-    textTransform: "capitalize" as const,
+    textTransform: "capitalize" as const
   },
   // Sections
   section: {
-    marginBottom: toRN(tokens.spacing[5]),
+    marginBottom: toRN(tokens.spacing[5])
   },
   sectionTitle: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.bold,
     color: colors.text.primary,
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   descriptionText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
     color: colors.text.secondary,
-    lineHeight: toRN(tokens.typography.fontSize.sm) * 1.6,
+    lineHeight: toRN(tokens.typography.fontSize.sm) * 1.6
   },
   // Instructions
   instructionsList: {
-    gap: toRN(tokens.spacing[3]),
+    gap: toRN(tokens.spacing[3])
   },
   instructionItem: {
     flexDirection: "row" as const,
     alignItems: "flex-start" as const,
-    gap: toRN(tokens.spacing[3]),
+    gap: toRN(tokens.spacing[3])
   },
   instructionNumber: {
     width: toRN(28),
@@ -629,56 +564,56 @@ const makeExerciseDetailModalStyles = (
     backgroundColor: brand.primary + "15",
     alignItems: "center" as const,
     justifyContent: "center" as const,
-    flexShrink: 0,
+    flexShrink: 0
   },
   instructionNumberText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.bold,
-    color: brand.primary,
+    color: brand.primary
   },
   instructionText: {
     flex: 1,
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
     color: colors.text.secondary,
-    lineHeight: toRN(tokens.typography.fontSize.sm) * 1.5,
+    lineHeight: toRN(tokens.typography.fontSize.sm) * 1.5
   },
   // Secondary Muscles
   secondaryMusclesRow: {
     flexDirection: "row" as const,
     flexWrap: "wrap" as const,
-    gap: toRN(tokens.spacing[2]),
+    gap: toRN(tokens.spacing[2])
   },
   secondaryMuscleChip: {
     paddingVertical: toRN(tokens.spacing[1]),
     paddingHorizontal: toRN(tokens.spacing[2.5]),
     borderRadius: toRN(tokens.borderRadius.md),
-    backgroundColor: colors.bg.muted,
+    backgroundColor: colors.bg.muted
   },
   secondaryMuscleText: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.medium,
     color: colors.text.secondary,
-    textTransform: "capitalize" as const,
+    textTransform: "capitalize" as const
   },
   // Focus Cues
   focusCuesList: {
-    gap: toRN(tokens.spacing[2]),
+    gap: toRN(tokens.spacing[2])
   },
   focusCueItem: {
     flexDirection: "row" as const,
     alignItems: "flex-start" as const,
-    gap: toRN(tokens.spacing[2]),
+    gap: toRN(tokens.spacing[2])
   },
   focusCueIcon: {
-    marginTop: 2,
+    marginTop: 2
   },
   focusCueText: {
     flex: 1,
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
     color: colors.text.secondary,
-    lineHeight: toRN(tokens.typography.fontSize.sm) * 1.5,
+    lineHeight: toRN(tokens.typography.fontSize.sm) * 1.5
   },
   // Error State
   errorContainer: {
@@ -686,23 +621,23 @@ const makeExerciseDetailModalStyles = (
     alignItems: "center" as const,
     justifyContent: "center" as const,
     gap: toRN(tokens.spacing[3]),
-    padding: toRN(tokens.spacing[6]),
+    padding: toRN(tokens.spacing[6])
   },
   errorText: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.medium,
     color: colors.text.tertiary,
-    textAlign: "center" as const,
+    textAlign: "center" as const
   },
   retryButton: {
     paddingVertical: toRN(tokens.spacing[2]),
     paddingHorizontal: toRN(tokens.spacing[4]),
     borderRadius: toRN(tokens.borderRadius.md),
-    backgroundColor: colors.bg.muted,
+    backgroundColor: colors.bg.muted
   },
   retryButtonText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.semiBold,
-    color: colors.text.primary,
-  },
+    color: colors.text.primary
+  }
 });

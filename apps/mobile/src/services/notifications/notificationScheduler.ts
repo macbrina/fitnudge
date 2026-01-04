@@ -1,9 +1,5 @@
 import { notificationService } from "./notificationService";
-import {
-  NotificationCategory,
-  NotificationData,
-  ScheduledNotification,
-} from "./notificationTypes";
+import { NotificationCategory, NotificationData, ScheduledNotification } from "./notificationTypes";
 
 /**
  * NotificationScheduler
@@ -35,16 +31,13 @@ class NotificationScheduler {
   public async cancelGoalNotifications(goalId: string): Promise<void> {
     try {
       // Get all scheduled notifications
-      const allNotifications =
-        await notificationService.getScheduledNotifications();
+      const allNotifications = await notificationService.getScheduledNotifications();
 
       // Cancel notifications related to this goal
       for (const notif of allNotifications) {
         const data = notif.content.data as NotificationData;
         if (data?.goalId === goalId) {
-          await notificationService.cancelScheduledNotification(
-            notif.identifier,
-          );
+          await notificationService.cancelScheduledNotification(notif.identifier);
         }
       }
 
@@ -73,15 +66,14 @@ class NotificationScheduler {
    */
   public async getScheduledNotifications(): Promise<ScheduledNotification[]> {
     try {
-      const notifications =
-        await notificationService.getScheduledNotifications();
+      const notifications = await notificationService.getScheduledNotifications();
       return notifications.map((notif) => ({
         id: notif.identifier,
         title: notif.content.title || "",
         body: notif.content.body || "",
         data: notif.content.data as NotificationData,
         trigger: notif.trigger as any,
-        category: notif.content.categoryIdentifier as NotificationCategory,
+        category: notif.content.categoryIdentifier as NotificationCategory
       }));
     } catch (error) {
       console.error("Failed to get scheduled notifications:", error);

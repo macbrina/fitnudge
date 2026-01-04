@@ -78,9 +78,6 @@ class PostCreate(BaseModel):
 
 **Access Control**:
 
-- **Free Users**: Cannot create voice posts
-- **Pro/Elite Users**: Can create voice posts
-
 **Implementation**:
 
 - Checks user's plan before allowing voice post creation

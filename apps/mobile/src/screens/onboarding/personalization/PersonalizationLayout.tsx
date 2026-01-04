@@ -29,7 +29,7 @@ export default function PersonalizationLayout({
   canContinue,
   isLoading = false,
   buttonText,
-  title,
+  title
 }: PersonalizationLayoutProps) {
   const { t } = useTranslation();
   const styles = useStyles(makePersonalizationLayoutStyles);
@@ -53,7 +53,7 @@ export default function PersonalizationLayout({
                 styles.progressSegment,
                 step <= currentStep && styles.progressSegmentActive,
                 index === 0 && styles.progressSegmentFirst,
-                index === segments.length - 1 && styles.progressSegmentLast,
+                index === segments.length - 1 && styles.progressSegmentLast
               ]}
             />
           ))}
@@ -93,62 +93,58 @@ export default function PersonalizationLayout({
   );
 }
 
-const makePersonalizationLayoutStyles = (
-  tokens: any,
-  colors: any,
-  brand: any,
-) => {
+const makePersonalizationLayoutStyles = (tokens: any, colors: any, brand: any) => {
   return {
     container: {
       flex: 1,
-      backgroundColor: colors.bg.canvas,
+      backgroundColor: colors.bg.canvas
     },
     header: {
       paddingHorizontal: toRN(tokens.spacing[6]),
       paddingTop: toRN(tokens.spacing[2]),
-      paddingBottom: toRN(tokens.spacing[4]),
+      paddingBottom: toRN(tokens.spacing[4])
     },
     headerTitle: {
       fontSize: toRN(tokens.typography.fontSize.base),
       color: colors.text.secondary,
       fontFamily: fontFamily.groteskMedium,
       textAlign: "center" as const,
-      marginBottom: toRN(tokens.spacing[3]),
+      marginBottom: toRN(tokens.spacing[3])
     },
     progressContainer: {
       flexDirection: "row" as const,
       gap: toRN(tokens.spacing[1]),
-      width: "100%",
+      width: "100%"
     },
     progressSegment: {
       flex: 1,
       height: 4,
-      backgroundColor: colors.bg.secondary,
+      backgroundColor: colors.bg.secondary
     },
     progressSegmentActive: {
-      backgroundColor: brand.primary,
+      backgroundColor: brand.primary
     },
     progressSegmentFirst: {
       borderTopLeftRadius: 2,
-      borderBottomLeftRadius: 2,
+      borderBottomLeftRadius: 2
     },
     progressSegmentLast: {
       borderTopRightRadius: 2,
-      borderBottomRightRadius: 2,
+      borderBottomRightRadius: 2
     },
     content: {
-      flex: 1,
+      flex: 1
     },
     contentContainer: {
       flexGrow: 1,
-      paddingHorizontal: toRN(tokens.spacing[6]),
+      paddingHorizontal: toRN(tokens.spacing[6])
     },
     footer: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
       paddingHorizontal: toRN(tokens.spacing[6]),
       paddingBottom: toRN(tokens.spacing[4]),
-      gap: toRN(tokens.spacing[3]),
+      gap: toRN(tokens.spacing[3])
     },
     backButton: {
       width: 48,
@@ -156,13 +152,13 @@ const makePersonalizationLayoutStyles = (
       borderRadius: 24,
       backgroundColor: colors.bg.muted,
       alignItems: "center" as const,
-      justifyContent: "center" as const,
+      justifyContent: "center" as const
     },
     backButtonPlaceholder: {
-      width: 0,
+      width: 0
     },
     continueButtonContainer: {
-      flex: 1,
-    },
+      flex: 1
+    }
   };
 };

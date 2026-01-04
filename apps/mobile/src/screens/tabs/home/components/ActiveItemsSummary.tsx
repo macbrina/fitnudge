@@ -23,10 +23,7 @@ interface ActiveItemsSummaryProps {
  * ActiveItemsSummary - Shows a summary card of active goals, challenges, and group goals
  * with a "View All" CTA to navigate to the Goals screen.
  */
-export function ActiveItemsSummary({
-  items,
-  isLoading,
-}: ActiveItemsSummaryProps) {
+export function ActiveItemsSummary({ items, isLoading }: ActiveItemsSummaryProps) {
   const styles = useStyles(makeActiveItemsSummaryStyles);
   const { colors, brandColors } = useTheme();
   const { t } = useTranslation();
@@ -67,17 +64,9 @@ export function ActiveItemsSummary({
       <View style={styles.container}>
         <Card shadow="sm" style={styles.card}>
           <View style={styles.header}>
-            <SkeletonBox
-              width={40}
-              height={40}
-              borderRadius={toRN(tokens.borderRadius.lg)}
-            />
+            <SkeletonBox width={40} height={40} borderRadius={toRN(tokens.borderRadius.lg)} />
             <View style={styles.headerText}>
-              <SkeletonBox
-                width="60%"
-                height={20}
-                borderRadius={toRN(tokens.borderRadius.sm)}
-              />
+              <SkeletonBox width="60%" height={20} borderRadius={toRN(tokens.borderRadius.sm)} />
               <SkeletonBox
                 width="40%"
                 height={14}
@@ -111,16 +100,12 @@ export function ActiveItemsSummary({
               />
             </View>
             <Text style={styles.emptyTitle}>{t("home.no_items_title")}</Text>
-            <Text style={styles.emptyMessage}>
-              {t("home.no_items_message")}
-            </Text>
+            <Text style={styles.emptyMessage}>{t("home.no_items_message")}</Text>
             <Button
               variant="primary"
               size="sm"
               onPress={handleCreate}
-              title={
-                hasAnyGoals ? t("home.create_goal") : t("home.get_started")
-              }
+              title={hasAnyGoals ? t("home.create_goal") : t("home.get_started")}
               leftIcon="add"
             />
           </View>
@@ -183,20 +168,16 @@ export function ActiveItemsSummary({
   );
 }
 
-const makeActiveItemsSummaryStyles = (
-  tokens: any,
-  colors: any,
-  brand: any,
-) => ({
+const makeActiveItemsSummaryStyles = (tokens: any, colors: any, brand: any) => ({
   container: {
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   card: {
-    padding: toRN(tokens.spacing[4]),
+    padding: toRN(tokens.spacing[4])
   },
   header: {
     flexDirection: "row" as const,
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   iconContainer: {
     width: toRN(tokens.spacing[12]),
@@ -205,21 +186,21 @@ const makeActiveItemsSummaryStyles = (
     backgroundColor: brand.primary + "15",
     justifyContent: "center" as const,
     alignItems: "center" as const,
-    marginRight: toRN(tokens.spacing[3]),
+    marginRight: toRN(tokens.spacing[3])
   },
   headerText: {
-    flex: 1,
+    flex: 1
   },
   title: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.bold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   preview: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
     color: colors.text.secondary,
-    marginTop: toRN(tokens.spacing[0.5]),
+    marginTop: toRN(tokens.spacing[0.5])
   },
   badgesContainer: {
     flexDirection: "row" as const,
@@ -228,7 +209,7 @@ const makeActiveItemsSummaryStyles = (
     marginTop: toRN(tokens.spacing[3]),
     paddingTop: toRN(tokens.spacing[3]),
     borderTopWidth: 1,
-    borderTopColor: colors.border.default,
+    borderTopColor: colors.border.default
   },
   badge: {
     flexDirection: "row" as const,
@@ -237,20 +218,20 @@ const makeActiveItemsSummaryStyles = (
     backgroundColor: colors.bg.muted,
     paddingVertical: toRN(tokens.spacing[2]),
     paddingHorizontal: toRN(tokens.spacing[3]),
-    borderRadius: toRN(tokens.borderRadius.full),
+    borderRadius: toRN(tokens.borderRadius.full)
   },
   badgeIcon: {
     fontSize: toRN(tokens.typography.fontSize.sm),
-    marginRight: toRN(tokens.spacing[1]),
+    marginRight: toRN(tokens.spacing[1])
   },
   badgeText: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.medium,
-    color: colors.text.secondary,
+    color: colors.text.secondary
   },
   emptyContent: {
     alignItems: "center" as const,
-    paddingVertical: toRN(tokens.spacing[4]),
+    paddingVertical: toRN(tokens.spacing[4])
   },
   emptyIconContainer: {
     width: toRN(tokens.spacing[16]),
@@ -259,23 +240,23 @@ const makeActiveItemsSummaryStyles = (
     backgroundColor: colors.bg.muted,
     justifyContent: "center" as const,
     alignItems: "center" as const,
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   emptyIcon: {
-    fontSize: toRN(tokens.typography.fontSize["3xl"]),
+    fontSize: toRN(tokens.typography.fontSize["3xl"])
   },
   emptyTitle: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.bold,
     color: colors.text.primary,
-    marginBottom: toRN(tokens.spacing[1]),
+    marginBottom: toRN(tokens.spacing[1])
   },
   emptyMessage: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
     color: colors.text.secondary,
     textAlign: "center" as const,
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   createButton: {
     flexDirection: "row" as const,
@@ -284,11 +265,11 @@ const makeActiveItemsSummaryStyles = (
     paddingVertical: toRN(tokens.spacing[2.5]),
     paddingHorizontal: toRN(tokens.spacing[4]),
     borderRadius: toRN(tokens.borderRadius.full),
-    gap: toRN(tokens.spacing[1]),
+    gap: toRN(tokens.spacing[1])
   },
   createButtonText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.semiBold,
-    color: brand.onPrimary,
-  },
+    color: brand.onPrimary
+  }
 });

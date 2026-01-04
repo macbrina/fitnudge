@@ -22,7 +22,7 @@ The MVP focuses on a **minimal, mobile-first**, emotionally engaging experience 
 | **Progress Tracker**             | Weekly streaks and summary cards (e.g., "You worked out 4/7 days!").                                  | Free          |
 | **Social Feed (Combined)**       | AI motivation + community text/voice posts in unified feed.                                           | Free          |
 | **Text Post Creation**           | Share progress, thoughts, achievements publicly.                                                      | Free          |
-| **Voice Post Creation**          | Record and share voice motivation (Pro/Elite feature).                                                | Paid          |
+| **Voice Post Creation**          | Record and share voice motivation (Premium feature).                                                  | Premium       |
 | **Like & Cheer System**          | React to posts with encouragement and support.                                                        | Free          |
 | **Comments on Posts**            | Reply and engage in discussions on community posts.                                                   | Free          |
 | **User Profiles**                | View other users' profiles with their activity and stats.                                             | Free          |
@@ -48,7 +48,7 @@ The MVP focuses on a **minimal, mobile-first**, emotionally engaging experience 
 | ----------------------------------- | -------------------------------------------------------------------------------------------- | --------- |
 | **AI Voice Messages**               | Generate short pep-talk voice notes via ElevenLabs.                                          | Paid      |
 | **Integration with Fitness APIs**   | Pull activity data from Apple Health, Fitbit, Strava.                                        | Paid      |
-| **AI Progress Reflections**         | Premium deep AI coach summaries with actionable insights (enhanced version of weekly recap). | Pro/Elite |
+| **AI Progress Reflections**         | Premium deep AI coach summaries with actionable insights (enhanced version of weekly recap). | Premium   |
 | **Reminders via Multiple Channels** | Telegram, WhatsApp, or Email check-ins.                                                      | Paid      |
 | **Direct Messaging**                | Private one-on-one conversations between users.                                              | Free      |
 | **Custom Routine Templates**        | Choose predefined training templates.                                                        | Paid      |
@@ -216,7 +216,7 @@ api/
 **Key Tables:**
 
 - `users` — basic profile, subscription tier, preferences.
-- `goals` — each user's fitness target (1 per Free user, multiple for Starter/Pro/Elite).
+- `goals` — each user's fitness target (1 per Free user, unlimited for Premium).
 - `check_ins` — daily progress (date, success, reflection, mood, photo_urls).
 - `motivations` — AI-generated messages per goal.
 - `posts` — social wall content (text, voice, created_at).
@@ -414,20 +414,20 @@ Calm: “Remember why you started—today’s effort is tomorrow’s reward.”
 
 ## 🧾 Feature Access Table (Free vs Paid Summary)
 
-| Category              | Free                                   | Paid                                              |
-| --------------------- | -------------------------------------- | ------------------------------------------------- |
-| Goal creation         | 1 goal                                 | Multiple goals (Starter: 3, Pro/Elite: unlimited) |
-| Motivation messages   | Text only                              | Voice + text (Pro/Elite)                          |
-| Personality tone      | Default                                | Custom reminder messages                          |
-| Analytics             | Basic streak, habit chains             | Advanced insights, AI reflections (Pro/Elite)     |
-| Notifications         | Single daily                           | Multiple / adaptive                               |
-| Social wall           | Text + Voice posts (Voice = Pro/Elite) | Comments, following, filters                      |
-| Social Accountability | Share goals, partners, group goals     | Full accountability features                      |
-| Meal Tracking         | Log meals with nutritional data        | Daily nutrition summaries                         |
-| Progress Tracking     | Streaks, photos, achievements          | Weekly recaps (all plans)                         |
-| Challenges            | Join and participate in challenges     | Create challenges, leaderboards                   |
-| Integrations          | —                                      | Fitbit, Apple Health (Paid)                       |
-| Memory AI             | —                                      | Personalized recall (Future)                      |
+| Category              | Free                                   | Premium                                              |
+| --------------------- | -------------------------------------- | ---------------------------------------------------- |
+| Goal creation         | 1 goal                                 | Unlimited goals                                      |
+| Motivation messages   | Text only (limited)                    | Unlimited text + AI Chat Motivation                  |
+| Personality tone      | Default                                | Custom reminder messages                             |
+| Analytics             | Basic streak, habit chains             | Advanced insights, AI reflections                    |
+| Notifications         | Single daily                           | Multiple / adaptive                                  |
+| Social wall           | Text posts                             | Comments, following, filters, all social features    |
+| Social Accountability | Limited                                | Full accountability partners, group goals            |
+| Meal Tracking         | Log meals with nutritional data        | Daily nutrition summaries, analytics                 |
+| Progress Tracking     | Streaks, photos, achievements          | Weekly recaps, AI insights                           |
+| Challenges            | Join 1 challenge                       | Create challenges, unlimited joins, leaderboards     |
+| Integrations          | —                                      | Fitbit, Apple Health (Coming Soon)                   |
+| Memory AI             | —                                      | Personalized recall, AI memory                       |
 
 ---
 
@@ -566,13 +566,12 @@ Calm: “Remember why you started—today’s effort is tomorrow’s reward.”
 
 ### 💰 Pricing Tiers
 
-**Subscription Plans:**
+**Subscription Plans (2-Tier System):**
 
-| Plan      | Price       | Features                                                     |
-| --------- | ----------- | ------------------------------------------------------------ |
-| **Free**  | $0/month    | 1 goal, text motivation, basic tracking                      |
-| **Pro**   | $4.99/month | Multiple goals, voice messages, analytics, social features   |
-| **Elite** | $9.99/month | All Pro features + AI memory, integrations, priority support |
+| Plan        | Price                          | Features                                              |
+| ----------- | ------------------------------ | ----------------------------------------------------- |
+| **Free**    | $0                             | 1 goal, limited text motivation, basic tracking       |
+| **Premium** | $9.99/month or $79.99/year     | Unlimited goals, AI chat motivation, all features     |
 
 **Payment Methods:**
 
@@ -606,25 +605,17 @@ FitNudge uses platform-native payment systems for all subscriptions:
 - **Android**: Google Play Billing
 - **Web**: No subscriptions (landing page only)
 
-**Product IDs:**
+**Product IDs (2-Tier System):**
 
 iOS (Apple):
 
-- `com.fitnudge.starter.monthly` - Starter Monthly ($2.99)
-- `com.fitnudge.starter.annual` - Starter Annual ($29.99)
-- `com.fitnudge.pro.monthly` - Pro Monthly ($4.99)
-- `com.fitnudge.pro.annual` - Pro Annual ($49.99)
-- `com.fitnudge.coach.monthly` - Elite Monthly ($9.99)
-- `com.fitnudge.coach.annual` - Elite Annual ($99.99)
+- `com.fitnudge.premium.monthly` - Premium Monthly ($9.99)
+- `com.fitnudge.premium.annual` - Premium Annual ($79.99)
 
 Android (Google Play):
 
-- `starter_monthly` - Starter Monthly ($2.99)
-- `starter_annual` - Starter Annual ($29.99)
-- `pro_monthly` - Pro Monthly ($4.99)
-- `pro_annual` - Pro Annual ($49.99)
-- `coach_monthly` - Elite Monthly ($9.99)
-- `coach_annual` - Elite Annual ($99.99)
+- `com.fitnudge.premium.monthly` - Premium Monthly ($9.99)
+- `com.fitnudge.premium.annual` - Premium Annual ($79.99)
 
 **Promotional Offers:**
 

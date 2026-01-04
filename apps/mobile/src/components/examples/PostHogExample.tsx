@@ -3,8 +3,7 @@ import { View, Text, Button, Alert } from "react-native";
 import { usePostHog } from "@/hooks/usePostHog";
 
 export const PostHogExample: React.FC = () => {
-  const { capture, setUserProperties, getFeatureFlag, isFeatureEnabled } =
-    usePostHog();
+  const { capture, setUserProperties, getFeatureFlag, isFeatureEnabled } = usePostHog();
 
   useEffect(() => {
     // Track component mount
@@ -14,7 +13,7 @@ export const PostHogExample: React.FC = () => {
   const handleTrackEvent = () => {
     capture("button_clicked", {
       button_name: "track_event",
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toISOString()
     });
     Alert.alert("Event Tracked", "Check your PostHog dashboard!");
   };
@@ -22,7 +21,7 @@ export const PostHogExample: React.FC = () => {
   const handleSetUserProperties = () => {
     setUserProperties({
       last_activity: new Date().toISOString(),
-      example_used: true,
+      example_used: true
     });
     Alert.alert("Properties Set", "User properties updated!");
   };
@@ -33,7 +32,7 @@ export const PostHogExample: React.FC = () => {
 
     Alert.alert(
       "Feature Flag Check",
-      `Flag value: ${JSON.stringify(flagValue)}\nIs enabled: ${isEnabled}`,
+      `Flag value: ${JSON.stringify(flagValue)}\nIs enabled: ${isEnabled}`
     );
   };
 

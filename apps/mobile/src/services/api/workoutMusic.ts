@@ -18,7 +18,7 @@ export interface WorkoutMusicResponse {
 // API route helpers
 const ROUTES = {
   ALL: "/workout-music/all",
-  PAGINATED: "/workout-music",
+  PAGINATED: "/workout-music"
 };
 
 class WorkoutMusicService extends BaseApiService {
@@ -34,14 +34,10 @@ class WorkoutMusicService extends BaseApiService {
   /**
    * Get paginated workout music tracks.
    */
-  async getPaginated(
-    page = 1,
-    pageSize = 50,
-    mood?: string,
-  ): Promise<WorkoutMusicResponse> {
+  async getPaginated(page = 1, pageSize = 50, mood?: string): Promise<WorkoutMusicResponse> {
     const params = new URLSearchParams({
       page: String(page),
-      page_size: String(pageSize),
+      page_size: String(pageSize)
     });
 
     if (mood) {
@@ -49,7 +45,7 @@ class WorkoutMusicService extends BaseApiService {
     }
 
     const response = await this.get<WorkoutMusicResponse>(
-      `${ROUTES.PAGINATED}?${params.toString()}`,
+      `${ROUTES.PAGINATED}?${params.toString()}`
     );
     return (
       response.data || {
@@ -57,7 +53,7 @@ class WorkoutMusicService extends BaseApiService {
         total: 0,
         page,
         page_size: pageSize,
-        has_more: false,
+        has_more: false
       }
     );
   }

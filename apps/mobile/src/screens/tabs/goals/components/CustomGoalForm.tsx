@@ -1,12 +1,5 @@
 import React, { useState, useEffect } from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  Platform,
-} from "react-native";
-import DateTimePicker from "@react-native-community/datetimepicker";
+import { View, Text, ScrollView, TouchableOpacity } from "react-native";
 import { useTranslation } from "@/lib/i18n";
 import { fontFamily } from "@/lib/fonts";
 import { toRN } from "@/lib/units";
@@ -20,6 +13,7 @@ import { usePricing } from "@/hooks/usePricing";
 import { useAuthStore } from "@/stores/authStore";
 import Button from "@/components/ui/Button";
 import { TextInput } from "@/components/ui/TextInput";
+import { ReminderTimesPicker } from "@/components/ui/ReminderTimesPicker";
 import Modal from "@/components/ui/Modal";
 import { SuggestedGoal } from "@/services/api/onboarding";
 import { useAlertModal } from "@/contexts/AlertModalContext";
@@ -34,7 +28,7 @@ import {
   validateCategory,
   validateFrequency,
   validateDaysOfWeek,
-  validateReminderTimes,
+  validateReminderTimes
 } from "@/utils/goalValidation";
 
 export interface CustomGoalFormProps {
@@ -49,11 +43,7 @@ export interface CustomGoalFormProps {
  */
 // Sanitize category - fix common AI mistakes
 // "hydration" is a tracking_type, not a category - it should be under "nutrition"
-const sanitizeCategory = (
-  cat: string | undefined,
-  title?: string,
-  desc?: string,
-): string => {
+const sanitizeCategory = (cat: string | undefined, title?: string, desc?: string): string => {
   const categoryLower = (cat || "").toLowerCase();
   const combinedText = `${title || ""} ${desc || ""}`.toLowerCase();
   const hydrationKeywords = [
@@ -64,17 +54,14 @@ const sanitizeCategory = (
     "glasses",
     "ml",
     "fluid",
-    "h2o",
+    "h2o"
   ];
-  const isHydrationGoal = hydrationKeywords.some((kw) =>
-    combinedText.includes(kw),
-  );
+  const isHydrationGoal = hydrationKeywords.some((kw) => combinedText.includes(kw));
 
   // If category is "hydration" or it's clearly a hydration goal with invalid category, use "nutrition"
   if (
     categoryLower === "hydration" ||
-    (isHydrationGoal &&
-      !(VALID_CATEGORIES as readonly string[]).includes(categoryLower))
+    (isHydrationGoal && !(VALID_CATEGORIES as readonly string[]).includes(categoryLower))
   ) {
     return "nutrition";
   }
@@ -91,39 +78,25 @@ const sanitizeCategory = (
 export function CustomGoalForm({ initialData }: CustomGoalFormProps) {
   // Form state - initialize from initialData if available
   const [title, setTitle] = useState(initialData?.title || "");
-  const [description, setDescription] = useState(
-    initialData?.description || "",
-  );
+  const [description, setDescription] = useState(initialData?.description || "");
   const [category, setCategory] = useState(() =>
     initialData?.category
-      ? sanitizeCategory(
-          initialData.category,
-          initialData.title,
-          initialData.description,
-        )
-      : "fitness",
+      ? sanitizeCategory(initialData.category, initialData.title, initialData.description)
+      : "fitness"
   );
   const [frequency, setFrequency] = useState(initialData?.frequency || "daily");
   const [targetDays, setTargetDays] = useState(
-    initialData?.target_days ? String(initialData.target_days) : "7",
+    initialData?.target_days ? String(initialData.target_days) : "7"
   );
-  const [daysOfWeek, setDaysOfWeek] = useState<number[]>(
-    initialData?.days_of_week || [],
-  );
-  const [reminderTimes, setReminderTimes] = useState<string[]>(
-    initialData?.reminder_times || [],
-  );
+  const [daysOfWeek, setDaysOfWeek] = useState<number[]>(initialData?.days_of_week || []);
+  const [reminderTimes, setReminderTimes] = useState<string[]>(initialData?.reminder_times || []);
   const [isCreating, setIsCreating] = useState(false);
-  const [showTimePicker, setShowTimePicker] = useState(false);
-  const [selectedTime, setSelectedTime] = useState<Date>(new Date());
 
   // Validation errors
   const [titleError, setTitleError] = useState<string | null>(null);
   const [categoryError, setCategoryError] = useState<string | null>(null);
   const [frequencyError, setFrequencyError] = useState<string | null>(null);
-  const [reminderTimesError, setReminderTimesError] = useState<string | null>(
-    null,
-  );
+  const [reminderTimesError, setReminderTimesError] = useState<string | null>(null);
   const [daysOfWeekError, setDaysOfWeekError] = useState<string | null>(null);
 
   const { t } = useTranslation();
@@ -141,11 +114,7 @@ export function CustomGoalForm({ initialData }: CustomGoalFormProps) {
       setTitle(initialData.title || "");
       setDescription(initialData.description || "");
       setCategory(
-        sanitizeCategory(
-          initialData.category,
-          initialData.title,
-          initialData.description,
-        ),
+        sanitizeCategory(initialData.category, initialData.title, initialData.description)
       );
       const freq = initialData.frequency || "daily";
       setFrequency(freq);
@@ -231,51 +200,10 @@ export function CustomGoalForm({ initialData }: CustomGoalFormProps) {
     }
   };
 
-  const formatTime = (date: Date): string => {
-    const hours = date.getHours().toString().padStart(2, "0");
-    const minutes = date.getMinutes().toString().padStart(2, "0");
-    return `${hours}:${minutes}`;
-  };
-
-  const handleTimePickerChange = async (event: any, date?: Date) => {
-    if (Platform.OS === "android") {
-      setShowTimePicker(false);
-      if (event.type === "set" && date) {
-        const timeString = formatTime(date);
-        if (reminderTimes.includes(timeString)) {
-          await showAlert({
-            title: t("common.error"),
-            message:
-              t("goals.create.form.add_time_error_duplicate") ||
-              "This time is already added",
-            variant: "error",
-            confirmLabel: t("common.ok"),
-          });
-          return;
-        }
-        setReminderTimes((prev) => {
-          const newTimes = [...prev, timeString].sort();
-          const error = validateReminderTimes(newTimes);
-          setReminderTimesError(error);
-          return newTimes;
-        });
-      }
-    } else if (Platform.OS === "ios" && date) {
-      setSelectedTime(date);
-    }
-  };
-
-  const handleAddReminderTime = () => {
-    setShowTimePicker(true);
-  };
-
-  const handleRemoveReminderTime = (time: string) => {
-    setReminderTimes((prev) => {
-      const newTimes = prev.filter((t) => t !== time);
-      const error = validateReminderTimes(newTimes);
-      setReminderTimesError(error);
-      return newTimes;
-    });
+  const handleReminderTimesChange = (times: string[]) => {
+    setReminderTimes(times);
+    const error = validateReminderTimes(times);
+    setReminderTimesError(error);
   };
 
   const handleCategoryChange = (value: string) => {
@@ -344,11 +272,9 @@ export function CustomGoalForm({ initialData }: CustomGoalFormProps) {
     if (!validateAllFields()) {
       await showAlert({
         title: t("common.error"),
-        message:
-          t("goals.create.error.validation_failed") ||
-          "Please fix the errors in the form",
+        message: t("goals.create.error.validation_failed") || "Please fix the errors in the form",
         variant: "error",
-        confirmLabel: t("common.ok"),
+        confirmLabel: t("common.ok")
       });
       return;
     }
@@ -358,10 +284,10 @@ export function CustomGoalForm({ initialData }: CustomGoalFormProps) {
       await showAlert({
         title: t("common.error"),
         message: t("onboarding.suggested_goals.goal_limit_reached", {
-          limit: user?.plan ? getGoalLimit(user.plan) || 0 : 0,
+          limit: user?.plan ? getGoalLimit(user.plan) || 0 : 0
         }),
         variant: "error",
-        confirmLabel: t("common.ok"),
+        confirmLabel: t("common.ok")
       });
       return;
     }
@@ -372,7 +298,7 @@ export function CustomGoalForm({ initialData }: CustomGoalFormProps) {
         title: t("common.error"),
         message: "Invalid category selected",
         variant: "error",
-        confirmLabel: t("common.ok"),
+        confirmLabel: t("common.ok")
       });
       return;
     }
@@ -382,7 +308,7 @@ export function CustomGoalForm({ initialData }: CustomGoalFormProps) {
         title: t("common.error"),
         message: "Invalid frequency selected",
         variant: "error",
-        confirmLabel: t("common.ok"),
+        confirmLabel: t("common.ok")
       });
       return;
     }
@@ -390,25 +316,16 @@ export function CustomGoalForm({ initialData }: CustomGoalFormProps) {
     try {
       setIsCreating(true);
 
-      const finalTargetDays =
-        frequency === "daily" ? 7 : parseInt(targetDays, 10);
+      const finalTargetDays = frequency === "daily" ? 7 : parseInt(targetDays, 10);
 
       const goalData = {
         title: title.trim(),
         description: description.trim() || undefined,
-        category: category as
-          | "fitness"
-          | "nutrition"
-          | "wellness"
-          | "mindfulness"
-          | "sleep",
+        category: category as "fitness" | "nutrition" | "wellness" | "mindfulness" | "sleep",
         frequency: frequency as "daily" | "weekly",
         target_days: finalTargetDays,
-        days_of_week:
-          frequency === "weekly" && daysOfWeek.length > 0
-            ? daysOfWeek
-            : undefined,
-        reminder_times: reminderTimes || [],
+        days_of_week: frequency === "weekly" && daysOfWeek.length > 0 ? daysOfWeek : undefined,
+        reminder_times: reminderTimes || []
       };
 
       await createGoal.mutateAsync(goalData);
@@ -418,7 +335,6 @@ export function CustomGoalForm({ initialData }: CustomGoalFormProps) {
       const isUpgradeError =
         error?.status === 403 ||
         errorMessage.toLowerCase().includes("upgrade") ||
-        errorMessage.toLowerCase().includes("pro") ||
         errorMessage.toLowerCase().includes("premium");
 
       if (isUpgradeError) {
@@ -426,19 +342,19 @@ export function CustomGoalForm({ initialData }: CustomGoalFormProps) {
           title: t("onboarding.subscription.upgrade_required"),
           message: errorMessage,
           variant: "warning",
-          confirmLabel: t("common.ok"),
+          confirmLabel: t("common.ok")
         });
       } else {
         logger.error("Failed to create goal", {
           error: errorMessage,
-          goalData: { title, category, frequency },
+          goalData: { title, category, frequency }
         });
 
         await showAlert({
           title: t("common.error"),
           message: t("goals.create.error.failed"),
           variant: "error",
-          confirmLabel: t("common.ok"),
+          confirmLabel: t("common.ok")
         });
       }
     } finally {
@@ -506,9 +422,7 @@ export function CustomGoalForm({ initialData }: CustomGoalFormProps) {
                 "Category selected by AI based on your goal"}
             </Text>
           )}
-          {categoryError && (
-            <Text style={styles.errorText}>{categoryError}</Text>
-          )}
+          {categoryError && <Text style={styles.errorText}>{categoryError}</Text>}
         </View>
 
         {/* Frequency Selection */}
@@ -527,9 +441,7 @@ export function CustomGoalForm({ initialData }: CustomGoalFormProps) {
               />
             ))}
           </View>
-          {frequencyError && (
-            <Text style={styles.errorText}>{frequencyError}</Text>
-          )}
+          {frequencyError && <Text style={styles.errorText}>{frequencyError}</Text>}
         </View>
 
         {/* Target Days - Only shown for daily (disabled) */}
@@ -569,16 +481,10 @@ export function CustomGoalForm({ initialData }: CustomGoalFormProps) {
                   <TouchableOpacity
                     key={day.value}
                     onPress={() => toggleDaySelection(day.value)}
-                    style={[
-                      styles.dayButton,
-                      isSelected && styles.dayButtonSelected,
-                    ]}
+                    style={[styles.dayButton, isSelected && styles.dayButtonSelected]}
                   >
                     <Text
-                      style={[
-                        styles.dayButtonText,
-                        isSelected && styles.dayButtonTextSelected,
-                      ]}
+                      style={[styles.dayButtonText, isSelected && styles.dayButtonTextSelected]}
                     >
                       {day.label}
                     </Text>
@@ -586,120 +492,27 @@ export function CustomGoalForm({ initialData }: CustomGoalFormProps) {
                 );
               })}
             </View>
-            {daysOfWeekError && (
-              <Text style={styles.errorText}>{daysOfWeekError}</Text>
-            )}
+            {daysOfWeekError && <Text style={styles.errorText}>{daysOfWeekError}</Text>}
           </View>
         )}
 
         {/* Reminder Times */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>
-            {t(`goals.create.form.reminder_times_${category}`) ||
-              t("goals.create.form.reminder_times")}
-          </Text>
-          <Text style={styles.helperText}>
-            {t(`goals.create.form.reminder_times_description_${category}`) ||
-              t("goals.create.form.reminder_times_description") ||
-              "Set times when you want to be reminded."}
-          </Text>
-
-          {reminderTimes.length > 0 && (
-            <View style={styles.reminderTimesList}>
-              {reminderTimes.map((time) => (
-                <View key={time} style={styles.reminderTimeChip}>
-                  <Text style={styles.reminderTimeText}>{time}</Text>
-                  <TouchableOpacity
-                    onPress={() => handleRemoveReminderTime(time)}
-                    style={styles.removeTimeButton}
-                  >
-                    <Text style={styles.removeTimeText}>×</Text>
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </View>
-          )}
-
-          <View style={styles.addTimeContainer}>
-            <Button
-              title={t("goals.create.form.add_time") || "Add Time"}
-              onPress={handleAddReminderTime}
-              variant="outline"
-              size="md"
-              style={{ flex: 1 }}
-            />
-          </View>
-
-          {/* Time Picker */}
-          {showTimePicker && Platform.OS === "ios" && (
-            <Modal
-              visible={showTimePicker}
-              onClose={() => setShowTimePicker(false)}
-              title={t("goals.create.form.add_time") || "Select Time"}
-            >
-              <View style={styles.timePickerContainer}>
-                <DateTimePicker
-                  value={selectedTime}
-                  mode="time"
-                  is24Hour={true}
-                  display="spinner"
-                  onChange={handleTimePickerChange}
-                  style={styles.timePicker}
-                />
-                <View style={styles.timePickerActions}>
-                  <Button
-                    title={t("common.cancel")}
-                    onPress={() => setShowTimePicker(false)}
-                    variant="outline"
-                    size="md"
-                    style={{ flex: 1, marginRight: toRN(tokens.spacing[2]) }}
-                  />
-                  <Button
-                    title={t("common.done")}
-                    onPress={() => {
-                      const timeString = formatTime(selectedTime);
-                      if (reminderTimes.includes(timeString)) {
-                        showAlert({
-                          title: t("common.error"),
-                          message:
-                            t("goals.create.form.add_time_error_duplicate") ||
-                            "This time is already added",
-                          variant: "error",
-                          confirmLabel: t("common.ok"),
-                        });
-                        return;
-                      }
-                      setReminderTimes((prev) => {
-                        const newTimes = [...prev, timeString].sort();
-                        const error = validateReminderTimes(newTimes);
-                        setReminderTimesError(error);
-                        return newTimes;
-                      });
-                      setShowTimePicker(false);
-                    }}
-                    variant="primary"
-                    size="md"
-                    style={{ flex: 1 }}
-                  />
-                </View>
-              </View>
-            </Modal>
-          )}
-
-          {showTimePicker && Platform.OS === "android" && (
-            <DateTimePicker
-              value={selectedTime}
-              mode="time"
-              is24Hour={true}
-              display="default"
-              onChange={handleTimePickerChange}
-            />
-          )}
-
-          {reminderTimesError && (
-            <Text style={styles.errorText}>{reminderTimesError}</Text>
-          )}
-        </View>
+        <ReminderTimesPicker
+          value={reminderTimes}
+          onChange={handleReminderTimesChange}
+          label={
+            t(`goals.create.form.reminder_times_${category}`) ||
+            t("goals.create.form.reminder_times") ||
+            "Reminders"
+          }
+          description={
+            t(`goals.create.form.reminder_times_description_${category}`) ||
+            t("goals.create.form.reminder_times_description") ||
+            "Set times when you want to be reminded."
+          }
+          error={reminderTimesError || undefined}
+          is24Hour={false}
+        />
       </ScrollView>
 
       {/* Actions */}
@@ -729,44 +542,44 @@ export function CustomGoalForm({ initialData }: CustomGoalFormProps) {
 const makeCustomGoalFormStyles = (tokens: any, colors: any, brand: any) => {
   return {
     scrollView: {
-      flex: 1,
+      flex: 1
     },
     scrollContent: {
       paddingHorizontal: toRN(tokens.spacing[6]),
-      paddingBottom: toRN(tokens.spacing[6]),
+      paddingBottom: toRN(tokens.spacing[6])
     },
     inputGroup: {
-      marginBottom: toRN(tokens.spacing[6]),
+      marginBottom: toRN(tokens.spacing[6])
     },
     label: {
       fontSize: toRN(tokens.typography.fontSize.base),
       fontWeight: tokens.typography.fontWeight.semibold,
       color: colors.text.primary,
       marginBottom: toRN(tokens.spacing[2]),
-      fontFamily: fontFamily.groteskSemiBold,
+      fontFamily: fontFamily.groteskSemiBold
     },
     helperText: {
       fontSize: toRN(tokens.typography.fontSize.sm),
       color: colors.text.secondary,
       marginTop: toRN(tokens.spacing[1]),
-      fontFamily: fontFamily.groteskRegular,
+      fontFamily: fontFamily.groteskRegular
     },
     errorText: {
       fontSize: toRN(tokens.typography.fontSize.sm),
       color: colors.error || "#ef4444",
       marginTop: toRN(tokens.spacing[1]),
-      fontFamily: fontFamily.groteskRegular,
+      fontFamily: fontFamily.groteskRegular
     },
     optionsGrid: {
       flexDirection: "row" as const,
       flexWrap: "wrap" as const,
-      gap: toRN(tokens.spacing[2]),
+      gap: toRN(tokens.spacing[2])
     },
     optionButton: {
-      margin: 0,
+      margin: 0
     },
     disabledOption: {
-      opacity: 0.4,
+      opacity: 0.4
     },
     actions: {
       paddingHorizontal: toRN(tokens.spacing[6]),
@@ -774,13 +587,13 @@ const makeCustomGoalFormStyles = (tokens: any, colors: any, brand: any) => {
       paddingBottom: toRN(tokens.spacing[4]),
       backgroundColor: colors.bg.canvas,
       borderTopWidth: 1,
-      borderTopColor: colors.border.default,
+      borderTopColor: colors.border.default
     },
     daysGrid: {
       flexDirection: "row" as const,
       flexWrap: "wrap" as const,
       gap: toRN(tokens.spacing[2]),
-      marginTop: toRN(tokens.spacing[2]),
+      marginTop: toRN(tokens.spacing[2])
     },
     dayButton: {
       width: toRN(48),
@@ -790,26 +603,26 @@ const makeCustomGoalFormStyles = (tokens: any, colors: any, brand: any) => {
       borderColor: colors.border.default,
       backgroundColor: colors.bg.surface,
       alignItems: "center" as const,
-      justifyContent: "center" as const,
+      justifyContent: "center" as const
     },
     dayButtonSelected: {
       backgroundColor: brand.primary,
-      borderColor: brand.primary,
+      borderColor: brand.primary
     },
     dayButtonText: {
       fontSize: toRN(tokens.typography.fontSize.sm),
       fontFamily: fontFamily.groteskMedium,
-      color: colors.text.primary,
+      color: colors.text.primary
     },
     dayButtonTextSelected: {
       color: colors.text.inverse || "#FFFFFF",
-      fontFamily: fontFamily.groteskSemiBold,
+      fontFamily: fontFamily.groteskSemiBold
     },
     reminderTimesList: {
       flexDirection: "row" as const,
       flexWrap: "wrap" as const,
       gap: toRN(tokens.spacing[2]),
-      marginBottom: toRN(tokens.spacing[3]),
+      marginBottom: toRN(tokens.spacing[3])
     },
     reminderTimeChip: {
       flexDirection: "row" as const,
@@ -817,43 +630,43 @@ const makeCustomGoalFormStyles = (tokens: any, colors: any, brand: any) => {
       backgroundColor: brand.primary + "15",
       borderRadius: toRN(tokens.borderRadius.md),
       paddingHorizontal: toRN(tokens.spacing[3]),
-      paddingVertical: toRN(tokens.spacing[2]),
+      paddingVertical: toRN(tokens.spacing[2])
     },
     reminderTimeText: {
       fontSize: toRN(tokens.typography.fontSize.base),
       fontFamily: fontFamily.groteskMedium,
       color: brand.primary,
-      marginRight: toRN(tokens.spacing[2]),
+      marginRight: toRN(tokens.spacing[2])
     },
     removeTimeButton: {
       width: toRN(20),
       height: toRN(20),
       alignItems: "center" as const,
-      justifyContent: "center" as const,
+      justifyContent: "center" as const
     },
     removeTimeText: {
       fontSize: toRN(tokens.typography.fontSize.xl),
       color: brand.primary,
-      lineHeight: toRN(tokens.typography.fontSize.xl),
+      lineHeight: toRN(tokens.typography.fontSize.xl)
     },
     addTimeContainer: {
       flexDirection: "row" as const,
       alignItems: "flex-start" as const,
-      gap: toRN(tokens.spacing[2]),
+      gap: toRN(tokens.spacing[2])
     },
     timePickerContainer: {
-      paddingVertical: toRN(tokens.spacing[4]),
+      paddingVertical: toRN(tokens.spacing[4])
     },
     timePicker: {
       width: "100%",
-      height: toRN(200),
+      height: toRN(200)
     },
     timePickerActions: {
       flexDirection: "row" as const,
       marginTop: toRN(tokens.spacing[4]),
       paddingTop: toRN(tokens.spacing[4]),
       borderTopWidth: 1,
-      borderTopColor: colors.border.default,
-    },
+      borderTopColor: colors.border.default
+    }
   };
 };

@@ -1,17 +1,6 @@
 import React, { useState } from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  Dimensions,
-  StyleSheet,
-} from "react-native";
-import Svg, {
-  Defs,
-  LinearGradient as SvgLinearGradient,
-  Stop,
-  Rect,
-} from "react-native-svg";
+import { View, Text, TouchableOpacity, Dimensions, StyleSheet } from "react-native";
+import Svg, { Defs, LinearGradient as SvgLinearGradient, Stop, Rect } from "react-native-svg";
 import { useStyles } from "@/themes";
 import { useTheme } from "@/themes";
 import { tokens } from "@/themes/tokens";
@@ -38,7 +27,7 @@ export function MotivationCard({ currentStreak }: MotivationCardProps) {
     data: dailyMotivation,
     isLoading,
     error,
-    refetch: refetchMotivation,
+    refetch: refetchMotivation
   } = useTodayDailyMotivation();
 
   // Calculate card width accounting for container padding (spacing[4] on each side)
@@ -82,11 +71,7 @@ export function MotivationCard({ currentStreak }: MotivationCardProps) {
           />
         </View>
         <View style={styles.gradientCard}>
-          <SkeletonBox
-            width="100%"
-            height={200}
-            borderRadius={toRN(tokens.borderRadius.base)}
-          />
+          <SkeletonBox width="100%" height={200} borderRadius={toRN(tokens.borderRadius.base)} />
         </View>
       </View>
     );
@@ -145,19 +130,9 @@ export function MotivationCard({ currentStreak }: MotivationCardProps) {
         >
           <View style={styles.gradientCard}>
             {/* SVG Gradient Background */}
-            <Svg
-              width={calculatedCardWidth}
-              height={200}
-              style={StyleSheet.absoluteFill}
-            >
+            <Svg width={calculatedCardWidth} height={200} style={StyleSheet.absoluteFill}>
               <Defs>
-                <SvgLinearGradient
-                  id="motivationGradient"
-                  x1="0%"
-                  y1="0%"
-                  x2="100%"
-                  y2="100%"
-                >
+                <SvgLinearGradient id="motivationGradient" x1="0%" y1="0%" x2="100%" y2="100%">
                   {gradientColors.map((color, index) => (
                     <Stop
                       key={index}
@@ -178,10 +153,7 @@ export function MotivationCard({ currentStreak }: MotivationCardProps) {
 
             {/* Motivation Text */}
             <View style={styles.messageContainer}>
-              <Text
-                style={[styles.messageText, { color: textColor }]}
-                numberOfLines={3}
-              >
+              <Text style={[styles.messageText, { color: textColor }]} numberOfLines={3}>
                 {motivationMessage}
               </Text>
             </View>
@@ -206,32 +178,32 @@ export function MotivationCard({ currentStreak }: MotivationCardProps) {
 
 const makeMotivationCardStyles = (tokens: any, colors: any, brand: any) => ({
   container: {
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: toRN(tokens.spacing[3]),
-    paddingHorizontal: toRN(tokens.spacing[1]),
+    paddingHorizontal: toRN(tokens.spacing[1])
   },
   headerTitle: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.bold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   viewButton: {
     flexDirection: "row",
     alignItems: "center",
-    gap: toRN(tokens.spacing[1]),
+    gap: toRN(tokens.spacing[1])
   },
   viewText: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.regular,
-    color: colors.text.secondary,
+    color: colors.text.secondary
   },
   cardContainer: {
-    marginHorizontal: 0,
+    marginHorizontal: 0
   },
   gradientCard: {
     width: "100%",
@@ -242,18 +214,18 @@ const makeMotivationCardStyles = (tokens: any, colors: any, brand: any) => ({
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 4
     },
     shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 4,
+    elevation: 4
   },
   messageContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     padding: toRN(tokens.spacing[6]),
-    paddingVertical: toRN(tokens.spacing[8]),
+    paddingVertical: toRN(tokens.spacing[8])
   },
   messageText: {
     fontSize: toRN(tokens.typography.fontSize.lg),
@@ -263,6 +235,6 @@ const makeMotivationCardStyles = (tokens: any, colors: any, brand: any) => ({
     lineHeight: toRN(tokens.typography.fontSize.lg) * 1.5,
     textShadowColor: "rgba(0, 0, 0, 0.1)",
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
+    textShadowRadius: 2
+  }
 });

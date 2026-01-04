@@ -1,11 +1,5 @@
 import React, { useState } from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  ActivityIndicator,
-  ScrollView,
-} from "react-native";
+import { View, Text, TouchableOpacity, ActivityIndicator, ScrollView } from "react-native";
 import Video, { ResizeMode } from "react-native-video";
 import { Ionicons } from "@expo/vector-icons";
 import { useStyles, useTheme } from "@/themes";
@@ -46,7 +40,7 @@ interface ExerciseDisplayProps {
 export function ExerciseDisplay({
   exercise,
   isResting = false,
-  isPaused = false,
+  isPaused = false
 }: ExerciseDisplayProps) {
   const styles = useStyles(makeStyles);
   const { colors, brandColors } = useTheme();
@@ -74,9 +68,7 @@ export function ExerciseDisplay({
   return (
     <View style={styles.container}>
       {/* Exercise Name */}
-      <Text
-        style={[styles.exerciseName, isResting && styles.exerciseNameResting]}
-      >
+      <Text style={[styles.exerciseName, isResting && styles.exerciseNameResting]}>
         {exercise.name}
       </Text>
 
@@ -90,9 +82,7 @@ export function ExerciseDisplay({
       )}
 
       {/* Resting message */}
-      {isResting && (
-        <Text style={styles.restingMessage}>{t("workout.take_a_break")}</Text>
-      )}
+      {isResting && <Text style={styles.restingMessage}>{t("workout.take_a_break")}</Text>}
 
       {/* Video Display */}
       {mp4Url && !videoError && !isResting && (
@@ -121,11 +111,7 @@ export function ExerciseDisplay({
       {isResting && (
         <View style={styles.restingContainer}>
           <View style={styles.restingIconContainer}>
-            <Ionicons
-              name="cafe-outline"
-              size={64}
-              color={colors.feedback.success}
-            />
+            <Ionicons name="cafe-outline" size={64} color={colors.feedback.success} />
           </View>
           <Text style={styles.restingHint}>{t("workout.catch_breath")}</Text>
         </View>
@@ -142,11 +128,7 @@ export function ExerciseDisplay({
           )}
           {exercise.demo.equipment && (
             <View style={styles.tag}>
-              <Ionicons
-                name="barbell-outline"
-                size={14}
-                color={colors.text.secondary}
-              />
+              <Ionicons name="barbell-outline" size={14} color={colors.text.secondary} />
               <Text style={styles.tagText}>{exercise.demo.equipment}</Text>
             </View>
           )}
@@ -155,16 +137,12 @@ export function ExerciseDisplay({
               style={[
                 styles.tag,
                 {
-                  backgroundColor:
-                    getDifficultyColor(exercise.demo.difficulty) + "15",
-                },
+                  backgroundColor: getDifficultyColor(exercise.demo.difficulty) + "15"
+                }
               ]}
             >
               <Text
-                style={[
-                  styles.tagText,
-                  { color: getDifficultyColor(exercise.demo.difficulty) },
-                ]}
+                style={[styles.tagText, { color: getDifficultyColor(exercise.demo.difficulty) }]}
               >
                 {exercise.demo.difficulty}
               </Text>
@@ -175,14 +153,9 @@ export function ExerciseDisplay({
 
       {/* Details Toggle */}
       {exercise.demo?.instructions && !isResting && (
-        <TouchableOpacity
-          style={styles.detailsToggle}
-          onPress={() => setShowDetails(!showDetails)}
-        >
+        <TouchableOpacity style={styles.detailsToggle} onPress={() => setShowDetails(!showDetails)}>
           <Text style={styles.detailsToggleText}>
-            {showDetails
-              ? t("workout.hide_details")
-              : t("workout.show_details")}
+            {showDetails ? t("workout.hide_details") : t("workout.show_details")}
           </Text>
           <Ionicons
             name={showDetails ? "chevron-up" : "chevron-down"}
@@ -200,9 +173,7 @@ export function ExerciseDisplay({
             {exercise.demo.body_part && (
               <View style={styles.detailItem}>
                 <Text style={styles.detailLabel}>{t("workout.body_part")}</Text>
-                <Text style={styles.detailValue}>
-                  {exercise.demo.body_part}
-                </Text>
+                <Text style={styles.detailValue}>{exercise.demo.body_part}</Text>
               </View>
             )}
             {exercise.demo.category && (
@@ -214,25 +185,20 @@ export function ExerciseDisplay({
           </View>
 
           {/* Secondary Muscles */}
-          {exercise.demo.secondary_muscles &&
-            exercise.demo.secondary_muscles.length > 0 && (
-              <View style={styles.secondaryMuscles}>
-                <Text style={styles.detailLabel}>
-                  {t("workout.also_works")}
-                </Text>
-                <Text style={styles.secondaryMusclesText}>
-                  {exercise.demo.secondary_muscles.join(", ")}
-                </Text>
-              </View>
-            )}
+          {exercise.demo.secondary_muscles && exercise.demo.secondary_muscles.length > 0 && (
+            <View style={styles.secondaryMuscles}>
+              <Text style={styles.detailLabel}>{t("workout.also_works")}</Text>
+              <Text style={styles.secondaryMusclesText}>
+                {exercise.demo.secondary_muscles.join(", ")}
+              </Text>
+            </View>
+          )}
 
           {/* Description */}
           {exercise.demo.description && (
             <View style={styles.descriptionContainer}>
               <Text style={styles.detailLabel}>{t("workout.description")}</Text>
-              <Text style={styles.descriptionText}>
-                {exercise.demo.description}
-              </Text>
+              <Text style={styles.descriptionText}>{exercise.demo.description}</Text>
             </View>
           )}
 
@@ -256,30 +222,30 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
   container: {
     flex: 1,
     alignItems: "center" as const,
-    paddingHorizontal: toRN(tokens.spacing[4]),
+    paddingHorizontal: toRN(tokens.spacing[4])
   },
   exerciseName: {
     fontSize: toRN(tokens.typography.fontSize["2xl"]),
     fontFamily: fontFamily.groteskBold,
     color: colors.text.primary,
     textAlign: "center" as const,
-    textTransform: "capitalize" as const,
+    textTransform: "capitalize" as const
   },
   exerciseNameResting: {
     color: colors.text.secondary,
-    fontSize: toRN(tokens.typography.fontSize.lg),
+    fontSize: toRN(tokens.typography.fontSize.lg)
   },
   setsReps: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.medium,
     color: colors.text.secondary,
-    marginTop: toRN(tokens.spacing[1]),
+    marginTop: toRN(tokens.spacing[1])
   },
   restingMessage: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.medium,
     color: colors.feedback.success,
-    marginTop: toRN(tokens.spacing[2]),
+    marginTop: toRN(tokens.spacing[2])
   },
   videoContainer: {
     width: "100%",
@@ -288,7 +254,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: colors.bg.secondary,
     overflow: "hidden" as const,
     marginTop: toRN(tokens.spacing[4]),
-    position: "relative" as const,
+    position: "relative" as const
   },
   loadingContainer: {
     position: "absolute" as const,
@@ -298,18 +264,18 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     bottom: 0,
     alignItems: "center" as const,
     justifyContent: "center" as const,
-    zIndex: 1,
+    zIndex: 1
   },
   video: {
     width: "100%",
-    height: "100%",
+    height: "100%"
   },
   videoHidden: {
-    opacity: 0,
+    opacity: 0
   },
   restingContainer: {
     alignItems: "center" as const,
-    marginTop: toRN(tokens.spacing[6]),
+    marginTop: toRN(tokens.spacing[6])
   },
   restingIconContainer: {
     width: toRN(120),
@@ -317,20 +283,20 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     borderRadius: toRN(60),
     backgroundColor: colors.feedback.success + "15",
     alignItems: "center" as const,
-    justifyContent: "center" as const,
+    justifyContent: "center" as const
   },
   restingHint: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
     color: colors.text.tertiary,
-    marginTop: toRN(tokens.spacing[3]),
+    marginTop: toRN(tokens.spacing[3])
   },
   tagsContainer: {
     flexDirection: "row" as const,
     flexWrap: "wrap" as const,
     justifyContent: "center" as const,
     gap: toRN(tokens.spacing[2]),
-    marginTop: toRN(tokens.spacing[3]),
+    marginTop: toRN(tokens.spacing[3])
   },
   tag: {
     flexDirection: "row" as const,
@@ -339,25 +305,25 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     paddingVertical: toRN(tokens.spacing[1]),
     paddingHorizontal: toRN(tokens.spacing[2]),
     borderRadius: toRN(tokens.borderRadius.md),
-    backgroundColor: colors.bg.muted,
+    backgroundColor: colors.bg.muted
   },
   tagText: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.medium,
     color: colors.text.secondary,
-    textTransform: "capitalize" as const,
+    textTransform: "capitalize" as const
   },
   detailsToggle: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
     gap: toRN(tokens.spacing[1]),
     marginTop: toRN(tokens.spacing[4]),
-    paddingVertical: toRN(tokens.spacing[2]),
+    paddingVertical: toRN(tokens.spacing[2])
   },
   detailsToggleText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
-    color: brand.primary,
+    color: brand.primary
   },
   detailsPanel: {
     width: "100%",
@@ -365,66 +331,66 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: colors.bg.secondary,
     borderRadius: toRN(tokens.borderRadius.lg),
     padding: toRN(tokens.spacing[3]),
-    marginTop: toRN(tokens.spacing[2]),
+    marginTop: toRN(tokens.spacing[2])
   },
   detailsRow: {
     flexDirection: "row" as const,
     gap: toRN(tokens.spacing[4]),
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   detailItem: {
-    flex: 1,
+    flex: 1
   },
   detailLabel: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.semiBold,
     color: colors.text.tertiary,
     textTransform: "uppercase" as const,
-    marginBottom: toRN(tokens.spacing[1]),
+    marginBottom: toRN(tokens.spacing[1])
   },
   detailValue: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
     color: colors.text.primary,
-    textTransform: "capitalize" as const,
+    textTransform: "capitalize" as const
   },
   secondaryMuscles: {
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   secondaryMusclesText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
     color: colors.text.secondary,
-    textTransform: "capitalize" as const,
+    textTransform: "capitalize" as const
   },
   descriptionContainer: {
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   descriptionText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.groteskRegular,
     color: colors.text.secondary,
-    lineHeight: toRN(tokens.typography.fontSize.sm) * 1.5,
+    lineHeight: toRN(tokens.typography.fontSize.sm) * 1.5
   },
   instructionsContainer: {
-    marginBottom: toRN(tokens.spacing[2]),
+    marginBottom: toRN(tokens.spacing[2])
   },
   instructionRow: {
     flexDirection: "row" as const,
     gap: toRN(tokens.spacing[2]),
-    marginTop: toRN(tokens.spacing[1]),
+    marginTop: toRN(tokens.spacing[1])
   },
   instructionNumber: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.semiBold,
     color: brand.primary,
-    minWidth: toRN(tokens.spacing[4]),
+    minWidth: toRN(tokens.spacing[4])
   },
   instructionText: {
     flex: 1,
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.groteskRegular,
     color: colors.text.secondary,
-    lineHeight: toRN(tokens.typography.fontSize.sm) * 1.5,
-  },
+    lineHeight: toRN(tokens.typography.fontSize.sm) * 1.5
+  }
 });

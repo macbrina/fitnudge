@@ -1,12 +1,5 @@
 import React from "react";
-import {
-  View,
-  Text,
-  Modal,
-  TouchableOpacity,
-  FlatList,
-  Dimensions,
-} from "react-native";
+import { View, Text, Modal, TouchableOpacity, FlatList, Dimensions } from "react-native";
 import Video, { ResizeMode } from "react-native-video";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStyles, useTheme } from "@/themes";
@@ -39,7 +32,7 @@ export function ExerciseListModal({
   onClose,
   exercises,
   currentExerciseIndex,
-  onSelectExercise,
+  onSelectExercise
 }: ExerciseListModalProps) {
   const styles = useStyles(makeStyles);
   const { colors, brandColors } = useTheme();
@@ -84,13 +77,7 @@ export function ExerciseListModal({
     onClose();
   };
 
-  const renderExerciseItem = ({
-    item,
-    index,
-  }: {
-    item: AnyExercise;
-    index: number;
-  }) => {
+  const renderExerciseItem = ({ item, index }: { item: AnyExercise; index: number }) => {
     const isHighlighted = index === currentExerciseIndex;
     const isCompleted = index < currentExerciseIndex; // Exercises before current are completed
     const mp4Url = getMp4Url(item);
@@ -100,17 +87,14 @@ export function ExerciseListModal({
         style={[
           styles.exerciseItem,
           isCompleted && styles.exerciseItemCompleted,
-          isHighlighted && styles.exerciseItemHighlighted,
+          isHighlighted && styles.exerciseItemHighlighted
         ]}
         onPress={() => handleExercisePress(index)}
         activeOpacity={0.7}
       >
         {/* Exercise thumbnail */}
         <View
-          style={[
-            styles.thumbnailContainer,
-            isCompleted && styles.thumbnailContainerCompleted,
-          ]}
+          style={[styles.thumbnailContainer, isCompleted && styles.thumbnailContainerCompleted]}
         >
           {mp4Url ? (
             <Video
@@ -142,7 +126,7 @@ export function ExerciseListModal({
             style={[
               styles.exerciseName,
               isCompleted && styles.exerciseNameCompleted,
-              isHighlighted && styles.exerciseNameHighlighted,
+              isHighlighted && styles.exerciseNameHighlighted
             ]}
             numberOfLines={1}
           >
@@ -152,7 +136,7 @@ export function ExerciseListModal({
             style={[
               styles.exerciseDuration,
               isCompleted && styles.exerciseDurationCompleted,
-              isHighlighted && styles.exerciseDurationHighlighted,
+              isHighlighted && styles.exerciseDurationHighlighted
             ]}
           >
             {getExerciseDuration(item)}
@@ -191,13 +175,11 @@ export function ExerciseListModal({
           keyExtractor={(_, index) => `exercise-${index}`}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
-          initialScrollIndex={
-            currentExerciseIndex > 2 ? currentExerciseIndex - 2 : 0
-          }
+          initialScrollIndex={currentExerciseIndex > 2 ? currentExerciseIndex - 2 : 0}
           getItemLayout={(data, index) => ({
             length: 80,
             offset: 80 * index,
-            index,
+            index
           })}
         />
 
@@ -205,7 +187,7 @@ export function ExerciseListModal({
         <View
           style={[
             styles.bottomContainer,
-            { paddingBottom: insets.bottom + toRN(tokens.spacing[4]) },
+            { paddingBottom: insets.bottom + toRN(tokens.spacing[4]) }
           ]}
         >
           <TouchableOpacity style={styles.closeButtonBottom} onPress={onClose}>
@@ -220,19 +202,19 @@ export function ExerciseListModal({
 const makeStyles = (tokens: any, colors: any, brand: any) => ({
   container: {
     flex: 1,
-    backgroundColor: colors.bg.canvas,
+    backgroundColor: colors.bg.canvas
   },
   header: {
     flexDirection: "row" as const,
     justifyContent: "space-between" as const,
     alignItems: "center" as const,
     paddingHorizontal: toRN(tokens.spacing[4]),
-    paddingVertical: toRN(tokens.spacing[4]),
+    paddingVertical: toRN(tokens.spacing[4])
   },
   title: {
     fontSize: toRN(tokens.typography.fontSize["2xl"]),
     fontFamily: fontFamily.bold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   closeButton: {
     width: toRN(32),
@@ -240,11 +222,11 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     borderRadius: toRN(tokens.borderRadius.full),
     backgroundColor: colors.bg.muted,
     alignItems: "center" as const,
-    justifyContent: "center" as const,
+    justifyContent: "center" as const
   },
   listContent: {
     paddingHorizontal: toRN(tokens.spacing[4]),
-    paddingBottom: toRN(tokens.spacing[4]),
+    paddingBottom: toRN(tokens.spacing[4])
   },
   exerciseItem: {
     flexDirection: "row" as const,
@@ -254,16 +236,16 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     padding: toRN(tokens.spacing[3]),
     marginBottom: toRN(tokens.spacing[2]),
     borderWidth: 1,
-    borderColor: colors.border.subtle,
+    borderColor: colors.border.subtle
   },
   exerciseItemCompleted: {
     backgroundColor: colors.bg.muted,
-    opacity: 0.7,
+    opacity: 0.7
   },
   exerciseItemHighlighted: {
     backgroundColor: brand.primary,
     borderColor: brand.primary,
-    opacity: 1,
+    opacity: 1
   },
   thumbnailContainer: {
     width: toRN(60),
@@ -271,21 +253,21 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     borderRadius: toRN(tokens.borderRadius.lg),
     overflow: "hidden" as const,
     backgroundColor: colors.bg.muted,
-    position: "relative" as const,
+    position: "relative" as const
   },
   thumbnailContainerCompleted: {
-    opacity: 0.6,
+    opacity: 0.6
   },
   thumbnail: {
     width: "100%",
-    height: "100%",
+    height: "100%"
   },
   thumbnailPlaceholder: {
     width: "100%",
     height: "100%",
     alignItems: "center" as const,
     justifyContent: "center" as const,
-    backgroundColor: colors.bg.muted,
+    backgroundColor: colors.bg.muted
   },
   completedOverlay: {
     position: "absolute" as const,
@@ -295,53 +277,53 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     bottom: 0,
     backgroundColor: "rgba(0,0,0,0.5)",
     alignItems: "center" as const,
-    justifyContent: "center" as const,
+    justifyContent: "center" as const
   },
   exerciseInfo: {
     flex: 1,
-    marginLeft: toRN(tokens.spacing[3]),
+    marginLeft: toRN(tokens.spacing[3])
   },
   exerciseName: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.semiBold,
     color: colors.text.primary,
     textTransform: "capitalize" as const,
-    marginBottom: toRN(tokens.spacing[0.5]),
+    marginBottom: toRN(tokens.spacing[0.5])
   },
   exerciseNameCompleted: {
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   exerciseNameHighlighted: {
-    color: "white",
+    color: "white"
   },
   exerciseDuration: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   exerciseDurationCompleted: {
-    color: colors.text.muted,
+    color: colors.text.muted
   },
   exerciseDurationHighlighted: {
-    color: "rgba(255,255,255,0.8)",
+    color: "rgba(255,255,255,0.8)"
   },
   bottomContainer: {
     paddingHorizontal: toRN(tokens.spacing[4]),
     paddingTop: toRN(tokens.spacing[3]),
     borderTopWidth: 1,
-    borderTopColor: colors.border.subtle,
+    borderTopColor: colors.border.subtle
   },
   closeButtonBottom: {
     backgroundColor: brand.primary,
     paddingVertical: toRN(tokens.spacing[4]),
     borderRadius: toRN(tokens.borderRadius.xl),
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   closeButtonText: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.semiBold,
-    color: "white",
-  },
+    color: "white"
+  }
 });
 
 export default ExerciseListModal;

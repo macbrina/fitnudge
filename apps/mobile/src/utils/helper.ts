@@ -32,8 +32,7 @@ export const getGradientAverageLuminance = (colors: string[]): number => {
   if (!colors || colors.length === 0) return 0.5;
 
   const luminances = colors.map((color) => getColorLuminance(color));
-  const average =
-    luminances.reduce((sum, lum) => sum + lum, 0) / luminances.length;
+  const average = luminances.reduce((sum, lum) => sum + lum, 0) / luminances.length;
 
   return average;
 };
@@ -58,7 +57,7 @@ export const getContrastingTextColor = (backgroundColors: string[]): string => {
  */
 export const convertTimeToDeviceTimezone = (
   reminderTime: string,
-  userTimezone: string,
+  userTimezone: string
 ): { hours: number; minutes: number } => {
   // Parse reminder time (HH:MM format)
   const [userHours, userMinutes] = reminderTime.split(":").map(Number);
@@ -80,14 +79,7 @@ export const convertTimeToDeviceTimezone = (
 
     // Create a date object representing today at the reminder time in local device time
     // fromZonedTime will interpret this date as if it represents local time in the user's timezone
-    const dateAsUserLocal = new Date(
-      year,
-      month,
-      day,
-      userHours,
-      userMinutes,
-      0,
-    );
+    const dateAsUserLocal = new Date(year, month, day, userHours, userMinutes, 0);
 
     // fromZonedTime: Treats the date as if it represents local time in userTimezone,
     // and returns a Date object representing the same moment in UTC
@@ -103,13 +95,13 @@ export const convertTimeToDeviceTimezone = (
 
     return {
       hours: deviceHours,
-      minutes: deviceMinutes,
+      minutes: deviceMinutes
     };
   } catch (error) {
     console.error(
       "Error converting timezone, using original time:",
       error,
-      `User timezone: ${userTimezone}, Device timezone: ${deviceTimezone}, Reminder time: ${reminderTime}`,
+      `User timezone: ${userTimezone}, Device timezone: ${deviceTimezone}, Reminder time: ${reminderTime}`
     );
     // Fallback to original time if conversion fails
     return { hours: userHours, minutes: userMinutes };
@@ -122,10 +114,7 @@ export const convertTimeToDeviceTimezone = (
  * @param format - Format type: "short" (Jan 15, 2024) or "long" (January 15, 2024)
  * @returns Formatted date string
  */
-export const formatDate = (
-  date: string | Date,
-  format: "short" | "long" = "short",
-): string => {
+export const formatDate = (date: string | Date, format: "short" | "long" = "short"): string => {
   try {
     const dateObj = typeof date === "string" ? new Date(date) : date;
 
@@ -138,12 +127,12 @@ export const formatDate = (
         ? {
             year: "numeric",
             month: "short",
-            day: "numeric",
+            day: "numeric"
           }
         : {
             year: "numeric",
             month: "long",
-            day: "numeric",
+            day: "numeric"
           };
 
     return new Intl.DateTimeFormat("en-US", options).format(dateObj);
@@ -163,11 +152,10 @@ export const formatDate = (
 export const formatWeekRange = (
   startDate: string | Date,
   endDate: string | Date,
-  format: "short" | "long" = "short",
+  format: "short" | "long" = "short"
 ): string => {
   try {
-    const startObj =
-      typeof startDate === "string" ? new Date(startDate) : startDate;
+    const startObj = typeof startDate === "string" ? new Date(startDate) : startDate;
     const endObj = typeof endDate === "string" ? new Date(endDate) : endDate;
 
     if (isNaN(startObj.getTime()) || isNaN(endObj.getTime())) {
@@ -177,21 +165,18 @@ export const formatWeekRange = (
     const monthFormat = format === "short" ? "short" : "long";
 
     const startMonth = new Intl.DateTimeFormat("en-US", {
-      month: monthFormat,
+      month: monthFormat
     }).format(startObj);
     const startDay = startObj.getDate();
 
     const endMonth = new Intl.DateTimeFormat("en-US", {
-      month: monthFormat,
+      month: monthFormat
     }).format(endObj);
     const endDay = endObj.getDate();
     const endYear = endObj.getFullYear();
 
     // If same month, don't repeat month name
-    if (
-      startMonth === endMonth &&
-      startObj.getFullYear() === endObj.getFullYear()
-    ) {
+    if (startMonth === endMonth && startObj.getFullYear() === endObj.getFullYear()) {
       return `${startMonth} ${startDay} - ${endDay}, ${endYear}`;
     }
 
@@ -219,10 +204,7 @@ export const parseISODate = (dateString: string): Date => {
  * @param options - Options for formatting
  * @returns Formatted relative time string
  */
-export const formatTimeAgo = (
-  date: string | Date,
-  options?: { addSuffix?: boolean },
-): string => {
+export const formatTimeAgo = (date: string | Date, options?: { addSuffix?: boolean }): string => {
   try {
     const dateObj = typeof date === "string" ? new Date(date) : date;
 
@@ -231,9 +213,7 @@ export const formatTimeAgo = (
     }
 
     const now = new Date();
-    const diffInSeconds = Math.floor(
-      (now.getTime() - dateObj.getTime()) / 1000,
-    );
+    const diffInSeconds = Math.floor((now.getTime() - dateObj.getTime()) / 1000);
 
     // Handle future dates
     if (diffInSeconds < 0) {

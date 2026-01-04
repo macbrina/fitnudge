@@ -43,39 +43,31 @@ const SHADOW_PRESETS: Record<
     offset: { width: 0, height: 2 },
     radius: 6,
     elevation: 2,
-    opacity: 0.08,
+    opacity: 0.08
   },
   md: {
     offset: { width: 0, height: 6 },
     radius: 12,
     elevation: 4,
-    opacity: 0.12,
+    opacity: 0.12
   },
   lg: {
     offset: { width: 0, height: 12 },
     radius: 18,
     elevation: 6,
-    opacity: 0.16,
+    opacity: 0.16
   },
   xl: {
     offset: { width: 0, height: 18 },
     radius: 28,
     elevation: 9,
-    opacity: 0.24,
-  },
+    opacity: 0.24
+  }
 };
 
 const Card = forwardRef<View, CardProps>(function Card(
-  {
-    children,
-    style,
-    padded = true,
-    shadow = "lg",
-    backgroundColor,
-    disabled = false,
-    ...rest
-  },
-  ref,
+  { children, style, padded = true, shadow = "lg", backgroundColor, disabled = false, ...rest },
+  ref
 ) {
   const { colors } = useTheme();
 
@@ -83,7 +75,7 @@ const Card = forwardRef<View, CardProps>(function Card(
     backgroundColor: backgroundColor ?? colors.bg.card,
     borderRadius: toRN(tokens.borderRadius.xl),
     borderWidth: 1,
-    borderColor: colors.border.subtle,
+    borderColor: colors.border.subtle
   };
 
   if (padded) {

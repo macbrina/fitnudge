@@ -24,7 +24,7 @@ export const BackButton: React.FC<BackButtonProps> = ({
   title,
   titleCentered = false,
   textInput,
-  rightInput,
+  rightInput
 }) => {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
@@ -50,10 +50,7 @@ export const BackButton: React.FC<BackButtonProps> = ({
 
         {hasTextInput && textInputPosition === "left" && (
           <View style={styles.textInputContainer}>
-            <TextInput
-              {...textInput}
-              containerStyle={styles.textInputWrapper}
-            />
+            <TextInput {...textInput} containerStyle={styles.textInputWrapper} />
           </View>
         )}
 
@@ -71,16 +68,11 @@ export const BackButton: React.FC<BackButtonProps> = ({
 
         {hasTextInput && textInputPosition === "right" && (
           <View style={styles.textInputContainer}>
-            <TextInput
-              {...textInput}
-              containerStyle={styles.textInputWrapper}
-            />
+            <TextInput {...textInput} containerStyle={styles.textInputWrapper} />
           </View>
         )}
 
-        {hasRightInput && (
-          <View style={styles.rightInputContainer}>{rightInput}</View>
-        )}
+        {hasRightInput && <View style={styles.rightInputContainer}>{rightInput}</View>}
       </View>
     </View>
   );
@@ -93,14 +85,14 @@ const makeBackButtonStyles = (tokens: any, colors: any, brand: any) => {
       paddingVertical: toRN(tokens.spacing[4]),
       borderBottomWidth: 1,
       borderBottomColor: colors.border.default,
-      marginBottom: toRN(tokens.spacing[4]),
+      marginBottom: toRN(tokens.spacing[4])
     },
     content: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
       justifyContent: "flex-start" as const,
       gap: toRN(tokens.spacing[3]),
-      position: "relative" as const,
+      position: "relative" as const
     },
     backButton: {
       width: 48,
@@ -112,23 +104,23 @@ const makeBackButtonStyles = (tokens: any, colors: any, brand: any) => {
       shadowColor: colors.shadow.default,
       shadowOffset: {
         width: 0,
-        height: 2,
+        height: 2
       },
       shadowOpacity: 0.1,
       shadowRadius: 4,
       elevation: 3,
-      zIndex: 2,
+      zIndex: 2
     },
     title: {
       fontSize: toRN(tokens.typography.fontSize.lg),
       fontWeight: tokens.typography.fontWeight.bold,
       color: colors.text.primary,
       fontFamily: fontFamily.groteskBold,
-      flex: 1,
+      flex: 1
     },
     titleCentered: {
       flex: 0,
-      textAlign: "center" as const,
+      textAlign: "center" as const
     },
     centeredTitleContainer: {
       position: "absolute" as const,
@@ -137,20 +129,20 @@ const makeBackButtonStyles = (tokens: any, colors: any, brand: any) => {
       alignItems: "center" as const,
       justifyContent: "center" as const,
       pointerEvents: "none" as const,
-      zIndex: 0,
+      zIndex: 0
     },
     textInputContainer: {
       flex: 1,
       maxWidth: 200,
-      zIndex: 1,
+      zIndex: 1
     },
     textInputWrapper: {
-      marginBottom: 0,
+      marginBottom: 0
     },
     rightInputContainer: {
       marginLeft: "auto" as const,
-      zIndex: 1,
-    },
+      zIndex: 1
+    }
   };
 };
 

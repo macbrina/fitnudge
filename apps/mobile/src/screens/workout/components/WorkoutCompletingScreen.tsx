@@ -14,7 +14,7 @@ const MESSAGES = [
   "On fire today! 🔥",
   "Great session! ⭐",
   "Well done! 🏆",
-  "Amazing work! ✨",
+  "Amazing work! ✨"
 ];
 
 export function WorkoutCompletingScreen() {
@@ -28,9 +28,7 @@ export function WorkoutCompletingScreen() {
   const spinValue = useRef(new Animated.Value(0)).current;
 
   // Message cycling
-  const [messageIndex, setMessageIndex] = useState(
-    Math.floor(Math.random() * MESSAGES.length),
-  );
+  const [messageIndex, setMessageIndex] = useState(Math.floor(Math.random() * MESSAGES.length));
 
   // Check icon pop-in and pulse
   useEffect(() => {
@@ -41,13 +39,13 @@ export function WorkoutCompletingScreen() {
           toValue: 1,
           friction: 4,
           tension: 100,
-          useNativeDriver: true,
+          useNativeDriver: true
         }),
         Animated.timing(checkOpacity, {
           toValue: 1,
           duration: 300,
-          useNativeDriver: true,
-        }),
+          useNativeDriver: true
+        })
       ]),
       // Gentle pulse loop
       Animated.loop(
@@ -56,16 +54,16 @@ export function WorkoutCompletingScreen() {
             toValue: 1.05,
             duration: 1000,
             easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
+            useNativeDriver: true
           }),
           Animated.timing(pulseScale, {
             toValue: 1,
             duration: 1000,
             easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
-          }),
-        ]),
-      ),
+            useNativeDriver: true
+          })
+        ])
+      )
     ]).start();
   }, []);
 
@@ -76,8 +74,8 @@ export function WorkoutCompletingScreen() {
         toValue: 1,
         duration: 1500,
         easing: Easing.linear,
-        useNativeDriver: true,
-      }),
+        useNativeDriver: true
+      })
     ).start();
   }, []);
 
@@ -91,7 +89,7 @@ export function WorkoutCompletingScreen() {
 
   const spin = spinValue.interpolate({
     inputRange: [0, 1],
-    outputRange: ["0deg", "360deg"],
+    outputRange: ["0deg", "360deg"]
   });
 
   return (
@@ -103,8 +101,8 @@ export function WorkoutCompletingScreen() {
             styles.iconContainer,
             {
               opacity: checkOpacity,
-              transform: [{ scale: pulseScale }],
-            },
+              transform: [{ scale: pulseScale }]
+            }
           ]}
         >
           <View style={styles.iconCircle}>
@@ -113,9 +111,7 @@ export function WorkoutCompletingScreen() {
         </Animated.View>
 
         {/* Title */}
-        <Text style={styles.title}>
-          {t("workout.completing_title", "Workout Complete!")}
-        </Text>
+        <Text style={styles.title}>{t("workout.completing_title", "Workout Complete!")}</Text>
 
         {/* Cycling message */}
         <Text style={styles.message}>{MESSAGES[messageIndex]}</Text>
@@ -137,16 +133,16 @@ export function WorkoutCompletingScreen() {
 const makeStyles = (tokens: any, colors: any, brand: any) => ({
   container: {
     flex: 1,
-    backgroundColor: colors.bg.canvas,
+    backgroundColor: colors.bg.canvas
   },
   content: {
     flex: 1,
     alignItems: "center" as const,
     justifyContent: "center" as const,
-    paddingHorizontal: toRN(tokens.spacing[6]),
+    paddingHorizontal: toRN(tokens.spacing[6])
   },
   iconContainer: {
-    marginBottom: toRN(tokens.spacing[6]),
+    marginBottom: toRN(tokens.spacing[6])
   },
   iconCircle: {
     width: 88,
@@ -156,30 +152,30 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     alignItems: "center" as const,
     justifyContent: "center" as const,
     borderWidth: 3,
-    borderColor: brand.primary,
+    borderColor: brand.primary
   },
   title: {
     fontSize: toRN(24),
     fontFamily: fontFamily.groteskBold,
     color: colors.text.primary,
     textAlign: "center" as const,
-    marginBottom: toRN(tokens.spacing[2]),
+    marginBottom: toRN(tokens.spacing[2])
   },
   message: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.medium,
     color: colors.text.secondary,
     textAlign: "center" as const,
-    marginBottom: toRN(tokens.spacing[10]),
+    marginBottom: toRN(tokens.spacing[10])
   },
   loadingSection: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    gap: toRN(tokens.spacing[2]),
+    gap: toRN(tokens.spacing[2])
   },
   loadingText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
-    color: colors.text.tertiary,
-  },
+    color: colors.text.tertiary
+  }
 });

@@ -15,44 +15,44 @@ export default function UserLayout() {
         <Stack.Screen
           name="(tabs)"
           options={{
-            headerShown: false,
+            headerShown: false
           }}
         />
         <Stack.Screen
           name="(onboarding)"
           options={{
-            headerShown: false,
+            headerShown: false
           }}
         />
         <Stack.Screen
           name="(goals)"
           options={{
-            headerShown: false,
+            headerShown: false
           }}
         />
         <Stack.Screen
           name="challenges"
           options={{
-            headerShown: false,
+            headerShown: false
           }}
         />
         <Stack.Screen
           name="social"
           options={{
-            headerShown: false,
+            headerShown: false
           }}
         />
 
         <Stack.Screen
           name="workout"
           options={{
-            headerShown: false,
+            headerShown: false
           }}
         />
         <Stack.Screen
           name="profile"
           options={{
-            headerShown: false,
+            headerShown: false
           }}
         />
       </Stack.Protected>

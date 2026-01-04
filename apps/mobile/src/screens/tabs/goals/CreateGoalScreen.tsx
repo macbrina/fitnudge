@@ -29,8 +29,7 @@ export default function CreateGoalScreen() {
   }>();
 
   const [activeTab, setActiveTab] = useState<TabType>("suggestions");
-  const [selectedSuggestion, setSelectedSuggestion] =
-    useState<SuggestedGoal | null>(null);
+  const [selectedSuggestion, setSelectedSuggestion] = useState<SuggestedGoal | null>(null);
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
   const [showSubscriptionScreen, setShowSubscriptionScreen] = useState(false);
   // Track what type of item user wants to create in custom tab
@@ -41,19 +40,15 @@ export default function CreateGoalScreen() {
   const { colors, brandColors, isDark } = useTheme();
 
   // Check goal limits and challenge limits
-  const { canCreateGoal, canParticipateInChallenge, getPlan, hasFeature } =
-    useSubscriptionStore();
-  const { data: activeGoalsResponse, isLoading: isLoadingGoals } =
-    useActiveGoals();
-  const { data: myChallengesResponse, isLoading: isLoadingChallenges } =
-    useMyChallenges();
+  const { canCreateGoal, canParticipateInChallenge, getPlan, hasFeature } = useSubscriptionStore();
+  const { data: activeGoalsResponse, isLoading: isLoadingGoals } = useActiveGoals();
+  const { data: myChallengesResponse, isLoading: isLoadingChallenges } = useMyChallenges();
 
   const activeGoalCount = activeGoalsResponse?.data?.length || 0;
   // Only count active/upcoming challenges, not archived/completed ones
   const activeChallengeCount =
-    myChallengesResponse?.data?.filter(
-      (c: any) => c.status === "active" || c.status === "upcoming",
-    ).length || 0;
+    myChallengesResponse?.data?.filter((c: any) => c.status === "active" || c.status === "upcoming")
+      .length || 0;
 
   const canCreateNewGoal = canCreateGoal(activeGoalCount);
   const canCreateNewChallenge = canParticipateInChallenge(activeChallengeCount);
@@ -150,9 +145,7 @@ export default function CreateGoalScreen() {
   // Render the type selector for custom tab
   const renderTypeSelector = () => (
     <View style={styles.typeSelectorContainer}>
-      <Text style={styles.typeSelectorTitle}>
-        {t("goals.create.what_to_create")}
-      </Text>
+      <Text style={styles.typeSelectorTitle}>{t("goals.create.what_to_create")}</Text>
 
       {/* Goal Option */}
       <TouchableOpacity
@@ -164,10 +157,8 @@ export default function CreateGoalScreen() {
           style={[
             styles.typeIconContainer,
             {
-              backgroundColor: goalLimitReached
-                ? disabledBgColor
-                : `${goalColor}15`,
-            },
+              backgroundColor: goalLimitReached ? disabledBgColor : `${goalColor}15`
+            }
           ]}
         >
           <Ionicons
@@ -177,12 +168,7 @@ export default function CreateGoalScreen() {
           />
         </View>
         <View style={styles.typeTextContainer}>
-          <Text
-            style={[
-              styles.typeCardTitle,
-              goalLimitReached && styles.typeCardTitleDisabled,
-            ]}
-          >
+          <Text style={[styles.typeCardTitle, goalLimitReached && styles.typeCardTitleDisabled]}>
             {t("goals.create.as_goal")}
           </Text>
           <Text style={styles.typeCardDescription}>
@@ -194,20 +180,13 @@ export default function CreateGoalScreen() {
         {goalLimitReached ? (
           <Ionicons name="lock-closed" size={20} color={disabledColor} />
         ) : (
-          <Ionicons
-            name="chevron-forward"
-            size={24}
-            color={colors.text.tertiary}
-          />
+          <Ionicons name="chevron-forward" size={24} color={colors.text.tertiary} />
         )}
       </TouchableOpacity>
 
       {/* Challenge Option */}
       <TouchableOpacity
-        style={[
-          styles.typeCard,
-          challengeLimitReached && styles.typeCardDisabled,
-        ]}
+        style={[styles.typeCard, challengeLimitReached && styles.typeCardDisabled]}
         onPress={() => {
           if (challengeFeatureDisabled) {
             // Show subscription modal - hybrid approach
@@ -226,10 +205,8 @@ export default function CreateGoalScreen() {
           style={[
             styles.typeIconContainer,
             {
-              backgroundColor: challengeLimitReached
-                ? disabledBgColor
-                : `${challengeColor}15`,
-            },
+              backgroundColor: challengeLimitReached ? disabledBgColor : `${challengeColor}15`
+            }
           ]}
         >
           <Ionicons
@@ -241,10 +218,7 @@ export default function CreateGoalScreen() {
         <View style={styles.typeTextContainer}>
           <View style={styles.titleRow}>
             <Text
-              style={[
-                styles.typeCardTitle,
-                challengeLimitReached && styles.typeCardTitleDisabled,
-              ]}
+              style={[styles.typeCardTitle, challengeLimitReached && styles.typeCardTitleDisabled]}
             >
               {t("goals.create.as_challenge")}
             </Text>
@@ -256,19 +230,14 @@ export default function CreateGoalScreen() {
           </View>
           <Text style={styles.typeCardDescription}>
             {challengeLimitReached
-              ? t("goals.create.challenge_limit_reached") ||
-                "Challenge limit reached"
+              ? t("goals.create.challenge_limit_reached") || "Challenge limit reached"
               : t("goals.create.as_challenge_desc")}
           </Text>
         </View>
         {challengeLimitReached ? (
           <Ionicons name="lock-closed" size={20} color={disabledColor} />
         ) : (
-          <Ionicons
-            name="chevron-forward"
-            size={24}
-            color={colors.text.tertiary}
-          />
+          <Ionicons name="chevron-forward" size={24} color={colors.text.tertiary} />
         )}
       </TouchableOpacity>
     </View>
@@ -290,10 +259,7 @@ export default function CreateGoalScreen() {
       {/* Segmented Control */}
       <View style={styles.segmentedControlContainer}>
         <SegmentedControl
-          options={[
-            t("goals.create.tabs.suggestions"),
-            t("goals.create.tabs.custom"),
-          ]}
+          options={[t("goals.create.tabs.suggestions"), t("goals.create.tabs.custom")]}
           selectedIndex={activeTab === "suggestions" ? 0 : 1}
           onChange={handleTabChange}
         />
@@ -323,12 +289,10 @@ export default function CreateGoalScreen() {
                     title: selectedSuggestion.title,
                     description: selectedSuggestion.description,
                     category: selectedSuggestion.category,
-                    frequency: selectedSuggestion.frequency as
-                      | "daily"
-                      | "weekly",
+                    frequency: selectedSuggestion.frequency as "daily" | "weekly",
                     target_days: selectedSuggestion.target_days,
                     days_of_week: selectedSuggestion.days_of_week,
-                    reminder_times: selectedSuggestion.reminder_times,
+                    reminder_times: selectedSuggestion.reminder_times
                   }
                 : undefined
             }
@@ -357,7 +321,7 @@ const makeCreateGoalScreenStyles = (tokens: any, colors: any, brand: any) => {
   return {
     container: {
       flex: 1,
-      backgroundColor: colors.bg.canvas,
+      backgroundColor: colors.bg.canvas
     },
     segmentedControlContainer: {
       paddingHorizontal: toRN(tokens.spacing[6]),
@@ -365,16 +329,16 @@ const makeCreateGoalScreenStyles = (tokens: any, colors: any, brand: any) => {
       paddingBottom: toRN(tokens.spacing[3]),
       backgroundColor: colors.bg.canvas,
       borderBottomWidth: 1,
-      borderBottomColor: colors.border.default,
+      borderBottomColor: colors.border.default
     },
     content: {
-      flex: 1,
+      flex: 1
     },
     // Type selector styles
     typeSelectorContainer: {
       flex: 1,
       paddingHorizontal: toRN(tokens.spacing[6]),
-      paddingTop: toRN(tokens.spacing[8]),
+      paddingTop: toRN(tokens.spacing[8])
     },
     typeSelectorTitle: {
       fontSize: toRN(tokens.typography.fontSize.xl),
@@ -382,7 +346,7 @@ const makeCreateGoalScreenStyles = (tokens: any, colors: any, brand: any) => {
       color: colors.text.primary,
       fontFamily: fontFamily.groteskBold,
       marginBottom: toRN(tokens.spacing[6]),
-      textAlign: "center" as const,
+      textAlign: "center" as const
     },
     typeCard: {
       flexDirection: "row" as const,
@@ -392,7 +356,7 @@ const makeCreateGoalScreenStyles = (tokens: any, colors: any, brand: any) => {
       borderWidth: 2,
       borderColor: colors.border.default,
       backgroundColor: colors.bg.surface,
-      marginBottom: toRN(tokens.spacing[4]),
+      marginBottom: toRN(tokens.spacing[4])
     },
     typeIconContainer: {
       width: toRN(56),
@@ -400,47 +364,47 @@ const makeCreateGoalScreenStyles = (tokens: any, colors: any, brand: any) => {
       borderRadius: toRN(tokens.borderRadius.lg),
       alignItems: "center" as const,
       justifyContent: "center" as const,
-      marginRight: toRN(tokens.spacing[4]),
+      marginRight: toRN(tokens.spacing[4])
     },
     typeTextContainer: {
-      flex: 1,
+      flex: 1
     },
     typeCardTitle: {
       fontSize: toRN(tokens.typography.fontSize.lg),
       fontWeight: tokens.typography.fontWeight.semibold,
       color: colors.text.primary,
       fontFamily: fontFamily.groteskSemiBold,
-      marginBottom: toRN(tokens.spacing[1]),
+      marginBottom: toRN(tokens.spacing[1])
     },
     typeCardTitleDisabled: {
-      color: colors.text.tertiary,
+      color: colors.text.tertiary
     },
     typeCardDescription: {
       fontSize: toRN(tokens.typography.fontSize.sm),
       color: colors.text.secondary,
-      fontFamily: fontFamily.groteskRegular,
+      fontFamily: fontFamily.groteskRegular
     },
     typeCardDisabled: {
       opacity: 0.7,
-      borderColor: colors.border.muted || colors.border.default,
+      borderColor: colors.border.muted || colors.border.default
     },
     titleRow: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
-      marginBottom: toRN(tokens.spacing[1]),
+      marginBottom: toRN(tokens.spacing[1])
     },
     proBadge: {
       backgroundColor: brand.gradient?.start || "#8B5CF6",
       paddingHorizontal: toRN(tokens.spacing[2]),
       paddingVertical: toRN(2),
       borderRadius: toRN(tokens.borderRadius.sm),
-      marginLeft: toRN(tokens.spacing[2]),
+      marginLeft: toRN(tokens.spacing[2])
     },
     proBadgeText: {
       fontSize: toRN(tokens.typography.fontSize.xs),
       fontFamily: fontFamily.bold,
       color: "#FFFFFF",
-      textTransform: "uppercase" as const,
-    },
+      textTransform: "uppercase" as const
+    }
   };
 };

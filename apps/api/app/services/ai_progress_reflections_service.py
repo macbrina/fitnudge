@@ -1,7 +1,7 @@
 """
 AI Progress Reflections Service
 
-Premium AI-powered progress reflections for Pro/Elite users.
+Premium AI-powered progress reflections for premium users.
 Enhanced version of weekly recap with deeper insights and coaching.
 """
 

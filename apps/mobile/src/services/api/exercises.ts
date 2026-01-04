@@ -44,9 +44,7 @@ class ExercisesService extends BaseApiService {
   /**
    * Search exercises with filters
    */
-  async searchExercises(
-    params: SearchExercisesParams = {},
-  ): Promise<ExerciseListResponse> {
+  async searchExercises(params: SearchExercisesParams = {}): Promise<ExerciseListResponse> {
     const queryParams = new URLSearchParams();
 
     if (params.query) queryParams.append("query", params.query);
@@ -54,8 +52,7 @@ class ExercisesService extends BaseApiService {
     if (params.equipment) queryParams.append("equipment", params.equipment);
     if (params.difficulty) queryParams.append("difficulty", params.difficulty);
     if (params.category) queryParams.append("category", params.category);
-    if (params.target_muscle)
-      queryParams.append("target_muscle", params.target_muscle);
+    if (params.target_muscle) queryParams.append("target_muscle", params.target_muscle);
     if (params.limit) queryParams.append("limit", params.limit.toString());
 
     const queryString = queryParams.toString();
@@ -69,9 +66,7 @@ class ExercisesService extends BaseApiService {
    * Get popular exercises
    */
   async getPopularExercises(limit: number = 20): Promise<ExerciseListResponse> {
-    const response = await this.get<ExerciseListResponse>(
-      `/exercises/popular/list?limit=${limit}`,
-    );
+    const response = await this.get<ExerciseListResponse>(`/exercises/popular/list?limit=${limit}`);
     return response.data || { exercises: [], total: 0 };
   }
 }

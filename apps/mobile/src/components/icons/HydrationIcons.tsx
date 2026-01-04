@@ -12,7 +12,7 @@ import Svg, {
   FeBlend,
   LinearGradient,
   Stop,
-  Mask,
+  Mask
 } from "react-native-svg";
 import { useTheme } from "@/themes";
 
@@ -229,20 +229,8 @@ const BottleIcon = ({ size = 24, color }: { size: number; color: string }) => (
     />
     <Rect x="208.176" y="7.014" fill="#FF6243" width="96.188" height="40.078" />
     <G>
-      <Rect
-        x="208.176"
-        y="7.014"
-        fill="#D80027"
-        width="16.031"
-        height="40.078"
-      />
-      <Rect
-        x="208.176"
-        y="31.061"
-        fill="#D80027"
-        width="96.188"
-        height="16.031"
-      />
+      <Rect x="208.176" y="7.014" fill="#D80027" width="16.031" height="40.078" />
+      <Rect x="208.176" y="31.061" fill="#D80027" width="96.188" height="16.031" />
     </G>
     <Path
       d="M367.859,339.663c0-11.391-5.325-21.54-13.68-28.055c8.354-6.515,13.774-16.664,13.774-28.055
@@ -263,41 +251,11 @@ const BottleIcon = ({ size = 24, color }: { size: number; color: string }) => (
  h-20.039v15.029H332.415z"
     />
     <G>
-      <Rect
-        x="200.16"
-        y="111.718"
-        fill="#FFFFFF"
-        width="16.031"
-        height="15.029"
-      />
-      <Rect
-        x="216.192"
-        y="95.687"
-        fill="#FFFFFF"
-        width="16.031"
-        height="15.029"
-      />
-      <Rect
-        x="280.317"
-        y="304.094"
-        fill="#FFFFFF"
-        width="16.031"
-        height="15.029"
-      />
-      <Rect
-        x="280.317"
-        y="247.984"
-        fill="#FFFFFF"
-        width="16.031"
-        height="15.029"
-      />
-      <Rect
-        x="280.317"
-        y="360.204"
-        fill="#FFFFFF"
-        width="16.031"
-        height="15.029"
-      />
+      <Rect x="200.16" y="111.718" fill="#FFFFFF" width="16.031" height="15.029" />
+      <Rect x="216.192" y="95.687" fill="#FFFFFF" width="16.031" height="15.029" />
+      <Rect x="280.317" y="304.094" fill="#FFFFFF" width="16.031" height="15.029" />
+      <Rect x="280.317" y="247.984" fill="#FFFFFF" width="16.031" height="15.029" />
+      <Rect x="280.317" y="360.204" fill="#FFFFFF" width="16.031" height="15.029" />
     </G>
   </Svg>
 );
@@ -307,13 +265,7 @@ const BottleIcon = ({ size = 24, color }: { size: number; color: string }) => (
  * Flaticon search: "large bottle", "sports bottle", "water jug"
  * Recommended: Larger bottle with handle or sports bottle
  */
-const LargeBottleIcon = ({
-  size = 24,
-  color,
-}: {
-  size: number;
-  color: string;
-}) => (
+const LargeBottleIcon = ({ size = 24, color }: { size: number; color: string }) => (
   <Svg viewBox="0 0 500 500" height={size} width={size}>
     <Filter
       id="Adobe_OpacityMaskFilter"
@@ -692,10 +644,7 @@ const LargeBottleIcon = ({
         fill="url(#SVGID_14_)"
         opacity=".4"
       />
-      <Path
-        d="m125.402 231.726h249.196v142.982h-249.196z"
-        fill="url(#SVGID_15_)"
-      />
+      <Path d="m125.402 231.726h249.196v142.982h-249.196z" fill="url(#SVGID_15_)" />
       <Path
         d="m132.127 436.514c0-2.271 1.637-4.192 3.79-4.914 6.417-2.15 11.05-8.159 11.05-15.303 0-7.221-4.734-13.284-11.26-15.372-2.124-.679-3.58-2.614-3.58-4.844v-178.428c0-2.229 1.458-4.165 3.581-4.844 6.526-2.088 11.259-8.15 11.259-15.371 0-6.522-3.855-12.123-9.406-14.693-2.209-1.023-3.626-3.303-3.155-5.69 7.363-37.296 33.062-67.902 67.323-82.147 12.42-5.165 20.193-17.673 20.193-31.124v-5.946h-6.726v5.946c0 13.451-7.773 25.959-20.193 31.124-34.26 14.245-59.96 44.851-67.322 82.147-.471 2.387.946 4.667 3.154 5.69 5.551 2.57 9.406 8.171 9.406 14.693 0 7.222-4.733 13.283-11.259 15.371-2.124.679-3.581 2.615-3.581 4.844v178.429c0 2.23 1.458 4.164 3.581 4.844 6.526 2.088 11.259 8.151 11.259 15.372 0 7.144-4.632 13.153-11.049 15.303-2.154.722-3.79 2.643-3.79 4.914.001 21.254 17.232 38.485 38.487 38.485h6.725c-21.255 0-38.486-17.231-38.487-38.486z"
         fill="#fff"
@@ -850,17 +799,11 @@ const JugIcon = ({ size = 24, color }: { size: number; color: string }) => (
  * Main HydrationIcon component
  * Renders the appropriate icon based on hydration type
  */
-export function HydrationIcon({
-  type,
-  size = 24,
-  color,
-  selected = false,
-}: HydrationIconProps) {
+export function HydrationIcon({ type, size = 24, color, selected = false }: HydrationIconProps) {
   const { colors, brandColors } = useTheme();
 
   // Use provided color or default based on selection state
-  const iconColor =
-    color || (selected ? brandColors.onPrimary : colors.text.primary);
+  const iconColor = color || (selected ? brandColors.onPrimary : colors.text.primary);
 
   switch (type) {
     case "glass":
@@ -884,7 +827,7 @@ export function HydrationIcon({
 export const HYDRATION_PRESETS = {
   glass: 237, // 8 oz
   bottle: 500, // 16 oz
-  large_bottle: 750, // 25 oz
+  large_bottle: 750 // 25 oz
 } as const;
 
 export const HYDRATION_TYPES: {
@@ -899,8 +842,8 @@ export const HYDRATION_TYPES: {
     key: "large_bottle",
     label: "Large Bottle",
     sublabel: "25 oz (750ml)",
-    amount: 750,
-  },
+    amount: 750
+  }
 ];
 
 // Export individual icons for direct use if needed

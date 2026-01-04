@@ -15,7 +15,7 @@ export const semanticLight = {
     warning: tokens.colors.light.warning, // #f59e0b
     overlay: "rgba(0, 0, 0, 0.5)", // Modal overlay
     overlayLight: "rgba(0, 0, 0, 0.1)", // Modal overlay
-    overlayTransparent: "rgba(0, 0, 0, 0.0)", // Modal overlay
+    overlayTransparent: "rgba(0, 0, 0, 0.0)" // Modal overlay
   },
   text: {
     primary: tokens.colors.light.foreground, // #0f172a
@@ -27,26 +27,26 @@ export const semanticLight = {
     onAccent: tokens.colors.light.accentForeground, // #0f172a
     onDestructive: tokens.colors.light.destructiveForeground, // #ffffff
     onSuccess: tokens.colors.light.successForeground, // #ffffff
-    onWarning: tokens.colors.light.warningForeground, // #ffffff
+    onWarning: tokens.colors.light.warningForeground // #ffffff
   },
   border: {
     default: tokens.colors.light.border, // #e2e8f0
     subtle: tokens.colors.light.borderSubtle, // #e2e8f0
     input: tokens.colors.light.input, // #e2e8f0
-    ring: tokens.colors.light.ring, // #2563eb
+    ring: tokens.colors.light.ring // #2563eb
   },
   feedback: {
     success: tokens.colors.light.success, // #10b981
     error: tokens.colors.light.destructive, // #ef4444
-    warning: tokens.colors.light.warning, // #f59e0b
+    warning: tokens.colors.light.warning // #f59e0b
   },
   shadow: {
     default: "rgba(0, 0, 0, 0.1)", // Light shadow
     sm: "rgba(0, 0, 0, 0.05)", // Small shadow
     md: "rgba(0, 0, 0, 0.1)", // Medium shadow
     lg: "rgba(0, 0, 0, 0.15)", // Large shadow
-    xl: "rgba(0, 0, 0, 0.2)", // Extra large shadow
-  },
+    xl: "rgba(0, 0, 0, 0.2)" // Extra large shadow
+  }
 } as const;
 
 export const semanticDark = {
@@ -63,7 +63,7 @@ export const semanticDark = {
     warning: tokens.colors.dark.warning, // #fbbf24
     overlay: "rgba(0, 0, 0, 0.7)", // Modal overlay
     overlayLight: "rgba(0, 0, 0, 0.1)", // Modal overlay
-    overlayTransparent: "rgba(0, 0, 0, 0.0)", // Modal overlay
+    overlayTransparent: "rgba(0, 0, 0, 0.0)" // Modal overlay
   },
   text: {
     primary: tokens.colors.dark.foreground, // #f8fafc
@@ -75,26 +75,26 @@ export const semanticDark = {
     onAccent: tokens.colors.dark.accentForeground, // #f8fafc
     onDestructive: tokens.colors.dark.destructiveForeground, // #ffffff
     onSuccess: tokens.colors.dark.successForeground, // #064e3b
-    onWarning: tokens.colors.dark.warningForeground, // #78350f
+    onWarning: tokens.colors.dark.warningForeground // #78350f
   },
   border: {
     default: tokens.colors.dark.border, // #334155
     subtle: tokens.colors.dark.borderSubtle, // #334155
     input: tokens.colors.dark.input, // #334155
-    ring: tokens.colors.dark.ring, // #3b82f6
+    ring: tokens.colors.dark.ring // #3b82f6
   },
   feedback: {
     success: tokens.colors.dark.success, // #34d399
     error: tokens.colors.dark.destructive, // #dc2626
-    warning: tokens.colors.dark.warning, // #fbbf24
+    warning: tokens.colors.dark.warning // #fbbf24
   },
   shadow: {
     default: "rgba(0, 0, 0, 0.3)", // Dark shadow
     sm: "rgba(0, 0, 0, 0.2)", // Small shadow
     md: "rgba(0, 0, 0, 0.3)", // Medium shadow
     lg: "rgba(0, 0, 0, 0.4)", // Large shadow
-    xl: "rgba(0, 0, 0, 0.5)", // Extra large shadow
-  },
+    xl: "rgba(0, 0, 0, 0.5)" // Extra large shadow
+  }
 } as const;
 
 export type SemanticColors = typeof semanticLight;

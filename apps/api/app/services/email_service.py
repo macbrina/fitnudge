@@ -6,6 +6,8 @@ Supports Namecheap Private Email and other SMTP providers
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email import encoders
 from email.utils import formataddr
 from typing import Optional
 from app.core.config import settings
@@ -153,6 +155,85 @@ Alternatively, you can manually enter this reset token in the app:
 This token will expire in 1 hour.
 
 If you didn't request a password reset, please ignore this email.
+
+Best regards,
+The FitNudge Team
+"""
+
+    async def send_data_export_email(
+        self, to_email: str, user_name: str, export_data: str
+    ) -> bool:
+        """
+        Send data export email with user's data as JSON attachment.
+
+        Args:
+            to_email: Recipient email address
+            user_name: User's name for personalization
+            export_data: JSON string of user's data
+
+        Returns:
+            bool: True if email sent successfully, False otherwise
+        """
+        try:
+            subject = "Your FitNudge Data Export"
+            body = self._create_data_export_email_body(user_name)
+
+            message = MIMEMultipart("mixed")
+            message["Subject"] = subject
+            message["From"] = self.from_header
+            message["To"] = to_email
+            message["Reply-To"] = self.reply_to_email
+
+            # Add plain text part
+            text_part = MIMEText(body, "plain")
+            message.attach(text_part)
+
+            # Add JSON file attachment
+            attachment = MIMEBase("application", "json")
+            attachment.set_payload(export_data.encode("utf-8"))
+            encoders.encode_base64(attachment)
+            attachment.add_header(
+                "Content-Disposition",
+                "attachment",
+                filename="fitnudge_data_export.json"
+            )
+            message.attach(attachment)
+
+            # Send email
+            with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
+                server.starttls()
+                server.login(self.smtp_username, self.smtp_password)
+                server.sendmail(self.from_email, to_email, message.as_string())
+
+            logger.info(f"Data export email sent to {to_email}")
+            return True
+
+        except Exception as e:
+            logger.error(
+                "Failed to send data export email",
+                {
+                    "to": to_email,
+                    "error": str(e),
+                },
+            )
+            return False
+
+    def _create_data_export_email_body(self, user_name: str) -> str:
+        """Create email body for data export"""
+        return f"""Hi {user_name}!
+
+Your FitNudge data export is ready. Please find your data attached to this email as a JSON file.
+
+This file contains all the data we have stored about you, including:
+- Your profile information
+- Goals and check-ins
+- Fitness preferences
+- Workout sessions
+- Meal and hydration logs
+- Achievements
+- And more
+
+If you have any questions about your data, please contact us at {self.reply_to_email}.
 
 Best regards,
 The FitNudge Team

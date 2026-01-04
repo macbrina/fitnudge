@@ -26,7 +26,7 @@ export function ExerciseCountdown({
   visible,
   onComplete,
   coachVoiceEnabled = true,
-  isPaused = false,
+  isPaused = false
 }: ExerciseCountdownProps) {
   const { brandColors } = useTheme();
   const [currentNumber, setCurrentNumber] = useState(3);
@@ -78,20 +78,13 @@ export function ExerciseCountdown({
           },
           onError: () => {
             onComplete();
-          },
+          }
         });
       } else {
         onComplete();
       }
     }
-  }, [
-    visible,
-    isPaused,
-    wasEverPaused,
-    countdownStarted,
-    coachVoiceEnabled,
-    onComplete,
-  ]);
+  }, [visible, isPaused, wasEverPaused, countdownStarted, coachVoiceEnabled, onComplete]);
 
   // Run countdown when visible
   useEffect(() => {
@@ -132,7 +125,7 @@ export function ExerciseCountdown({
       if (coachVoiceEnabled) {
         Speech.speak(String(num), {
           rate: 1.0,
-          pitch: 1.1,
+          pitch: 1.1
         });
       }
 
@@ -149,19 +142,19 @@ export function ExerciseCountdown({
             toValue: 0,
             tension: 80,
             friction: 10,
-            useNativeDriver: true,
+            useNativeDriver: true
           }),
           Animated.timing(opacity, {
             toValue: 1,
             duration: 150,
-            useNativeDriver: true,
+            useNativeDriver: true
           }),
           Animated.spring(scale, {
             toValue: 1,
             tension: 80,
             friction: 8,
-            useNativeDriver: true,
-          }),
+            useNativeDriver: true
+          })
         ]),
         // Hold briefly
         Animated.delay(300),
@@ -170,14 +163,14 @@ export function ExerciseCountdown({
           Animated.timing(translateY, {
             toValue: 80,
             duration: 250,
-            useNativeDriver: true,
+            useNativeDriver: true
           }),
           Animated.timing(opacity, {
             toValue: 0,
             duration: 250,
-            useNativeDriver: true,
-          }),
-        ]),
+            useNativeDriver: true
+          })
+        ])
       ]);
 
       animationRef.current = animation;
@@ -205,7 +198,7 @@ export function ExerciseCountdown({
               onError: () => {
                 isSpeakingGo = false;
                 if (isMountedRef.current) onComplete();
-              },
+              }
             });
           } else {
             onComplete();
@@ -240,8 +233,8 @@ export function ExerciseCountdown({
           {
             color: brandColors.primary,
             transform: [{ translateY }, { scale }],
-            opacity,
-          },
+            opacity
+          }
         ]}
       >
         {currentNumber}
@@ -255,13 +248,13 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     justifyContent: "center",
     alignItems: "center",
-    zIndex: 50,
+    zIndex: 50
   },
   number: {
     fontSize: toRN(180),
     fontFamily: fontFamily.groteskBold,
     textShadowColor: "rgba(0,0,0,0.3)",
     textShadowOffset: { width: 0, height: 4 },
-    textShadowRadius: 8,
-  },
+    textShadowRadius: 8
+  }
 });

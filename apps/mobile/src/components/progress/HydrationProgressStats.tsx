@@ -26,17 +26,13 @@ interface HydrationProgressStatsProps {
 export function HydrationProgressStats({
   entityId,
   entityType = "goal",
-  period = 30,
+  period = 30
 }: HydrationProgressStatsProps) {
   const { t } = useTranslation();
   const styles = useStyles(makeStyles);
   const { colors, brandColors } = useTheme();
 
-  const { data: stats, isLoading } = useHydrationStats(
-    entityId,
-    entityType,
-    period,
-  );
+  const { data: stats, isLoading } = useHydrationStats(entityId, entityType, period);
 
   if (isLoading) {
     return (
@@ -50,7 +46,7 @@ export function HydrationProgressStats({
 
   const todayPercentage = Math.min(
     100,
-    Math.round((stats.intake_today_ml / stats.daily_target_ml) * 100),
+    Math.round((stats.intake_today_ml / stats.daily_target_ml) * 100)
   );
 
   const formatMl = (ml: number) => {
@@ -64,9 +60,7 @@ export function HydrationProgressStats({
     <View style={styles.container}>
       <View style={styles.header}>
         <Ionicons name="water" size={18} color={brandColors.primary} />
-        <Text style={styles.title}>
-          {t("progress.hydration_stats") || "Hydration Stats"}
-        </Text>
+        <Text style={styles.title}>{t("progress.hydration_stats") || "Hydration Stats"}</Text>
         <Text style={styles.period}>
           {t("progress.last_days", { days: period }) || `Last ${period} days`}
         </Text>
@@ -76,12 +70,8 @@ export function HydrationProgressStats({
       <View style={styles.todayCard}>
         <Text style={styles.todayLabel}>{t("progress.today") || "Today"}</Text>
         <View style={styles.todayProgress}>
-          <Text style={styles.todayValue}>
-            {formatMl(stats.intake_today_ml)}
-          </Text>
-          <Text style={styles.todayTarget}>
-            / {formatMl(stats.daily_target_ml)}
-          </Text>
+          <Text style={styles.todayValue}>{formatMl(stats.intake_today_ml)}</Text>
+          <Text style={styles.todayTarget}>/ {formatMl(stats.daily_target_ml)}</Text>
         </View>
         <View style={styles.progressBarBg}>
           <View
@@ -90,10 +80,8 @@ export function HydrationProgressStats({
               {
                 width: `${todayPercentage}%`,
                 backgroundColor:
-                  todayPercentage >= 100
-                    ? colors.feedback.success
-                    : brandColors.primary,
-              },
+                  todayPercentage >= 100 ? colors.feedback.success : brandColors.primary
+              }
             ]}
           />
         </View>
@@ -103,20 +91,14 @@ export function HydrationProgressStats({
       <View style={styles.statsGrid}>
         {/* Avg Daily */}
         <View style={styles.statItem}>
-          <Text style={styles.statValue}>
-            {formatMl(Math.round(stats.avg_daily_intake_ml))}
-          </Text>
-          <Text style={styles.statLabel}>
-            {t("progress.avg_daily") || "Avg/Day"}
-          </Text>
+          <Text style={styles.statValue}>{formatMl(Math.round(stats.avg_daily_intake_ml))}</Text>
+          <Text style={styles.statLabel}>{t("progress.avg_daily") || "Avg/Day"}</Text>
         </View>
 
         {/* Days Target Hit */}
         <View style={styles.statItem}>
           <Text style={styles.statValue}>{stats.days_target_hit}</Text>
-          <Text style={styles.statLabel}>
-            {t("progress.target_hit_days") || "Days Target Hit"}
-          </Text>
+          <Text style={styles.statLabel}>{t("progress.target_hit_days") || "Days Target Hit"}</Text>
         </View>
       </View>
 
@@ -147,92 +129,92 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     marginBottom: toRN(tokens.spacing[4]),
     padding: toRN(tokens.spacing[4]),
     backgroundColor: colors.bg.muted,
-    borderRadius: toRN(tokens.borderRadius.lg),
+    borderRadius: toRN(tokens.borderRadius.lg)
   },
   header: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
     gap: toRN(tokens.spacing[2]),
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   title: {
     flex: 1,
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.semiBold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   period: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.regular,
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   todayCard: {
     padding: toRN(tokens.spacing[3]),
     backgroundColor: colors.bg.card,
     borderRadius: toRN(tokens.borderRadius.md),
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   todayLabel: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.medium,
     color: colors.text.tertiary,
-    marginBottom: toRN(tokens.spacing[1]),
+    marginBottom: toRN(tokens.spacing[1])
   },
   todayProgress: {
     flexDirection: "row" as const,
     alignItems: "baseline" as const,
-    marginBottom: toRN(tokens.spacing[2]),
+    marginBottom: toRN(tokens.spacing[2])
   },
   todayValue: {
     fontSize: toRN(tokens.typography.fontSize["2xl"]),
     fontFamily: fontFamily.bold,
-    color: brand.primary,
+    color: brand.primary
   },
   todayTarget: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.regular,
     color: colors.text.tertiary,
-    marginLeft: toRN(tokens.spacing[1]),
+    marginLeft: toRN(tokens.spacing[1])
   },
   progressBarBg: {
     height: 8,
     backgroundColor: colors.bg.muted,
     borderRadius: toRN(tokens.borderRadius.full),
-    overflow: "hidden" as const,
+    overflow: "hidden" as const
   },
   progressBarFill: {
     height: "100%",
-    borderRadius: toRN(tokens.borderRadius.full),
+    borderRadius: toRN(tokens.borderRadius.full)
   },
   todayPercentage: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.medium,
     color: colors.text.tertiary,
     textAlign: "right" as const,
-    marginTop: toRN(tokens.spacing[1]),
+    marginTop: toRN(tokens.spacing[1])
   },
   statsGrid: {
     flexDirection: "row" as const,
-    gap: toRN(tokens.spacing[3]),
+    gap: toRN(tokens.spacing[3])
   },
   statItem: {
     flex: 1,
     padding: toRN(tokens.spacing[3]),
     backgroundColor: colors.bg.card,
     borderRadius: toRN(tokens.borderRadius.md),
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   statValue: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.bold,
-    color: brand.primary,
+    color: brand.primary
   },
   statLabel: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.regular,
     color: colors.text.tertiary,
     marginTop: toRN(tokens.spacing[1]),
-    textAlign: "center" as const,
+    textAlign: "center" as const
   },
   targetRow: {
     flexDirection: "row" as const,
@@ -241,11 +223,11 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     marginTop: toRN(tokens.spacing[3]),
     paddingTop: toRN(tokens.spacing[3]),
     borderTopWidth: 1,
-    borderTopColor: colors.border.subtle,
+    borderTopColor: colors.border.subtle
   },
   targetText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
-    color: colors.text.secondary,
-  },
+    color: colors.text.secondary
+  }
 });

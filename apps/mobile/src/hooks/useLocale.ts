@@ -1,9 +1,5 @@
 import { useTranslation } from "react-i18next";
-import {
-  getCurrentLanguage,
-  setAppLanguage,
-  SupportedLanguage,
-} from "@/lib/i18n";
+import { getCurrentLanguage, setAppLanguage, SupportedLanguage } from "@/lib/i18n";
 
 export const useLocale = () => {
   const { i18n } = useTranslation();
@@ -17,6 +13,6 @@ export const useLocale = () => {
   return {
     currentLanguage,
     changeLanguage,
-    isReady: i18n.isInitialized,
+    isReady: i18n.isInitialized
   };
 };

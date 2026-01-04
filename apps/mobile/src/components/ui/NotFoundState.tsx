@@ -39,7 +39,7 @@ export function NotFoundState({
   backButtonLabel,
   onBack,
   actionButton,
-  style,
+  style
 }: NotFoundStateProps) {
   const styles = useStyles(makeStyles);
   const { colors, brandColors } = useTheme();
@@ -113,11 +113,11 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     justifyContent: "center" as const,
     alignItems: "center" as const,
     paddingHorizontal: toRN(tokens.spacing[6]),
-    paddingVertical: toRN(tokens.spacing[8]),
+    paddingVertical: toRN(tokens.spacing[8])
   },
   illustrationContainer: {
     position: "relative" as const,
-    marginBottom: toRN(tokens.spacing[6]),
+    marginBottom: toRN(tokens.spacing[6])
   },
   iconRing: {
     width: 120,
@@ -125,7 +125,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     borderRadius: 60,
     backgroundColor: `${brand.primary}08`,
     justifyContent: "center" as const,
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   iconInner: {
     width: 88,
@@ -133,41 +133,41 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     borderRadius: 44,
     backgroundColor: `${brand.primary}15`,
     justifyContent: "center" as const,
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   dot: {
     position: "absolute" as const,
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: `${brand.primary}25`,
+    backgroundColor: `${brand.primary}25`
   },
   dotTopLeft: {
     top: 8,
-    left: 8,
+    left: 8
   },
   dotTopRight: {
     top: 16,
-    right: 4,
+    right: 4
   },
   dotBottomLeft: {
     bottom: 16,
-    left: 4,
+    left: 4
   },
   dotBottomRight: {
     bottom: 8,
-    right: 8,
+    right: 8
   },
   content: {
     alignItems: "center" as const,
-    marginBottom: toRN(tokens.spacing[6]),
+    marginBottom: toRN(tokens.spacing[6])
   },
   title: {
     fontFamily: fontFamily.bold,
     fontSize: toRN(tokens.typography.fontSize.xl),
     color: colors.text.primary,
     textAlign: "center" as const,
-    marginBottom: toRN(tokens.spacing[2]),
+    marginBottom: toRN(tokens.spacing[2])
   },
   description: {
     fontFamily: fontFamily.regular,
@@ -175,16 +175,16 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     color: colors.text.secondary,
     textAlign: "center" as const,
     lineHeight: toRN(tokens.typography.fontSize.base) * 1.5,
-    maxWidth: 300,
+    maxWidth: 300
   },
   actions: {
     gap: toRN(tokens.spacing[3]),
     width: "100%" as const,
-    maxWidth: 280,
+    maxWidth: 280
   },
   actionButton: {
-    width: "100%" as const,
-  },
+    width: "100%" as const
+  }
 });
 
 export default NotFoundState;

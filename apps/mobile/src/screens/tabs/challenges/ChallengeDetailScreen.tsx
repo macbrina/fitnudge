@@ -1,11 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  RefreshControl,
-} from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, RefreshControl } from "react-native";
 import { useTranslation } from "@/lib/i18n";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useStyles } from "@/themes";
@@ -29,13 +23,10 @@ import {
   useChallengeLeaderboard,
   useMyChallengeCheckIns,
   useJoinChallenge,
-  useLeaveChallenge,
+  useLeaveChallenge
 } from "@/hooks/api/useChallenges";
 import { usePartners } from "@/hooks/api/usePartners";
-import {
-  useChallengePlanStatus,
-  useChallengePlan,
-} from "@/hooks/api/useActionablePlans";
+import { useChallengePlanStatus, useChallengePlan } from "@/hooks/api/useActionablePlans";
 import { ChallengeProgressSection } from "./components/ChallengeProgressSection";
 import { LeaderboardPreview } from "./components/LeaderboardPreview";
 import { PlanSection } from "@/screens/tabs/goals/components/PlanSection";
@@ -74,7 +65,7 @@ export default function ChallengeDetailScreen() {
     if (!isPartnerView) return true; // Not partner view, always valid
     if (!partnersData?.data || !partnerId) return true; // Still loading, assume valid
     return partnersData.data.some(
-      (p) => p.partner?.id === partnerId || p.partner_user_id === partnerId,
+      (p) => p.partner?.id === partnerId || p.partner_user_id === partnerId
     );
   }, [partnersData?.data, partnerId, isPartnerView]);
 
@@ -83,11 +74,9 @@ export default function ChallengeDetailScreen() {
     if (isPartnerView && partnersData?.data && !isValidPartner) {
       showAlert({
         title: t("partners.access_denied") || "Access Denied",
-        message:
-          t("partners.not_partners_anymore") ||
-          "You are no longer accountability partners",
+        message: t("partners.not_partners_anymore") || "You are no longer accountability partners",
         variant: "error",
-        confirmLabel: t("common.ok"),
+        confirmLabel: t("common.ok")
       });
       router.back();
     }
@@ -99,27 +88,26 @@ export default function ChallengeDetailScreen() {
   const [showMealLogModal, setShowMealLogModal] = useState(false);
   const [showParticipantsModal, setShowParticipantsModal] = useState(false);
   const [showMenuSheet, setShowMenuSheet] = useState(false);
-  const [selectedCheckIn, setSelectedCheckIn] =
-    useState<ChallengeCheckIn | null>(null);
+  const [selectedCheckIn, setSelectedCheckIn] = useState<ChallengeCheckIn | null>(null);
   const [activeTab, setActiveTab] = useState(TAB_OVERVIEW);
 
   // Data hooks
   const {
     data: challengeResponse,
     isLoading: challengeLoading,
-    refetch: refetchChallenge,
+    refetch: refetchChallenge
   } = useChallenge(challengeId || "");
 
   const {
     data: leaderboardResponse,
     isLoading: leaderboardLoading,
-    refetch: refetchLeaderboard,
+    refetch: refetchLeaderboard
   } = useChallengeLeaderboard(challengeId || "");
 
   const {
     data: myCheckInsResponse,
     isLoading: checkInsLoading,
-    refetch: refetchCheckIns,
+    refetch: refetchCheckIns
   } = useMyChallengeCheckIns(challengeId || "");
 
   const challenge = challengeResponse?.data;
@@ -130,30 +118,23 @@ export default function ChallengeDetailScreen() {
   const challengeCategory = challenge?.category;
 
   // Plan status hook - only fetch if challenge has a category (plan was generated)
-  const { data: planStatusData } = useChallengePlanStatus(
-    challengeId,
-    !!challengeCategory,
-  );
+  const { data: planStatusData } = useChallengePlanStatus(challengeId, !!challengeCategory);
   const planStatus = planStatusData?.status;
 
   // Fetch full plan data to get targets (for meal tracking)
-  const { data: challengePlanData } = useChallengePlan(
-    challengeId,
-    planStatus === "completed",
-  );
+  const { data: challengePlanData } = useChallengePlan(challengeId, planStatus === "completed");
 
   // Extract meal targets from plan for MealLogModal
   const mealPlanTargets = useMemo(() => {
     const structure = challengePlanData?.plan?.structured_data?.structure;
-    if (!structure)
-      return { calorieTarget: undefined, proteinTarget: undefined };
+    if (!structure) return { calorieTarget: undefined, proteinTarget: undefined };
 
     const dailyTargets = structure.daily_targets || {};
     const nutritionalTargets = structure.nutritional_targets || {}; // Legacy fallback
 
     return {
       calorieTarget: dailyTargets.calories || nutritionalTargets.calories,
-      proteinTarget: dailyTargets.protein_grams || nutritionalTargets.protein,
+      proteinTarget: dailyTargets.protein_grams || nutritionalTargets.protein
     };
   }, [challengePlanData]);
 
@@ -177,8 +158,7 @@ export default function ChallengeDetailScreen() {
   const isWorkoutTracking = trackingType === "workout";
   const isMealTracking = trackingType === "meal";
   const isHydrationTracking = trackingType === "hydration";
-  const isManualTracking =
-    !isWorkoutTracking && !isMealTracking && !isHydrationTracking;
+  const isManualTracking = !isWorkoutTracking && !isMealTracking && !isHydrationTracking;
 
   // Challenge menu hook (shared with ChallengeCard)
   const { menuSections } = useChallengeMenu({
@@ -190,7 +170,7 @@ export default function ChallengeDetailScreen() {
     onCancelled: () => {
       refetchChallenge();
     },
-    isDetailScreen: true,
+    isDetailScreen: true
   });
 
   // Calculate days remaining
@@ -198,9 +178,7 @@ export default function ChallengeDetailScreen() {
     if (!challenge?.end_date) return null;
     const endDate = new Date(challenge.end_date);
     const today = new Date();
-    const diff = Math.ceil(
-      (endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
-    );
+    const diff = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
     return Math.max(0, diff);
   }, [challenge?.end_date]);
 
@@ -208,7 +186,7 @@ export default function ChallengeDetailScreen() {
   const tabs = useMemo(() => {
     const tabList = [
       { id: TAB_OVERVIEW, label: t("challenges.overview") || "Overview" },
-      { id: TAB_PROGRESS, label: t("challenges.progress") || "Progress" },
+      { id: TAB_PROGRESS, label: t("challenges.progress") || "Progress" }
     ];
 
     // Show Plan tab if challenge has a category (plan was/is being generated)
@@ -225,11 +203,7 @@ export default function ChallengeDetailScreen() {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      await Promise.all([
-        refetchChallenge(),
-        refetchLeaderboard(),
-        refetchCheckIns(),
-      ]);
+      await Promise.all([refetchChallenge(), refetchLeaderboard(), refetchCheckIns()]);
     } catch (error) {
       console.error("Error refreshing challenge:", error);
     } finally {
@@ -245,13 +219,13 @@ export default function ChallengeDetailScreen() {
       showToast({
         title: t("common.success"),
         message: t("social.challenge_joined_message") || "Successfully joined!",
-        variant: "success",
+        variant: "success"
       });
     } catch (error) {
       showAlert({
         title: t("common.error"),
         message: t("social.join_challenge_error") || "Failed to join challenge",
-        variant: "error",
+        variant: "error"
       });
     }
   };
@@ -266,7 +240,7 @@ export default function ChallengeDetailScreen() {
         "Are you sure you want to leave this challenge? Your progress will be lost.",
       confirmLabel: t("common.leave") || "Leave",
       cancelLabel: t("common.cancel"),
-      variant: "warning",
+      variant: "warning"
     });
 
     if (!confirmed) return;
@@ -278,7 +252,7 @@ export default function ChallengeDetailScreen() {
       showAlert({
         title: t("common.error"),
         message: "Failed to leave challenge",
-        variant: "error",
+        variant: "error"
       });
     }
   };
@@ -314,8 +288,7 @@ export default function ChallengeDetailScreen() {
   }, [challengeDaysOfWeek, todayCheckIn]);
 
   // Can check in: scheduled day, active challenge, participant, and not already checked in
-  const canCheckIn =
-    isScheduledDay && isActive && isParticipant && !hasCheckedInToday;
+  const canCheckIn = isScheduledDay && isActive && isParticipant && !hasCheckedInToday;
 
   const handleCheckIn = () => {
     if (!challengeId || !canCheckIn) return;
@@ -363,9 +336,7 @@ export default function ChallengeDetailScreen() {
 
     return (
       <View style={[styles.statusBadge, { backgroundColor: bgColor }]}>
-        <Text style={[styles.statusBadgeText, { color: textColor }]}>
-          {label}
-        </Text>
+        <Text style={[styles.statusBadgeText, { color: textColor }]}>{label}</Text>
       </View>
     );
   };
@@ -375,34 +346,20 @@ export default function ChallengeDetailScreen() {
     <>
       {/* Header Card */}
       <Card shadow="md" style={styles.headerCard}>
-        <Text style={styles.challengeTitle}>
-          {challenge?.title || t("challenges.untitled")}
-        </Text>
+        <Text style={styles.challengeTitle}>{challenge?.title || t("challenges.untitled")}</Text>
 
         {/* Status & Visibility Row */}
         <View style={styles.headerRow}>
           <StatusBadge />
           {challenge?.is_public ? (
             <View style={styles.publicBadge}>
-              <Ionicons
-                name="globe-outline"
-                size={14}
-                color={colors.text.tertiary}
-              />
-              <Text style={styles.publicBadgeText}>
-                {t("challenges.public") || "Public"}
-              </Text>
+              <Ionicons name="globe-outline" size={14} color={colors.text.tertiary} />
+              <Text style={styles.publicBadgeText}>{t("challenges.public") || "Public"}</Text>
             </View>
           ) : (
             <View style={styles.publicBadge}>
-              <Ionicons
-                name="lock-closed-outline"
-                size={14}
-                color={colors.text.tertiary}
-              />
-              <Text style={styles.publicBadgeText}>
-                {t("challenges.private") || "Private"}
-              </Text>
+              <Ionicons name="lock-closed-outline" size={14} color={colors.text.tertiary} />
+              <Text style={styles.publicBadgeText}>{t("challenges.private") || "Private"}</Text>
             </View>
           )}
         </View>
@@ -426,31 +383,19 @@ export default function ChallengeDetailScreen() {
             </View>
             {isCreator && (
               <View style={styles.creatorBadge}>
-                <Ionicons
-                  name="star"
-                  size={12}
-                  color={colors.feedback.warning}
-                />
+                <Ionicons name="star" size={12} color={colors.feedback.warning} />
               </View>
             )}
           </View>
         )}
 
-        {challenge?.description && (
-          <Text style={styles.description}>{challenge.description}</Text>
-        )}
+        {challenge?.description && <Text style={styles.description}>{challenge.description}</Text>}
 
         {/* Date Info Row */}
         <View style={styles.dateInfoRow}>
           <View style={styles.dateInfoItem}>
-            <Ionicons
-              name="calendar-outline"
-              size={14}
-              color={brandColors.primary}
-            />
-            <Text style={styles.dateInfoLabel}>
-              {t("challenges.start_date") || "Starts"}
-            </Text>
+            <Ionicons name="calendar-outline" size={14} color={brandColors.primary} />
+            <Text style={styles.dateInfoLabel}>{t("challenges.start_date") || "Starts"}</Text>
             <Text style={styles.dateInfoValue}>
               {challenge?.start_date ? formatDate(challenge.start_date) : "-"}
             </Text>
@@ -458,36 +403,17 @@ export default function ChallengeDetailScreen() {
 
           {challenge?.end_date && (
             <View style={styles.dateInfoItem}>
-              <Ionicons
-                name="flag-outline"
-                size={14}
-                color={colors.feedback.warning}
-              />
-              <Text style={styles.dateInfoLabel}>
-                {t("challenges.end_date") || "Ends"}
-              </Text>
-              <Text style={styles.dateInfoValue}>
-                {formatDate(challenge.end_date)}
-              </Text>
+              <Ionicons name="flag-outline" size={14} color={colors.feedback.warning} />
+              <Text style={styles.dateInfoLabel}>{t("challenges.end_date") || "Ends"}</Text>
+              <Text style={styles.dateInfoValue}>{formatDate(challenge.end_date)}</Text>
             </View>
           )}
 
           {daysRemaining !== null && isActive && (
             <View style={styles.dateInfoItem}>
-              <Ionicons
-                name="timer-outline"
-                size={14}
-                color={colors.feedback.success}
-              />
-              <Text style={styles.dateInfoLabel}>
-                {t("challenges.days_left") || "Left"}
-              </Text>
-              <Text
-                style={[
-                  styles.dateInfoValue,
-                  { color: colors.feedback.success },
-                ]}
-              >
+              <Ionicons name="timer-outline" size={14} color={colors.feedback.success} />
+              <Text style={styles.dateInfoLabel}>{t("challenges.days_left") || "Left"}</Text>
+              <Text style={[styles.dateInfoValue, { color: colors.feedback.success }]}>
                 {daysRemaining} {t("common.days") || "days"}
               </Text>
             </View>
@@ -515,11 +441,7 @@ export default function ChallengeDetailScreen() {
             </Text>
           </View>
         </View>
-        <Ionicons
-          name="chevron-forward"
-          size={20}
-          color={colors.text.tertiary}
-        />
+        <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
       </TouchableOpacity>
 
       {/* Leaderboard Preview */}
@@ -540,19 +462,8 @@ export default function ChallengeDetailScreen() {
             {["S", "M", "T", "W", "T", "F", "S"].map((dayLabel, index) => {
               const isDayActive = challengeDaysOfWeek.includes(index);
               return (
-                <View
-                  key={index}
-                  style={[
-                    styles.dayBadge,
-                    isDayActive && styles.dayBadgeActive,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.dayBadgeText,
-                      isDayActive && styles.dayBadgeTextActive,
-                    ]}
-                  >
+                <View key={index} style={[styles.dayBadge, isDayActive && styles.dayBadgeActive]}>
+                  <Text style={[styles.dayBadgeText, isDayActive && styles.dayBadgeTextActive]}>
                     {dayLabel}
                   </Text>
                 </View>
@@ -571,11 +482,7 @@ export default function ChallengeDetailScreen() {
           <View style={styles.reminderTimesRow}>
             {challengeReminderTimes.map((time, index) => (
               <View key={index} style={styles.reminderTimeBadge}>
-                <Ionicons
-                  name="time-outline"
-                  size={14}
-                  color={brandColors.primary}
-                />
+                <Ionicons name="time-outline" size={14} color={brandColors.primary} />
                 <Text style={styles.reminderTimeText}>{time}</Text>
               </View>
             ))}
@@ -587,18 +494,10 @@ export default function ChallengeDetailScreen() {
       {isUpcoming && challenge?.join_deadline && (
         <Card shadow="sm" style={styles.deadlineCard}>
           <View style={styles.deadlineRow}>
-            <Ionicons
-              name="time-outline"
-              size={24}
-              color={colors.feedback.warning}
-            />
+            <Ionicons name="time-outline" size={24} color={colors.feedback.warning} />
             <View style={styles.deadlineContent}>
-              <Text style={styles.deadlineTitle}>
-                {t("challenges.join_deadline") || "Join by"}
-              </Text>
-              <Text style={styles.deadlineDate}>
-                {formatDate(challenge.join_deadline)}
-              </Text>
+              <Text style={styles.deadlineTitle}>{t("challenges.join_deadline") || "Join by"}</Text>
+              <Text style={styles.deadlineDate}>{formatDate(challenge.join_deadline)}</Text>
             </View>
           </View>
         </Card>
@@ -632,14 +531,9 @@ export default function ChallengeDetailScreen() {
       {/* Not a participant message */}
       {!isParticipant && (
         <Card shadow="sm" style={styles.notParticipantCard}>
-          <Ionicons
-            name="lock-closed-outline"
-            size={32}
-            color={colors.text.tertiary}
-          />
+          <Ionicons name="lock-closed-outline" size={32} color={colors.text.tertiary} />
           <Text style={styles.notParticipantText}>
-            {t("challenges.join_to_see_progress") ||
-              "Join the challenge to track your progress"}
+            {t("challenges.join_to_see_progress") || "Join the challenge to track your progress"}
           </Text>
         </Card>
       )}
@@ -682,10 +576,7 @@ export default function ChallengeDetailScreen() {
           title={t("challenges.details") || "Challenge Details"}
           onPress={() => router.back()}
         />
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-        >
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
           <SkeletonCard width="100%" height={200} />
           <SkeletonCard width="100%" height={150} />
           <SkeletonCard width="100%" height={200} />
@@ -719,11 +610,7 @@ export default function ChallengeDetailScreen() {
           onPress={() => router.back()}
         />
         <View style={styles.errorContainer}>
-          <Ionicons
-            name="close-circle-outline"
-            size={48}
-            color={colors.text.tertiary}
-          />
+          <Ionicons name="close-circle-outline" size={48} color={colors.text.tertiary} />
           <Text style={styles.errorText}>
             {t("challenges.cancelled_message") ||
               "This challenge has been cancelled and is no longer available."}
@@ -753,11 +640,7 @@ export default function ChallengeDetailScreen() {
           onPress={() => router.back()}
         />
         <View style={styles.errorContainer}>
-          <Ionicons
-            name="lock-closed-outline"
-            size={48}
-            color={colors.text.tertiary}
-          />
+          <Ionicons name="lock-closed-outline" size={48} color={colors.text.tertiary} />
           <Text style={styles.errorText}>
             {t("challenges.private_access_denied") ||
               "This is a private challenge. You need an invitation to participate."}
@@ -779,15 +662,8 @@ export default function ChallengeDetailScreen() {
         titleCentered={false}
         onPress={() => router.back()}
         rightInput={
-          <TouchableOpacity
-            style={styles.menuButton}
-            onPress={() => setShowMenuSheet(true)}
-          >
-            <Ionicons
-              name="ellipsis-horizontal"
-              size={24}
-              color={colors.text.primary}
-            />
+          <TouchableOpacity style={styles.menuButton} onPress={() => setShowMenuSheet(true)}>
+            <Ionicons name="ellipsis-horizontal" size={24} color={colors.text.primary} />
           </TouchableOpacity>
         }
       />
@@ -818,14 +694,9 @@ export default function ChallengeDetailScreen() {
         {/* Partner View Banner */}
         {effectivePartnerView && (
           <View style={styles.partnerBanner}>
-            <Ionicons
-              name="eye-outline"
-              size={18}
-              color={brandColors.primary}
-            />
+            <Ionicons name="eye-outline" size={18} color={brandColors.primary} />
             <Text style={styles.partnerBannerText}>
-              {t("partners.viewing_partner_challenge") ||
-                "Viewing partner's challenge (read-only)"}
+              {t("partners.viewing_partner_challenge") || "Viewing partner's challenge (read-only)"}
             </Text>
           </View>
         )}
@@ -882,14 +753,9 @@ export default function ChallengeDetailScreen() {
                 {/* Workout tracking - hint to go to Plan tab */}
                 {isWorkoutTracking && planStatus === "completed" && (
                   <View style={styles.workoutHint}>
-                    <Ionicons
-                      name="fitness-outline"
-                      size={20}
-                      color={brandColors.primary}
-                    />
+                    <Ionicons name="fitness-outline" size={20} color={brandColors.primary} />
                     <Text style={styles.workoutHintText}>
-                      {t("goals.start_workout_hint") ||
-                        "Go to the Plan tab to start your workout"}
+                      {t("goals.start_workout_hint") || "Go to the Plan tab to start your workout"}
                     </Text>
                   </View>
                 )}
@@ -899,11 +765,7 @@ export default function ChallengeDetailScreen() {
             {/* Already checked in today */}
             {isParticipant && isActive && hasCheckedInToday && (
               <View style={styles.checkedInBadge}>
-                <Ionicons
-                  name="checkmark-circle"
-                  size={20}
-                  color={colors.feedback.success}
-                />
+                <Ionicons name="checkmark-circle" size={20} color={colors.feedback.success} />
                 <Text style={styles.checkedInText}>
                   {t("checkin.checked_in_today") || "Checked in today"}
                 </Text>
@@ -911,22 +773,14 @@ export default function ChallengeDetailScreen() {
             )}
 
             {/* Rest day - not a scheduled day for any tracking type */}
-            {isParticipant &&
-              isActive &&
-              !isScheduledDay &&
-              !hasCheckedInToday && (
-                <View style={styles.noCheckInScheduled}>
-                  <Ionicons
-                    name="moon-outline"
-                    size={20}
-                    color={colors.text.tertiary}
-                  />
-                  <Text style={styles.noCheckInScheduledText}>
-                    {t("goals.rest_day") ||
-                      "Rest day - no action scheduled for today"}
-                  </Text>
-                </View>
-              )}
+            {isParticipant && isActive && !isScheduledDay && !hasCheckedInToday && (
+              <View style={styles.noCheckInScheduled}>
+                <Ionicons name="moon-outline" size={20} color={colors.text.tertiary} />
+                <Text style={styles.noCheckInScheduledText}>
+                  {t("goals.rest_day") || "Rest day - no action scheduled for today"}
+                </Text>
+              </View>
+            )}
 
             {/* Challenge is not active - show status message */}
             {!isActive && !isUpcoming && challenge?.status && (
@@ -938,13 +792,10 @@ export default function ChallengeDetailScreen() {
                 />
                 <Text style={styles.inactiveChallengeText}>
                   {isCancelled
-                    ? t("challenges.challenge_cancelled") ||
-                      "This challenge has been cancelled"
+                    ? t("challenges.challenge_cancelled") || "This challenge has been cancelled"
                     : isCompleted
-                      ? t("challenges.challenge_completed") ||
-                        "This challenge is completed"
-                      : t("challenges.challenge_not_active") ||
-                        "This challenge is not active"}
+                      ? t("challenges.challenge_completed") || "This challenge is completed"
+                      : t("challenges.challenge_not_active") || "This challenge is not active"}
                 </Text>
               </View>
             )}
@@ -1031,26 +882,22 @@ export default function ChallengeDetailScreen() {
   );
 }
 
-const makeChallengeDetailScreenStyles = (
-  tokens: any,
-  colors: any,
-  brand: any,
-) => ({
+const makeChallengeDetailScreenStyles = (tokens: any, colors: any, brand: any) => ({
   container: {
     flex: 1,
-    backgroundColor: colors.bg.canvas,
+    backgroundColor: colors.bg.canvas
   },
   tabsContainer: {
     paddingHorizontal: toRN(tokens.spacing[4]),
-    backgroundColor: colors.bg.canvas,
+    backgroundColor: colors.bg.canvas
   },
   scrollView: {
-    flex: 1,
+    flex: 1
   },
   scrollContent: {
     padding: toRN(tokens.spacing[4]),
     paddingBottom: toRN(tokens.spacing[8]),
-    gap: toRN(tokens.spacing[4]),
+    gap: toRN(tokens.spacing[4])
   },
   // Partner view banner
   partnerBanner: {
@@ -1063,64 +910,64 @@ const makeChallengeDetailScreenStyles = (
     backgroundColor: `${brand.primary}15`,
     borderRadius: toRN(tokens.borderRadius.lg),
     borderWidth: 1,
-    borderColor: `${brand.primary}30`,
+    borderColor: `${brand.primary}30`
   },
   partnerBannerText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
     color: brand.primary,
-    flex: 1,
+    flex: 1
   },
   errorContainer: {
     flex: 1,
     justifyContent: "center" as const,
     alignItems: "center" as const,
     gap: toRN(tokens.spacing[4]),
-    padding: toRN(tokens.spacing[6]),
+    padding: toRN(tokens.spacing[6])
   },
   errorText: {
     fontFamily: fontFamily.regular,
     fontSize: toRN(tokens.typography.fontSize.base),
     color: colors.text.secondary,
-    textAlign: "center" as const,
+    textAlign: "center" as const
   },
   menuButton: {
-    padding: toRN(tokens.spacing[2]),
+    padding: toRN(tokens.spacing[2])
   },
   headerCard: {
     padding: toRN(tokens.spacing[4]),
-    gap: toRN(tokens.spacing[3]),
+    gap: toRN(tokens.spacing[3])
   },
   challengeTitle: {
     fontFamily: fontFamily.bold,
     fontSize: toRN(tokens.typography.fontSize.lg),
     color: colors.text.primary,
-    lineHeight: toRN(tokens.typography.fontSize.lg * 1.3),
+    lineHeight: toRN(tokens.typography.fontSize.lg * 1.3)
   },
   headerRow: {
     flexDirection: "row" as const,
     justifyContent: "space-between" as const,
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   statusBadge: {
     paddingHorizontal: toRN(tokens.spacing[3]),
     paddingVertical: toRN(tokens.spacing[1]),
-    borderRadius: toRN(tokens.borderRadius.full),
+    borderRadius: toRN(tokens.borderRadius.full)
   },
   statusBadgeText: {
     fontFamily: fontFamily.semiBold,
     fontSize: toRN(tokens.typography.fontSize.xs),
-    textTransform: "uppercase" as const,
+    textTransform: "uppercase" as const
   },
   publicBadge: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    gap: toRN(tokens.spacing[1]),
+    gap: toRN(tokens.spacing[1])
   },
   publicBadgeText: {
     fontFamily: fontFamily.regular,
     fontSize: toRN(tokens.typography.fontSize.xs),
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   creatorRow: {
     flexDirection: "row" as const,
@@ -1129,11 +976,11 @@ const makeChallengeDetailScreenStyles = (
     paddingVertical: toRN(tokens.spacing[2]),
     borderTopWidth: 1,
     borderTopColor: colors.border.default + "30",
-    marginTop: toRN(tokens.spacing[1]),
+    marginTop: toRN(tokens.spacing[1])
   },
   creatorAvatar: {
     width: 36,
-    height: 36,
+    height: 36
   },
   avatarPlaceholder: {
     width: 36,
@@ -1141,48 +988,48 @@ const makeChallengeDetailScreenStyles = (
     borderRadius: 18,
     backgroundColor: colors.bg.muted,
     justifyContent: "center" as const,
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   avatarInitial: {
     fontFamily: fontFamily.semiBold,
     fontSize: toRN(tokens.typography.fontSize.sm),
-    color: brand.primary,
+    color: brand.primary
   },
   creatorInfo: {
-    flex: 1,
+    flex: 1
   },
   creatorName: {
     fontFamily: fontFamily.regular,
     fontSize: toRN(tokens.typography.fontSize.sm),
-    color: colors.text.secondary,
+    color: colors.text.secondary
   },
   creatorBadge: {
-    padding: toRN(tokens.spacing[1]),
+    padding: toRN(tokens.spacing[1])
   },
   description: {
     fontFamily: fontFamily.regular,
     fontSize: toRN(tokens.typography.fontSize.sm),
     color: colors.text.secondary,
-    lineHeight: toRN(tokens.typography.fontSize.sm * 1.5),
+    lineHeight: toRN(tokens.typography.fontSize.sm * 1.5)
   },
   scheduledDaysCard: {
     backgroundColor: colors.bg.card,
     padding: toRN(tokens.spacing[4]),
     borderRadius: toRN(tokens.borderRadius.xl),
     borderWidth: 1,
-    borderColor: colors.border.subtle,
+    borderColor: colors.border.subtle
   },
   scheduledDaysLabel: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.semiBold,
     color: colors.text.tertiary,
     textTransform: "uppercase" as const,
-    letterSpacing: 0.5,
+    letterSpacing: 0.5
   },
   daysRow: {
     flexDirection: "row" as const,
     justifyContent: "space-between" as const,
-    marginTop: toRN(tokens.spacing[2]),
+    marginTop: toRN(tokens.spacing[2])
   },
   dayBadge: {
     width: toRN(tokens.spacing[8]),
@@ -1190,24 +1037,24 @@ const makeChallengeDetailScreenStyles = (
     borderRadius: toRN(tokens.borderRadius.full),
     backgroundColor: colors.bg.muted,
     alignItems: "center" as const,
-    justifyContent: "center" as const,
+    justifyContent: "center" as const
   },
   dayBadgeActive: {
-    backgroundColor: brand.primary,
+    backgroundColor: brand.primary
   },
   dayBadgeText: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.semiBold,
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   dayBadgeTextActive: {
-    color: brand.onPrimary,
+    color: brand.onPrimary
   },
   reminderTimesRow: {
     flexDirection: "row" as const,
     flexWrap: "wrap" as const,
     gap: toRN(tokens.spacing[2]),
-    marginTop: toRN(tokens.spacing[2]),
+    marginTop: toRN(tokens.spacing[2])
   },
   reminderTimeBadge: {
     flexDirection: "row" as const,
@@ -1216,12 +1063,12 @@ const makeChallengeDetailScreenStyles = (
     paddingHorizontal: toRN(tokens.spacing[3]),
     paddingVertical: toRN(tokens.spacing[2]),
     borderRadius: toRN(tokens.borderRadius.full),
-    backgroundColor: colors.bg.muted,
+    backgroundColor: colors.bg.muted
   },
   reminderTimeText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   dateInfoRow: {
     flexDirection: "row" as const,
@@ -1232,7 +1079,7 @@ const makeChallengeDetailScreenStyles = (
     paddingTop: toRN(tokens.spacing[3]),
     marginTop: toRN(tokens.spacing[3]),
     borderTopWidth: 1,
-    borderTopColor: colors.border.subtle,
+    borderTopColor: colors.border.subtle
   },
   dateInfoItem: {
     flexDirection: "row" as const,
@@ -1241,17 +1088,17 @@ const makeChallengeDetailScreenStyles = (
     paddingHorizontal: toRN(tokens.spacing[3]),
     paddingVertical: toRN(tokens.spacing[2]),
     backgroundColor: colors.bg.muted,
-    borderRadius: toRN(tokens.borderRadius.full),
+    borderRadius: toRN(tokens.borderRadius.full)
   },
   dateInfoLabel: {
     fontFamily: fontFamily.regular,
     fontSize: toRN(tokens.typography.fontSize.xs),
-    color: colors.text.secondary,
+    color: colors.text.secondary
   },
   dateInfoValue: {
     fontFamily: fontFamily.semiBold,
     fontSize: toRN(tokens.typography.fontSize.xs),
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   participantsCard: {
     flexDirection: "row" as const,
@@ -1261,13 +1108,13 @@ const makeChallengeDetailScreenStyles = (
     borderRadius: toRN(tokens.borderRadius.xl),
     padding: toRN(tokens.spacing[4]),
     borderWidth: 1,
-    borderColor: colors.border.subtle,
+    borderColor: colors.border.subtle
   },
   participantsCardLeft: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
     gap: toRN(tokens.spacing[3]),
-    flex: 1,
+    flex: 1
   },
   participantsIconContainer: {
     width: 48,
@@ -1275,60 +1122,60 @@ const makeChallengeDetailScreenStyles = (
     borderRadius: toRN(tokens.borderRadius.xl),
     backgroundColor: brand.primary + "15",
     justifyContent: "center" as const,
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   participantsCardContent: {
-    flex: 1,
+    flex: 1
   },
   participantsCardTitle: {
     fontFamily: fontFamily.semiBold,
     fontSize: toRN(tokens.typography.fontSize.base),
     color: colors.text.primary,
-    marginBottom: toRN(tokens.spacing[0.5]),
+    marginBottom: toRN(tokens.spacing[0.5])
   },
   participantsCardSubtitle: {
     fontFamily: fontFamily.regular,
     fontSize: toRN(tokens.typography.fontSize.sm),
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   deadlineCard: {
     padding: toRN(tokens.spacing[4]),
     backgroundColor: colors.feedback.warning + "10",
     borderWidth: 1,
-    borderColor: colors.feedback.warning + "30",
+    borderColor: colors.feedback.warning + "30"
   },
   deadlineRow: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    gap: toRN(tokens.spacing[3]),
+    gap: toRN(tokens.spacing[3])
   },
   deadlineContent: {
-    flex: 1,
+    flex: 1
   },
   deadlineTitle: {
     fontFamily: fontFamily.regular,
     fontSize: toRN(tokens.typography.fontSize.sm),
-    color: colors.text.secondary,
+    color: colors.text.secondary
   },
   deadlineDate: {
     fontFamily: fontFamily.semiBold,
     fontSize: toRN(tokens.typography.fontSize.base),
-    color: colors.feedback.warning,
+    color: colors.feedback.warning
   },
   notParticipantCard: {
     padding: toRN(tokens.spacing[6]),
     alignItems: "center" as const,
-    gap: toRN(tokens.spacing[3]),
+    gap: toRN(tokens.spacing[3])
   },
   notParticipantText: {
     fontFamily: fontFamily.regular,
     fontSize: toRN(tokens.typography.fontSize.base),
     color: colors.text.secondary,
-    textAlign: "center" as const,
+    textAlign: "center" as const
   },
   actionSection: {
     gap: toRN(tokens.spacing[3]),
-    marginTop: toRN(tokens.spacing[4]),
+    marginTop: toRN(tokens.spacing[4])
   },
   checkedInBadge: {
     flexDirection: "row" as const,
@@ -1338,12 +1185,12 @@ const makeChallengeDetailScreenStyles = (
     paddingVertical: toRN(tokens.spacing[3]),
     paddingHorizontal: toRN(tokens.spacing[4]),
     backgroundColor: colors.feedback.success + "15",
-    borderRadius: toRN(tokens.borderRadius.xl),
+    borderRadius: toRN(tokens.borderRadius.xl)
   },
   checkedInText: {
     fontFamily: fontFamily.medium,
     fontSize: toRN(tokens.typography.fontSize.base),
-    color: colors.feedback.success,
+    color: colors.feedback.success
   },
   noCheckInScheduled: {
     flexDirection: "row" as const,
@@ -1353,12 +1200,12 @@ const makeChallengeDetailScreenStyles = (
     paddingVertical: toRN(tokens.spacing[3]),
     paddingHorizontal: toRN(tokens.spacing[4]),
     backgroundColor: colors.bg.muted,
-    borderRadius: toRN(tokens.borderRadius.xl),
+    borderRadius: toRN(tokens.borderRadius.xl)
   },
   noCheckInScheduledText: {
     fontFamily: fontFamily.regular,
     fontSize: toRN(tokens.typography.fontSize.sm),
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   workoutHint: {
     flexDirection: "row" as const,
@@ -1367,12 +1214,12 @@ const makeChallengeDetailScreenStyles = (
     backgroundColor: brand.primary + "15",
     padding: toRN(tokens.spacing[4]),
     borderRadius: toRN(tokens.borderRadius.xl),
-    gap: toRN(tokens.spacing[2]),
+    gap: toRN(tokens.spacing[2])
   },
   workoutHintText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
-    color: brand.primary,
+    color: brand.primary
   },
   inactiveChallengeCard: {
     flexDirection: "row" as const,
@@ -1381,11 +1228,11 @@ const makeChallengeDetailScreenStyles = (
     backgroundColor: colors.bg.muted,
     padding: toRN(tokens.spacing[4]),
     borderRadius: toRN(tokens.borderRadius.xl),
-    gap: toRN(tokens.spacing[2]),
+    gap: toRN(tokens.spacing[2])
   },
   inactiveChallengeText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
-    color: colors.text.tertiary,
-  },
+    color: colors.text.tertiary
+  }
 });

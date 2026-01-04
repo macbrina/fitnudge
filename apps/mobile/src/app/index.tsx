@@ -31,7 +31,7 @@ export default function Index() {
           console.log("[Index] No tokens found, clearing authentication");
           useAuthStore.setState({
             isAuthenticated: false,
-            user: null,
+            user: null
           });
           setRedirectUrl(MOBILE_ROUTES.AUTH.MAIN);
           return;
@@ -44,7 +44,7 @@ export default function Index() {
         if (!currentAccessToken || !currentRefreshToken) {
           useAuthStore.setState({
             accessToken,
-            refreshToken,
+            refreshToken
           });
         }
 
@@ -81,24 +81,22 @@ export default function Index() {
           // Fetch subscription, features, pricing plans, and fitness profile in the background
           // This runs after user verification, preventing wasted calls if user doesn't exist
           try {
-            const [
-              { useSubscriptionStore },
-              { usePricingStore },
-              { useOnboardingStore },
-            ] = await Promise.all([
-              import("@/stores/subscriptionStore"),
-              import("@/stores/pricingStore"),
-              import("@/stores/onboardingStore"),
-            ]);
+            const [{ useSubscriptionStore }, { usePricingStore }, { useOnboardingStore }] =
+              await Promise.all([
+                import("@/stores/subscriptionStore"),
+                import("@/stores/pricingStore"),
+                import("@/stores/onboardingStore")
+              ]);
 
-            // Fetch subscription data, features, pricing plans, fitness profile,
+            // Fetch subscription data, features, history, pricing plans, fitness profile,
             // AND prefetch critical React Query data in parallel
-            const [, , , profileExists] = await Promise.all([
+            const [, , , , profileExists] = await Promise.all([
               useSubscriptionStore.getState().fetchSubscription(),
               useSubscriptionStore.getState().fetchFeatures(),
+              useSubscriptionStore.getState().fetchHistory(), // Prefetch subscription history (for exit offer eligibility)
               usePricingStore.getState().fetchPlans(), // Prefetch pricing plans
               useOnboardingStore.getState().checkHasFitnessProfile(), // Check fitness profile
-              prefetchCriticalData(queryClient), // Prefetch home, user, goals, exercises etc.
+              prefetchCriticalData(queryClient) // Prefetch home, user, goals, exercises etc.
             ]);
 
             hasFitnessProfile = profileExists;
@@ -117,7 +115,7 @@ export default function Index() {
 
         // Get redirect URL based on onboarding status for non-authenticated users
         const hasSeenOnboarding = await storageUtil.getItem<boolean>(
-          STORAGE_KEYS.HAS_SEEN_ONBOARDING,
+          STORAGE_KEYS.HAS_SEEN_ONBOARDING
         );
         if (!hasSeenOnboarding) {
           setRedirectUrl(MOBILE_ROUTES.ONBOARDING.MAIN);

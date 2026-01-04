@@ -8,12 +8,7 @@
 // Music Track
 // ============================================
 
-export type MusicMood =
-  | "energetic"
-  | "calm"
-  | "motivational"
-  | "intense"
-  | "chill";
+export type MusicMood = "energetic" | "calm" | "motivational" | "intense" | "chill";
 
 export interface WorkoutMusicTrack {
   id: string;
@@ -101,7 +96,7 @@ export const DEFAULT_AUDIO_PREFERENCES: Omit<
   coach_voice_volume: 0.8,
   sound_effects_enabled: true,
   sound_effects_volume: 0.8,
-  preferred_music_app: "playlist",
+  preferred_music_app: "playlist"
 };
 
 // ============================================
@@ -136,14 +131,14 @@ export const COACH_PHRASES = {
     "You've got this!",
     "Push through!",
     "Great form!",
-    "Keep going!",
+    "Keep going!"
   ],
   rest: [
     "Take a breather",
     "Rest up",
     "Good work, rest now",
     "Catch your breath",
-    "Well done, rest",
+    "Well done, rest"
   ],
   nextExercise: ["Next up:", "Coming up:", "Get ready for:"],
   complete: [
@@ -151,8 +146,8 @@ export const COACH_PHRASES = {
     "Amazing job!",
     "You crushed it!",
     "Fantastic work!",
-    "You did it!",
-  ],
+    "You did it!"
+  ]
 } as const;
 
 // Helper to get random phrase

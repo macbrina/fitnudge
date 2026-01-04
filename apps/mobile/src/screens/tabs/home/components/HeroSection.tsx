@@ -42,20 +42,20 @@ const makeHeroSectionStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: colors.bg.canvas,
     paddingHorizontal: toRN(tokens.spacing[4]),
     paddingTop: toRN(tokens.spacing[6]),
-    paddingBottom: toRN(tokens.spacing[4]),
+    paddingBottom: toRN(tokens.spacing[4])
   },
   greetingContainer: {
-    marginBottom: toRN(tokens.spacing[2]),
+    marginBottom: toRN(tokens.spacing[2])
   },
   greeting: {
     fontSize: toRN(tokens.typography.fontSize["3xl"]),
     fontFamily: fontFamily.bold,
     color: colors.text.primary,
-    marginBottom: toRN(tokens.spacing[2]),
+    marginBottom: toRN(tokens.spacing[2])
   },
   subtitle: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.regular,
-    color: colors.text.secondary,
-  },
+    color: colors.text.secondary
+  }
 });

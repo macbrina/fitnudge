@@ -21,12 +21,10 @@ const getLocalDayOfWeek = (dateStr: string): number => {
 
 export const progressQueryKeys = {
   all: ["progress"] as const,
-  streak: (goalId?: string) =>
-    [...progressQueryKeys.all, "streak", goalId] as const,
-  weekProgress: (goalId?: string) =>
-    [...progressQueryKeys.all, "week", goalId] as const,
+  streak: (goalId?: string) => [...progressQueryKeys.all, "streak", goalId] as const,
+  weekProgress: (goalId?: string) => [...progressQueryKeys.all, "week", goalId] as const,
   moodTrend: (goalId?: string, days?: number) =>
-    [...progressQueryKeys.all, "mood", goalId, days] as const,
+    [...progressQueryKeys.all, "mood", goalId, days] as const
 } as const;
 
 // Empty placeholder for streak data
@@ -42,7 +40,7 @@ export const useStreakInfo = (goalId?: string) => {
     },
     staleTime: 0, // Refetch immediately when invalidated (realtime updates)
     refetchOnMount: false,
-    placeholderData: EMPTY_STREAK,
+    placeholderData: EMPTY_STREAK
     // NOTE: Don't use keepPreviousData for goal-specific queries!
     // It causes stale data to show when switching between goals.
   });
@@ -65,11 +63,11 @@ export const useWeekProgress = (goalId?: string) => {
       const response = await checkInsService.getCheckInsByDateRange(
         formatLocalDate(monday),
         formatLocalDate(sunday),
-        goalId,
+        goalId
       );
       return response.data || [];
     },
-    staleTime: 0, // Refetch immediately when invalidated (realtime updates)
+    staleTime: 0 // Refetch immediately when invalidated (realtime updates)
     // NOTE: Don't use keepPreviousData for goal-specific queries!
   });
 
@@ -79,7 +77,7 @@ export const useWeekProgress = (goalId?: string) => {
         completed: 0,
         total: 7,
         percentage: 0,
-        daysCompleted: [false, false, false, false, false, false, false],
+        daysCompleted: [false, false, false, false, false, false, false]
       };
     }
 
@@ -101,13 +99,13 @@ export const useWeekProgress = (goalId?: string) => {
       completed: completedCount,
       total: 7,
       percentage: Math.round((completedCount / 7) * 100),
-      daysCompleted,
+      daysCompleted
     };
   }, [checkIns]);
 
   return {
     data: weekData,
-    isLoading,
+    isLoading
   };
 };
 
@@ -119,7 +117,7 @@ export const useMoodTrends = (goalId?: string, days: number = 7) => {
       const response = await checkInsService.getMoodTrends(goalId, days);
       return response.data;
     },
-    staleTime: 0, // Refetch immediately when invalidated (realtime updates)
+    staleTime: 0 // Refetch immediately when invalidated (realtime updates)
     // NOTE: Don't use keepPreviousData for goal-specific queries!
   });
 
@@ -131,13 +129,13 @@ export const useMoodTrends = (goalId?: string, days: number = 7) => {
     // Transform array of {date, average_mood, check_ins_count} to {date, mood}
     return stats.map((item) => ({
       date: item.date,
-      mood: Math.round(item.average_mood), // Round to nearest integer (1-5)
+      mood: Math.round(item.average_mood) // Round to nearest integer (1-5)
     }));
   }, [stats]);
 
   return {
     data: moodData,
-    isLoading,
+    isLoading
   };
 };
 
@@ -153,11 +151,11 @@ export const useHabitChain = (goalId?: string, days: number = 30) => {
       const response = await checkInsService.getCheckInsByDateRange(
         formatLocalDate(startDate),
         formatLocalDate(endDate),
-        goalId,
+        goalId
       );
       return response.data || [];
     },
-    staleTime: 0, // Refetch immediately when invalidated (realtime updates)
+    staleTime: 0 // Refetch immediately when invalidated (realtime updates)
     // NOTE: Don't use keepPreviousData for goal-specific queries!
   });
 
@@ -186,7 +184,7 @@ export const useHabitChain = (goalId?: string, days: number = 30) => {
       chain.push({
         date: dateStr,
         completed,
-        isFuture,
+        isFuture
       });
     }
 
@@ -195,6 +193,6 @@ export const useHabitChain = (goalId?: string, days: number = 30) => {
 
   return {
     data: chainData,
-    isLoading,
+    isLoading
   };
 };

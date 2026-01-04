@@ -1,11 +1,5 @@
 import React, { useState } from "react";
-import {
-  View,
-  Text,
-  TextInput as RNTextInput,
-  TouchableOpacity,
-  StyleSheet,
-} from "react-native";
+import { View, Text, TextInput as RNTextInput, TouchableOpacity, StyleSheet } from "react-native";
 import { useStyles } from "@/themes/makeStyles";
 import { fontFamily } from "@/lib/fonts";
 import { toRN } from "@/lib/units";
@@ -38,19 +32,19 @@ export interface TextInputProps {
 const makeTextInputStyles = (tokens: any, colors: any, brandColors: any) => {
   return {
     container: {
-      marginBottom: toRN(tokens.spacing[4]),
+      marginBottom: toRN(tokens.spacing[4])
     },
     label: {
       fontSize: toRN(tokens.typography.fontSize.sm),
       fontWeight: tokens.typography.fontWeight.medium,
       color: colors.text.primary,
       marginBottom: toRN(tokens.spacing[2]),
-      fontFamily: fontFamily.groteskMedium,
+      fontFamily: fontFamily.groteskMedium
     },
     inputContainer: {
       position: "relative" as const,
       flexDirection: "row" as const,
-      alignItems: "center" as const,
+      alignItems: "center" as const
     },
     input: {
       flex: 1,
@@ -63,44 +57,44 @@ const makeTextInputStyles = (tokens: any, colors: any, brandColors: any) => {
       backgroundColor: colors.bg.card,
       color: colors.text.primary,
       fontFamily: fontFamily.groteskRegular,
-      minHeight: toRN(48),
+      minHeight: toRN(48)
     },
     inputMultiline: {
       textAlignVertical: "top" as const,
       minHeight: toRN(80),
-      paddingTop: toRN(tokens.spacing[3]),
+      paddingTop: toRN(tokens.spacing[3])
     },
     inputFocused: {
       borderColor: brandColors.primary,
-      borderWidth: 1,
+      borderWidth: 1
     },
     inputError: {
       borderColor: colors.feedback.error,
-      borderWidth: 2,
+      borderWidth: 2
     },
     inputDisabled: {
       backgroundColor: colors.bg.muted,
-      color: colors.text.muted,
+      color: colors.text.muted
     },
     leftIconContainer: {
       position: "absolute" as const,
       left: toRN(tokens.spacing[3]),
-      zIndex: 1,
+      zIndex: 1
     },
     rightIconContainer: {
       position: "absolute" as const,
       right: toRN(tokens.spacing[3]),
-      zIndex: 1,
+      zIndex: 1
     },
     passwordToggle: {
-      padding: toRN(tokens.spacing[1]),
+      padding: toRN(tokens.spacing[1])
     },
     errorText: {
       fontSize: toRN(tokens.typography.fontSize.sm),
       color: colors.feedback.error,
       marginTop: toRN(tokens.spacing[1]),
-      fontFamily: fontFamily.groteskRegular,
-    },
+      fontFamily: fontFamily.groteskRegular
+    }
   };
 };
 
@@ -123,7 +117,7 @@ export const TextInput: React.FC<TextInputProps> = ({
   labelStyle,
   multiline = false,
   numberOfLines,
-  maxLength,
+  maxLength
 }) => {
   const [isFocused, setIsFocused] = useState(false);
   const [isPasswordVisible, setIsPasswordVisible] = useState(!secureTextEntry);
@@ -145,8 +139,7 @@ export const TextInput: React.FC<TextInputProps> = ({
     if (error) style.push(styles.inputError);
     if (disabled) style.push(styles.inputDisabled);
     if (leftIcon && !multiline) style.push({ paddingLeft: toRN(40) });
-    if ((rightIcon || showPasswordToggle) && !multiline)
-      style.push({ paddingRight: toRN(40) });
+    if ((rightIcon || showPasswordToggle) && !multiline) style.push({ paddingRight: toRN(40) });
     if (inputStyle) style.push(inputStyle);
 
     return style;
@@ -162,9 +155,7 @@ export const TextInput: React.FC<TextInputProps> = ({
         <RNTextInput
           style={getInputStyle()}
           placeholder={placeholder}
-          placeholderTextColor={
-            disabled ? colors.text.muted : colors.text.tertiary
-          }
+          placeholderTextColor={disabled ? colors.text.muted : colors.text.tertiary}
           value={value}
           onChangeText={onChangeText}
           onFocus={handleFocus}
@@ -186,10 +177,7 @@ export const TextInput: React.FC<TextInputProps> = ({
             disabled={disabled}
           >
             {isPasswordVisible ? (
-              <EyeOpenIcon
-                size={24}
-                color={disabled ? colors.text.muted : colors.text.secondary}
-              />
+              <EyeOpenIcon size={24} color={disabled ? colors.text.muted : colors.text.secondary} />
             ) : (
               <EyeClosedIcon
                 size={24}

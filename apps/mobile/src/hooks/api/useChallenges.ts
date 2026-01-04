@@ -3,13 +3,9 @@ import {
   challengesService,
   Challenge,
   ChallengeCheckInRequest,
-  ShareAsChallengeRequest,
+  ShareAsChallengeRequest
 } from "@/services/api/challenges";
-import {
-  goalsQueryKeys,
-  challengesQueryKeys,
-  actionablePlansQueryKeys,
-} from "./queryKeys";
+import { goalsQueryKeys, challengesQueryKeys, actionablePlansQueryKeys } from "./queryKeys";
 import { homeDashboardQueryKeys } from "./useHomeDashboard";
 import { trackingStatsQueryKeys } from "./useTrackingStats";
 import { progressQueryKeys } from "./useProgressData";
@@ -17,7 +13,7 @@ import {
   cancelProgressQueries,
   snapshotProgressData,
   optimisticallyUpdateProgress,
-  rollbackProgressData,
+  rollbackProgressData
 } from "./progressOptimisticUpdates";
 
 // =====================================================
@@ -42,7 +38,7 @@ export const useChallenges = () => {
     queryFn: () => challengesService.getChallenges(),
     staleTime: 2 * 60 * 1000, // 2 minutes
     refetchOnMount: false,
-    placeholderData: EMPTY_CHALLENGES_RESPONSE,
+    placeholderData: EMPTY_CHALLENGES_RESPONSE
   });
 };
 
@@ -52,13 +48,11 @@ export const useChallenges = () => {
  */
 export const useMyChallenges = (status?: string) => {
   return useQuery({
-    queryKey: status
-      ? [...challengesQueryKeys.my(), status]
-      : challengesQueryKeys.my(),
+    queryKey: status ? [...challengesQueryKeys.my(), status] : challengesQueryKeys.my(),
     queryFn: () => challengesService.getMyChallenges(status),
     staleTime: 2 * 60 * 1000, // 2 minutes
     refetchOnMount: false,
-    placeholderData: EMPTY_CHALLENGES_RESPONSE,
+    placeholderData: EMPTY_CHALLENGES_RESPONSE
   });
 };
 
@@ -69,7 +63,7 @@ export const usePublicChallenges = () => {
   return useQuery({
     queryKey: challengesQueryKeys.public(),
     queryFn: () => challengesService.getPublicChallenges(),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000 // 5 minutes
   });
 };
 
@@ -81,7 +75,7 @@ export const useChallenge = (id: string) => {
     queryKey: challengesQueryKeys.detail(id),
     queryFn: () => challengesService.getChallenge(id),
     enabled: !!id,
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 2 * 60 * 1000 // 2 minutes
   });
 };
 
@@ -93,7 +87,7 @@ export const useChallengeLeaderboard = (challengeId: string) => {
     queryKey: challengesQueryKeys.leaderboard(challengeId),
     queryFn: () => challengesService.getLeaderboard(challengeId),
     enabled: !!challengeId,
-    staleTime: 30 * 1000, // 30 seconds - leaderboards change frequently
+    staleTime: 30 * 1000 // 30 seconds - leaderboards change frequently
   });
 };
 
@@ -105,7 +99,7 @@ export const useChallengeParticipants = (challengeId: string) => {
     queryKey: challengesQueryKeys.participants(challengeId),
     queryFn: () => challengesService.getParticipants(challengeId),
     enabled: !!challengeId,
-    staleTime: 60 * 1000, // 1 minute
+    staleTime: 60 * 1000 // 1 minute
   });
 };
 
@@ -117,7 +111,7 @@ export const useChallengeCheckIns = (challengeId: string) => {
     queryKey: challengesQueryKeys.checkIns(challengeId),
     queryFn: () => challengesService.getCheckIns(challengeId),
     enabled: !!challengeId,
-    staleTime: 30 * 1000, // 30 seconds
+    staleTime: 30 * 1000 // 30 seconds
   });
 };
 
@@ -129,7 +123,7 @@ export const useMyChallengeCheckIns = (challengeId: string) => {
     queryKey: challengesQueryKeys.myCheckIns(challengeId),
     queryFn: () => challengesService.getMyCheckIns(challengeId),
     enabled: !!challengeId,
-    staleTime: 30 * 1000, // 30 seconds
+    staleTime: 30 * 1000 // 30 seconds
   });
 };
 
@@ -140,28 +134,21 @@ export const useCreateChallenge = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (
-      data: Parameters<typeof challengesService.createChallenge>[0],
-    ) => challengesService.createChallenge(data),
+    mutationFn: (data: Parameters<typeof challengesService.createChallenge>[0]) =>
+      challengesService.createChallenge(data),
     // Optimistic update for instant UI feedback
     onMutate: async (newChallenge) => {
       // Cancel outgoing refetches to prevent race conditions
       await queryClient.cancelQueries({ queryKey: challengesQueryKeys.list() });
       await queryClient.cancelQueries({ queryKey: challengesQueryKeys.my() });
       await queryClient.cancelQueries({
-        queryKey: homeDashboardQueryKeys.dashboard(),
+        queryKey: homeDashboardQueryKeys.dashboard()
       });
 
       // Snapshot previous data for rollback
-      const previousChallenges = queryClient.getQueryData(
-        challengesQueryKeys.list(),
-      );
-      const previousMyChallenges = queryClient.getQueryData(
-        challengesQueryKeys.my(),
-      );
-      const previousDashboard = queryClient.getQueryData(
-        homeDashboardQueryKeys.dashboard(),
-      );
+      const previousChallenges = queryClient.getQueryData(challengesQueryKeys.list());
+      const previousMyChallenges = queryClient.getQueryData(challengesQueryKeys.my());
+      const previousDashboard = queryClient.getQueryData(homeDashboardQueryKeys.dashboard());
 
       // Create optimistic challenge with temp ID
       const optimisticChallenge: Challenge = {
@@ -189,7 +176,7 @@ export const useCreateChallenge = () => {
         // User is creator and participant
         participants_count: 1,
         is_creator: true,
-        is_participant: true,
+        is_participant: true
       };
 
       // Optimistically add to challenges list
@@ -205,47 +192,32 @@ export const useCreateChallenge = () => {
       });
 
       // Optimistically update home dashboard
-      queryClient.setQueryData(
-        homeDashboardQueryKeys.dashboard(),
-        (old: any) => {
-          if (!old) return old;
-          return {
-            ...old,
-            items: [
-              ...(old.items || []),
-              { type: "challenge", data: optimisticChallenge },
-            ],
-            stats: old.stats
-              ? {
-                  ...old.stats,
-                  active_count: (old.stats.active_count || 0) + 1,
-                }
-              : old.stats,
-          };
-        },
-      );
+      queryClient.setQueryData(homeDashboardQueryKeys.dashboard(), (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          items: [...(old.items || []), { type: "challenge", data: optimisticChallenge }],
+          stats: old.stats
+            ? {
+                ...old.stats,
+                active_count: (old.stats.active_count || 0) + 1
+              }
+            : old.stats
+        };
+      });
 
       return { previousChallenges, previousMyChallenges, previousDashboard };
     },
     onError: (err, newChallenge, context) => {
       // Rollback on error
       if (context?.previousChallenges) {
-        queryClient.setQueryData(
-          challengesQueryKeys.list(),
-          context.previousChallenges,
-        );
+        queryClient.setQueryData(challengesQueryKeys.list(), context.previousChallenges);
       }
       if (context?.previousMyChallenges) {
-        queryClient.setQueryData(
-          challengesQueryKeys.my(),
-          context.previousMyChallenges,
-        );
+        queryClient.setQueryData(challengesQueryKeys.my(), context.previousMyChallenges);
       }
       if (context?.previousDashboard) {
-        queryClient.setQueryData(
-          homeDashboardQueryKeys.dashboard(),
-          context.previousDashboard,
-        );
+        queryClient.setQueryData(homeDashboardQueryKeys.dashboard(), context.previousDashboard);
       }
     },
     onSuccess: (response) => {
@@ -255,64 +227,49 @@ export const useCreateChallenge = () => {
         // Update challenges list - remove temp and add real
         queryClient.setQueryData(challengesQueryKeys.list(), (old: any) => {
           if (!old?.data) return { data: [realChallenge], status: 200 };
-          const filtered = old.data.filter(
-            (c: Challenge) => !c.id.startsWith("temp-"),
-          );
+          const filtered = old.data.filter((c: Challenge) => !c.id.startsWith("temp-"));
           return { ...old, data: [...filtered, realChallenge] };
         });
 
         // Update my challenges - remove temp and add real
         queryClient.setQueryData(challengesQueryKeys.my(), (old: any) => {
           if (!old?.data) return { data: [realChallenge], status: 200 };
-          const filtered = old.data.filter(
-            (c: Challenge) => !c.id.startsWith("temp-"),
-          );
+          const filtered = old.data.filter((c: Challenge) => !c.id.startsWith("temp-"));
           return { ...old, data: [...filtered, realChallenge] };
         });
 
         // Update home dashboard - replace temp item with real
-        queryClient.setQueryData(
-          homeDashboardQueryKeys.dashboard(),
-          (old: any) => {
-            if (!old) return old;
-            return {
-              ...old,
-              items: (old.items || []).map((item: any) => {
-                if (
-                  item.type === "challenge" &&
-                  item.data?.id?.startsWith("temp-")
-                ) {
-                  return { type: "challenge", data: realChallenge };
-                }
-                return item;
-              }),
-            };
-          },
-        );
+        queryClient.setQueryData(homeDashboardQueryKeys.dashboard(), (old: any) => {
+          if (!old) return old;
+          return {
+            ...old,
+            items: (old.items || []).map((item: any) => {
+              if (item.type === "challenge" && item.data?.id?.startsWith("temp-")) {
+                return { type: "challenge", data: realChallenge };
+              }
+              return item;
+            })
+          };
+        });
       }
 
       // 🆕 OPTIMISTICALLY set plan status to "pending" immediately
       // This shows "Generating" badge right away instead of waiting for API fetch
       // The backend creates the pending plan entry, but this ensures instant UI feedback
       if (realChallenge?.id) {
-        queryClient.setQueryData(
-          actionablePlansQueryKeys.challengePlanStatus(realChallenge.id),
-          {
-            status: "pending" as const,
-            challenge_id: realChallenge.id,
-            plan_type: null,
-            structured_data: null,
-          },
-        );
+        queryClient.setQueryData(actionablePlansQueryKeys.challengePlanStatus(realChallenge.id), {
+          status: "pending" as const,
+          challenge_id: realChallenge.id,
+          plan_type: null,
+          structured_data: null
+        });
 
         // Also invalidate to start polling (will merge with optimistic data)
         queryClient.invalidateQueries({
-          queryKey: actionablePlansQueryKeys.challengePlanStatus(
-            realChallenge.id,
-          ),
+          queryKey: actionablePlansQueryKeys.challengePlanStatus(realChallenge.id)
         });
       }
-    },
+    }
   });
 };
 
@@ -323,47 +280,39 @@ export const useJoinChallenge = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (challengeId: string) =>
-      challengesService.joinChallenge(challengeId),
+    mutationFn: (challengeId: string) => challengesService.joinChallenge(challengeId),
     // Optimistic update
     onMutate: async (challengeId) => {
       await queryClient.cancelQueries({
-        queryKey: challengesQueryKeys.detail(challengeId),
+        queryKey: challengesQueryKeys.detail(challengeId)
       });
       await queryClient.cancelQueries({
-        queryKey: challengesQueryKeys.list(),
+        queryKey: challengesQueryKeys.list()
       });
       await queryClient.cancelQueries({
-        queryKey: homeDashboardQueryKeys.dashboard(),
+        queryKey: homeDashboardQueryKeys.dashboard()
       });
 
-      const previousDetail = queryClient.getQueryData(
-        challengesQueryKeys.detail(challengeId),
-      );
+      const previousDetail = queryClient.getQueryData(challengesQueryKeys.detail(challengeId));
       const previousList = queryClient.getQueryData(challengesQueryKeys.list());
-      const previousDashboard = queryClient.getQueryData(
-        homeDashboardQueryKeys.dashboard(),
-      );
+      const previousDashboard = queryClient.getQueryData(homeDashboardQueryKeys.dashboard());
 
       // Get the challenge data for optimistic updates
       const challengeDetail = previousDetail as any;
       const challenge = challengeDetail?.data;
 
       // Update challenge detail to show user as participant
-      queryClient.setQueryData(
-        challengesQueryKeys.detail(challengeId),
-        (old: any) => {
-          if (!old?.data) return old;
-          return {
-            ...old,
-            data: {
-              ...old.data,
-              is_participant: true,
-              participant_count: (old.data.participant_count || 0) + 1,
-            },
-          };
-        },
-      );
+      queryClient.setQueryData(challengesQueryKeys.detail(challengeId), (old: any) => {
+        if (!old?.data) return old;
+        return {
+          ...old,
+          data: {
+            ...old.data,
+            is_participant: true,
+            participant_count: (old.data.participant_count || 0) + 1
+          }
+        };
+      });
 
       // Also add to challenges list if not already there
       queryClient.setQueryData(challengesQueryKeys.list(), (old: any) => {
@@ -378,95 +327,79 @@ export const useJoinChallenge = () => {
                 ? {
                     ...c,
                     is_participant: true,
-                    participant_count: (c.participant_count || 0) + 1,
+                    participant_count: (c.participant_count || 0) + 1
                   }
-                : c,
-            ),
+                : c
+            )
           };
         }
         // Add new entry if we have challenge data
         if (challenge) {
           return {
             ...old,
-            data: [...old.data, { ...challenge, is_participant: true }],
+            data: [...old.data, { ...challenge, is_participant: true }]
           };
         }
         return old;
       });
 
       // Optimistically update home dashboard - add challenge to items
-      queryClient.setQueryData(
-        homeDashboardQueryKeys.dashboard(),
-        (old: any) => {
-          if (!old) return old;
+      queryClient.setQueryData(homeDashboardQueryKeys.dashboard(), (old: any) => {
+        if (!old) return old;
 
-          // Create the item to add
-          const itemToAdd = challenge
+        // Create the item to add
+        const itemToAdd = challenge
+          ? {
+              type: "challenge" as const,
+              data: { ...challenge, is_participant: true }
+            }
+          : null;
+
+        // Check if already exists in items
+        const alreadyExists = (old.items || []).some(
+          (item: any) => item.type === "challenge" && item.data?.id === challengeId
+        );
+
+        return {
+          ...old,
+          items: itemToAdd && !alreadyExists ? [...(old.items || []), itemToAdd] : old.items,
+          stats: old.stats
             ? {
-                type: "challenge" as const,
-                data: { ...challenge, is_participant: true },
+                ...old.stats,
+                active_count: (old.stats.active_count || 0) + 1
               }
-            : null;
-
-          // Check if already exists in items
-          const alreadyExists = (old.items || []).some(
-            (item: any) =>
-              item.type === "challenge" && item.data?.id === challengeId,
-          );
-
-          return {
-            ...old,
-            items:
-              itemToAdd && !alreadyExists
-                ? [...(old.items || []), itemToAdd]
-                : old.items,
-            stats: old.stats
-              ? {
-                  ...old.stats,
-                  active_count: (old.stats.active_count || 0) + 1,
-                }
-              : old.stats,
-          };
-        },
-      );
+            : old.stats
+        };
+      });
 
       return { previousDetail, previousList, previousDashboard };
     },
     onError: (err, challengeId, context) => {
       if (context?.previousDetail) {
-        queryClient.setQueryData(
-          challengesQueryKeys.detail(challengeId),
-          context.previousDetail,
-        );
+        queryClient.setQueryData(challengesQueryKeys.detail(challengeId), context.previousDetail);
       }
       if (context?.previousList) {
-        queryClient.setQueryData(
-          challengesQueryKeys.list(),
-          context.previousList,
-        );
+        queryClient.setQueryData(challengesQueryKeys.list(), context.previousList);
       }
       if (context?.previousDashboard) {
-        queryClient.setQueryData(
-          homeDashboardQueryKeys.dashboard(),
-          context.previousDashboard,
-        );
+        queryClient.setQueryData(homeDashboardQueryKeys.dashboard(), context.previousDashboard);
       }
     },
     onSettled: (_, __, challengeId) => {
       // Refetch to ensure consistency
       queryClient.invalidateQueries({
-        queryKey: challengesQueryKeys.detail(challengeId),
+        queryKey: challengesQueryKeys.detail(challengeId)
       });
       queryClient.invalidateQueries({
-        queryKey: challengesQueryKeys.participants(challengeId),
+        queryKey: challengesQueryKeys.participants(challengeId)
       });
       queryClient.invalidateQueries({
-        queryKey: challengesQueryKeys.list(),
+        queryKey: challengesQueryKeys.list()
       });
       queryClient.invalidateQueries({
-        queryKey: homeDashboardQueryKeys.all,
+        queryKey: homeDashboardQueryKeys.all
       });
-    },
+    }
   });
 };
 
@@ -477,114 +410,90 @@ export const useLeaveChallenge = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (challengeId: string) =>
-      challengesService.leaveChallenge(challengeId),
+    mutationFn: (challengeId: string) => challengesService.leaveChallenge(challengeId),
     // Optimistic update
     onMutate: async (challengeId) => {
       await queryClient.cancelQueries({
-        queryKey: challengesQueryKeys.detail(challengeId),
+        queryKey: challengesQueryKeys.detail(challengeId)
       });
       await queryClient.cancelQueries({
-        queryKey: challengesQueryKeys.list(),
+        queryKey: challengesQueryKeys.list()
       });
       await queryClient.cancelQueries({
-        queryKey: homeDashboardQueryKeys.dashboard(),
+        queryKey: homeDashboardQueryKeys.dashboard()
       });
 
-      const previousDetail = queryClient.getQueryData(
-        challengesQueryKeys.detail(challengeId),
-      );
+      const previousDetail = queryClient.getQueryData(challengesQueryKeys.detail(challengeId));
       const previousList = queryClient.getQueryData(challengesQueryKeys.list());
-      const previousDashboard = queryClient.getQueryData(
-        homeDashboardQueryKeys.dashboard(),
-      );
+      const previousDashboard = queryClient.getQueryData(homeDashboardQueryKeys.dashboard());
 
       // Update challenge detail to show user left
-      queryClient.setQueryData(
-        challengesQueryKeys.detail(challengeId),
-        (old: any) => {
-          if (!old?.data) return old;
-          return {
-            ...old,
-            data: {
-              ...old.data,
-              is_participant: false,
-              participant_count: Math.max(
-                0,
-                (old.data.participant_count || 1) - 1,
-              ),
-            },
-          };
-        },
-      );
+      queryClient.setQueryData(challengesQueryKeys.detail(challengeId), (old: any) => {
+        if (!old?.data) return old;
+        return {
+          ...old,
+          data: {
+            ...old.data,
+            is_participant: false,
+            participant_count: Math.max(0, (old.data.participant_count || 1) - 1)
+          }
+        };
+      });
 
       // Remove from list
       queryClient.setQueryData(challengesQueryKeys.list(), (old: any) => {
         if (!old?.data) return old;
         return {
           ...old,
-          data: old.data.filter((c: Challenge) => c.id !== challengeId),
+          data: old.data.filter((c: Challenge) => c.id !== challengeId)
         };
       });
 
       // Optimistically update home dashboard - remove challenge from items
-      queryClient.setQueryData(
-        homeDashboardQueryKeys.dashboard(),
-        (old: any) => {
-          if (!old) return old;
-          return {
-            ...old,
-            items: (old.items || []).filter(
-              (item: any) =>
-                !(item.type === "challenge" && item.data?.id === challengeId),
-            ),
-            stats: old.stats
-              ? {
-                  ...old.stats,
-                  active_count: Math.max(0, (old.stats.active_count || 1) - 1),
-                }
-              : old.stats,
-          };
-        },
-      );
+      queryClient.setQueryData(homeDashboardQueryKeys.dashboard(), (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          items: (old.items || []).filter(
+            (item: any) => !(item.type === "challenge" && item.data?.id === challengeId)
+          ),
+          stats: old.stats
+            ? {
+                ...old.stats,
+                active_count: Math.max(0, (old.stats.active_count || 1) - 1)
+              }
+            : old.stats
+        };
+      });
 
       return { previousDetail, previousList, previousDashboard };
     },
     onError: (err, challengeId, context) => {
       if (context?.previousDetail) {
-        queryClient.setQueryData(
-          challengesQueryKeys.detail(challengeId),
-          context.previousDetail,
-        );
+        queryClient.setQueryData(challengesQueryKeys.detail(challengeId), context.previousDetail);
       }
       if (context?.previousList) {
-        queryClient.setQueryData(
-          challengesQueryKeys.list(),
-          context.previousList,
-        );
+        queryClient.setQueryData(challengesQueryKeys.list(), context.previousList);
       }
       if (context?.previousDashboard) {
-        queryClient.setQueryData(
-          homeDashboardQueryKeys.dashboard(),
-          context.previousDashboard,
-        );
+        queryClient.setQueryData(homeDashboardQueryKeys.dashboard(), context.previousDashboard);
       }
     },
     onSettled: (_, __, challengeId) => {
       // Refetch to ensure consistency
       queryClient.invalidateQueries({
-        queryKey: challengesQueryKeys.detail(challengeId),
+        queryKey: challengesQueryKeys.detail(challengeId)
       });
       queryClient.invalidateQueries({
-        queryKey: challengesQueryKeys.participants(challengeId),
+        queryKey: challengesQueryKeys.participants(challengeId)
       });
       queryClient.invalidateQueries({
-        queryKey: challengesQueryKeys.list(),
+        queryKey: challengesQueryKeys.list()
       });
       queryClient.invalidateQueries({
-        queryKey: homeDashboardQueryKeys.all,
+        queryKey: homeDashboardQueryKeys.all
       });
-    },
+    }
   });
 };
 
@@ -596,52 +505,40 @@ export const useCancelChallenge = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({
-      challengeId,
-      reason,
-    }: {
-      challengeId: string;
-      reason?: string;
-    }) => challengesService.cancelChallenge(challengeId, reason),
+    mutationFn: ({ challengeId, reason }: { challengeId: string; reason?: string }) =>
+      challengesService.cancelChallenge(challengeId, reason),
 
     // Optimistic update
     onMutate: async ({ challengeId }) => {
       await queryClient.cancelQueries({
-        queryKey: challengesQueryKeys.detail(challengeId),
+        queryKey: challengesQueryKeys.detail(challengeId)
       });
       await queryClient.cancelQueries({
-        queryKey: challengesQueryKeys.list(),
+        queryKey: challengesQueryKeys.list()
       });
       await queryClient.cancelQueries({
-        queryKey: challengesQueryKeys.my(),
+        queryKey: challengesQueryKeys.my()
       });
       await queryClient.cancelQueries({
-        queryKey: homeDashboardQueryKeys.dashboard(),
+        queryKey: homeDashboardQueryKeys.dashboard()
       });
 
-      const previousDetail = queryClient.getQueryData(
-        challengesQueryKeys.detail(challengeId),
-      );
+      const previousDetail = queryClient.getQueryData(challengesQueryKeys.detail(challengeId));
       const previousList = queryClient.getQueryData(challengesQueryKeys.list());
       const previousMy = queryClient.getQueryData(challengesQueryKeys.my());
-      const previousDashboard = queryClient.getQueryData(
-        homeDashboardQueryKeys.dashboard(),
-      );
+      const previousDashboard = queryClient.getQueryData(homeDashboardQueryKeys.dashboard());
 
       // Update challenge detail to show cancelled status
-      queryClient.setQueryData(
-        challengesQueryKeys.detail(challengeId),
-        (old: any) => {
-          if (!old?.data) return old;
-          return {
-            ...old,
-            data: {
-              ...old.data,
-              status: "cancelled",
-            },
-          };
-        },
-      );
+      queryClient.setQueryData(challengesQueryKeys.detail(challengeId), (old: any) => {
+        if (!old?.data) return old;
+        return {
+          ...old,
+          data: {
+            ...old.data,
+            status: "cancelled"
+          }
+        };
+      });
 
       // Update in list cache
       queryClient.setQueryData(challengesQueryKeys.list(), (old: any) => {
@@ -649,8 +546,8 @@ export const useCancelChallenge = () => {
         return {
           ...old,
           data: old.data.map((c: Challenge) =>
-            c.id === challengeId ? { ...c, status: "cancelled" } : c,
-          ),
+            c.id === challengeId ? { ...c, status: "cancelled" } : c
+          )
         };
       });
 
@@ -660,72 +557,198 @@ export const useCancelChallenge = () => {
         return {
           ...old,
           data: old.data.map((c: Challenge) =>
-            c.id === challengeId ? { ...c, status: "cancelled" } : c,
-          ),
+            c.id === challengeId ? { ...c, status: "cancelled" } : c
+          )
         };
       });
 
       // Optimistically update home dashboard - remove cancelled challenge from items
-      queryClient.setQueryData(
-        homeDashboardQueryKeys.dashboard(),
-        (old: any) => {
-          if (!old) return old;
-          return {
-            ...old,
-            items: (old.items || []).filter(
-              (item: any) =>
-                !(item.type === "challenge" && item.data?.id === challengeId),
-            ),
-            stats: old.stats
-              ? {
-                  ...old.stats,
-                  active_count: Math.max(0, (old.stats.active_count || 1) - 1),
-                }
-              : old.stats,
-          };
-        },
-      );
+      queryClient.setQueryData(homeDashboardQueryKeys.dashboard(), (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          items: (old.items || []).filter(
+            (item: any) => !(item.type === "challenge" && item.data?.id === challengeId)
+          ),
+          stats: old.stats
+            ? {
+                ...old.stats,
+                active_count: Math.max(0, (old.stats.active_count || 1) - 1)
+              }
+            : old.stats
+        };
+      });
 
       return { previousDetail, previousList, previousMy, previousDashboard };
     },
     onError: (err, { challengeId }, context) => {
       if (context?.previousDetail) {
-        queryClient.setQueryData(
-          challengesQueryKeys.detail(challengeId),
-          context.previousDetail,
-        );
+        queryClient.setQueryData(challengesQueryKeys.detail(challengeId), context.previousDetail);
       }
       if (context?.previousList) {
-        queryClient.setQueryData(
-          challengesQueryKeys.list(),
-          context.previousList,
-        );
+        queryClient.setQueryData(challengesQueryKeys.list(), context.previousList);
       }
       if (context?.previousMy) {
         queryClient.setQueryData(challengesQueryKeys.my(), context.previousMy);
       }
       if (context?.previousDashboard) {
-        queryClient.setQueryData(
-          homeDashboardQueryKeys.dashboard(),
-          context.previousDashboard,
-        );
+        queryClient.setQueryData(homeDashboardQueryKeys.dashboard(), context.previousDashboard);
       }
     },
     onSettled: (_, __, { challengeId }) => {
       // Refetch to ensure consistency
       queryClient.invalidateQueries({
-        queryKey: challengesQueryKeys.detail(challengeId),
+        queryKey: challengesQueryKeys.detail(challengeId)
       });
       queryClient.invalidateQueries({
-        queryKey: challengesQueryKeys.list(),
+        queryKey: challengesQueryKeys.list()
       });
       queryClient.invalidateQueries({
-        queryKey: challengesQueryKeys.my(),
+        queryKey: challengesQueryKeys.my()
       });
       queryClient.invalidateQueries({
-        queryKey: homeDashboardQueryKeys.all,
+        queryKey: homeDashboardQueryKeys.all
       });
+    }
+  });
+};
+
+/**
+ * Edit a challenge (creator only, status === 'upcoming')
+ *
+ * Only allows changes that don't affect the AI-generated plan:
+ * - title, description: Safe (plan was based on original, user is warned)
+ * - join_deadline: EXTEND only
+ * - max_participants: INCREASE only
+ * - reminder_times: Just notification preferences
+ */
+export const useEditChallenge = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      challengeId,
+      edits
+    }: {
+      challengeId: string;
+      edits: {
+        title?: string;
+        description?: string;
+        join_deadline?: string;
+        max_participants?: number;
+        reminder_times?: string[];
+      };
+    }) => challengesService.editChallenge(challengeId, edits),
+
+    // Optimistic update
+    onMutate: async ({ challengeId, edits }) => {
+      await queryClient.cancelQueries({
+        queryKey: challengesQueryKeys.detail(challengeId)
+      });
+      await queryClient.cancelQueries({
+        queryKey: challengesQueryKeys.list()
+      });
+      await queryClient.cancelQueries({
+        queryKey: challengesQueryKeys.my()
+      });
+      await queryClient.cancelQueries({
+        queryKey: homeDashboardQueryKeys.dashboard()
+      });
+
+      const previousDetail = queryClient.getQueryData(challengesQueryKeys.detail(challengeId));
+      const previousList = queryClient.getQueryData(challengesQueryKeys.list());
+      const previousMy = queryClient.getQueryData(challengesQueryKeys.my());
+      const previousDashboard = queryClient.getQueryData(homeDashboardQueryKeys.dashboard());
+
+      // Update challenge detail
+      queryClient.setQueryData(challengesQueryKeys.detail(challengeId), (old: any) => {
+        if (!old?.data) return old;
+        return {
+          ...old,
+          data: {
+            ...old.data,
+            ...edits,
+            updated_at: new Date().toISOString()
+          }
+        };
+      });
+
+      // Update in list cache
+      queryClient.setQueryData(challengesQueryKeys.list(), (old: any) => {
+        if (!old?.data) return old;
+        return {
+          ...old,
+          data: old.data.map((c: Challenge) =>
+            c.id === challengeId ? { ...c, ...edits, updated_at: new Date().toISOString() } : c
+          )
+        };
+      });
+
+      // Update in my challenges cache
+      queryClient.setQueryData(challengesQueryKeys.my(), (old: any) => {
+        if (!old?.data) return old;
+        return {
+          ...old,
+          data: old.data.map((c: Challenge) =>
+            c.id === challengeId ? { ...c, ...edits, updated_at: new Date().toISOString() } : c
+          )
+        };
+      });
+
+      // Update home dashboard
+      queryClient.setQueryData(homeDashboardQueryKeys.dashboard(), (old: any) => {
+        if (!old?.items) return old;
+        return {
+          ...old,
+          items: old.items.map((item: any) =>
+            item.type === "challenge" && item.data?.id === challengeId
+              ? { ...item, data: { ...item.data, ...edits, updated_at: new Date().toISOString() } }
+              : item
+          )
+        };
+      });
+
+      return { previousDetail, previousList, previousMy, previousDashboard, challengeId };
     },
+
+    onError: (err, { challengeId }, context) => {
+      // Rollback on error
+      if (context?.previousDetail) {
+        queryClient.setQueryData(challengesQueryKeys.detail(challengeId), context.previousDetail);
+      }
+      if (context?.previousList) {
+        queryClient.setQueryData(challengesQueryKeys.list(), context.previousList);
+      }
+      if (context?.previousMy) {
+        queryClient.setQueryData(challengesQueryKeys.my(), context.previousMy);
+      }
+      if (context?.previousDashboard) {
+        queryClient.setQueryData(homeDashboardQueryKeys.dashboard(), context.previousDashboard);
+      }
+    },
+
+    onSuccess: (response, { challengeId }) => {
+      const updatedChallenge = response?.data;
+
+      // Update cache with real server response
+      if (updatedChallenge) {
+        queryClient.setQueryData(challengesQueryKeys.detail(challengeId), (old: any) => ({
+          ...old,
+          data: updatedChallenge
+        }));
+      }
+
+      // Invalidate to ensure consistency
+      queryClient.invalidateQueries({
+        queryKey: challengesQueryKeys.list()
+      });
+      queryClient.invalidateQueries({
+        queryKey: challengesQueryKeys.my()
+      });
+      queryClient.invalidateQueries({
+        queryKey: homeDashboardQueryKeys.all
+      });
+    }
   });
 };
 
@@ -736,13 +759,8 @@ export const useChallengeCheckIn = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({
-      challengeId,
-      data,
-    }: {
-      challengeId: string;
-      data?: ChallengeCheckInRequest;
-    }) => challengesService.checkIn(challengeId, data),
+    mutationFn: ({ challengeId, data }: { challengeId: string; data?: ChallengeCheckInRequest }) =>
+      challengesService.checkIn(challengeId, data),
 
     // Optimistic update - mark pre-created check-in as completed
     onMutate: async ({ challengeId, data }) => {
@@ -752,13 +770,13 @@ export const useChallengeCheckIn = () => {
 
       // Cancel in-flight queries to prevent race conditions
       await queryClient.cancelQueries({
-        queryKey: challengesQueryKeys.myCheckIns(challengeId),
+        queryKey: challengesQueryKeys.myCheckIns(challengeId)
       });
       await queryClient.cancelQueries({
-        queryKey: challengesQueryKeys.checkIns(challengeId),
+        queryKey: challengesQueryKeys.checkIns(challengeId)
       });
       await queryClient.cancelQueries({
-        queryKey: homeDashboardQueryKeys.dashboard(),
+        queryKey: homeDashboardQueryKeys.dashboard()
       });
 
       // Cancel progress queries for optimistic updates
@@ -766,80 +784,65 @@ export const useChallengeCheckIn = () => {
 
       // Snapshot previous data for rollback
       const previousMyCheckIns = queryClient.getQueryData(
-        challengesQueryKeys.myCheckIns(challengeId),
+        challengesQueryKeys.myCheckIns(challengeId)
       );
-      const previousCheckIns = queryClient.getQueryData(
-        challengesQueryKeys.checkIns(challengeId),
-      );
-      const previousDashboard = queryClient.getQueryData(
-        homeDashboardQueryKeys.dashboard(),
-      );
+      const previousCheckIns = queryClient.getQueryData(challengesQueryKeys.checkIns(challengeId));
+      const previousDashboard = queryClient.getQueryData(homeDashboardQueryKeys.dashboard());
 
       // Snapshot progress data for rollback
-      const previousProgressData = snapshotProgressData(
-        queryClient,
-        challengeId,
-        today,
-      );
+      const previousProgressData = snapshotProgressData(queryClient, challengeId, today);
 
       // Update existing pre-created check-in to mark as completed
-      queryClient.setQueryData(
-        challengesQueryKeys.myCheckIns(challengeId),
-        (old: any) => {
-          if (!old) return old;
-          const dataArray = Array.isArray(old) ? old : old?.data || [];
-          const updated = dataArray.map((c: any) =>
-            c.check_in_date === today && !c.is_checked_in
-              ? {
-                  ...c,
-                  completed: true,
-                  is_checked_in: true,
-                  notes: data?.notes || c.notes,
-                  mood: data?.mood || c.mood,
-                  photo_url: data?.photo_url || c.photo_url,
-                  updated_at: new Date().toISOString(),
-                }
-              : c,
-          );
-          return Array.isArray(old) ? updated : { ...old, data: updated };
-        },
-      );
+      queryClient.setQueryData(challengesQueryKeys.myCheckIns(challengeId), (old: any) => {
+        if (!old) return old;
+        const dataArray = Array.isArray(old) ? old : old?.data || [];
+        const updated = dataArray.map((c: any) =>
+          c.check_in_date === today && !c.is_checked_in
+            ? {
+                ...c,
+                completed: true,
+                is_checked_in: true,
+                notes: data?.notes || c.notes,
+                mood: data?.mood || c.mood,
+                photo_url: data?.photo_url || c.photo_url,
+                updated_at: new Date().toISOString()
+              }
+            : c
+        );
+        return Array.isArray(old) ? updated : { ...old, data: updated };
+      });
 
       // Remove from pending check-ins in dashboard and update stats
-      queryClient.setQueryData(
-        homeDashboardQueryKeys.dashboard(),
-        (old: any) => {
-          if (!old) return old;
-          return {
-            ...old,
-            // Remove this challenge from pending check-ins
-            today_pending_checkins: (old.today_pending_checkins || []).filter(
-              (c: any) =>
-                !(c.type === "challenge" && c.item?.id === challengeId),
-            ),
-            // Optimistically update stats
-            stats: old.stats
-              ? {
-                  ...old.stats,
-                  total_check_ins: (old.stats.total_check_ins || 0) + 1,
-                }
-              : old.stats,
-            // Update challenge progress in items
-            items: (old.items || []).map((item: any) => {
-              if (item.type === "challenge" && item.data?.id === challengeId) {
-                return {
-                  ...item,
-                  data: {
-                    ...item.data,
-                    my_progress: (item.data.my_progress || 0) + 1,
-                  },
-                };
+      queryClient.setQueryData(homeDashboardQueryKeys.dashboard(), (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          // Remove this challenge from pending check-ins
+          today_pending_checkins: (old.today_pending_checkins || []).filter(
+            (c: any) => !(c.type === "challenge" && c.item?.id === challengeId)
+          ),
+          // Optimistically update stats
+          stats: old.stats
+            ? {
+                ...old.stats,
+                total_check_ins: (old.stats.total_check_ins || 0) + 1
               }
-              return item;
-            }),
-          };
-        },
-      );
+            : old.stats,
+          // Update challenge progress in items
+          items: (old.items || []).map((item: any) => {
+            if (item.type === "challenge" && item.data?.id === challengeId) {
+              return {
+                ...item,
+                data: {
+                  ...item.data,
+                  my_progress: (item.data.my_progress || 0) + 1
+                }
+              };
+            }
+            return item;
+          })
+        };
+      });
 
       // Optimistically update progress data (streak, week, chain)
       optimisticallyUpdateProgress(queryClient, challengeId, today);
@@ -849,7 +852,7 @@ export const useChallengeCheckIn = () => {
         previousCheckIns,
         previousDashboard,
         previousProgressData,
-        challengeId,
+        challengeId
       };
     },
 
@@ -858,20 +861,17 @@ export const useChallengeCheckIn = () => {
       if (context?.previousMyCheckIns) {
         queryClient.setQueryData(
           challengesQueryKeys.myCheckIns(challengeId),
-          context.previousMyCheckIns,
+          context.previousMyCheckIns
         );
       }
       if (context?.previousCheckIns) {
         queryClient.setQueryData(
           challengesQueryKeys.checkIns(challengeId),
-          context.previousCheckIns,
+          context.previousCheckIns
         );
       }
       if (context?.previousDashboard) {
-        queryClient.setQueryData(
-          homeDashboardQueryKeys.dashboard(),
-          context.previousDashboard,
-        );
+        queryClient.setQueryData(homeDashboardQueryKeys.dashboard(), context.previousDashboard);
       }
       // Rollback progress data
       if (context?.previousProgressData) {
@@ -885,45 +885,40 @@ export const useChallengeCheckIn = () => {
 
       if (realCheckIn) {
         // Replace temp check-in with real one
-        queryClient.setQueryData(
-          challengesQueryKeys.myCheckIns(challengeId),
-          (old: any) => {
-            if (!old) return [realCheckIn];
-            const data = Array.isArray(old) ? old : old?.data || [];
-            const filtered = data.filter(
-              (c: any) => !c.id?.startsWith?.("temp-"),
-            );
-            const result = [...filtered, realCheckIn];
-            return Array.isArray(old) ? result : { ...old, data: result };
-          },
-        );
+        queryClient.setQueryData(challengesQueryKeys.myCheckIns(challengeId), (old: any) => {
+          if (!old) return [realCheckIn];
+          const data = Array.isArray(old) ? old : old?.data || [];
+          const filtered = data.filter((c: any) => !c.id?.startsWith?.("temp-"));
+          const result = [...filtered, realCheckIn];
+          return Array.isArray(old) ? result : { ...old, data: result };
+        });
       }
 
       // Invalidate server-calculated data
       queryClient.invalidateQueries({
-        queryKey: challengesQueryKeys.checkIns(challengeId),
+        queryKey: challengesQueryKeys.checkIns(challengeId)
       });
       queryClient.invalidateQueries({
-        queryKey: challengesQueryKeys.leaderboard(challengeId),
+        queryKey: challengesQueryKeys.leaderboard(challengeId)
       });
       queryClient.invalidateQueries({
-        queryKey: challengesQueryKeys.detail(challengeId),
+        queryKey: challengesQueryKeys.detail(challengeId)
       });
       queryClient.invalidateQueries({
-        queryKey: challengesQueryKeys.list(),
+        queryKey: challengesQueryKeys.list()
       });
       queryClient.invalidateQueries({
-        queryKey: homeDashboardQueryKeys.dashboard(),
+        queryKey: homeDashboardQueryKeys.dashboard()
       });
       // Invalidate tracking stats for challenge progress display
       queryClient.invalidateQueries({
-        queryKey: trackingStatsQueryKeys.entity("challenge", challengeId),
+        queryKey: trackingStatsQueryKeys.entity("challenge", challengeId)
       });
       // Invalidate progress data for server recalculation
       queryClient.invalidateQueries({
-        queryKey: progressQueryKeys.all,
+        queryKey: progressQueryKeys.all
       });
-    },
+    }
   });
 };
 
@@ -937,7 +932,7 @@ export const useUpdateChallengeCheckIn = () => {
     mutationFn: ({
       challengeId,
       checkInId,
-      data,
+      data
     }: {
       challengeId: string;
       checkInId: string;
@@ -952,10 +947,10 @@ export const useUpdateChallengeCheckIn = () => {
 
       // Cancel in-flight queries
       await queryClient.cancelQueries({
-        queryKey: challengesQueryKeys.myCheckIns(challengeId),
+        queryKey: challengesQueryKeys.myCheckIns(challengeId)
       });
       await queryClient.cancelQueries({
-        queryKey: challengesQueryKeys.checkIns(challengeId),
+        queryKey: challengesQueryKeys.checkIns(challengeId)
       });
 
       // Cancel progress queries for optimistic updates
@@ -963,39 +958,25 @@ export const useUpdateChallengeCheckIn = () => {
 
       // Snapshot previous data
       const previousMyCheckIns = queryClient.getQueryData(
-        challengesQueryKeys.myCheckIns(challengeId),
+        challengesQueryKeys.myCheckIns(challengeId)
       );
-      const previousCheckIns = queryClient.getQueryData(
-        challengesQueryKeys.checkIns(challengeId),
-      );
+      const previousCheckIns = queryClient.getQueryData(challengesQueryKeys.checkIns(challengeId));
 
       // Snapshot progress data for rollback
-      const previousProgressData = snapshotProgressData(
-        queryClient,
-        challengeId,
-        today,
-      );
+      const previousProgressData = snapshotProgressData(queryClient, challengeId, today);
 
       // Optimistically update the check-in
       const updateCheckInList = (old: any) => {
         if (!old) return old;
         const dataArray = Array.isArray(old) ? old : old?.data || [];
         const updated = dataArray.map((c: any) =>
-          c.id === checkInId
-            ? { ...c, ...data, updated_at: new Date().toISOString() }
-            : c,
+          c.id === checkInId ? { ...c, ...data, updated_at: new Date().toISOString() } : c
         );
         return Array.isArray(old) ? updated : { ...old, data: updated };
       };
 
-      queryClient.setQueryData(
-        challengesQueryKeys.myCheckIns(challengeId),
-        updateCheckInList,
-      );
-      queryClient.setQueryData(
-        challengesQueryKeys.checkIns(challengeId),
-        updateCheckInList,
-      );
+      queryClient.setQueryData(challengesQueryKeys.myCheckIns(challengeId), updateCheckInList);
+      queryClient.setQueryData(challengesQueryKeys.checkIns(challengeId), updateCheckInList);
 
       // Optimistically update progress data
       optimisticallyUpdateProgress(queryClient, challengeId, today);
@@ -1004,7 +985,7 @@ export const useUpdateChallengeCheckIn = () => {
         previousMyCheckIns,
         previousCheckIns,
         previousProgressData,
-        challengeId,
+        challengeId
       };
     },
 
@@ -1013,13 +994,13 @@ export const useUpdateChallengeCheckIn = () => {
       if (context?.previousMyCheckIns) {
         queryClient.setQueryData(
           challengesQueryKeys.myCheckIns(challengeId),
-          context.previousMyCheckIns,
+          context.previousMyCheckIns
         );
       }
       if (context?.previousCheckIns) {
         queryClient.setQueryData(
           challengesQueryKeys.checkIns(challengeId),
-          context.previousCheckIns,
+          context.previousCheckIns
         );
       }
       // Rollback progress data
@@ -1037,43 +1018,37 @@ export const useUpdateChallengeCheckIn = () => {
           if (!old) return old;
           const dataArray = Array.isArray(old) ? old : old?.data || [];
           const updated = dataArray.map((c: any) =>
-            c.id === updatedCheckIn.id ? updatedCheckIn : c,
+            c.id === updatedCheckIn.id ? updatedCheckIn : c
           );
           return Array.isArray(old) ? updated : { ...old, data: updated };
         };
 
-        queryClient.setQueryData(
-          challengesQueryKeys.myCheckIns(challengeId),
-          updateWithReal,
-        );
-        queryClient.setQueryData(
-          challengesQueryKeys.checkIns(challengeId),
-          updateWithReal,
-        );
+        queryClient.setQueryData(challengesQueryKeys.myCheckIns(challengeId), updateWithReal);
+        queryClient.setQueryData(challengesQueryKeys.checkIns(challengeId), updateWithReal);
       }
 
       // Invalidate server-calculated data
       queryClient.invalidateQueries({
-        queryKey: challengesQueryKeys.leaderboard(challengeId),
+        queryKey: challengesQueryKeys.leaderboard(challengeId)
       });
       queryClient.invalidateQueries({
-        queryKey: challengesQueryKeys.detail(challengeId),
+        queryKey: challengesQueryKeys.detail(challengeId)
       });
       queryClient.invalidateQueries({
-        queryKey: challengesQueryKeys.list(),
+        queryKey: challengesQueryKeys.list()
       });
       queryClient.invalidateQueries({
-        queryKey: homeDashboardQueryKeys.dashboard(),
+        queryKey: homeDashboardQueryKeys.dashboard()
       });
       // Invalidate tracking stats for challenge progress display
       queryClient.invalidateQueries({
-        queryKey: trackingStatsQueryKeys.entity("challenge", challengeId),
+        queryKey: trackingStatsQueryKeys.entity("challenge", challengeId)
       });
       // Invalidate progress data for server recalculation
       queryClient.invalidateQueries({
-        queryKey: progressQueryKeys.all,
+        queryKey: progressQueryKeys.all
       });
-    },
+    }
   });
 };
 
@@ -1084,31 +1059,24 @@ export const useDeleteChallengeCheckIn = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({
-      challengeId,
-      checkInId,
-    }: {
-      challengeId: string;
-      checkInId: string;
-    }) => challengesService.deleteCheckIn(challengeId, checkInId),
+    mutationFn: ({ challengeId, checkInId }: { challengeId: string; checkInId: string }) =>
+      challengesService.deleteCheckIn(challengeId, checkInId),
 
     // Optimistic delete
     onMutate: async ({ challengeId, checkInId }) => {
       // Cancel in-flight queries
       await queryClient.cancelQueries({
-        queryKey: challengesQueryKeys.myCheckIns(challengeId),
+        queryKey: challengesQueryKeys.myCheckIns(challengeId)
       });
       await queryClient.cancelQueries({
-        queryKey: challengesQueryKeys.checkIns(challengeId),
+        queryKey: challengesQueryKeys.checkIns(challengeId)
       });
 
       // Snapshot previous data
       const previousMyCheckIns = queryClient.getQueryData(
-        challengesQueryKeys.myCheckIns(challengeId),
+        challengesQueryKeys.myCheckIns(challengeId)
       );
-      const previousCheckIns = queryClient.getQueryData(
-        challengesQueryKeys.checkIns(challengeId),
-      );
+      const previousCheckIns = queryClient.getQueryData(challengesQueryKeys.checkIns(challengeId));
 
       // Optimistically remove the check-in
       const removeCheckIn = (old: any) => {
@@ -1118,14 +1086,8 @@ export const useDeleteChallengeCheckIn = () => {
         return Array.isArray(old) ? filtered : { ...old, data: filtered };
       };
 
-      queryClient.setQueryData(
-        challengesQueryKeys.myCheckIns(challengeId),
-        removeCheckIn,
-      );
-      queryClient.setQueryData(
-        challengesQueryKeys.checkIns(challengeId),
-        removeCheckIn,
-      );
+      queryClient.setQueryData(challengesQueryKeys.myCheckIns(challengeId), removeCheckIn);
+      queryClient.setQueryData(challengesQueryKeys.checkIns(challengeId), removeCheckIn);
 
       return { previousMyCheckIns, previousCheckIns, challengeId };
     },
@@ -1135,13 +1097,13 @@ export const useDeleteChallengeCheckIn = () => {
       if (context?.previousMyCheckIns) {
         queryClient.setQueryData(
           challengesQueryKeys.myCheckIns(challengeId),
-          context.previousMyCheckIns,
+          context.previousMyCheckIns
         );
       }
       if (context?.previousCheckIns) {
         queryClient.setQueryData(
           challengesQueryKeys.checkIns(challengeId),
-          context.previousCheckIns,
+          context.previousCheckIns
         );
       }
     },
@@ -1149,18 +1111,18 @@ export const useDeleteChallengeCheckIn = () => {
     // Invalidate server-calculated data
     onSuccess: (response, { challengeId }) => {
       queryClient.invalidateQueries({
-        queryKey: challengesQueryKeys.leaderboard(challengeId),
+        queryKey: challengesQueryKeys.leaderboard(challengeId)
       });
       queryClient.invalidateQueries({
-        queryKey: challengesQueryKeys.detail(challengeId),
+        queryKey: challengesQueryKeys.detail(challengeId)
       });
       queryClient.invalidateQueries({
-        queryKey: challengesQueryKeys.list(),
+        queryKey: challengesQueryKeys.list()
       });
       queryClient.invalidateQueries({
-        queryKey: homeDashboardQueryKeys.dashboard(),
+        queryKey: homeDashboardQueryKeys.dashboard()
       });
-    },
+    }
   });
 };
 
@@ -1171,25 +1133,20 @@ export const useShareGoalAsChallenge = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({
-      goalId,
-      data,
-    }: {
-      goalId: string;
-      data: ShareAsChallengeRequest;
-    }) => challengesService.shareGoalAsChallenge(goalId, data),
+    mutationFn: ({ goalId, data }: { goalId: string; data: ShareAsChallengeRequest }) =>
+      challengesService.shareGoalAsChallenge(goalId, data),
     onSuccess: (response, { goalId }) => {
       // Invalidate goal and challenges
       queryClient.invalidateQueries({
-        queryKey: goalsQueryKeys.detail(goalId),
+        queryKey: goalsQueryKeys.detail(goalId)
       });
       queryClient.invalidateQueries({
-        queryKey: goalsQueryKeys.list(),
+        queryKey: goalsQueryKeys.list()
       });
       queryClient.invalidateQueries({
-        queryKey: challengesQueryKeys.list(),
+        queryKey: challengesQueryKeys.list()
       });
-    },
+    }
   });
 };
 
@@ -1204,7 +1161,7 @@ const updateUserChallengeInviteStatus = (
   updates: {
     challenge_invite_status?: string;
     pending_challenge_invite_id?: string | null;
-  },
+  }
 ) => {
   queryClient.setQueryData(queryKey, (old: any) => {
     if (!old?.pages) return old;
@@ -1212,10 +1169,8 @@ const updateUserChallengeInviteStatus = (
       ...old,
       pages: old.pages.map((page: any) => ({
         ...page,
-        users: page.users.map((user: any) =>
-          user.id === userId ? { ...user, ...updates } : user,
-        ),
-      })),
+        users: page.users.map((user: any) => (user.id === userId ? { ...user, ...updates } : user))
+      }))
     };
   });
 };
@@ -1227,7 +1182,7 @@ export const useReceivedChallengeInvites = () => {
   return useQuery({
     queryKey: challengeInvitesQueryKeys.received(),
     queryFn: () => challengesService.getReceivedInvites(),
-    staleTime: 60 * 1000, // 1 minute
+    staleTime: 60 * 1000 // 1 minute
   });
 };
 
@@ -1238,7 +1193,7 @@ export const useSentChallengeInvites = () => {
   return useQuery({
     queryKey: challengeInvitesQueryKeys.sent(),
     queryFn: () => challengesService.getSentInvites(),
-    staleTime: 60 * 1000, // 1 minute
+    staleTime: 60 * 1000 // 1 minute
   });
 };
 
@@ -1253,7 +1208,7 @@ export const useSendChallengeInvite = () => {
   return useMutation({
     mutationFn: ({
       challengeId,
-      userId,
+      userId
     }: {
       challengeId: string;
       userId: string;
@@ -1268,36 +1223,34 @@ export const useSendChallengeInvite = () => {
     onMutate: async ({ challengeId, userId, userInfo, challengeInfo }) => {
       // Cancel queries we're about to update
       await queryClient.cancelQueries({
-        queryKey: challengeInvitesQueryKeys.sent(),
+        queryKey: challengeInvitesQueryKeys.sent()
       });
       await queryClient.cancelQueries({
-        queryKey: challengesQueryKeys.participants(challengeId),
+        queryKey: challengesQueryKeys.participants(challengeId)
       });
       // Also cancel search/suggested queries (same as partners)
       await queryClient.cancelQueries({
         queryKey: [...partnersQueryKeys.all, "search-infinite"],
-        exact: false,
+        exact: false
       });
       await queryClient.cancelQueries({
-        queryKey: partnersQueryKeys.suggestedInfinite(),
+        queryKey: partnersQueryKeys.suggestedInfinite()
       });
 
       // Snapshot previous data for rollback
-      const previousSent = queryClient.getQueryData(
-        challengeInvitesQueryKeys.sent(),
-      );
+      const previousSent = queryClient.getQueryData(challengeInvitesQueryKeys.sent());
       const previousParticipants = queryClient.getQueryData(
-        challengesQueryKeys.participants(challengeId),
+        challengesQueryKeys.participants(challengeId)
       );
 
       // Get all search infinite query keys and snapshot them (same as partners)
       const searchQueryState = queryClient.getQueriesData({
         queryKey: [...partnersQueryKeys.all, "search-infinite"],
-        exact: false,
+        exact: false
       });
 
       const suggestedQueryState = queryClient.getQueriesData({
-        queryKey: partnersQueryKeys.suggestedInfinite(),
+        queryKey: partnersQueryKeys.suggestedInfinite()
       });
 
       // Create optimistic invite
@@ -1313,16 +1266,16 @@ export const useSendChallengeInvite = () => {
               id: userId,
               name: userInfo.name,
               username: userInfo.username,
-              profile_picture_url: userInfo.profile_picture_url,
+              profile_picture_url: userInfo.profile_picture_url
             }
           : { id: userId },
         challenge: challengeInfo
           ? {
               id: challengeId,
               title: challengeInfo.title || "",
-              start_date: "",
+              start_date: ""
             }
-          : undefined,
+          : undefined
       };
 
       // Add to sent list
@@ -1332,34 +1285,24 @@ export const useSendChallengeInvite = () => {
         }
         return {
           ...old,
-          data: [optimisticInvite, ...old.data],
+          data: [optimisticInvite, ...old.data]
         };
       });
 
       // Optimistically update the user in search/suggested results (same as partners)
       // Update all search queries
       searchQueryState.forEach(([key]) => {
-        updateUserChallengeInviteStatus(
-          queryClient,
-          key as readonly string[],
-          userId,
-          {
-            challenge_invite_status: "sent",
-            pending_challenge_invite_id: optimisticInvite.id,
-          },
-        );
+        updateUserChallengeInviteStatus(queryClient, key as readonly string[], userId, {
+          challenge_invite_status: "sent",
+          pending_challenge_invite_id: optimisticInvite.id
+        });
       });
 
       // Update suggested query
-      updateUserChallengeInviteStatus(
-        queryClient,
-        partnersQueryKeys.suggestedInfinite(),
-        userId,
-        {
-          challenge_invite_status: "sent",
-          pending_challenge_invite_id: optimisticInvite.id,
-        },
-      );
+      updateUserChallengeInviteStatus(queryClient, partnersQueryKeys.suggestedInfinite(), userId, {
+        challenge_invite_status: "sent",
+        pending_challenge_invite_id: optimisticInvite.id
+      });
 
       return {
         previousSent,
@@ -1367,22 +1310,19 @@ export const useSendChallengeInvite = () => {
         challengeId,
         searchQueryState,
         suggestedQueryState,
-        userId,
+        userId
       };
     },
     onError: (err, { challengeId, userId }, context) => {
       // Rollback sent list
       if (context?.previousSent) {
-        queryClient.setQueryData(
-          challengeInvitesQueryKeys.sent(),
-          context.previousSent,
-        );
+        queryClient.setQueryData(challengeInvitesQueryKeys.sent(), context.previousSent);
       }
       // Rollback participants
       if (context?.previousParticipants) {
         queryClient.setQueryData(
           challengesQueryKeys.participants(challengeId),
-          context.previousParticipants,
+          context.previousParticipants
         );
       }
       // Rollback search queries (same as partners)
@@ -1398,33 +1338,23 @@ export const useSendChallengeInvite = () => {
       // Replace temp with real data
       const realInvite = response?.data;
       if (realInvite) {
-        queryClient.setQueryData(
-          challengeInvitesQueryKeys.sent(),
-          (old: any) => {
-            if (!old?.data) return { data: [realInvite] };
-            const filtered = old.data.filter(
-              (i: ChallengeInvite) => !i.id?.startsWith?.("temp-"),
-            );
-            return { ...old, data: [realInvite, ...filtered] };
-          },
-        );
+        queryClient.setQueryData(challengeInvitesQueryKeys.sent(), (old: any) => {
+          if (!old?.data) return { data: [realInvite] };
+          const filtered = old.data.filter((i: ChallengeInvite) => !i.id?.startsWith?.("temp-"));
+          return { ...old, data: [realInvite, ...filtered] };
+        });
 
         // Update the real invite_id in search/suggested (same as partners)
         const searchQueryState = queryClient.getQueriesData({
           queryKey: [...partnersQueryKeys.all, "search-infinite"],
-          exact: false,
+          exact: false
         });
 
         searchQueryState.forEach(([key]) => {
-          updateUserChallengeInviteStatus(
-            queryClient,
-            key as readonly string[],
-            userId,
-            {
-              challenge_invite_status: "sent",
-              pending_challenge_invite_id: realInvite.invite_id,
-            },
-          );
+          updateUserChallengeInviteStatus(queryClient, key as readonly string[], userId, {
+            challenge_invite_status: "sent",
+            pending_challenge_invite_id: realInvite.invite_id
+          });
         });
 
         updateUserChallengeInviteStatus(
@@ -1433,16 +1363,16 @@ export const useSendChallengeInvite = () => {
           userId,
           {
             challenge_invite_status: "sent",
-            pending_challenge_invite_id: realInvite.invite_id,
-          },
+            pending_challenge_invite_id: realInvite.invite_id
+          }
         );
       }
 
       // Invalidate participants to update invite status
       queryClient.invalidateQueries({
-        queryKey: challengesQueryKeys.participants(challengeId),
+        queryKey: challengesQueryKeys.participants(challengeId)
       });
-    },
+    }
   });
 };
 
@@ -1451,8 +1381,7 @@ export const useSendChallengeInvite = () => {
  */
 export const useGenerateChallengeInviteLink = () => {
   return useMutation({
-    mutationFn: (challengeId: string) =>
-      challengesService.generateInviteLink(challengeId),
+    mutationFn: (challengeId: string) => challengesService.generateInviteLink(challengeId)
   });
 };
 
@@ -1469,37 +1398,28 @@ export const useAcceptChallengeInvite = () => {
     onMutate: async (inviteId) => {
       // Cancel queries we're about to update
       await queryClient.cancelQueries({
-        queryKey: challengeInvitesQueryKeys.received(),
+        queryKey: challengeInvitesQueryKeys.received()
       });
       await queryClient.cancelQueries({
-        queryKey: challengesQueryKeys.list(),
+        queryKey: challengesQueryKeys.list()
       });
 
       // Snapshot previous data for rollback
-      const previousReceived = queryClient.getQueryData(
-        challengeInvitesQueryKeys.received(),
-      );
-      const previousChallengesList = queryClient.getQueryData(
-        challengesQueryKeys.list(),
-      );
+      const previousReceived = queryClient.getQueryData(challengeInvitesQueryKeys.received());
+      const previousChallengesList = queryClient.getQueryData(challengesQueryKeys.list());
 
       // Find the invite being accepted
       let acceptedInvite: ChallengeInvite | undefined;
 
       // Remove from received
-      queryClient.setQueryData(
-        challengeInvitesQueryKeys.received(),
-        (old: any) => {
-          if (!old?.data) return old;
-          acceptedInvite = old.data.find(
-            (i: ChallengeInvite) => i.id === inviteId,
-          );
-          return {
-            ...old,
-            data: old.data.filter((i: ChallengeInvite) => i.id !== inviteId),
-          };
-        },
-      );
+      queryClient.setQueryData(challengeInvitesQueryKeys.received(), (old: any) => {
+        if (!old?.data) return old;
+        acceptedInvite = old.data.find((i: ChallengeInvite) => i.id === inviteId);
+        return {
+          ...old,
+          data: old.data.filter((i: ChallengeInvite) => i.id !== inviteId)
+        };
+      });
 
       // Optionally add the challenge to the user's list (if we have challenge info)
       if (acceptedInvite?.challenge) {
@@ -1509,15 +1429,13 @@ export const useAcceptChallengeInvite = () => {
               data: [
                 {
                   ...acceptedInvite!.challenge,
-                  is_participant: true,
-                },
-              ],
+                  is_participant: true
+                }
+              ]
             };
           }
           // Check if already in list
-          const exists = old.data.some(
-            (c: Challenge) => c.id === acceptedInvite!.challenge_id,
-          );
+          const exists = old.data.some((c: Challenge) => c.id === acceptedInvite!.challenge_id);
           if (exists) return old;
           return {
             ...old,
@@ -1525,9 +1443,9 @@ export const useAcceptChallengeInvite = () => {
               ...old.data,
               {
                 ...acceptedInvite!.challenge,
-                is_participant: true,
-              },
-            ],
+                is_participant: true
+              }
+            ]
           };
         });
       }
@@ -1537,44 +1455,34 @@ export const useAcceptChallengeInvite = () => {
     onError: (err, inviteId, context) => {
       // Rollback received
       if (context?.previousReceived) {
-        queryClient.setQueryData(
-          challengeInvitesQueryKeys.received(),
-          context.previousReceived,
-        );
+        queryClient.setQueryData(challengeInvitesQueryKeys.received(), context.previousReceived);
       }
       // Rollback challenges list
       if (context?.previousChallengesList) {
-        queryClient.setQueryData(
-          challengesQueryKeys.list(),
-          context.previousChallengesList,
-        );
+        queryClient.setQueryData(challengesQueryKeys.list(), context.previousChallengesList);
       }
     },
     onSettled: (_, __, ___, context) => {
       // Refetch to ensure consistency
       queryClient.invalidateQueries({
-        queryKey: challengeInvitesQueryKeys.received(),
+        queryKey: challengeInvitesQueryKeys.received()
       });
       queryClient.invalidateQueries({
-        queryKey: challengesQueryKeys.list(),
+        queryKey: challengesQueryKeys.list()
       });
       // If we know the challenge, invalidate its detail and participants
       if (context?.acceptedInvite?.challenge_id) {
         queryClient.invalidateQueries({
-          queryKey: challengesQueryKeys.detail(
-            context.acceptedInvite.challenge_id,
-          ),
+          queryKey: challengesQueryKeys.detail(context.acceptedInvite.challenge_id)
         });
         queryClient.invalidateQueries({
-          queryKey: challengesQueryKeys.participants(
-            context.acceptedInvite.challenge_id,
-          ),
+          queryKey: challengesQueryKeys.participants(context.acceptedInvite.challenge_id)
         });
       }
       queryClient.invalidateQueries({
-        queryKey: homeDashboardQueryKeys.all,
+        queryKey: homeDashboardQueryKeys.all
       });
-    },
+    }
   });
 };
 
@@ -1590,43 +1498,35 @@ export const useDeclineChallengeInvite = () => {
     onMutate: async (inviteId) => {
       // Cancel queries we're about to update
       await queryClient.cancelQueries({
-        queryKey: challengeInvitesQueryKeys.received(),
+        queryKey: challengeInvitesQueryKeys.received()
       });
 
       // Snapshot previous data for rollback
-      const previousReceived = queryClient.getQueryData(
-        challengeInvitesQueryKeys.received(),
-      );
+      const previousReceived = queryClient.getQueryData(challengeInvitesQueryKeys.received());
 
       // Remove from received
-      queryClient.setQueryData(
-        challengeInvitesQueryKeys.received(),
-        (old: any) => {
-          if (!old?.data) return old;
-          return {
-            ...old,
-            data: old.data.filter((i: ChallengeInvite) => i.id !== inviteId),
-          };
-        },
-      );
+      queryClient.setQueryData(challengeInvitesQueryKeys.received(), (old: any) => {
+        if (!old?.data) return old;
+        return {
+          ...old,
+          data: old.data.filter((i: ChallengeInvite) => i.id !== inviteId)
+        };
+      });
 
       return { previousReceived };
     },
     onError: (err, inviteId, context) => {
       // Rollback received
       if (context?.previousReceived) {
-        queryClient.setQueryData(
-          challengeInvitesQueryKeys.received(),
-          context.previousReceived,
-        );
+        queryClient.setQueryData(challengeInvitesQueryKeys.received(), context.previousReceived);
       }
     },
     onSettled: () => {
       // Refetch to ensure consistency
       queryClient.invalidateQueries({
-        queryKey: challengeInvitesQueryKeys.received(),
+        queryKey: challengeInvitesQueryKeys.received()
       });
-    },
+    }
   });
 };
 
@@ -1643,30 +1543,28 @@ export const useCancelChallengeInvite = () => {
     onMutate: async (inviteId) => {
       // Cancel queries we're about to update
       await queryClient.cancelQueries({
-        queryKey: challengeInvitesQueryKeys.sent(),
+        queryKey: challengeInvitesQueryKeys.sent()
       });
       // Also cancel search/suggested queries (same as partners)
       await queryClient.cancelQueries({
         queryKey: [...partnersQueryKeys.all, "search-infinite"],
-        exact: false,
+        exact: false
       });
       await queryClient.cancelQueries({
-        queryKey: partnersQueryKeys.suggestedInfinite(),
+        queryKey: partnersQueryKeys.suggestedInfinite()
       });
 
       // Snapshot previous data for rollback
-      const previousSent = queryClient.getQueryData(
-        challengeInvitesQueryKeys.sent(),
-      );
+      const previousSent = queryClient.getQueryData(challengeInvitesQueryKeys.sent());
 
       // Get all search infinite query keys and snapshot them (same as partners)
       const searchQueryState = queryClient.getQueriesData({
         queryKey: [...partnersQueryKeys.all, "search-infinite"],
-        exact: false,
+        exact: false
       });
 
       const suggestedQueryState = queryClient.getQueriesData({
-        queryKey: partnersQueryKeys.suggestedInfinite(),
+        queryKey: partnersQueryKeys.suggestedInfinite()
       });
 
       // Find the invite being cancelled to get user_id and challenge_id
@@ -1675,12 +1573,10 @@ export const useCancelChallengeInvite = () => {
       // Remove from sent
       queryClient.setQueryData(challengeInvitesQueryKeys.sent(), (old: any) => {
         if (!old?.data) return old;
-        cancelledInvite = old.data.find(
-          (i: ChallengeInvite) => i.id === inviteId,
-        );
+        cancelledInvite = old.data.find((i: ChallengeInvite) => i.id === inviteId);
         return {
           ...old,
-          data: old.data.filter((i: ChallengeInvite) => i.id !== inviteId),
+          data: old.data.filter((i: ChallengeInvite) => i.id !== inviteId)
         };
       });
 
@@ -1688,15 +1584,10 @@ export const useCancelChallengeInvite = () => {
       const invitedUserId = cancelledInvite?.invited_user_id;
       if (invitedUserId) {
         searchQueryState.forEach(([key]) => {
-          updateUserChallengeInviteStatus(
-            queryClient,
-            key as readonly string[],
-            invitedUserId,
-            {
-              challenge_invite_status: "none",
-              pending_challenge_invite_id: null,
-            },
-          );
+          updateUserChallengeInviteStatus(queryClient, key as readonly string[], invitedUserId, {
+            challenge_invite_status: "none",
+            pending_challenge_invite_id: null
+          });
         });
 
         updateUserChallengeInviteStatus(
@@ -1705,8 +1596,8 @@ export const useCancelChallengeInvite = () => {
           invitedUserId,
           {
             challenge_invite_status: "none",
-            pending_challenge_invite_id: null,
-          },
+            pending_challenge_invite_id: null
+          }
         );
       }
 
@@ -1714,16 +1605,13 @@ export const useCancelChallengeInvite = () => {
         previousSent,
         cancelledInvite,
         searchQueryState,
-        suggestedQueryState,
+        suggestedQueryState
       };
     },
     onError: (err, inviteId, context) => {
       // Rollback sent
       if (context?.previousSent) {
-        queryClient.setQueryData(
-          challengeInvitesQueryKeys.sent(),
-          context.previousSent,
-        );
+        queryClient.setQueryData(challengeInvitesQueryKeys.sent(), context.previousSent);
       }
       // Rollback search queries (same as partners)
       context?.searchQueryState?.forEach(([key, value]: [any, any]) => {
@@ -1737,17 +1625,15 @@ export const useCancelChallengeInvite = () => {
     onSettled: (_, __, ___, context) => {
       // Refetch to ensure consistency
       queryClient.invalidateQueries({
-        queryKey: challengeInvitesQueryKeys.sent(),
+        queryKey: challengeInvitesQueryKeys.sent()
       });
       // If we know the challenge, invalidate its participants
       if (context?.cancelledInvite?.challenge_id) {
         queryClient.invalidateQueries({
-          queryKey: challengesQueryKeys.participants(
-            context.cancelledInvite.challenge_id,
-          ),
+          queryKey: challengesQueryKeys.participants(context.cancelledInvite.challenge_id)
         });
       }
-    },
+    }
   });
 };
 
@@ -1758,16 +1644,15 @@ export const useJoinChallengeViaInvite = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (inviteCode: string) =>
-      challengesService.joinViaInviteCode(inviteCode),
+    mutationFn: (inviteCode: string) => challengesService.joinViaInviteCode(inviteCode),
     onSuccess: () => {
       // Refetch challenges list since user joined a new one
       queryClient.invalidateQueries({
-        queryKey: challengesQueryKeys.list(),
+        queryKey: challengesQueryKeys.list()
       });
       queryClient.invalidateQueries({
-        queryKey: homeDashboardQueryKeys.all,
+        queryKey: homeDashboardQueryKeys.all
       });
-    },
+    }
   });
 };

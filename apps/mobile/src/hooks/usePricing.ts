@@ -11,7 +11,7 @@ export const usePricing = () => {
     getGoalLimit,
     canCreateGoal,
     clearError,
-    lastFetched,
+    lastFetched
   } = usePricingStore();
 
   // Auto-fetch plans on mount, but only if we don't have cached data
@@ -32,6 +32,6 @@ export const usePricing = () => {
     canCreateGoal,
     clearError,
     // Expose cache status for debugging
-    isCached: lastFetched !== null && plans.length > 0,
+    isCached: lastFetched !== null && plans.length > 0
   };
 };

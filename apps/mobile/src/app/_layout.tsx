@@ -3,6 +3,7 @@ import "react-native-url-polyfill/auto";
 
 import { SystemStatusListener } from "@/components/system/SystemStatusListener";
 import { AlertModalProvider } from "@/contexts/AlertModalContext";
+import { AppUpdateProvider } from "@/providers/AppUpdateProvider";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { RealtimeProvider } from "@/contexts/RealtimeContext";
 import { RevenueCatProvider } from "@/contexts/RevenueCatContext";
@@ -34,11 +35,8 @@ try {
     enableLogs: true,
     replaysSessionSampleRate: 0.1,
     replaysOnErrorSampleRate: 1,
-    integrations: [
-      Sentry.mobileReplayIntegration(),
-      Sentry.feedbackIntegration(),
-    ],
-    spotlight: __DEV__,
+    integrations: [Sentry.mobileReplayIntegration(), Sentry.feedbackIntegration()],
+    spotlight: __DEV__
   });
 
   // Initialize vendor logger after Sentry
@@ -56,8 +54,7 @@ function SafeAreaWrapper() {
   const segments = useSegments();
   const { isAuthenticated } = useAuthStore();
 
-  const inOnboarding =
-    segments.includes("(onboarding)") && !segments.includes("(user)");
+  const inOnboarding = segments.includes("(onboarding)") && !segments.includes("(user)");
   const inAuth = segments.includes("(auth)") || pathname.startsWith("/auth");
   const isAuthBase = segments.includes("(auth)") && segments.includes("auth");
   // console.log("pathname", pathname);
@@ -65,11 +62,9 @@ function SafeAreaWrapper() {
   // Check if we're in tabs route using segments: ["(user)", "(tabs)", ...]
   const inTabs = segments.includes("(user)") && segments.includes("(tabs)");
   const inGoals = segments.includes("(user)") && segments.includes("(goals)");
-  const inChallenges =
-    segments.includes("(user)") && segments.includes("challenges");
+  const inChallenges = segments.includes("(user)") && segments.includes("challenges");
   const inWorkout = segments.includes("(user)") && segments.includes("workout");
-  const inAchievements =
-    segments.includes("(user)") && segments.includes("achievements");
+  const inAchievements = segments.includes("(user)") && segments.includes("achievements");
   const isSocial = segments.includes("(user)") && segments.includes("social");
   // Workout screens handle their own safe areas for full-screen overlays
   const isSafeAreaHidden = inOnboarding || isAuthBase || inWorkout;
@@ -93,7 +88,7 @@ function SafeAreaWrapper() {
       <Stack
         screenOptions={{
           animation: "slide_from_right",
-          headerShown: false,
+          headerShown: false
         }}
       >
         <Stack.Screen name="index" />
@@ -107,14 +102,11 @@ function SafeAreaWrapper() {
   }
 
   return (
-    <SafeAreaView
-      style={{ flex: 1, backgroundColor: colors.bg.canvas }}
-      edges={safeAreaEdges}
-    >
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg.canvas }} edges={safeAreaEdges}>
       <Stack
         screenOptions={{
           animation: "slide_from_right",
-          headerShown: false,
+          headerShown: false
         }}
       >
         <Stack.Screen name="index" />
@@ -142,10 +134,7 @@ function StatusBarWrapper() {
   useEffect(() => {
     if (Platform.OS === "android") {
       RNStatusBar.setBackgroundColor(backgroundColor, true);
-      RNStatusBar.setBarStyle(
-        statusBarStyle === "light" ? "light-content" : "dark-content",
-        true,
-      );
+      RNStatusBar.setBarStyle(statusBarStyle === "light" ? "light-content" : "dark-content", true);
       RNStatusBar.setTranslucent(false);
     }
   }, [backgroundColor, statusBarStyle]);
@@ -156,21 +145,13 @@ function StatusBarWrapper() {
   }
 
   return (
-    <StatusBar
-      style={statusBarStyle}
-      translucent={false}
-      backgroundColor={colors.bg.canvas}
-    />
+    <StatusBar style={statusBarStyle} translucent={false} backgroundColor={colors.bg.canvas} />
   );
 }
 
 function BackgroundColorWrapper({ children }: { children: ReactNode }) {
   const { colors } = useTheme();
-  return (
-    <View style={{ flex: 1, backgroundColor: colors.bg.canvas }}>
-      {children}
-    </View>
-  );
+  return <View style={{ flex: 1, backgroundColor: colors.bg.canvas }}>{children}</View>;
 }
 
 // LaunchDarkly user identification is now handled by the provider
@@ -178,9 +159,7 @@ function BackgroundColorWrapper({ children }: { children: ReactNode }) {
 function RootLayout(): ReactElement {
   // Lock to portrait on app start (workout player can override this)
   useEffect(() => {
-    ScreenOrientation.lockAsync(
-      ScreenOrientation.OrientationLock.PORTRAIT_UP,
-    ).catch((error) => {
+    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch((error) => {
       console.warn("[RootLayout] Failed to lock orientation:", error);
     });
   }, []);
@@ -210,11 +189,13 @@ function RootLayout(): ReactElement {
                   <NotificationProvider>
                     <AlertModalProvider>
                       <RevenueCatProvider>
-                        <BackgroundColorWrapper>
-                          <StatusBarWrapper />
-                          <SafeAreaWrapper />
-                          <SystemStatusListener />
-                        </BackgroundColorWrapper>
+                        <AppUpdateProvider autoShow showDelay={3000}>
+                          <BackgroundColorWrapper>
+                            <StatusBarWrapper />
+                            <SafeAreaWrapper />
+                            <SystemStatusListener />
+                          </BackgroundColorWrapper>
+                        </AppUpdateProvider>
                       </RevenueCatProvider>
                     </AlertModalProvider>
                   </NotificationProvider>

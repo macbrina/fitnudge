@@ -41,6 +41,6 @@ export const useGoalNotifications = () => {
 
   return {
     cancelGoalNotifications,
-    cancelAllNotifications,
+    cancelAllNotifications
   };
 };

@@ -8,6 +8,7 @@ import { lineHeight } from "@/themes/tokens";
 import { useTheme } from "@/themes";
 import PersonalizationLayout from "./PersonalizationLayout";
 import { useOnboardingStore } from "@/stores/onboardingStore";
+import { PREFERRED_LOCATIONS } from "@/constants/personalization";
 
 interface WorkoutSettingScreenProps {
   onContinue: (preferredLocation: string) => void;
@@ -16,33 +17,14 @@ interface WorkoutSettingScreenProps {
   totalSteps: number;
 }
 
-const LOCATION_OPTIONS = [
-  { id: "gym", label: "onboarding.personalization.workout_setting.gym.title" },
-  {
-    id: "home",
-    label: "onboarding.personalization.workout_setting.home.title",
-  },
-  {
-    id: "outdoor",
-    label: "onboarding.personalization.workout_setting.outdoor.title",
-  },
-  { id: "mix", label: "onboarding.personalization.workout_setting.mix.title" },
-  {
-    id: "dont_know",
-    label: "onboarding.personalization.workout_setting.dont_know.title",
-  },
-];
-
 export default function WorkoutSettingScreen({
   onContinue,
   onBack,
   currentStep,
-  totalSteps,
+  totalSteps
 }: WorkoutSettingScreenProps) {
   const { preferred_location } = useOnboardingStore();
-  const [selectedLocation, setSelectedLocation] = useState<string>(
-    preferred_location || "",
-  );
+  const [selectedLocation, setSelectedLocation] = useState<string>(preferred_location || "");
   const { t } = useTranslation();
   const styles = useStyles(makeStyles);
   const { brandColors } = useTheme();
@@ -66,40 +48,32 @@ export default function WorkoutSettingScreen({
       canContinue={!!selectedLocation}
     >
       <View style={styles.content}>
-        <Text style={styles.title}>
-          {t("onboarding.personalization.workout_setting.title")}
-        </Text>
+        <Text style={styles.title}>{t("onboarding.personalization.workout_setting.title")}</Text>
 
         <Text style={styles.subtitle}>
           {t("onboarding.personalization.workout_setting.subtitle")}
         </Text>
 
         <View style={styles.optionsContainer}>
-          {LOCATION_OPTIONS.map((option) => {
-            const isSelected = selectedLocation === option.id;
+          {PREFERRED_LOCATIONS.map((option) => {
+            const isSelected = selectedLocation === option.value;
             return (
               <TouchableOpacity
-                key={option.id}
-                onPress={() => setSelectedLocation(option.id)}
+                key={option.value}
+                onPress={() => setSelectedLocation(option.value)}
                 activeOpacity={0.7}
                 style={[
                   styles.optionCard,
-                  isSelected && [
-                    styles.optionCardSelected,
-                    { borderColor: brandColors.primary },
-                  ],
+                  isSelected && [styles.optionCardSelected, { borderColor: brandColors.primary }]
                 ]}
               >
                 <Text
                   style={[
                     styles.optionLabel,
-                    isSelected && [
-                      styles.optionLabelSelected,
-                      { color: brandColors.primary },
-                    ],
+                    isSelected && [styles.optionLabelSelected, { color: brandColors.primary }]
                   ]}
                 >
-                  {t(option.label)}
+                  {t(option.onboardingLabelKey)}
                 </Text>
               </TouchableOpacity>
             );
@@ -114,7 +88,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => {
   return {
     content: {
       flex: 1,
-      paddingTop: toRN(tokens.spacing[2]),
+      paddingTop: toRN(tokens.spacing[2])
     },
     title: {
       fontSize: toRN(tokens.typography.fontSize["2xl"]),
@@ -122,23 +96,17 @@ const makeStyles = (tokens: any, colors: any, brand: any) => {
       color: colors.text.primary,
       marginBottom: toRN(tokens.spacing[2]),
       fontFamily: fontFamily.groteskBold,
-      lineHeight: lineHeight(
-        tokens.typography.fontSize["2xl"],
-        tokens.typography.lineHeight.tight,
-      ),
+      lineHeight: lineHeight(tokens.typography.fontSize["2xl"], tokens.typography.lineHeight.tight)
     },
     subtitle: {
       fontSize: toRN(tokens.typography.fontSize.base),
       color: colors.text.secondary,
       marginBottom: toRN(tokens.spacing[6]),
       fontFamily: fontFamily.groteskRegular,
-      lineHeight: lineHeight(
-        tokens.typography.fontSize.base,
-        tokens.typography.lineHeight.relaxed,
-      ),
+      lineHeight: lineHeight(tokens.typography.fontSize.base, tokens.typography.lineHeight.relaxed)
     },
     optionsContainer: {
-      gap: toRN(tokens.spacing[3]),
+      gap: toRN(tokens.spacing[3])
     },
     optionCard: {
       backgroundColor: colors.bg.muted,
@@ -146,17 +114,17 @@ const makeStyles = (tokens: any, colors: any, brand: any) => {
       paddingVertical: toRN(tokens.spacing[5]),
       paddingHorizontal: toRN(tokens.spacing[5]),
       borderWidth: 2,
-      borderColor: colors.border.subtle,
+      borderColor: colors.border.subtle
     },
     optionCardSelected: {
-      backgroundColor: brand.primary + "08",
+      backgroundColor: brand.primary + "08"
     },
     optionLabel: {
       fontSize: toRN(tokens.typography.fontSize.lg),
       fontWeight: tokens.typography.fontWeight.semibold,
       color: colors.text.primary,
-      fontFamily: fontFamily.groteskSemiBold,
+      fontFamily: fontFamily.groteskSemiBold
     },
-    optionLabelSelected: {},
+    optionLabelSelected: {}
   };
 };

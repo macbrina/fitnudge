@@ -25,39 +25,23 @@ export function AccountabilityPlanCard({ plan }: AccountabilityPlanCardProps) {
     <Card shadow="lg" style={styles.card}>
       <View style={styles.header}>
         <View style={styles.iconContainer}>
-          <Ionicons
-            name="checkmark-circle"
-            size={28}
-            color={brandColors.primary}
-          />
+          <Ionicons name="checkmark-circle" size={28} color={brandColors.primary} />
         </View>
-        <Text style={styles.cardTitle}>
-          {t("goals.plan.accountability_title")}
-        </Text>
+        <Text style={styles.cardTitle}>{t("goals.plan.accountability_title")}</Text>
       </View>
 
       <View style={styles.trackingCard}>
         <View style={styles.trackingRow}>
-          <Ionicons
-            name="calendar-outline"
-            size={20}
-            color={colors.text.secondary}
-          />
+          <Ionicons name="calendar-outline" size={20} color={colors.text.secondary} />
           <Text style={styles.trackingLabel}>{t("goals.plan.frequency")}:</Text>
           <Text style={styles.trackingValue}>
-            {tracking.frequency === "daily"
-              ? t("goals.plan.daily")
-              : t("goals.plan.weekly")}
+            {tracking.frequency === "daily" ? t("goals.plan.daily") : t("goals.plan.weekly")}
           </Text>
         </View>
 
         {tracking.target_days_per_week && (
           <View style={styles.trackingRow}>
-            <Ionicons
-              name="flag-outline"
-              size={20}
-              color={colors.text.secondary}
-            />
+            <Ionicons name="flag-outline" size={20} color={colors.text.secondary} />
             <Text style={styles.trackingLabel}>{t("goals.plan.target")}:</Text>
             <Text style={styles.trackingValue}>
               {tracking.target_days_per_week} {t("goals.plan.days_per_week")}
@@ -66,28 +50,18 @@ export function AccountabilityPlanCard({ plan }: AccountabilityPlanCardProps) {
         )}
 
         <View style={styles.trackingRow}>
-          <Ionicons
-            name="checkbox-outline"
-            size={20}
-            color={colors.text.secondary}
-          />
+          <Ionicons name="checkbox-outline" size={20} color={colors.text.secondary} />
           <Text style={styles.trackingLabel}>{t("goals.plan.method")}:</Text>
-          <Text style={styles.trackingValue}>
-            {t("goals.plan.daily_checkins")}
-          </Text>
+          <Text style={styles.trackingValue}>{t("goals.plan.daily_checkins")}</Text>
         </View>
       </View>
     </Card>
   );
 }
 
-const makeAccountabilityPlanCardStyles = (
-  tokens: any,
-  colors: any,
-  brand: any,
-) => ({
+const makeAccountabilityPlanCardStyles = (tokens: any, colors: any, brand: any) => ({
   card: {
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   header: {
     flexDirection: "row" as const,
@@ -95,7 +69,7 @@ const makeAccountabilityPlanCardStyles = (
     marginBottom: toRN(tokens.spacing[4]),
     paddingBottom: toRN(tokens.spacing[3]),
     borderBottomWidth: 1,
-    borderBottomColor: colors.border.default,
+    borderBottomColor: colors.border.default
   },
   iconContainer: {
     width: toRN(tokens.spacing[10]),
@@ -104,33 +78,33 @@ const makeAccountabilityPlanCardStyles = (
     backgroundColor: brand.primary + "1A",
     alignItems: "center" as const,
     justifyContent: "center" as const,
-    marginRight: toRN(tokens.spacing[3]),
+    marginRight: toRN(tokens.spacing[3])
   },
   cardTitle: {
     fontSize: toRN(tokens.typography.fontSize.xl),
     fontFamily: fontFamily.groteskBold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   trackingCard: {
     gap: toRN(tokens.spacing[3]),
     padding: toRN(tokens.spacing[4]),
     backgroundColor: colors.bg.muted,
-    borderRadius: toRN(tokens.borderRadius.lg),
+    borderRadius: toRN(tokens.borderRadius.lg)
   },
   trackingRow: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    gap: toRN(tokens.spacing[2]),
+    gap: toRN(tokens.spacing[2])
   },
   trackingLabel: {
     flex: 1,
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.groteskMedium,
-    color: colors.text.secondary,
+    color: colors.text.secondary
   },
   trackingValue: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.groteskSemiBold,
-    color: colors.text.primary,
-  },
+    color: colors.text.primary
+  }
 });

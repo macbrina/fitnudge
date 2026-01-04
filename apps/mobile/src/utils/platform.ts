@@ -11,7 +11,8 @@ import { Platform } from "react-native";
 export const isIOS = Platform.OS === "ios";
 export const isAndroid = Platform.OS === "android";
 
-export type PlanId = "starter" | "pro" | "elite";
+// 2-tier system: only premium plan (free is implicit)
+export type PlanId = "premium";
 export type BillingPeriod = "monthly" | "annual";
 
 /**
@@ -43,7 +44,7 @@ export interface ExitOfferPricing {
  */
 export function getProductIdFromPlan(
   productIds: PlanProductIds,
-  period: BillingPeriod,
+  period: BillingPeriod
 ): string | null {
   if (isIOS) {
     return period === "monthly"
@@ -64,12 +65,8 @@ export function getAllProductIdsFromPlans(plans: PlanProductIds[]): string[] {
   const ids: string[] = [];
 
   plans.forEach((plan) => {
-    const monthlyId = isIOS
-      ? plan.product_id_ios_monthly
-      : plan.product_id_android_monthly;
-    const annualId = isIOS
-      ? plan.product_id_ios_annual
-      : plan.product_id_android_annual;
+    const monthlyId = isIOS ? plan.product_id_ios_monthly : plan.product_id_android_monthly;
+    const annualId = isIOS ? plan.product_id_ios_annual : plan.product_id_android_annual;
 
     if (monthlyId) ids.push(monthlyId);
     if (annualId) ids.push(annualId);
@@ -85,7 +82,7 @@ export function getAllProductIdsFromPlans(plans: PlanProductIds[]): string[] {
  */
 export function getPlanFromProductId(
   productId: string,
-  plans: PlanProductIds[],
+  plans: PlanProductIds[]
 ): { planId: string; period: BillingPeriod } | null {
   for (const plan of plans) {
     // Check iOS product IDs
@@ -123,10 +120,7 @@ export function getStoreName(): "App Store" | "Google Play" {
 /**
  * Calculate discount percentage between original and discounted price
  */
-export function calculateDiscountPercent(
-  originalPrice: number,
-  discountedPrice: number,
-): number {
+export function calculateDiscountPercent(originalPrice: number, discountedPrice: number): number {
   if (originalPrice <= 0) return 0;
   return Math.round(((originalPrice - discountedPrice) / originalPrice) * 100);
 }

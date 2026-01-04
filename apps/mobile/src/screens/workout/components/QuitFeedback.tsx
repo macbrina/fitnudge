@@ -1,11 +1,5 @@
 import React from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  StyleSheet,
-} from "react-native";
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStyles, useTheme } from "@/themes";
 import { tokens } from "@/themes/tokens";
@@ -40,7 +34,7 @@ export function QuitFeedback({
   timeSpent,
   onResume,
   onSubmitFeedback,
-  onQuitWithoutFeedback,
+  onQuitWithoutFeedback
 }: QuitFeedbackProps) {
   const insets = useSafeAreaInsets();
   const styles = useStyles(makeStyles);
@@ -52,20 +46,20 @@ export function QuitFeedback({
   const feedbackOptions: { reason: QuitReason; label: string }[] = [
     {
       reason: "dont_know_how",
-      label: t("workout.feedback.dont_know_how"),
+      label: t("workout.feedback.dont_know_how")
     },
     {
       reason: "too_easy",
-      label: t("workout.feedback.too_easy"),
+      label: t("workout.feedback.too_easy")
     },
     {
       reason: "too_hard",
-      label: t("workout.feedback.too_hard"),
+      label: t("workout.feedback.too_hard")
     },
     {
       reason: "just_looking",
-      label: t("workout.feedback.just_looking"),
-    },
+      label: t("workout.feedback.just_looking")
+    }
   ];
 
   // Fire and forget - submits feedback and exits immediately
@@ -79,12 +73,7 @@ export function QuitFeedback({
       <View style={styles.background} />
 
       {/* Header with resume button - at top */}
-      <View
-        style={[
-          styles.header,
-          { paddingTop: insets.top + toRN(tokens.spacing[2]) },
-        ]}
-      >
+      <View style={[styles.header, { paddingTop: insets.top + toRN(tokens.spacing[2]) }]}>
         <TouchableOpacity style={styles.resumeButton} onPress={onResume}>
           <Ionicons name="chevron-back" size={20} color={colors.text.primary} />
           <Text style={styles.resumeText}>{t("workout.resume")}</Text>
@@ -97,7 +86,7 @@ export function QuitFeedback({
           style={styles.scrollContent}
           contentContainerStyle={[
             styles.contentContainer,
-            { paddingBottom: insets.bottom + toRN(tokens.spacing[6]) },
+            { paddingBottom: insets.bottom + toRN(tokens.spacing[6]) }
           ]}
           showsVerticalScrollIndicator={false}
         >
@@ -140,48 +129,48 @@ export function QuitFeedback({
 
 const makeStyles = (tokens: any, colors: any, brand: any) => ({
   overlay: {
-    zIndex: 100,
+    zIndex: 100
   },
   background: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: colors.bg.canvas,
+    backgroundColor: colors.bg.canvas
   },
   container: {
-    flex: 1,
+    flex: 1
   },
   header: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
     paddingHorizontal: toRN(tokens.spacing[4]),
-    paddingBottom: toRN(tokens.spacing[3]),
+    paddingBottom: toRN(tokens.spacing[3])
   },
   resumeButton: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    gap: toRN(tokens.spacing[1]),
+    gap: toRN(tokens.spacing[1])
   },
   resumeText: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.semiBold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   bottomContainer: {
     flex: 1,
-    justifyContent: "flex-end" as const,
+    justifyContent: "flex-end" as const
   },
   scrollContent: {
-    flexGrow: 0,
+    flexGrow: 0
   },
   contentContainer: {
     paddingHorizontal: toRN(tokens.spacing[5]),
-    paddingTop: toRN(tokens.spacing[6]),
+    paddingTop: toRN(tokens.spacing[6])
   },
   heading: {
     fontSize: toRN(tokens.typography.fontSize["3xl"]),
     fontFamily: fontFamily.groteskBold,
     color: colors.text.primary,
     textAlign: "center" as const,
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   subheading: {
     fontSize: toRN(tokens.typography.fontSize.base),
@@ -190,15 +179,15 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     lineHeight: toRN(tokens.typography.fontSize.base) * 1.5,
     textAlign: "center" as const,
     marginBottom: toRN(tokens.spacing[6]),
-    paddingHorizontal: toRN(tokens.spacing[4]),
+    paddingHorizontal: toRN(tokens.spacing[4])
   },
   optionsContainer: {
-    gap: toRN(tokens.spacing[3]),
+    gap: toRN(tokens.spacing[3])
   },
   divider: {
     height: 1,
     backgroundColor: colors.border.subtle,
     marginVertical: toRN(tokens.spacing[5]),
-    marginHorizontal: toRN(tokens.spacing[4]),
-  },
+    marginHorizontal: toRN(tokens.spacing[4])
+  }
 });

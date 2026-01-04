@@ -6,7 +6,7 @@ import {
   Platform,
   ScrollView,
   Image,
-  ActivityIndicator,
+  ActivityIndicator
 } from "react-native";
 import { useTranslation } from "@/lib/i18n";
 import { fontFamily } from "@/lib/fonts";
@@ -21,6 +21,7 @@ import { MOBILE_ROUTES } from "@/lib/routes";
 import { useResetPassword } from "@/hooks/api/useAuth";
 import { authService } from "@/services/api";
 import { useAlertModal } from "@/contexts/AlertModalContext";
+import { ApiError } from "@/services/api/base";
 import { useAuthStore } from "@/stores/authStore";
 import { getRedirection } from "@/utils/getRedirection";
 import LoadingContainer from "@/components/common/LoadingContainer";
@@ -35,11 +36,11 @@ export default function ResetPasswordScreen() {
     password?: string;
     confirmPassword?: string;
   }>({});
-  const [validationState, setValidationState] = useState<
-    "checking" | "valid" | "invalid"
-  >(initialToken ? "checking" : "invalid");
+  const [validationState, setValidationState] = useState<"checking" | "valid" | "invalid">(
+    initialToken ? "checking" : "invalid"
+  );
   const [validationMessage, setValidationMessage] = useState<string | null>(
-    initialToken ? null : null,
+    initialToken ? null : null
   );
 
   const { t } = useTranslation();
@@ -53,10 +54,10 @@ export default function ResetPasswordScreen() {
     (message: string) => {
       router.replace({
         pathname: MOBILE_ROUTES.AUTH.LOGIN,
-        params: { alertMessage: message },
+        params: { alertMessage: message }
       });
     },
-    [router],
+    [router]
   );
 
   useEffect(() => {
@@ -69,10 +70,7 @@ export default function ResetPasswordScreen() {
           router.replace(destination);
         }
       } catch (error) {
-        console.warn(
-          "[ResetPassword] Failed to compute authenticated redirect",
-          error,
-        );
+        console.warn("[ResetPassword] Failed to compute authenticated redirect", error);
         if (isMounted) {
           router.replace(MOBILE_ROUTES.MAIN.HOME);
         }
@@ -128,8 +126,7 @@ export default function ResetPasswordScreen() {
           setValidationState("valid");
           setValidationMessage(null);
         } else {
-          const message =
-            response.error || t("auth.reset_password.error_token_expired");
+          const message = response.error || t("auth.reset_password.error_token_expired");
           setValidationState("invalid");
           setValidationMessage(message);
           redirectToLoginWithMessage(message);
@@ -164,9 +161,7 @@ export default function ResetPasswordScreen() {
     }
 
     if (!confirmPassword) {
-      newErrors.confirmPassword = t(
-        "auth.reset_password.confirm_password_required",
-      );
+      newErrors.confirmPassword = t("auth.reset_password.confirm_password_required");
     } else if (password !== confirmPassword) {
       newErrors.confirmPassword = t("auth.reset_password.passwords_dont_match");
     }
@@ -185,9 +180,8 @@ export default function ResetPasswordScreen() {
     if (validationState !== "valid") {
       showAlert({
         title: t("common.error"),
-        message:
-          validationMessage || t("auth.reset_password.error_token_expired"),
-        variant: "error",
+        message: validationMessage || t("auth.reset_password.error_token_expired"),
+        variant: "error"
       });
       return;
     }
@@ -195,7 +189,7 @@ export default function ResetPasswordScreen() {
     resetPasswordMutation.mutate(
       {
         token: token.trim(),
-        new_password: password,
+        new_password: password
       },
       {
         onSuccess: async () => {
@@ -204,35 +198,35 @@ export default function ResetPasswordScreen() {
             message: t("auth.reset_password.success_message"),
             confirmLabel: t("common.done"),
             dismissible: false,
-            variant: "success",
+            variant: "success"
           });
 
           if (confirmed) {
             router.replace(MOBILE_ROUTES.AUTH.LOGIN);
           }
         },
-        onError: async (error: any) => {
+        onError: async (error: unknown) => {
+          console.error("Reset password error:", error);
           const errorMessage =
-            error?.error ||
-            error?.response?.data?.detail ||
-            error?.message ||
-            t("auth.reset_password.error_reset_failed");
+            error instanceof ApiError ? error.message : t("auth.reset_password.error_reset_failed");
 
-          if (errorMessage.includes("expired")) {
+          const errorLower = errorMessage.toLowerCase();
+
+          if (errorLower.includes("expired")) {
             await showAlert({
               title: t("common.error"),
-              message: t("auth.reset_password.error_token_expired"),
-              variant: "error",
+              message: errorMessage,
+              variant: "error"
             });
             const message = t("auth.reset_password.error_token_expired");
             setValidationState("invalid");
             setValidationMessage(message);
             redirectToLoginWithMessage(message);
-          } else if (errorMessage.includes("Invalid")) {
+          } else if (errorLower.includes("invalid")) {
             await showAlert({
               title: t("common.error"),
-              message: t("auth.reset_password.error_invalid_token"),
-              variant: "error",
+              message: errorMessage,
+              variant: "error"
             });
             const message = t("auth.reset_password.error_invalid_token");
             setValidationState("invalid");
@@ -242,21 +236,16 @@ export default function ResetPasswordScreen() {
             await showAlert({
               title: t("common.error"),
               message: errorMessage,
-              variant: "error",
+              variant: "error"
             });
           }
-        },
-      },
+        }
+      }
     );
   };
 
   if (validationState === "checking" || isAuthenticated) {
-    return (
-      <LoadingContainer
-        visible
-        text={t("auth.reset_password.validating_link")}
-      />
-    );
+    return <LoadingContainer visible text={t("auth.reset_password.validating_link")} />;
   }
 
   return (
@@ -269,7 +258,7 @@ export default function ResetPasswordScreen() {
           style={{ flex: 1 }}
           contentContainerStyle={{
             flexGrow: 1,
-            paddingBottom: insets.bottom,
+            paddingBottom: insets.bottom
           }}
           showsVerticalScrollIndicator={false}
         >
@@ -285,13 +274,10 @@ export default function ResetPasswordScreen() {
           {/* Title and Subtitle */}
           <View style={styles.titleContainer}>
             <Text style={styles.title}>{t("auth.reset_password.title")}</Text>
-            <Text style={styles.subtitle}>
-              {t("auth.reset_password.subtitle")}
-            </Text>
+            <Text style={styles.subtitle}>{t("auth.reset_password.subtitle")}</Text>
             {validationState === "invalid" && (
               <Text style={styles.validationMessage}>
-                {t(`${validationMessage}`) ||
-                  t("auth.reset_password.error_token_expired")}
+                {t(`${validationMessage}`) || t("auth.reset_password.error_token_expired")}
               </Text>
             )}
           </View>
@@ -317,16 +303,14 @@ export default function ResetPasswordScreen() {
 
             <TextInput
               label={t("auth.reset_password.confirm_password_label")}
-              placeholder={t(
-                "auth.reset_password.confirm_password_placeholder",
-              )}
+              placeholder={t("auth.reset_password.confirm_password_placeholder")}
               value={confirmPassword}
               onChangeText={(text) => {
                 setConfirmPassword(text);
                 if (errors.confirmPassword) {
                   setErrors((prev) => ({
                     ...prev,
-                    confirmPassword: undefined,
+                    confirmPassword: undefined
                   }));
                 }
               }}
@@ -345,9 +329,7 @@ export default function ResetPasswordScreen() {
                   : t("auth.reset_password.reset_password")
               }
               onPress={handleSubmit}
-              disabled={
-                resetPasswordMutation.isPending || validationState !== "valid"
-              }
+              disabled={resetPasswordMutation.isPending || validationState !== "valid"}
               loading={resetPasswordMutation.isPending}
             />
 
@@ -365,9 +347,7 @@ export default function ResetPasswordScreen() {
               <View style={styles.validationMessageContainer}>
                 <Button
                   title={t("auth.reset_password.request_new_link")}
-                  onPress={() =>
-                    router.replace(MOBILE_ROUTES.AUTH.FORGOT_PASSWORD)
-                  }
+                  onPress={() => router.replace(MOBILE_ROUTES.AUTH.FORGOT_PASSWORD)}
                   variant="text"
                   size="sm"
                 />
@@ -380,28 +360,24 @@ export default function ResetPasswordScreen() {
   );
 }
 
-const makeResetPasswordScreenStyles = (
-  tokens: any,
-  colors: any,
-  brand: any,
-) => {
+const makeResetPasswordScreenStyles = (tokens: any, colors: any, brand: any) => {
   return {
     container: {
       flex: 1,
-      backgroundColor: colors.bg.canvas,
+      backgroundColor: colors.bg.canvas
     },
     logoContainer: {
       alignItems: "center" as const,
-      marginBottom: toRN(tokens.spacing[8]),
+      marginBottom: toRN(tokens.spacing[8])
     },
     logoImage: {
       width: 100,
-      height: 100,
+      height: 100
     },
     titleContainer: {
       alignItems: "center" as const,
       marginBottom: toRN(tokens.spacing[8]),
-      paddingHorizontal: toRN(tokens.spacing[6]),
+      paddingHorizontal: toRN(tokens.spacing[6])
     },
     title: {
       fontSize: toRN(tokens.typography.fontSize["3xl"]),
@@ -409,45 +385,42 @@ const makeResetPasswordScreenStyles = (
       color: colors.text.primary,
       textAlign: "center" as const,
       marginBottom: toRN(tokens.spacing[3]),
-      fontFamily: fontFamily.groteskBold,
+      fontFamily: fontFamily.groteskBold
     },
     subtitle: {
       fontSize: toRN(tokens.typography.fontSize.base),
       color: colors.text.secondary,
       textAlign: "center" as const,
-      lineHeight: lineHeight(
-        tokens.typography.fontSize.base,
-        tokens.typography.lineHeight.relaxed,
-      ),
-      fontFamily: fontFamily.groteskRegular,
+      lineHeight: lineHeight(tokens.typography.fontSize.base, tokens.typography.lineHeight.relaxed),
+      fontFamily: fontFamily.groteskRegular
     },
     form: {
       paddingHorizontal: toRN(tokens.spacing[6]),
-      flex: 1,
+      flex: 1
     },
     backToLoginContainer: {
       alignItems: "center" as const,
-      marginTop: toRN(tokens.spacing[6]),
+      marginTop: toRN(tokens.spacing[6])
     },
     validationStateContainer: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
-      marginBottom: toRN(tokens.spacing[4]),
+      marginBottom: toRN(tokens.spacing[4])
     },
     validationStateText: {
       color: colors.text.secondary,
       fontFamily: fontFamily.groteskRegular,
-      marginLeft: toRN(tokens.spacing[2]),
+      marginLeft: toRN(tokens.spacing[2])
     },
     validationMessageContainer: {
-      alignItems: "center" as const,
+      alignItems: "center" as const
     },
     validationMessage: {
       color: colors.feedback.error,
       textAlign: "center" as const,
       fontFamily: fontFamily.groteskRegular,
       fontSize: toRN(tokens.typography.fontSize.sm),
-      marginBottom: toRN(tokens.spacing[2]),
-    },
+      marginBottom: toRN(tokens.spacing[2])
+    }
   };
 };

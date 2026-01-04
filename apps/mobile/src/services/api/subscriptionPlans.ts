@@ -9,7 +9,7 @@ export interface PlanFeature {
   feature_value: number | null;
   is_enabled: boolean;
   sort_order: number;
-  minimum_tier: number; // 0=free, 1=starter, 2=pro, 3=elite
+  minimum_tier: number; // 0=free, 1=premium
 }
 
 export interface SubscriptionPlan {
@@ -45,9 +45,7 @@ export class SubscriptionPlansApiService extends BaseApiService {
    * Get all active subscription plans
    */
   async getPlans(): Promise<SubscriptionPlan[]> {
-    const response = await this.get<SubscriptionPlansResponse>(
-      ROUTES.SUBSCRIPTION_PLANS.PLANS,
-    );
+    const response = await this.get<SubscriptionPlansResponse>(ROUTES.SUBSCRIPTION_PLANS.PLANS);
     return response.data?.plans ?? [];
   }
 
@@ -56,7 +54,7 @@ export class SubscriptionPlansApiService extends BaseApiService {
    */
   async getPlan(planId: string): Promise<SubscriptionPlan | null> {
     const response = await this.get<SubscriptionPlan>(
-      ROUTES.SUBSCRIPTION_PLANS.PLAN_BY_ID.replace(":id", planId),
+      ROUTES.SUBSCRIPTION_PLANS.PLAN_BY_ID.replace(":id", planId)
     );
 
     return response.data ?? null;

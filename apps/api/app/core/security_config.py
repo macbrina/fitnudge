@@ -112,15 +112,43 @@ class SecurityConfig:
     AUDIT_LOGGING = {
         "enabled": True,
         "sensitive_endpoints": [
+            # Authentication & Account Security
             "/auth/login",
             "/auth/signup",
             "/auth/logout",
+            "/auth/set-password",
+            "/auth/forgot-password",
+            "/auth/reset-password",
+            "/auth/verify-email",
+            "/auth/link",  # Account linking (Google/Apple)
+            "/auth/unlink",  # Account unlinking
+            "/auth/oauth",  # OAuth flows
+            # User Account Management
             "/users/delete",
             "/users/change-password",
+            "/users/profile",  # Profile updates
+            "/users/notification-settings",
+            "/users/export",  # Data export (GDPR)
+            # Subscription & Payments
+            "/subscriptions",
+            "/subscription-plans",
+            "/webhooks",  # Payment webhooks
+            # Content & Media
             "/media/upload",
+            "/media/delete",
+            # Core User Data (health/fitness - privacy sensitive)
             "/goals",
             "/check-ins",
-            "/subscriptions",
+            "/challenges",
+            "/meals",
+            "/hydration",
+            "/workout-sessions",
+            # Social Features
+            "/partners",  # Accountability partnerships
+            "/nudges",
+            "/social",
+            # API Access
+            "/api-keys",
         ],
         "retention_days": 90,
         "log_user_agents": True,

@@ -5,7 +5,7 @@ import {
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
-  RefreshControl,
+  RefreshControl
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -22,14 +22,8 @@ import { useTranslation } from "@/lib/i18n";
 import { useStyles, useTheme } from "@/themes";
 import { toRN } from "@/lib/units";
 import { fontFamily } from "@/lib/fonts";
-import {
-  partnersQueryKeys,
-  challengeInvitesQueryKeys,
-} from "@/hooks/api/queryKeys";
-import {
-  useSearchPartnersInfinite,
-  useSuggestedPartnersInfinite,
-} from "@/hooks/api/usePartners";
+import { partnersQueryKeys, challengeInvitesQueryKeys } from "@/hooks/api/queryKeys";
+import { useSearchPartnersInfinite, useSuggestedPartnersInfinite } from "@/hooks/api/usePartners";
 import {
   useReceivedChallengeInvites,
   useSentChallengeInvites,
@@ -37,7 +31,7 @@ import {
   useDeclineChallengeInvite,
   useCancelChallengeInvite,
   useSendChallengeInvite,
-  useChallenge,
+  useChallenge
 } from "@/hooks/api/useChallenges";
 import { SearchUserResult } from "@/services/api/partners";
 import { ChallengeInvite } from "@/services/api/challenges";
@@ -68,8 +62,7 @@ export const ChallengeRequestScreen: React.FC = () => {
     if (!challenge) return false;
 
     // Challenge must be active or upcoming
-    const validStatus =
-      challenge.status === "active" || challenge.status === "upcoming";
+    const validStatus = challenge.status === "active" || challenge.status === "upcoming";
     if (!validStatus) return false;
 
     // Check join deadline
@@ -91,9 +84,9 @@ export const ChallengeRequestScreen: React.FC = () => {
     () => [
       { id: "search", label: t("challenges.invite_users") },
       { id: "received", label: t("challenges.received") },
-      { id: "sent", label: t("challenges.pending") },
+      { id: "sent", label: t("challenges.pending") }
     ],
-    [t],
+    [t]
   );
 
   // Debounce search query
@@ -114,7 +107,7 @@ export const ChallengeRequestScreen: React.FC = () => {
     fetchNextPage: fetchNextSearchPage,
     hasNextPage: hasNextSearchPage,
     isFetchingNextPage: isFetchingNextSearchPage,
-    isLoading: isSearchLoading,
+    isLoading: isSearchLoading
   } = useSearchPartnersInfinite(debouncedQuery);
 
   // Suggested users query
@@ -123,15 +116,13 @@ export const ChallengeRequestScreen: React.FC = () => {
     fetchNextPage: fetchNextSuggestedPage,
     hasNextPage: hasNextSuggestedPage,
     isFetchingNextPage: isFetchingNextSuggestedPage,
-    isLoading: isSuggestedLoading,
+    isLoading: isSuggestedLoading
   } = useSuggestedPartnersInfinite();
 
   // Received/Sent invites
-  const { data: receivedData, isLoading: isLoadingReceived } =
-    useReceivedChallengeInvites();
+  const { data: receivedData, isLoading: isLoadingReceived } = useReceivedChallengeInvites();
 
-  const { data: sentData, isLoading: isLoadingSent } =
-    useSentChallengeInvites();
+  const { data: sentData, isLoading: isLoadingSent } = useSentChallengeInvites();
 
   // Mutations
   const sendInviteMutation = useSendChallengeInvite();
@@ -140,9 +131,7 @@ export const ChallengeRequestScreen: React.FC = () => {
   const cancelMutation = useCancelChallengeInvite();
 
   // Track which users are currently being processed (for showing loading on specific buttons)
-  const [processingUsers, setProcessingUsers] = useState<Set<string>>(
-    new Set(),
-  );
+  const [processingUsers, setProcessingUsers] = useState<Set<string>>(new Set());
 
   // Track manual refresh state (don't show RefreshControl for background refetches)
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
@@ -159,16 +148,11 @@ export const ChallengeRequestScreen: React.FC = () => {
   }, [suggestedData]);
 
   // Get current data based on active tab and search query
-  const currentUsers =
-    debouncedQuery.length >= 2 ? searchUsers : suggestedUsers;
-  const isLoading =
-    debouncedQuery.length >= 2 ? isSearchLoading : isSuggestedLoading;
+  const currentUsers = debouncedQuery.length >= 2 ? searchUsers : suggestedUsers;
+  const isLoading = debouncedQuery.length >= 2 ? isSearchLoading : isSuggestedLoading;
   const isFetchingNextPage =
-    debouncedQuery.length >= 2
-      ? isFetchingNextSearchPage
-      : isFetchingNextSuggestedPage;
-  const hasNextPage =
-    debouncedQuery.length >= 2 ? hasNextSearchPage : hasNextSuggestedPage;
+    debouncedQuery.length >= 2 ? isFetchingNextSearchPage : isFetchingNextSuggestedPage;
+  const hasNextPage = debouncedQuery.length >= 2 ? hasNextSearchPage : hasNextSuggestedPage;
 
   const receivedInvites = receivedData?.data || [];
   const sentInvites = sentData?.data || [];
@@ -176,9 +160,7 @@ export const ChallengeRequestScreen: React.FC = () => {
   // Filter sent invites: only show pending invites (for the Pending tab)
   // If challengeId provided, also filter by challenge
   const filteredSentInvites = sentInvites.filter(
-    (inv) =>
-      inv.status === "pending" &&
-      (!challengeId || inv.challenge_id === challengeId),
+    (inv) => inv.status === "pending" && (!challengeId || inv.challenge_id === challengeId)
   );
 
   // Check if user already has pending invite for this challenge
@@ -186,10 +168,10 @@ export const ChallengeRequestScreen: React.FC = () => {
     (userId: string) => {
       if (!challengeId) return false;
       return filteredSentInvites.some(
-        (inv) => inv.invited_user_id === userId && inv.status === "pending",
+        (inv) => inv.invited_user_id === userId && inv.status === "pending"
       );
     },
-    [challengeId, filteredSentInvites],
+    [challengeId, filteredSentInvites]
   );
 
   // Get the invite for a specific user (for cancellation)
@@ -197,10 +179,10 @@ export const ChallengeRequestScreen: React.FC = () => {
     (userId: string): ChallengeInvite | undefined => {
       if (!challengeId) return undefined;
       return filteredSentInvites.find(
-        (inv) => inv.invited_user_id === userId && inv.status === "pending",
+        (inv) => inv.invited_user_id === userId && inv.status === "pending"
       );
     },
-    [challengeId, filteredSentInvites],
+    [challengeId, filteredSentInvites]
   );
 
   const handleLoadMore = useCallback(() => {
@@ -216,7 +198,7 @@ export const ChallengeRequestScreen: React.FC = () => {
     isFetchingNextPage,
     hasNextPage,
     fetchNextSearchPage,
-    fetchNextSuggestedPage,
+    fetchNextSuggestedPage
   ]);
 
   const handleRefresh = useCallback(async () => {
@@ -226,19 +208,19 @@ export const ChallengeRequestScreen: React.FC = () => {
         // Invalidate both search and suggested queries to force fresh fetch
         await Promise.all([
           queryClient.invalidateQueries({
-            queryKey: partnersQueryKeys.searchInfinite(debouncedQuery),
+            queryKey: partnersQueryKeys.searchInfinite(debouncedQuery)
           }),
           queryClient.invalidateQueries({
-            queryKey: partnersQueryKeys.suggestedInfinite(),
-          }),
+            queryKey: partnersQueryKeys.suggestedInfinite()
+          })
         ]);
       } else if (activeTab === "received") {
         await queryClient.invalidateQueries({
-          queryKey: challengeInvitesQueryKeys.received(),
+          queryKey: challengeInvitesQueryKeys.received()
         });
       } else {
         await queryClient.invalidateQueries({
-          queryKey: challengeInvitesQueryKeys.sent(),
+          queryKey: challengeInvitesQueryKeys.sent()
         });
       }
     } finally {
@@ -278,20 +260,13 @@ export const ChallengeRequestScreen: React.FC = () => {
           title: t("common.error"),
           message: error?.message || t("challenges.cancel_invite_error"),
           variant: "error",
-          confirmLabel: t("common.ok"),
+          confirmLabel: t("common.ok")
         });
       } finally {
         removeProcessingUser(userId);
       }
     },
-    [
-      getInviteForUser,
-      cancelMutation,
-      showAlert,
-      t,
-      addProcessingUser,
-      removeProcessingUser,
-    ],
+    [getInviteForUser, cancelMutation, showAlert, t, addProcessingUser, removeProcessingUser]
   );
 
   const handleSendInvite = useCallback(
@@ -301,7 +276,7 @@ export const ChallengeRequestScreen: React.FC = () => {
           title: t("common.error"),
           message: t("challenges.no_challenge_selected"),
           variant: "error",
-          confirmLabel: t("common.ok"),
+          confirmLabel: t("common.ok")
         });
         return;
       }
@@ -314,7 +289,7 @@ export const ChallengeRequestScreen: React.FC = () => {
             t("challenges.invite_not_allowed") ||
             "Invites are no longer allowed for this challenge",
           variant: "error",
-          confirmLabel: t("common.ok"),
+          confirmLabel: t("common.ok")
         });
         return;
       }
@@ -331,11 +306,11 @@ export const ChallengeRequestScreen: React.FC = () => {
           userInfo: {
             name: user.name,
             username: user.username,
-            profile_picture_url: user.profile_picture_url,
+            profile_picture_url: user.profile_picture_url
           },
           challengeInfo: {
-            title: challenge?.title,
-          },
+            title: challenge?.title
+          }
         });
         // No need to refresh - optimistic update handles button state
       } catch (error: any) {
@@ -343,7 +318,7 @@ export const ChallengeRequestScreen: React.FC = () => {
           title: t("common.error"),
           message: error?.message || t("challenges.send_invite_error"),
           variant: "error",
-          confirmLabel: t("common.ok"),
+          confirmLabel: t("common.ok")
         });
       } finally {
         removeProcessingUser(user.id);
@@ -358,25 +333,21 @@ export const ChallengeRequestScreen: React.FC = () => {
       showAlert,
       t,
       addProcessingUser,
-      removeProcessingUser,
-    ],
+      removeProcessingUser
+    ]
   );
 
   const handleAcceptInvite = useCallback(
     async (invite: ChallengeInvite) => {
       // Check if challenge is still joinable
       const challengeStatus = invite.challenge?.status;
-      if (
-        challengeStatus &&
-        !["active", "upcoming"].includes(challengeStatus)
-      ) {
+      if (challengeStatus && !["active", "upcoming"].includes(challengeStatus)) {
         showAlert({
           title: t("common.error"),
           message:
-            t("challenges.invite_challenge_ended") ||
-            "This challenge is no longer available",
+            t("challenges.invite_challenge_ended") || "This challenge is no longer available",
           variant: "error",
-          confirmLabel: t("common.ok"),
+          confirmLabel: t("common.ok")
         });
         return;
       }
@@ -390,13 +361,13 @@ export const ChallengeRequestScreen: React.FC = () => {
           title: t("common.error"),
           message: error?.message || t("challenges.accept_invite_error"),
           variant: "error",
-          confirmLabel: t("common.ok"),
+          confirmLabel: t("common.ok")
         });
       } finally {
         removeProcessingUser(invite.id);
       }
     },
-    [acceptMutation, showAlert, t, addProcessingUser, removeProcessingUser],
+    [acceptMutation, showAlert, t, addProcessingUser, removeProcessingUser]
   );
 
   const handleDeclineInvite = useCallback(
@@ -410,13 +381,13 @@ export const ChallengeRequestScreen: React.FC = () => {
           title: t("common.error"),
           message: error?.message || t("challenges.decline_invite_error"),
           variant: "error",
-          confirmLabel: t("common.ok"),
+          confirmLabel: t("common.ok")
         });
       } finally {
         removeProcessingUser(invite.id);
       }
     },
-    [declineMutation, showAlert, t, addProcessingUser, removeProcessingUser],
+    [declineMutation, showAlert, t, addProcessingUser, removeProcessingUser]
   );
 
   const handleCancelInvite = useCallback(
@@ -430,20 +401,20 @@ export const ChallengeRequestScreen: React.FC = () => {
           title: t("common.error"),
           message: error?.message || t("challenges.cancel_invite_error"),
           variant: "error",
-          confirmLabel: t("common.ok"),
+          confirmLabel: t("common.ok")
         });
       } finally {
         removeProcessingUser(invite.id);
       }
     },
-    [cancelMutation, showAlert, t, addProcessingUser, removeProcessingUser],
+    [cancelMutation, showAlert, t, addProcessingUser, removeProcessingUser]
   );
 
   const handleViewChallenge = useCallback(
     (id: string) => {
       router.push(MOBILE_ROUTES.CHALLENGES.DETAILS(id));
     },
-    [router],
+    [router]
   );
 
   const formatDate = useCallback((dateStr?: string) => {
@@ -451,7 +422,7 @@ export const ChallengeRequestScreen: React.FC = () => {
     const date = new Date(dateStr);
     return date.toLocaleDateString("en-US", {
       month: "short",
-      day: "numeric",
+      day: "numeric"
     });
   }, []);
 
@@ -459,12 +430,9 @@ export const ChallengeRequestScreen: React.FC = () => {
     ({ item }: { item: SearchUserResult }) => {
       const isProcessing = processingUsers.has(item.id);
       // Check challenge_invite_status from user data (same pattern as FindPartnerScreen uses request_status)
-      const challengeInviteStatus =
-        (item as any).challenge_invite_status || "none";
-      const pendingChallengeInviteId =
-        (item as any).pending_challenge_invite_id || null;
-      const alreadyInvited =
-        challengeInviteStatus === "sent" || hasInvitePending(item.id);
+      const challengeInviteStatus = (item as any).challenge_invite_status || "none";
+      const pendingChallengeInviteId = (item as any).pending_challenge_invite_id || null;
+      const alreadyInvited = challengeInviteStatus === "sent" || hasInvitePending(item.id);
       const displayName = item.name || item.username || t("common.user");
 
       // Render action button based on invite status (same pattern as FindPartnerScreen)
@@ -474,9 +442,7 @@ export const ChallengeRequestScreen: React.FC = () => {
           return (
             <TouchableOpacity
               style={styles.requestedButton}
-              onPress={() =>
-                handleCancelInviteForUser(item.id, pendingChallengeInviteId)
-              }
+              onPress={() => handleCancelInviteForUser(item.id, pendingChallengeInviteId)}
               disabled={isProcessing}
               activeOpacity={0.7}
             >
@@ -484,14 +450,8 @@ export const ChallengeRequestScreen: React.FC = () => {
                 <ActivityIndicator size="small" color={colors.text.tertiary} />
               ) : (
                 <>
-                  <Ionicons
-                    name="time-outline"
-                    size={14}
-                    color={colors.text.tertiary}
-                  />
-                  <Text style={styles.requestedButtonText}>
-                    {t("challenges.requested")}
-                  </Text>
+                  <Ionicons name="time-outline" size={14} color={colors.text.tertiary} />
+                  <Text style={styles.requestedButtonText}>{t("challenges.requested")}</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -499,8 +459,7 @@ export const ChallengeRequestScreen: React.FC = () => {
         }
 
         // No invite - show "Invite" button
-        const isButtonDisabled =
-          isProcessing || !challengeId || !canSendInvites;
+        const isButtonDisabled = isProcessing || !challengeId || !canSendInvites;
         return (
           <TouchableOpacity
             style={[styles.addButton, isButtonDisabled && { opacity: 0.5 }]}
@@ -515,16 +474,12 @@ export const ChallengeRequestScreen: React.FC = () => {
                 <Ionicons
                   name="person-add"
                   size={16}
-                  color={
-                    !isButtonDisabled
-                      ? brandColors.primary
-                      : colors.text.tertiary
-                  }
+                  color={!isButtonDisabled ? brandColors.primary : colors.text.tertiary}
                 />
                 <Text
                   style={[
                     styles.addButtonText,
-                    isButtonDisabled && { color: colors.text.tertiary },
+                    isButtonDisabled && { color: colors.text.tertiary }
                   ]}
                 >
                   {t("challenges.invite")}
@@ -540,15 +495,8 @@ export const ChallengeRequestScreen: React.FC = () => {
           <View style={styles.userRow}>
             {/* Avatar */}
             <View style={styles.avatarContainer}>
-              <View
-                style={[
-                  styles.avatarPlaceholder,
-                  { backgroundColor: brandColors.primary },
-                ]}
-              >
-                <Text style={styles.avatarInitial}>
-                  {displayName.charAt(0).toUpperCase()}
-                </Text>
+              <View style={[styles.avatarPlaceholder, { backgroundColor: brandColors.primary }]}>
+                <Text style={styles.avatarInitial}>{displayName.charAt(0).toUpperCase()}</Text>
               </View>
             </View>
 
@@ -580,31 +528,23 @@ export const ChallengeRequestScreen: React.FC = () => {
       hasInvitePending,
       processingUsers,
       styles,
-      t,
-    ],
+      t
+    ]
   );
 
   const renderReceivedInviteCard = useCallback(
     ({ item: invite }: { item: ChallengeInvite }) => {
       const isProcessing = processingUsers.has(invite.id);
-      const inviterName =
-        invite.inviter?.name || invite.inviter?.username || t("common.user");
+      const inviterName = invite.inviter?.name || invite.inviter?.username || t("common.user");
 
       return (
         <Card style={styles.inviteCard}>
           <TouchableOpacity
-            onPress={() =>
-              invite.challenge_id && handleViewChallenge(invite.challenge_id)
-            }
+            onPress={() => invite.challenge_id && handleViewChallenge(invite.challenge_id)}
             activeOpacity={0.7}
           >
             <View style={styles.inviteHeader}>
-              <View
-                style={[
-                  styles.iconContainer,
-                  { backgroundColor: `${brandColors.primary}15` },
-                ]}
-              >
+              <View style={[styles.iconContainer, { backgroundColor: `${brandColors.primary}15` }]}>
                 <Ionicons name="trophy" size={22} color={brandColors.primary} />
               </View>
               <View style={styles.inviteInfo}>
@@ -616,8 +556,7 @@ export const ChallengeRequestScreen: React.FC = () => {
                 </Text>
                 {invite.challenge?.start_date && (
                   <Text style={styles.dateText}>
-                    {t("challenges.starts")}{" "}
-                    {formatDate(invite.challenge.start_date)}
+                    {t("challenges.starts")} {formatDate(invite.challenge.start_date)}
                   </Text>
                 )}
               </View>
@@ -636,9 +575,7 @@ export const ChallengeRequestScreen: React.FC = () => {
               ) : (
                 <>
                   <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-                  <Text style={styles.acceptButtonText}>
-                    {t("common.accept")}
-                  </Text>
+                  <Text style={styles.acceptButtonText}>{t("common.accept")}</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -648,9 +585,7 @@ export const ChallengeRequestScreen: React.FC = () => {
               disabled={isProcessing}
               activeOpacity={0.7}
             >
-              <Text style={styles.declineButtonText}>
-                {t("common.decline")}
-              </Text>
+              <Text style={styles.declineButtonText}>{t("common.decline")}</Text>
             </TouchableOpacity>
           </View>
         </Card>
@@ -665,31 +600,23 @@ export const ChallengeRequestScreen: React.FC = () => {
       handleViewChallenge,
       processingUsers,
       styles,
-      t,
-    ],
+      t
+    ]
   );
 
   const renderSentInviteCard = useCallback(
     ({ item: invite }: { item: ChallengeInvite }) => {
       const isProcessing = processingUsers.has(invite.id);
-      const inviteeName =
-        invite.invitee?.name || invite.invitee?.username || t("common.user");
+      const inviteeName = invite.invitee?.name || invite.invitee?.username || t("common.user");
 
       return (
         <Card style={styles.inviteCard}>
           <TouchableOpacity
-            onPress={() =>
-              invite.challenge_id && handleViewChallenge(invite.challenge_id)
-            }
+            onPress={() => invite.challenge_id && handleViewChallenge(invite.challenge_id)}
             activeOpacity={0.7}
           >
             <View style={styles.inviteHeader}>
-              <View
-                style={[
-                  styles.iconContainer,
-                  { backgroundColor: `${brandColors.primary}15` },
-                ]}
-              >
+              <View style={[styles.iconContainer, { backgroundColor: `${brandColors.primary}15` }]}>
                 <Ionicons name="trophy" size={22} color={brandColors.primary} />
               </View>
               <View style={styles.inviteInfo}>
@@ -701,8 +628,7 @@ export const ChallengeRequestScreen: React.FC = () => {
                 </Text>
                 {invite.challenge?.start_date && (
                   <Text style={styles.dateText}>
-                    {t("challenges.starts")}{" "}
-                    {formatDate(invite.challenge.start_date)}
+                    {t("challenges.starts")} {formatDate(invite.challenge.start_date)}
                   </Text>
                 )}
               </View>
@@ -720,11 +646,7 @@ export const ChallengeRequestScreen: React.FC = () => {
                 <ActivityIndicator size="small" color={colors.feedback.error} />
               ) : (
                 <>
-                  <Ionicons
-                    name="close-circle-outline"
-                    size={16}
-                    color={colors.feedback.error}
-                  />
+                  <Ionicons name="close-circle-outline" size={16} color={colors.feedback.error} />
                   <Text style={styles.cancelRequestButtonText}>
                     {t("challenges.cancel_request")}
                   </Text>
@@ -743,8 +665,8 @@ export const ChallengeRequestScreen: React.FC = () => {
       handleViewChallenge,
       processingUsers,
       styles,
-      t,
-    ],
+      t
+    ]
   );
 
   const renderEmptyState = useCallback(() => {
@@ -756,12 +678,8 @@ export const ChallengeRequestScreen: React.FC = () => {
             <View style={styles.emptyIconContainer}>
               <Ionicons name="search" size={48} color={colors.text.tertiary} />
             </View>
-            <Text style={styles.emptyTitle}>
-              {t("challenges.search_users_title")}
-            </Text>
-            <Text style={styles.emptyDescription}>
-              {t("challenges.search_users_description")}
-            </Text>
+            <Text style={styles.emptyTitle}>{t("challenges.search_users_title")}</Text>
+            <Text style={styles.emptyDescription}>{t("challenges.search_users_description")}</Text>
           </View>
         );
       }
@@ -775,18 +693,10 @@ export const ChallengeRequestScreen: React.FC = () => {
         return (
           <View style={styles.emptyState}>
             <View style={styles.emptyIconContainer}>
-              <Ionicons
-                name="person-outline"
-                size={48}
-                color={colors.text.tertiary}
-              />
+              <Ionicons name="person-outline" size={48} color={colors.text.tertiary} />
             </View>
-            <Text style={styles.emptyTitle}>
-              {t("challenges.no_users_to_invite")}
-            </Text>
-            <Text style={styles.emptyDescription}>
-              {t("challenges.no_users_to_invite_desc")}
-            </Text>
+            <Text style={styles.emptyTitle}>{t("challenges.no_users_to_invite")}</Text>
+            <Text style={styles.emptyDescription}>{t("challenges.no_users_to_invite_desc")}</Text>
           </View>
         );
       }
@@ -795,15 +705,9 @@ export const ChallengeRequestScreen: React.FC = () => {
       return (
         <View style={styles.emptyState}>
           <View style={styles.emptyIconContainer}>
-            <Ionicons
-              name="people-outline"
-              size={48}
-              color={colors.text.tertiary}
-            />
+            <Ionicons name="people-outline" size={48} color={colors.text.tertiary} />
           </View>
-          <Text style={styles.emptyTitle}>
-            {t("challenges.no_suggestions_challenge")}
-          </Text>
+          <Text style={styles.emptyTitle}>{t("challenges.no_suggestions_challenge")}</Text>
           <Text style={styles.emptyDescription}>
             {t("challenges.no_suggestions_challenge_desc")}
           </Text>
@@ -816,18 +720,10 @@ export const ChallengeRequestScreen: React.FC = () => {
       return (
         <View style={styles.emptyState}>
           <View style={styles.emptyIconContainer}>
-            <Ionicons
-              name="mail-open-outline"
-              size={48}
-              color={colors.text.tertiary}
-            />
+            <Ionicons name="mail-open-outline" size={48} color={colors.text.tertiary} />
           </View>
-          <Text style={styles.emptyTitle}>
-            {t("challenges.no_received_invites")}
-          </Text>
-          <Text style={styles.emptyDescription}>
-            {t("challenges.no_received_invites_desc")}
-          </Text>
+          <Text style={styles.emptyTitle}>{t("challenges.no_received_invites")}</Text>
+          <Text style={styles.emptyDescription}>{t("challenges.no_received_invites_desc")}</Text>
         </View>
       );
     }
@@ -837,30 +733,13 @@ export const ChallengeRequestScreen: React.FC = () => {
     return (
       <View style={styles.emptyState}>
         <View style={styles.emptyIconContainer}>
-          <Ionicons
-            name="time-outline"
-            size={48}
-            color={colors.text.tertiary}
-          />
+          <Ionicons name="time-outline" size={48} color={colors.text.tertiary} />
         </View>
-        <Text style={styles.emptyTitle}>
-          {t("challenges.no_pending_requests")}
-        </Text>
-        <Text style={styles.emptyDescription}>
-          {t("challenges.no_pending_requests_desc")}
-        </Text>
+        <Text style={styles.emptyTitle}>{t("challenges.no_pending_requests")}</Text>
+        <Text style={styles.emptyDescription}>{t("challenges.no_pending_requests_desc")}</Text>
       </View>
     );
-  }, [
-    activeTab,
-    debouncedQuery,
-    isLoading,
-    isLoadingReceived,
-    isLoadingSent,
-    colors,
-    styles,
-    t,
-  ]);
+  }, [activeTab, debouncedQuery, isLoading, isLoadingReceived, isLoadingSent, colors, styles, t]);
 
   const renderFooter = useCallback(() => {
     if (!isFetchingNextPage) return null;
@@ -880,19 +759,14 @@ export const ChallengeRequestScreen: React.FC = () => {
             <SkeletonBox width={48} height={48} borderRadius={24} />
             <View style={styles.skeletonContent}>
               <SkeletonBox width={120} height={16} borderRadius={4} />
-              <SkeletonBox
-                width={80}
-                height={12}
-                borderRadius={4}
-                style={{ marginTop: 4 }}
-              />
+              <SkeletonBox width={80} height={12} borderRadius={4} style={{ marginTop: 4 }} />
             </View>
             <SkeletonBox width={60} height={32} borderRadius={16} />
           </View>
         ))}
       </View>
     ),
-    [styles],
+    [styles]
   );
 
   // Show skeleton loading for initial load
@@ -934,26 +808,16 @@ export const ChallengeRequestScreen: React.FC = () => {
       </View>
 
       {/* Warning Banner when invites not allowed */}
-      {activeTab === "search" &&
-        challengeId &&
-        !canSendInvites &&
-        challenge && (
-          <View style={styles.warningBanner}>
-            <Ionicons
-              name="warning-outline"
-              size={18}
-              color={colors.feedback.warning}
-            />
-            <Text style={styles.warningText}>
-              {challenge.status === "completed" ||
-              challenge.status === "cancelled"
-                ? t("challenges.invite_disabled_ended") ||
-                  "This challenge has ended"
-                : t("challenges.invite_disabled_deadline") ||
-                  "Join deadline has passed"}
-            </Text>
-          </View>
-        )}
+      {activeTab === "search" && challengeId && !canSendInvites && challenge && (
+        <View style={styles.warningBanner}>
+          <Ionicons name="warning-outline" size={18} color={colors.feedback.warning} />
+          <Text style={styles.warningText}>
+            {challenge.status === "completed" || challenge.status === "cancelled"
+              ? t("challenges.invite_disabled_ended") || "This challenge has ended"
+              : t("challenges.invite_disabled_deadline") || "Join deadline has passed"}
+          </Text>
+        </View>
+      )}
 
       {/* Search Bar (only in search tab) */}
       {activeTab === "search" && (
@@ -977,7 +841,7 @@ export const ChallengeRequestScreen: React.FC = () => {
             keyExtractor={(item: any) => item.id}
             contentContainerStyle={[
               styles.listContent,
-              getListData().length === 0 && styles.emptyListContent,
+              getListData().length === 0 && styles.emptyListContent
             ]}
             showsVerticalScrollIndicator={false}
             onEndReached={activeTab === "search" ? handleLoadMore : undefined}
@@ -1000,7 +864,7 @@ export const ChallengeRequestScreen: React.FC = () => {
       <View style={styles.inviteSection}>
         <Button
           title={t("social.invite_friends")}
-          onPress={() => router.push(MOBILE_ROUTES.SOCIAL.REFERRAL)}
+          onPress={() => router.push(MOBILE_ROUTES.PROFILE.REFERRAL)}
           variant="outline"
           leftIcon="share-outline"
           fullWidth
@@ -1013,11 +877,11 @@ export const ChallengeRequestScreen: React.FC = () => {
 const makeStyles = (tokens: any, colors: any, brand: any) => ({
   container: {
     flex: 1,
-    backgroundColor: colors.bg.canvas,
+    backgroundColor: colors.bg.canvas
   },
   tabsContainer: {
     paddingHorizontal: toRN(tokens.spacing[4]),
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   warningBanner: {
     flexDirection: "row" as const,
@@ -1030,74 +894,74 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: `${colors.feedback.warning}15`,
     borderRadius: toRN(tokens.borderRadius.md),
     borderWidth: 1,
-    borderColor: `${colors.feedback.warning}30`,
+    borderColor: `${colors.feedback.warning}30`
   },
   warningText: {
     flex: 1,
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
-    color: colors.feedback.warning,
+    color: colors.feedback.warning
   },
   searchContainer: {
     paddingHorizontal: toRN(tokens.spacing[4]),
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   contentWrapper: {
-    flex: 1,
+    flex: 1
   },
   listContent: {
     paddingHorizontal: toRN(tokens.spacing[4]),
     paddingBottom: toRN(tokens.spacing[8]),
-    flexGrow: 1,
+    flexGrow: 1
   },
   emptyListContent: {
-    flex: 1,
+    flex: 1
   },
   separator: {
-    height: toRN(tokens.spacing[3]),
+    height: toRN(tokens.spacing[3])
   },
 
   // User Card
   userCard: {
-    padding: toRN(tokens.spacing[4]),
+    padding: toRN(tokens.spacing[4])
   },
   userRow: {
     flexDirection: "row" as const,
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   avatarContainer: {
-    marginRight: toRN(tokens.spacing[3]),
+    marginRight: toRN(tokens.spacing[3])
   },
   avatarPlaceholder: {
     width: 48,
     height: 48,
     borderRadius: 24,
     justifyContent: "center" as const,
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   avatarInitial: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.bold,
-    color: "#fff",
+    color: "#fff"
   },
   userInfo: {
     flex: 1,
-    marginRight: toRN(tokens.spacing[3]),
+    marginRight: toRN(tokens.spacing[3])
   },
   userName: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.semiBold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   userUsername: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
     color: colors.text.secondary,
-    marginTop: toRN(tokens.spacing[0.5]),
+    marginTop: toRN(tokens.spacing[0.5])
   },
   actionContainer: {
     minWidth: 80,
-    alignItems: "flex-end" as const,
+    alignItems: "flex-end" as const
   },
   addButton: {
     flexDirection: "row" as const,
@@ -1106,12 +970,12 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     paddingHorizontal: toRN(tokens.spacing[3]),
     backgroundColor: `${brand.primary}15`,
     borderRadius: toRN(tokens.borderRadius.full),
-    gap: toRN(tokens.spacing[1]),
+    gap: toRN(tokens.spacing[1])
   },
   addButtonText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.semiBold,
-    color: brand.primary,
+    color: brand.primary
   },
   requestedButton: {
     flexDirection: "row" as const,
@@ -1120,12 +984,12 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     paddingHorizontal: toRN(tokens.spacing[3]),
     backgroundColor: colors.bg.muted,
     borderRadius: toRN(tokens.borderRadius.full),
-    gap: toRN(tokens.spacing[1]),
+    gap: toRN(tokens.spacing[1])
   },
   requestedButtonText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   invitedBadge: {
     flexDirection: "row" as const,
@@ -1134,21 +998,21 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     paddingHorizontal: toRN(tokens.spacing[2]),
     backgroundColor: `${colors.feedback.success}15`,
     borderRadius: toRN(tokens.borderRadius.full),
-    gap: toRN(tokens.spacing[1]),
+    gap: toRN(tokens.spacing[1])
   },
   invitedBadgeText: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.medium,
-    color: colors.feedback.success,
+    color: colors.feedback.success
   },
 
   // Invite Card
   inviteCard: {
-    padding: toRN(tokens.spacing[4]),
+    padding: toRN(tokens.spacing[4])
   },
   inviteHeader: {
     flexDirection: "row" as const,
-    alignItems: "flex-start" as const,
+    alignItems: "flex-start" as const
   },
   iconContainer: {
     width: 48,
@@ -1156,57 +1020,57 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     borderRadius: toRN(tokens.borderRadius.lg),
     alignItems: "center" as const,
     justifyContent: "center" as const,
-    marginRight: toRN(tokens.spacing[3]),
+    marginRight: toRN(tokens.spacing[3])
   },
   inviteInfo: {
     flex: 1,
-    marginRight: toRN(tokens.spacing[3]),
+    marginRight: toRN(tokens.spacing[3])
   },
   challengeTitle: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.semiBold,
     color: colors.text.primary,
-    marginBottom: 2,
+    marginBottom: 2
   },
   inviterText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
     color: colors.text.secondary,
-    marginBottom: 2,
+    marginBottom: 2
   },
   dateText: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.regular,
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   inviteeName: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.semiBold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   challengeSubtitle: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
     color: colors.text.secondary,
-    marginTop: 2,
+    marginTop: 2
   },
   pendingBadge: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
     gap: toRN(tokens.spacing[1]),
-    marginTop: toRN(tokens.spacing[1]),
+    marginTop: toRN(tokens.spacing[1])
   },
   pendingBadgeText: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.medium,
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
 
   // Action Buttons
   actionButtons: {
     flexDirection: "row" as const,
     gap: toRN(tokens.spacing[2]),
-    marginTop: toRN(tokens.spacing[3]),
+    marginTop: toRN(tokens.spacing[3])
   },
   acceptButton: {
     flex: 1,
@@ -1217,12 +1081,12 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     paddingHorizontal: toRN(tokens.spacing[3]),
     backgroundColor: brand.primary,
     borderRadius: toRN(tokens.borderRadius.full),
-    gap: toRN(tokens.spacing[1]),
+    gap: toRN(tokens.spacing[1])
   },
   acceptButtonText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.semiBold,
-    color: "#FFFFFF",
+    color: "#FFFFFF"
   },
   declineButton: {
     flex: 1,
@@ -1232,12 +1096,12 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     paddingVertical: toRN(tokens.spacing[2]),
     paddingHorizontal: toRN(tokens.spacing[3]),
     backgroundColor: colors.bg.muted,
-    borderRadius: toRN(tokens.borderRadius.full),
+    borderRadius: toRN(tokens.borderRadius.full)
   },
   declineButtonText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
-    color: colors.text.secondary,
+    color: colors.text.secondary
   },
   cancelRequestButton: {
     flex: 1,
@@ -1248,12 +1112,12 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     paddingHorizontal: toRN(tokens.spacing[3]),
     backgroundColor: `${colors.feedback.error}15`,
     borderRadius: toRN(tokens.borderRadius.full),
-    gap: toRN(tokens.spacing[1]),
+    gap: toRN(tokens.spacing[1])
   },
   cancelRequestButtonText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
-    color: colors.feedback.error,
+    color: colors.feedback.error
   },
   cancelButton: {
     width: 36,
@@ -1261,7 +1125,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     borderRadius: 18,
     backgroundColor: `${colors.feedback.error}15`,
     alignItems: "center" as const,
-    justifyContent: "center" as const,
+    justifyContent: "center" as const
   },
 
   // Empty State
@@ -1270,7 +1134,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     justifyContent: "center" as const,
     alignItems: "center" as const,
     paddingHorizontal: toRN(tokens.spacing[8]),
-    paddingVertical: toRN(tokens.spacing[12]),
+    paddingVertical: toRN(tokens.spacing[12])
   },
   emptyIconContainer: {
     width: 80,
@@ -1279,21 +1143,21 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: colors.bg.muted,
     justifyContent: "center" as const,
     alignItems: "center" as const,
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   emptyTitle: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.semiBold,
     color: colors.text.primary,
     textAlign: "center" as const,
-    marginBottom: toRN(tokens.spacing[2]),
+    marginBottom: toRN(tokens.spacing[2])
   },
   emptyDescription: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
     color: colors.text.secondary,
     textAlign: "center" as const,
-    lineHeight: toRN(tokens.typography.fontSize.sm) * 1.5,
+    lineHeight: toRN(tokens.typography.fontSize.sm) * 1.5
   },
 
   // Loading
@@ -1302,17 +1166,17 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     justifyContent: "center" as const,
     alignItems: "center" as const,
     paddingVertical: toRN(tokens.spacing[4]),
-    gap: toRN(tokens.spacing[2]),
+    gap: toRN(tokens.spacing[2])
   },
   loadingText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
-    color: colors.text.secondary,
+    color: colors.text.secondary
   },
 
   // Skeleton
   skeletonContainer: {
-    paddingHorizontal: toRN(tokens.spacing[4]),
+    paddingHorizontal: toRN(tokens.spacing[4])
   },
   skeletonCard: {
     flexDirection: "row" as const,
@@ -1320,20 +1184,20 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     padding: toRN(tokens.spacing[4]),
     backgroundColor: colors.bg.card,
     borderRadius: toRN(tokens.borderRadius.lg),
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   skeletonContent: {
     flex: 1,
     marginLeft: toRN(tokens.spacing[3]),
-    marginRight: toRN(tokens.spacing[3]),
+    marginRight: toRN(tokens.spacing[3])
   },
 
   // Invite Section
   inviteSection: {
     padding: toRN(tokens.spacing[4]),
     borderTopWidth: 1,
-    borderTopColor: colors.border.default,
-  },
+    borderTopColor: colors.border.default
+  }
 });
 
 export default ChallengeRequestScreen;

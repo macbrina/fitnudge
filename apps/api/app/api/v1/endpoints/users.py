@@ -19,10 +19,14 @@ class UserProfileResponse(BaseModel):
     bio: Optional[str]
     plan: str
     timezone: str  # User's timezone (IANA format)
+    language: Optional[str] = None  # Language code (e.g., 'en', 'es')
+    country: Optional[str] = None  # ISO 3166-1 alpha-2 country code
     email_verified: bool
     auth_provider: str
     created_at: str
     last_login_at: Optional[str]
+    linked_providers: Optional[List[str]] = None  # List of linked OAuth providers
+    has_password: Optional[bool] = None  # Whether the user has a password set
 
 
 class UserStatsResponse(BaseModel):
@@ -43,6 +47,8 @@ class ProfileUpdate(BaseModel):
     bio: Optional[str] = None
     profile_picture_url: Optional[str] = None
     timezone: Optional[str] = None  # IANA timezone string (e.g., 'America/New_York')
+    language: Optional[str] = None  # Language code (e.g., 'en', 'es')
+    country: Optional[str] = None  # ISO 3166-1 alpha-2 country code (e.g., 'US', 'NG')
 
 
 class PasswordChange(BaseModel):
@@ -53,7 +59,39 @@ class PasswordChange(BaseModel):
 @router.get("/profile", response_model=UserProfileResponse)
 async def get_my_profile(current_user: dict = Depends(get_current_user)):
     """Get current user's profile"""
-    return current_user
+    from app.core.database import get_supabase_client
+
+    user_id = current_user["id"]
+    supabase = get_supabase_client()
+
+    # Get linked providers from oauth_accounts
+    oauth_result = (
+        supabase.table("oauth_accounts")
+        .select("provider")
+        .eq("user_id", user_id)
+        .execute()
+    )
+    linked_providers = (
+        list(set([acc["provider"] for acc in oauth_result.data]))
+        if oauth_result.data
+        else []
+    )
+
+    # Add primary auth provider if not already in the list
+    primary_provider = current_user.get("auth_provider")
+    if primary_provider and primary_provider not in linked_providers:
+        linked_providers.append(primary_provider)
+
+    # Compute has_password
+    password_hash = current_user.get("password_hash")
+    has_password = password_hash is not None and len(str(password_hash)) > 0
+
+    # Build response with computed fields
+    return {
+        **current_user,
+        "linked_providers": linked_providers,
+        "has_password": has_password,
+    }
 
 
 @router.get("/me/stats", response_model=UserStatsResponse)
@@ -445,7 +483,7 @@ async def get_my_referrals(current_user: dict = Depends(get_current_user)):
 
     referrals = await get_user_referrals(current_user["id"])
 
-    # Format the response
+    # Format the response to match frontend expectations
     formatted_referrals = []
     for referral in referrals:
         formatted_referrals.append(
@@ -453,12 +491,9 @@ async def get_my_referrals(current_user: dict = Depends(get_current_user)):
                 "id": referral.get("id"),
                 "username": referral.get("username"),
                 "name": referral.get("name"),
-                "joined_at": referral.get("created_at"),
-                "bonus_granted": referral.get("referral_bonus_granted_at") is not None,
+                "created_at": referral.get("created_at"),
+                "referral_bonus_granted_at": referral.get("referral_bonus_granted_at"),
             }
         )
 
-    return {
-        "referrals": formatted_referrals,
-        "total_count": len(formatted_referrals),
-    }
+    return formatted_referrals

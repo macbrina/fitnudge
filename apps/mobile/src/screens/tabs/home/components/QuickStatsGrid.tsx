@@ -16,10 +16,7 @@ interface QuickStatsGridProps {
   isLoading: boolean;
 }
 
-export function QuickStatsGrid({
-  dashboardStats,
-  isLoading,
-}: QuickStatsGridProps) {
+export function QuickStatsGrid({ dashboardStats, isLoading }: QuickStatsGridProps) {
   const styles = useStyles(makeQuickStatsGridStyles);
   const { t } = useTranslation();
 
@@ -49,18 +46,9 @@ export function QuickStatsGrid({
 
   return (
     <View style={styles.container}>
-      <StatCard
-        label={t("home.active_goals")}
-        value={dashboardStats.active_count}
-      />
-      <StatCard
-        label={t("home.current_streak")}
-        value={dashboardStats.current_streak}
-      />
-      <StatCard
-        label={t("home.total_checkins")}
-        value={dashboardStats.total_check_ins}
-      />
+      <StatCard label={t("home.active_goals")} value={dashboardStats.active_count} />
+      <StatCard label={t("home.current_streak")} value={dashboardStats.current_streak} />
+      <StatCard label={t("home.total_checkins")} value={dashboardStats.total_check_ins} />
       <StatCard
         label={t("home.completion_rate")}
         value={`${Math.round(dashboardStats.completion_rate)}%`}
@@ -74,11 +62,11 @@ const makeQuickStatsGridStyles = (tokens: any, colors: any, brand: any) => ({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: toRN(tokens.spacing[3]),
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   statCard: {
     flex: 1,
     minWidth: "45%",
-    padding: toRN(tokens.spacing[4]),
-  },
+    padding: toRN(tokens.spacing[4])
+  }
 });

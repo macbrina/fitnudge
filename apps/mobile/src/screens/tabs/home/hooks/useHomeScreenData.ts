@@ -2,11 +2,7 @@ import { useHomeDashboard } from "@/hooks/api/useHomeDashboard";
 import { useMemo, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { homeDashboardQueryKeys } from "@/hooks/api/useHomeDashboard";
-import {
-  ActiveItem,
-  PendingCheckIn,
-  DashboardStats,
-} from "@/services/api/home";
+import { ActiveItem, PendingCheckIn, DashboardStats } from "@/services/api/home";
 
 export interface HomeScreenData {
   /** Combined list of active goals, challenges, and group goals */
@@ -33,12 +29,7 @@ export interface HomeScreenData {
 export function useHomeScreenData(): HomeScreenData {
   const queryClient = useQueryClient();
 
-  const {
-    data: dashboardData,
-    isLoading,
-    isError,
-    refetch: refetchDashboard,
-  } = useHomeDashboard();
+  const { data: dashboardData, isLoading, isError, refetch: refetchDashboard } = useHomeDashboard();
 
   // Extract active items from response (goals + challenges)
   const activeItems = useMemo(() => {
@@ -70,6 +61,6 @@ export function useHomeScreenData(): HomeScreenData {
     dashboardStats,
     isLoading,
     hasError: isError,
-    refetch,
+    refetch
   };
 }

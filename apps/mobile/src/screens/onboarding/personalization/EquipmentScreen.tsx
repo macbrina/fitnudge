@@ -9,6 +9,7 @@ import { lineHeight } from "@/themes/tokens";
 import { useTheme } from "@/themes";
 import PersonalizationLayout from "./PersonalizationLayout";
 import { useOnboardingStore } from "@/stores/onboardingStore";
+import { AVAILABLE_EQUIPMENT } from "@/constants/personalization";
 
 interface EquipmentScreenProps {
   onContinue: (equipment: string[]) => void;
@@ -17,49 +18,14 @@ interface EquipmentScreenProps {
   totalSteps: number;
 }
 
-const EQUIPMENT_OPTIONS = [
-  {
-    id: "none",
-    label: "onboarding.personalization.equipment.none.title",
-    exclusive: true,
-  },
-  {
-    id: "resistance_band",
-    label: "onboarding.personalization.equipment.resistance_band.title",
-    exclusive: false,
-  },
-  {
-    id: "dumbbell",
-    label: "onboarding.personalization.equipment.dumbbell.title",
-    exclusive: false,
-  },
-  {
-    id: "kettlebell",
-    label: "onboarding.personalization.equipment.kettlebell.title",
-    exclusive: false,
-  },
-  {
-    id: "pull_up_bar",
-    label: "onboarding.personalization.equipment.pull_up_bar.title",
-    exclusive: false,
-  },
-  {
-    id: "yoga_mat",
-    label: "onboarding.personalization.equipment.yoga_mat.title",
-    exclusive: false,
-  },
-];
-
 export default function EquipmentScreen({
   onContinue,
   onBack,
   currentStep,
-  totalSteps,
+  totalSteps
 }: EquipmentScreenProps) {
   const { available_equipment } = useOnboardingStore();
-  const [selectedEquipment, setSelectedEquipment] = useState<string[]>(
-    available_equipment || [],
-  );
+  const [selectedEquipment, setSelectedEquipment] = useState<string[]>(available_equipment || []);
   const { t } = useTranslation();
   const styles = useStyles(makeStyles);
   const { brandColors } = useTheme();
@@ -69,9 +35,10 @@ export default function EquipmentScreen({
   }, [available_equipment]);
 
   const handleToggleEquipment = (equipmentId: string) => {
-    const option = EQUIPMENT_OPTIONS.find((o) => o.id === equipmentId);
+    const option = AVAILABLE_EQUIPMENT.find((o) => o.value === equipmentId);
 
-    if (option?.exclusive) {
+    // Check if the option has the "exclusive" property (only "none" has it)
+    if (option && "exclusive" in option && option.exclusive) {
       setSelectedEquipment(["none"]);
     } else {
       setSelectedEquipment((prev) => {
@@ -86,13 +53,11 @@ export default function EquipmentScreen({
   };
 
   const handleContinue = () => {
-    const equipment =
-      selectedEquipment.length > 0 ? selectedEquipment : ["none"];
+    const equipment = selectedEquipment.length > 0 ? selectedEquipment : ["none"];
     onContinue(equipment);
   };
 
-  const isSelected = (equipmentId: string) =>
-    selectedEquipment.includes(equipmentId);
+  const isSelected = (equipmentId: string) => selectedEquipment.includes(equipmentId);
 
   return (
     <PersonalizationLayout
@@ -103,40 +68,30 @@ export default function EquipmentScreen({
       canContinue={true}
     >
       <View style={styles.content}>
-        <Text style={styles.title}>
-          {t("onboarding.personalization.equipment.title")}
-        </Text>
+        <Text style={styles.title}>{t("onboarding.personalization.equipment.title")}</Text>
 
-        <Text style={styles.subtitle}>
-          {t("onboarding.personalization.equipment.subtitle")}
-        </Text>
+        <Text style={styles.subtitle}>{t("onboarding.personalization.equipment.subtitle")}</Text>
 
         <View style={styles.optionsContainer}>
-          {EQUIPMENT_OPTIONS.map((option) => {
-            const selected = isSelected(option.id);
+          {AVAILABLE_EQUIPMENT.map((option) => {
+            const selected = isSelected(option.value);
             return (
               <TouchableOpacity
-                key={option.id}
-                onPress={() => handleToggleEquipment(option.id)}
+                key={option.value}
+                onPress={() => handleToggleEquipment(option.value)}
                 activeOpacity={0.7}
                 style={[
                   styles.optionCard,
-                  selected && [
-                    styles.optionCardSelected,
-                    { borderColor: brandColors.primary },
-                  ],
+                  selected && [styles.optionCardSelected, { borderColor: brandColors.primary }]
                 ]}
               >
                 <Text
                   style={[
                     styles.optionLabel,
-                    selected && [
-                      styles.optionLabelSelected,
-                      { color: brandColors.primary },
-                    ],
+                    selected && [styles.optionLabelSelected, { color: brandColors.primary }]
                   ]}
                 >
-                  {t(option.label)}
+                  {t(option.onboardingLabelKey)}
                 </Text>
 
                 {/* Checkbox */}
@@ -147,14 +102,12 @@ export default function EquipmentScreen({
                       styles.checkboxSelected,
                       {
                         backgroundColor: brandColors.primary,
-                        borderColor: brandColors.primary,
-                      },
-                    ],
+                        borderColor: brandColors.primary
+                      }
+                    ]
                   ]}
                 >
-                  {selected && (
-                    <Ionicons name="checkmark" size={16} color="white" />
-                  )}
+                  {selected && <Ionicons name="checkmark" size={16} color="white" />}
                 </View>
               </TouchableOpacity>
             );
@@ -169,7 +122,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => {
   return {
     content: {
       flex: 1,
-      paddingTop: toRN(tokens.spacing[2]),
+      paddingTop: toRN(tokens.spacing[2])
     },
     title: {
       fontSize: toRN(tokens.typography.fontSize["2xl"]),
@@ -177,23 +130,17 @@ const makeStyles = (tokens: any, colors: any, brand: any) => {
       color: colors.text.primary,
       marginBottom: toRN(tokens.spacing[2]),
       fontFamily: fontFamily.groteskBold,
-      lineHeight: lineHeight(
-        tokens.typography.fontSize["2xl"],
-        tokens.typography.lineHeight.tight,
-      ),
+      lineHeight: lineHeight(tokens.typography.fontSize["2xl"], tokens.typography.lineHeight.tight)
     },
     subtitle: {
       fontSize: toRN(tokens.typography.fontSize.base),
       color: colors.text.secondary,
       marginBottom: toRN(tokens.spacing[6]),
       fontFamily: fontFamily.groteskRegular,
-      lineHeight: lineHeight(
-        tokens.typography.fontSize.base,
-        tokens.typography.lineHeight.relaxed,
-      ),
+      lineHeight: lineHeight(tokens.typography.fontSize.base, tokens.typography.lineHeight.relaxed)
     },
     optionsContainer: {
-      gap: toRN(tokens.spacing[3]),
+      gap: toRN(tokens.spacing[3])
     },
     optionCard: {
       flexDirection: "row" as const,
@@ -204,17 +151,17 @@ const makeStyles = (tokens: any, colors: any, brand: any) => {
       paddingVertical: toRN(tokens.spacing[5]),
       paddingHorizontal: toRN(tokens.spacing[5]),
       borderWidth: 2,
-      borderColor: colors.border.subtle,
+      borderColor: colors.border.subtle
     },
     optionCardSelected: {
-      backgroundColor: brand.primary + "08",
+      backgroundColor: brand.primary + "08"
     },
     optionLabel: {
       flex: 1,
       fontSize: toRN(tokens.typography.fontSize.lg),
       fontWeight: tokens.typography.fontWeight.semibold,
       color: colors.text.primary,
-      fontFamily: fontFamily.groteskSemiBold,
+      fontFamily: fontFamily.groteskSemiBold
     },
     optionLabelSelected: {},
     checkbox: {
@@ -225,8 +172,8 @@ const makeStyles = (tokens: any, colors: any, brand: any) => {
       borderColor: colors.border.default,
       alignItems: "center" as const,
       justifyContent: "center" as const,
-      marginLeft: toRN(tokens.spacing[3]),
+      marginLeft: toRN(tokens.spacing[3])
     },
-    checkboxSelected: {},
+    checkboxSelected: {}
   };
 };

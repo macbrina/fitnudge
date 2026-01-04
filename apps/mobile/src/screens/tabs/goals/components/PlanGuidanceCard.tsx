@@ -72,12 +72,12 @@ export function PlanGuidanceCard({ guidance }: PlanGuidanceCardProps) {
 
 const makePlanGuidanceCardStyles = (tokens: any, colors: any, brand: any) => ({
   card: {
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   header: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   iconContainer: {
     width: toRN(tokens.spacing[8]),
@@ -86,55 +86,55 @@ const makePlanGuidanceCardStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: brand.primary + "1A",
     alignItems: "center" as const,
     justifyContent: "center" as const,
-    marginRight: toRN(tokens.spacing[2]),
+    marginRight: toRN(tokens.spacing[2])
   },
   cardTitle: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.groteskBold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   description: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.groteskRegular,
     color: colors.text.secondary,
     lineHeight: toRN(tokens.typography.fontSize.sm) * 1.5,
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   tipsSection: {
     paddingTop: toRN(tokens.spacing[3]),
     borderTopWidth: 1,
-    borderTopColor: colors.border.default,
+    borderTopColor: colors.border.default
   },
   tipsTitle: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.groteskSemiBold,
     color: colors.text.primary,
-    marginBottom: toRN(tokens.spacing[2]),
+    marginBottom: toRN(tokens.spacing[2])
   },
   tipsList: {
-    gap: toRN(tokens.spacing[2.5]),
+    gap: toRN(tokens.spacing[2.5])
   },
   tipRow: {
     flexDirection: "row" as const,
     alignItems: "flex-start" as const,
-    gap: toRN(tokens.spacing[2]),
+    gap: toRN(tokens.spacing[2])
   },
   tipBullet: {
     width: toRN(tokens.spacing[4]),
     alignItems: "center" as const,
-    paddingTop: toRN(tokens.spacing[0.25]),
+    paddingTop: toRN(tokens.spacing[0.25])
   },
   tipBulletText: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     color: brand.primary,
-    lineHeight: toRN(tokens.typography.fontSize.sm) * 1.5,
+    lineHeight: toRN(tokens.typography.fontSize.sm) * 1.5
   },
   tipText: {
     flex: 1,
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.groteskRegular,
     color: colors.text.primary,
-    lineHeight: toRN(tokens.typography.fontSize.sm) * 1.5,
+    lineHeight: toRN(tokens.typography.fontSize.sm) * 1.5
   },
   showMoreButton: {
     flexDirection: "row" as const,
@@ -142,11 +142,11 @@ const makePlanGuidanceCardStyles = (tokens: any, colors: any, brand: any) => ({
     justifyContent: "center" as const,
     gap: toRN(tokens.spacing[1]),
     paddingVertical: toRN(tokens.spacing[2]),
-    marginTop: toRN(tokens.spacing[2]),
+    marginTop: toRN(tokens.spacing[2])
   },
   showMoreText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.groteskMedium,
-    color: brand.primary,
-  },
+    color: brand.primary
+  }
 });

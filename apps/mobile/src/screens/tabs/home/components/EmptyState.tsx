@@ -17,13 +17,7 @@ interface EmptyStateProps {
   style?: any;
 }
 
-export function EmptyState({
-  icon,
-  iconColor,
-  title,
-  message,
-  style,
-}: EmptyStateProps) {
+export function EmptyState({ icon, iconColor, title, message, style }: EmptyStateProps) {
   const styles = useStyles(makeEmptyStateStyles);
   const { colors, brandColors } = useTheme();
 
@@ -33,14 +27,10 @@ export function EmptyState({
         <View
           style={[
             styles.iconContainer,
-            { backgroundColor: `${iconColor || brandColors.primary}15` },
+            { backgroundColor: `${iconColor || brandColors.primary}15` }
           ]}
         >
-          <Ionicons
-            name={icon}
-            size={24}
-            color={iconColor || brandColors.primary}
-          />
+          <Ionicons name={icon} size={24} color={iconColor || brandColors.primary} />
         </View>
       )}
       <Text style={styles.title}>{title}</Text>
@@ -54,7 +44,7 @@ const makeEmptyStateStyles = (tokens: any, colors: any, brand: any) => ({
     alignItems: "center" as const,
     justifyContent: "center" as const,
     paddingVertical: toRN(tokens.spacing[8]),
-    paddingHorizontal: toRN(tokens.spacing[4]),
+    paddingHorizontal: toRN(tokens.spacing[4])
   },
   iconContainer: {
     width: 64,
@@ -62,20 +52,20 @@ const makeEmptyStateStyles = (tokens: any, colors: any, brand: any) => ({
     borderRadius: 16,
     justifyContent: "center" as const,
     alignItems: "center" as const,
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   title: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.semiBold,
     color: colors.text.primary,
     marginBottom: toRN(tokens.spacing[2]),
-    textAlign: "center" as const,
+    textAlign: "center" as const
   },
   message: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.regular,
     color: colors.text.secondary,
     textAlign: "center" as const,
-    lineHeight: toRN(tokens.typography.fontSize.base) * 1.5,
-  },
+    lineHeight: toRN(tokens.typography.fontSize.base) * 1.5
+  }
 });

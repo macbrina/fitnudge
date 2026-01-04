@@ -34,7 +34,7 @@ export enum NotificationCategory {
   MOTIVATION_MESSAGE = "motivation_message",
   WEEKLY_RECAP = "weekly_recap",
   STREAK_MILESTONE = "streak_milestone",
-  GOAL_COMPLETE = "goal_complete",
+  GOAL_COMPLETE = "goal_complete"
 }
 
 export interface NotificationData {
@@ -102,11 +102,7 @@ export interface ScheduledNotification {
   category: NotificationCategory;
 }
 
-export type PermissionStatus =
-  | "undetermined"
-  | "denied"
-  | "granted"
-  | "provisional";
+export type PermissionStatus = "undetermined" | "denied" | "granted" | "provisional";
 
 export interface NotificationChannel {
   id: string;

@@ -3,31 +3,25 @@ import Constants from "expo-constants";
 
 // Get PostHog configuration from environment variables
 const POSTHOG_API_KEY =
-  Constants.expoConfig?.extra?.posthogApiKey ||
-  process.env.EXPO_PUBLIC_POSTHOG_API_KEY;
+  Constants.expoConfig?.extra?.posthogApiKey || process.env.EXPO_PUBLIC_POSTHOG_API_KEY;
 const POSTHOG_HOST =
   Constants.expoConfig?.extra?.posthogHost ||
   process.env.EXPO_PUBLIC_POSTHOG_HOST ||
   "https://us.i.posthog.com";
 
 if (!POSTHOG_API_KEY) {
-  console.warn(
-    "PostHog API key not found. PostHog analytics will be disabled.",
-  );
+  console.warn("PostHog API key not found. PostHog analytics will be disabled.");
 }
 
 // Create PostHog instance
 export const posthog = new PostHog(POSTHOG_API_KEY || "phc_disabled", {
   host: POSTHOG_HOST,
   // Disable in development if needed
-  disabled: __DEV__ && !POSTHOG_API_KEY,
+  disabled: __DEV__ && !POSTHOG_API_KEY
 });
 
 // Helper function to identify users
-export const identifyUser = (
-  userId: string,
-  userProperties?: Record<string, any>,
-) => {
+export const identifyUser = (userId: string, userProperties?: Record<string, any>) => {
   if (posthog) {
     posthog.identify(userId, userProperties);
   }
@@ -41,10 +35,7 @@ export const resetUser = () => {
 };
 
 // Helper function to capture events
-export const captureEvent = (
-  eventName: string,
-  properties?: Record<string, any>,
-) => {
+export const captureEvent = (eventName: string, properties?: Record<string, any>) => {
   if (posthog) {
     posthog.capture(eventName, properties);
   }

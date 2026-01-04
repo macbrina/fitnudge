@@ -1,12 +1,5 @@
 import React, { useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  Image,
-} from "react-native";
+import { View, Text, KeyboardAvoidingView, Platform, ScrollView, Image } from "react-native";
 import { useAuthStore } from "@/stores/authStore";
 import { useTranslation } from "@/lib/i18n";
 import { fontFamily } from "@/lib/fonts";
@@ -30,13 +23,15 @@ import {
   performNativeGoogleSignIn,
   getFriendlyGoogleError,
   hasGoogleSignInConfiguration,
-  isGoogleCancelledError,
+  isGoogleCancelledError
 } from "@/lib/auth/google";
 import {
   performNativeAppleSignIn,
   isAppleSigninAvailable,
-  isAppleCancelledError,
+  isAppleCancelledError
 } from "@/lib/auth/apple";
+import { ApiError } from "@/services/api/base";
+import { EXTERNAL_URLS } from "@/constants/general";
 
 export default function SignupScreen() {
   // Get query params from deep links
@@ -46,9 +41,7 @@ export default function SignupScreen() {
   }>();
 
   // Extract referral param (handle array case from expo-router)
-  const referral = Array.isArray(params.referral)
-    ? params.referral[0]
-    : params.referral;
+  const referral = Array.isArray(params.referral) ? params.referral[0] : params.referral;
 
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -82,15 +75,16 @@ export default function SignupScreen() {
   // Fetch subscription data after login (non-blocking)
   const fetchSubscriptionData = async () => {
     try {
-      const [{ useSubscriptionStore }, { usePricingStore }] = await Promise.all(
-        [import("@/stores/subscriptionStore"), import("@/stores/pricingStore")],
-      );
+      const [{ useSubscriptionStore }, { usePricingStore }] = await Promise.all([
+        import("@/stores/subscriptionStore"),
+        import("@/stores/pricingStore")
+      ]);
 
       // Fetch subscription, features, and pricing plans in parallel
       await Promise.all([
         useSubscriptionStore.getState().fetchSubscription(),
         useSubscriptionStore.getState().fetchFeatures(),
-        usePricingStore.getState().fetchPlans(),
+        usePricingStore.getState().fetchPlans()
       ]);
     } catch (error) {
       console.warn("[Signup] Failed to fetch subscription data:", error);
@@ -159,7 +153,7 @@ export default function SignupScreen() {
     await showAlert({
       title: t("common.error"),
       message,
-      variant: "error",
+      variant: "error"
     });
   };
 
@@ -211,7 +205,7 @@ export default function SignupScreen() {
         username: username.trim(),
         email: email.trim().toLowerCase(),
         password,
-        referral_code: referralCode.trim() || undefined,
+        referral_code: referralCode.trim() || undefined
       },
       {
         onSuccess: async (response) => {
@@ -220,7 +214,7 @@ export default function SignupScreen() {
             await login(
               response.data.user,
               response.data.access_token,
-              response.data.refresh_token,
+              response.data.refresh_token
             );
 
             // Fetch subscription data immediately after login (non-blocking for navigation)
@@ -228,11 +222,7 @@ export default function SignupScreen() {
 
             // Check if email verification is required
             const user = response.data.user;
-            if (
-              user &&
-              !user.email_verified &&
-              user.auth_provider === "email"
-            ) {
+            if (user && !user.email_verified && user.auth_provider === "email") {
               // Redirect to email verification screen
               router.replace(MOBILE_ROUTES.AUTH.VERIFY_EMAIL);
             } else {
@@ -242,10 +232,7 @@ export default function SignupScreen() {
                 const destination = await getRedirection({ hasFitnessProfile });
                 router.replace(destination);
               } catch (redirectError) {
-                console.warn(
-                  "[Signup] Failed to compute redirection",
-                  redirectError,
-                );
+                console.warn("[Signup] Failed to compute redirection", redirectError);
                 router.replace(MOBILE_ROUTES.MAIN.HOME);
               }
             }
@@ -259,7 +246,7 @@ export default function SignupScreen() {
             dataRecord,
             detailRecord,
             detailString,
-            backendMessage,
+            backendMessage
           } = getApiErrorDetails(error);
 
           // Handle specific error cases
@@ -280,26 +267,25 @@ export default function SignupScreen() {
               await showAlert({
                 title: t("common.error"),
                 message: backendMessage || t("errors.registration_error"),
-                variant: "error",
+                variant: "error"
               });
             }
           } else {
             await showAlert({
               title: t("common.error"),
               message: backendMessage || t("errors.registration_error"),
-              variant: "error",
+              variant: "error"
             });
           }
-        },
-      },
+        }
+      }
     );
   };
 
   const handleGoogleSignIn = async () => {
     if (!showGoogle) {
       await handleSocialError(
-        t("errors.authentication_error") ||
-          "Google Sign-In is not configured for this build.",
+        t("errors.authentication_error") || "Google Sign-In is not configured for this build."
       );
       return;
     }
@@ -309,17 +295,12 @@ export default function SignupScreen() {
       const { idToken } = await performNativeGoogleSignIn();
 
       // Pass referral code if available
-      const response = await authService.loginWithGoogle(
-        idToken,
-        referralCode.trim() || undefined,
-      );
+      const response = await authService.loginWithGoogle(idToken, referralCode.trim() || undefined);
 
       if (response.data) {
         await handleSocialSuccess(response.data);
       } else {
-        await handleSocialError(
-          response.error || t("errors.authentication_error"),
-        );
+        await handleSocialError(response.error || t("errors.authentication_error"));
       }
     } catch (error) {
       if (isGoogleCancelledError(error)) {
@@ -327,8 +308,17 @@ export default function SignupScreen() {
       }
 
       console.error("Google sign-in failed:", error);
+
+      // Check if it's an API error (from our backend)
+      let errorMessage: string;
+      if (error instanceof ApiError) {
+        errorMessage = error.message;
+      } else {
+        errorMessage = getFriendlyGoogleError(error);
+      }
+
       // Trigger alert asynchronously so loading state can reset immediately
-      void handleSocialError(getFriendlyGoogleError(error));
+      void handleSocialError(errorMessage);
     } finally {
       setIsGoogleLoading(false);
     }
@@ -336,9 +326,7 @@ export default function SignupScreen() {
 
   const handleAppleSignIn = async () => {
     if (!showApple) {
-      await handleSocialError(
-        "Sign in with Apple is not available on this device.",
-      );
+      await handleSocialError("Sign in with Apple is not available on this device.");
       return;
     }
 
@@ -365,19 +353,17 @@ export default function SignupScreen() {
           fullName: credential.fullName
             ? {
                 givenName: credential.fullName.givenName ?? undefined,
-                familyName: credential.fullName.familyName ?? undefined,
+                familyName: credential.fullName.familyName ?? undefined
               }
-            : undefined,
+            : undefined
         },
-        referralCode.trim() || undefined,
+        referralCode.trim() || undefined
       );
 
       if (response.data) {
         await handleSocialSuccess(response.data);
       } else {
-        await handleSocialError(
-          response.error || t("errors.authentication_error"),
-        );
+        await handleSocialError(response.error || t("errors.authentication_error"));
       }
     } catch (error: any) {
       if (isAppleCancelledError(error)) {
@@ -385,7 +371,16 @@ export default function SignupScreen() {
       }
 
       console.error("Apple sign-in failed:", error);
-      await handleSocialError(t("errors.authentication_error"));
+
+      // Check if it's an API error (from our backend)
+      let errorMessage: string;
+      if (error instanceof ApiError) {
+        errorMessage = error.message;
+      } else {
+        errorMessage = t("errors.authentication_error");
+      }
+
+      await handleSocialError(errorMessage);
     } finally {
       setIsAppleLoading(false);
     }
@@ -401,7 +396,7 @@ export default function SignupScreen() {
           style={{ flex: 1 }}
           contentContainerStyle={{
             flexGrow: 1,
-            paddingBottom: insets.bottom,
+            paddingBottom: insets.bottom
           }}
           showsVerticalScrollIndicator={false}
         >
@@ -524,7 +519,7 @@ export default function SignupScreen() {
               <Text style={styles.termsText}>
                 {t("auth.signup.terms_text")}{" "}
                 <LinkText
-                  url="https://fitnudge.app/terms-of-service"
+                  url={EXTERNAL_URLS.TERMS_OF_SERVICE}
                   title={t("auth.signup.terms_of_use")}
                   style={styles.linkText}
                 >
@@ -532,7 +527,7 @@ export default function SignupScreen() {
                 </LinkText>
                 {" and "}
                 <LinkText
-                  url="https://fitnudge.app/privacy-policy"
+                  url={EXTERNAL_URLS.PRIVACY_POLICY}
                   title={t("auth.signup.privacy_policy")}
                   style={styles.linkText}
                 >
@@ -549,7 +544,7 @@ export default function SignupScreen() {
               size="sm"
               style={{
                 ...styles.loginLinkContainer,
-                paddingBottom: insets.bottom + 20,
+                paddingBottom: insets.bottom + 20
               }}
             />
           </View>
@@ -563,20 +558,20 @@ const makeSignupScreenStyles = (tokens: any, colors: any, brand: any) => {
   return {
     container: {
       flex: 1,
-      backgroundColor: colors.bg.canvas,
+      backgroundColor: colors.bg.canvas
     },
     logoContainer: {
       alignItems: "center" as const,
-      marginBottom: toRN(tokens.spacing[8]),
+      marginBottom: toRN(tokens.spacing[8])
     },
     logoImage: {
       width: 100,
-      height: 100,
+      height: 100
     },
     titleContainer: {
       alignItems: "center" as const,
       marginBottom: toRN(tokens.spacing[8]),
-      paddingHorizontal: toRN(tokens.spacing[6]),
+      paddingHorizontal: toRN(tokens.spacing[6])
     },
     title: {
       fontSize: toRN(tokens.typography.fontSize["3xl"]),
@@ -584,59 +579,53 @@ const makeSignupScreenStyles = (tokens: any, colors: any, brand: any) => {
       color: colors.text.primary,
       textAlign: "center" as const,
       marginBottom: toRN(tokens.spacing[3]),
-      fontFamily: fontFamily.groteskBold,
+      fontFamily: fontFamily.groteskBold
     },
     subtitle: {
       fontSize: toRN(tokens.typography.fontSize.base),
       color: colors.text.secondary,
       textAlign: "center" as const,
-      lineHeight: lineHeight(
-        tokens.typography.fontSize.base,
-        tokens.typography.lineHeight.relaxed,
-      ),
-      fontFamily: fontFamily.groteskRegular,
+      lineHeight: lineHeight(tokens.typography.fontSize.base, tokens.typography.lineHeight.relaxed),
+      fontFamily: fontFamily.groteskRegular
     },
     form: {
       paddingHorizontal: toRN(tokens.spacing[6]),
-      flex: 1,
+      flex: 1
     },
     referralToggle: {
       alignSelf: "flex-start" as const,
-      marginBottom: toRN(tokens.spacing[2]),
+      marginBottom: toRN(tokens.spacing[2])
     },
     loginLinkContainer: {
       alignItems: "center" as const,
-      marginTop: toRN(tokens.spacing[4]),
+      marginTop: toRN(tokens.spacing[4])
     },
     loginLinkText: {
       fontSize: toRN(tokens.typography.fontSize.base),
       color: colors.text.secondary,
-      fontFamily: fontFamily.groteskRegular,
+      fontFamily: fontFamily.groteskRegular
     },
     loginLink: {
       color: brand.primary,
-      fontFamily: fontFamily.groteskMedium,
+      fontFamily: fontFamily.groteskMedium
     },
     termsContainer: {
       alignItems: "center" as const,
       marginTop: toRN(tokens.spacing[4]),
-      paddingHorizontal: toRN(tokens.spacing[4]),
+      paddingHorizontal: toRN(tokens.spacing[4])
     },
     termsText: {
       fontSize: toRN(tokens.typography.fontSize.sm),
       color: colors.text.secondary,
       textAlign: "center" as const,
       fontFamily: fontFamily.groteskRegular,
-      lineHeight: lineHeight(
-        tokens.typography.fontSize.sm,
-        tokens.typography.lineHeight.relaxed,
-      ),
+      lineHeight: lineHeight(tokens.typography.fontSize.sm, tokens.typography.lineHeight.relaxed)
     },
     linkText: {
       fontSize: toRN(tokens.typography.fontSize.sm),
       color: brand.primary,
       fontFamily: fontFamily.groteskMedium,
-      textDecorationLine: "underline" as const,
-    },
+      textDecorationLine: "underline" as const
+    }
   };
 };

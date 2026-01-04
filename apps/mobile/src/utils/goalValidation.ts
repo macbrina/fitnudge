@@ -15,7 +15,7 @@ export const VALID_CATEGORIES = [
   "nutrition",
   "wellness",
   "mindfulness",
-  "sleep",
+  "sleep"
 ] as const;
 
 // Valid frequencies based on API requirements
@@ -30,13 +30,13 @@ export const CATEGORIES = [
   { key: "nutrition", label: "Nutrition" },
   { key: "wellness", label: "Wellness" },
   { key: "mindfulness", label: "Mindfulness" },
-  { key: "sleep", label: "Sleep" },
+  { key: "sleep", label: "Sleep" }
 ] as const;
 
 // Frequency options for UI display
 export const FREQUENCIES = [
   { key: "daily", label: "Daily" },
-  { key: "weekly", label: "Weekly" },
+  { key: "weekly", label: "Weekly" }
 ] as const;
 
 // Days of the week (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
@@ -47,7 +47,7 @@ export const DAYS_OF_WEEK = [
   { value: 3, label: "Wed", short: "W" },
   { value: 4, label: "Thu", short: "T" },
   { value: 5, label: "Fri", short: "F" },
-  { value: 6, label: "Sat", short: "S" },
+  { value: 6, label: "Sat", short: "S" }
 ] as const;
 
 // Challenge duration options (for time challenges)
@@ -56,7 +56,7 @@ export const CHALLENGE_DURATIONS = [
   { value: 30, label: "30" },
   { value: 60, label: "60" },
   { value: 90, label: "90" },
-  { value: -1, label: "Custom" },
+  { value: -1, label: "Custom" }
 ] as const;
 
 // Target check-in options (for target challenges)
@@ -66,7 +66,7 @@ export const TARGET_OPTIONS = [
   { value: 50, label: "50" },
   { value: 75, label: "75" },
   { value: 100, label: "100" },
-  { value: -1, label: "Custom" },
+  { value: -1, label: "Custom" }
 ] as const;
 
 // =============================================================================
@@ -151,7 +151,7 @@ export const validateTargetDays = (value: string): string | null => {
 export const validateDaysOfWeek = (
   days: number[],
   frequency: string,
-  _targetDays?: number, // No longer used - kept for backward compatibility
+  _targetDays?: number // No longer used - kept for backward compatibility
 ): string | null => {
   if (frequency === "weekly") {
     if (days.length === 0) {
@@ -189,10 +189,7 @@ export const validateReminderTimes = (times: string[]): string | null => {
  * @param duration - Duration in days
  * @param goalType - Optional goal type. If provided and not "time_challenge" or "streak", returns null (no validation needed)
  */
-export const validateChallengeDuration = (
-  duration: number,
-  goalType?: string,
-): string | null => {
+export const validateChallengeDuration = (duration: number, goalType?: string): string | null => {
   // Skip validation if goalType is provided and is not a time-based challenge
   if (goalType && goalType !== "time_challenge" && goalType !== "streak") {
     return null;
@@ -226,7 +223,7 @@ export const validateTargetCheckins = (
   daysOfWeek: number[],
   frequency: string,
   _challengeDuration: number,
-  _reminderTimes: string[],
+  _reminderTimes: string[]
 ): string | null => {
   if (targetCheckins <= 0) {
     return "Target check-ins must be greater than 0";
@@ -252,7 +249,7 @@ export const calculateMaxCheckins = (
   daysOfWeek: number[],
   frequency: string,
   challengeDuration: number,
-  reminderTimes: string[],
+  reminderTimes: string[]
 ): number => {
   const numReminderTimes = Math.max(1, reminderTimes.length);
 

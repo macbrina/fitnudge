@@ -16,15 +16,13 @@ export type PurchasesStoreProduct = any;
 
 export type PurchasesPromotionalOffer = any;
 
-// Our app's subscription tiers
-export type SubscriptionTier = "free" | "starter" | "pro" | "elite";
+// Our app's subscription tiers (2-tier system: free + premium)
+export type SubscriptionTier = "free" | "premium";
 export type BillingPeriod = "monthly" | "annual";
 
 // Entitlement identifiers in RevenueCat dashboard
 export const ENTITLEMENT_IDS = {
-  PRO: "pro_access",
-  STARTER: "starter_access",
-  COACH_PLUS: "elite_access",
+  PREMIUM: "premium_access"
 } as const;
 
 // Package type identifiers
@@ -116,7 +114,7 @@ export interface RevenueCatConfig {
 
 // Promotional offer identifiers
 export const PROMO_OFFER_IDS = {
-  PRO_EXIT_50: "pro_exit_50", // 50% off Pro Annual (exit intent)
+  PREMIUM_EXIT_50: "premium_exit_50" // 50% off Premium Annual (exit intent)
 } as const;
 
 // Promotional offer info for UI

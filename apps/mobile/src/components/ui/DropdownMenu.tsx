@@ -7,7 +7,7 @@ import {
   StyleSheet,
   ViewStyle,
   TextStyle,
-  LayoutChangeEvent,
+  LayoutChangeEvent
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/themes";
@@ -64,7 +64,7 @@ export function DropdownMenu({
   onOpen,
   onClose,
   style,
-  triggerStyle,
+  triggerStyle
 }: DropdownMenuProps) {
   const { colors, brandColors } = useTheme();
   const [visible, setVisible] = useState(false);
@@ -95,7 +95,7 @@ export function DropdownMenu({
       handleClose();
       await item.onPress();
     },
-    [handleClose],
+    [handleClose]
   );
 
   const handleTriggerLayout = (event: LayoutChangeEvent) => {
@@ -108,17 +108,17 @@ export function DropdownMenu({
       case "danger":
         return {
           text: colors.feedback?.error || "#EF4444",
-          icon: colors.feedback?.error || "#EF4444",
+          icon: colors.feedback?.error || "#EF4444"
         };
       case "primary":
         return {
           text: brandColors.primary,
-          icon: brandColors.primary,
+          icon: brandColors.primary
         };
       default:
         return {
           text: colors.text.primary,
-          icon: colors.text.secondary,
+          icon: colors.text.secondary
         };
     }
   };
@@ -140,10 +140,7 @@ export function DropdownMenu({
           <Ionicons
             name={triggerIcon}
             size={triggerIconSize || toRN(tokens.typography.fontSize.xl)}
-            color={
-              triggerIconColor ||
-              (disabled ? colors.text.muted : colors.text.tertiary)
-            }
+            color={triggerIconColor || (disabled ? colors.text.muted : colors.text.tertiary)}
           />
         )}
       </TouchableOpacity>
@@ -158,7 +155,7 @@ export function DropdownMenu({
           <View
             style={[
               styles.dropdown,
-              position === "left" ? styles.dropdownLeft : styles.dropdownRight,
+              position === "left" ? styles.dropdownLeft : styles.dropdownRight
             ]}
           >
             {items.map((item, index) => {
@@ -171,7 +168,7 @@ export function DropdownMenu({
                   style={[
                     styles.menuItem,
                     !isLast && styles.menuItemBorder,
-                    item.disabled && styles.menuItemDisabled,
+                    item.disabled && styles.menuItemDisabled
                   ]}
                   onPress={() => handleItemPress(item)}
                   disabled={item.disabled}
@@ -181,9 +178,7 @@ export function DropdownMenu({
                     <Ionicons
                       name={item.icon}
                       size={toRN(tokens.typography.fontSize.lg)}
-                      color={
-                        item.disabled ? colors.text.muted : variantColors.icon
-                      }
+                      color={item.disabled ? colors.text.muted : variantColors.icon}
                       style={styles.menuItemIcon}
                     />
                   )}
@@ -191,7 +186,7 @@ export function DropdownMenu({
                     style={[
                       styles.menuItemText,
                       { color: variantColors.text },
-                      item.disabled && styles.menuItemTextDisabled,
+                      item.disabled && styles.menuItemTextDisabled
                     ]}
                   >
                     {item.label}
@@ -207,41 +202,28 @@ export function DropdownMenu({
 }
 
 // Convenience component for common kebab menu pattern
-export interface KebabMenuProps
-  extends Omit<DropdownMenuProps, "trigger" | "triggerIcon"> {
+export interface KebabMenuProps extends Omit<DropdownMenuProps, "trigger" | "triggerIcon"> {
   /** Orientation of the dots */
   orientation?: "horizontal" | "vertical";
 }
 
-export function KebabMenu({
-  orientation = "horizontal",
-  ...props
-}: KebabMenuProps) {
+export function KebabMenu({ orientation = "horizontal", ...props }: KebabMenuProps) {
   return (
     <DropdownMenu
       {...props}
-      triggerIcon={
-        orientation === "horizontal"
-          ? "ellipsis-horizontal"
-          : "ellipsis-vertical"
-      }
+      triggerIcon={orientation === "horizontal" ? "ellipsis-horizontal" : "ellipsis-vertical"}
     />
   );
 }
 
-const makeStyles = (
-  colors: any,
-  brandColors: any,
-  position: "left" | "right",
-  minWidth: number,
-) =>
+const makeStyles = (colors: any, brandColors: any, position: "left" | "right", minWidth: number) =>
   StyleSheet.create({
     container: {
       position: "relative",
-      zIndex: 100,
+      zIndex: 100
     },
     trigger: {
-      padding: toRN(tokens.spacing[1]),
+      padding: toRN(tokens.spacing[1])
     },
     overlay: {
       position: "absolute",
@@ -251,7 +233,7 @@ const makeStyles = (
       bottom: -1000,
       width: 5000,
       height: 5000,
-      zIndex: 999,
+      zIndex: 999
     },
     dropdown: {
       position: "absolute",
@@ -267,38 +249,37 @@ const makeStyles = (
       elevation: 8,
       zIndex: 1000,
       borderWidth: 1,
-      borderColor: colors.border?.subtle || colors.border?.default || "#E5E7EB",
+      borderColor: colors.border?.subtle || colors.border?.default || "#E5E7EB"
     },
     dropdownLeft: {
-      left: 0,
+      left: 0
     },
     dropdownRight: {
-      right: 0,
+      right: 0
     },
     menuItem: {
       flexDirection: "row",
       alignItems: "center",
       paddingVertical: toRN(tokens.spacing[3]),
-      paddingHorizontal: toRN(tokens.spacing[4]),
+      paddingHorizontal: toRN(tokens.spacing[4])
     },
     menuItemBorder: {
       borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor:
-        colors.border?.subtle || colors.border?.default || "#E5E7EB",
+      borderBottomColor: colors.border?.subtle || colors.border?.default || "#E5E7EB"
     },
     menuItemDisabled: {
-      opacity: 0.5,
+      opacity: 0.5
     },
     menuItemIcon: {
-      marginRight: toRN(tokens.spacing[3]),
+      marginRight: toRN(tokens.spacing[3])
     },
     menuItemText: {
       fontSize: toRN(tokens.typography.fontSize.base),
-      fontFamily: fontFamily.medium,
+      fontFamily: fontFamily.medium
     },
     menuItemTextDisabled: {
-      color: colors.text.disabled,
-    },
+      color: colors.text.disabled
+    }
   });
 
 export default DropdownMenu;

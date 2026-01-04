@@ -1,14 +1,5 @@
-import {
-  useQuery,
-  useMutation,
-  useQueryClient,
-  useInfiniteQuery,
-} from "@tanstack/react-query";
-import {
-  partnersService,
-  Partner,
-  PartnerRequest,
-} from "@/services/api/partners";
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
+import { partnersService, Partner, PartnerRequest } from "@/services/api/partners";
 import { useSubscriptionStore } from "@/stores/subscriptionStore";
 import { partnersQueryKeys } from "./queryKeys";
 
@@ -27,7 +18,7 @@ export const usePartners = () => {
     queryFn: () => partnersService.getPartners(),
     staleTime: 5 * 60 * 1000, // 5 minutes
     refetchOnMount: false,
-    placeholderData: EMPTY_PARTNERS_RESPONSE,
+    placeholderData: EMPTY_PARTNERS_RESPONSE
   });
 };
 
@@ -40,7 +31,7 @@ export const usePendingPartnerRequests = () => {
     queryFn: () => partnersService.getPendingRequests(),
     staleTime: 60 * 1000, // 1 minute
     refetchOnMount: false,
-    placeholderData: EMPTY_PARTNERS_RESPONSE,
+    placeholderData: EMPTY_PARTNERS_RESPONSE
   });
 };
 
@@ -53,7 +44,7 @@ export const useSentPartnerRequests = () => {
     queryFn: () => partnersService.getSentRequests(),
     staleTime: 60 * 1000, // 1 minute
     refetchOnMount: false,
-    placeholderData: EMPTY_PARTNERS_RESPONSE,
+    placeholderData: EMPTY_PARTNERS_RESPONSE
   });
 };
 
@@ -68,29 +59,22 @@ export const useSearchPartners = (query: string) => {
       // Transform to match old format for backwards compatibility
       return {
         ...response,
-        data: response.data?.users || [],
+        data: response.data?.users || []
       };
     },
     enabled: query.length >= 2,
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 2 * 60 * 1000 // 2 minutes
   });
 };
 
 /**
  * Search for users to add as partners with infinite scroll pagination
  */
-export const useSearchPartnersInfinite = (
-  query: string,
-  limit: number = 20,
-) => {
+export const useSearchPartnersInfinite = (query: string, limit: number = 20) => {
   return useInfiniteQuery({
     queryKey: partnersQueryKeys.searchInfinite(query),
     queryFn: async ({ pageParam = 1 }) => {
-      const response = await partnersService.searchUsers(
-        query,
-        pageParam,
-        limit,
-      );
+      const response = await partnersService.searchUsers(query, pageParam, limit);
       if (response.status !== 200 || !response.data) {
         throw new Error(response.error || "Failed to search users");
       }
@@ -104,7 +88,7 @@ export const useSearchPartnersInfinite = (
       return undefined;
     },
     enabled: query.length >= 2,
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 2 * 60 * 1000 // 2 minutes
   });
 };
 
@@ -115,10 +99,7 @@ export const useSuggestedPartnersInfinite = (limit: number = 20) => {
   return useInfiniteQuery({
     queryKey: partnersQueryKeys.suggestedInfinite(),
     queryFn: async ({ pageParam = 1 }) => {
-      const response = await partnersService.getSuggestedUsers(
-        pageParam,
-        limit,
-      );
+      const response = await partnersService.getSuggestedUsers(pageParam, limit);
       if (response.status !== 200 || !response.data) {
         throw new Error(response.error || "Failed to get suggested users");
       }
@@ -131,7 +112,7 @@ export const useSuggestedPartnersInfinite = (limit: number = 20) => {
       }
       return undefined;
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000 // 5 minutes
   });
 };
 
@@ -147,7 +128,7 @@ const updateUserInInfiniteQuery = (
     partnership_id?: string | null;
     is_partner?: boolean;
     has_pending_request?: boolean;
-  },
+  }
 ) => {
   queryClient.setQueryData(queryKey, (old: any) => {
     if (!old?.pages) return old;
@@ -155,10 +136,8 @@ const updateUserInInfiniteQuery = (
       ...old,
       pages: old.pages.map((page: any) => ({
         ...page,
-        users: page.users.map((user: any) =>
-          user.id === userId ? { ...user, ...updates } : user,
-        ),
-      })),
+        users: page.users.map((user: any) => (user.id === userId ? { ...user, ...updates } : user))
+      }))
     };
   });
 };
@@ -176,14 +155,14 @@ export const useSendPartnerRequest = () => {
       // Cancel only specific queries we're about to update
       // Note: We do NOT update pending list - that's for requests RECEIVED from others
       await queryClient.cancelQueries({
-        queryKey: partnersQueryKeys.sent(),
+        queryKey: partnersQueryKeys.sent()
       });
       await queryClient.cancelQueries({
         queryKey: [...partnersQueryKeys.all, "search-infinite"],
-        exact: false,
+        exact: false
       });
       await queryClient.cancelQueries({
-        queryKey: partnersQueryKeys.suggestedInfinite(),
+        queryKey: partnersQueryKeys.suggestedInfinite()
       });
 
       // Snapshot previous data for rollback
@@ -193,11 +172,11 @@ export const useSendPartnerRequest = () => {
       // Use base key without search term to match all search queries
       const searchQueryState = queryClient.getQueriesData({
         queryKey: [...partnersQueryKeys.all, "search-infinite"],
-        exact: false,
+        exact: false
       });
 
       const suggestedQueryState = queryClient.getQueriesData({
-        queryKey: partnersQueryKeys.suggestedInfinite(),
+        queryKey: partnersQueryKeys.suggestedInfinite()
       });
 
       // Create optimistic sent request
@@ -207,7 +186,7 @@ export const useSendPartnerRequest = () => {
         partner_user_id: data.partner_user_id,
         status: "pending",
         initiated_by_user_id: "",
-        created_at: new Date().toISOString(),
+        created_at: new Date().toISOString()
       };
 
       // Add to sent list only (NOT pending - that's for received requests)
@@ -217,23 +196,18 @@ export const useSendPartnerRequest = () => {
         }
         return {
           ...old,
-          data: [optimisticRequest, ...old.data],
+          data: [optimisticRequest, ...old.data]
         };
       });
 
       // Optimistically update the user in search/suggested results
       // Update all search queries
       searchQueryState.forEach(([key]) => {
-        updateUserInInfiniteQuery(
-          queryClient,
-          key as readonly string[],
-          data.partner_user_id,
-          {
-            request_status: "sent",
-            partnership_id: optimisticRequest.id,
-            has_pending_request: true,
-          },
-        );
+        updateUserInInfiniteQuery(queryClient, key as readonly string[], data.partner_user_id, {
+          request_status: "sent",
+          partnership_id: optimisticRequest.id,
+          has_pending_request: true
+        });
       });
 
       // Update suggested query
@@ -244,23 +218,20 @@ export const useSendPartnerRequest = () => {
         {
           request_status: "sent",
           partnership_id: optimisticRequest.id,
-          has_pending_request: true,
-        },
+          has_pending_request: true
+        }
       );
 
       return {
         previousSent,
         searchQueryState,
-        suggestedQueryState,
+        suggestedQueryState
       };
     },
     onError: (err, data, context) => {
       // Rollback sent list
       if (context?.previousSent) {
-        queryClient.setQueryData(
-          partnersQueryKeys.sent(),
-          context.previousSent,
-        );
+        queryClient.setQueryData(partnersQueryKeys.sent(), context.previousSent);
       }
       // Rollback search queries
       context?.searchQueryState?.forEach(([key, value]: [any, any]) => {
@@ -280,8 +251,7 @@ export const useSendPartnerRequest = () => {
           if (!old?.data) return { data: [realPartnership] };
           // Filter out temp items AND duplicates of the real item
           const filtered = old.data.filter(
-            (p: Partner) =>
-              !p.id.startsWith("temp-") && p.id !== realPartnership.id,
+            (p: Partner) => !p.id.startsWith("temp-") && p.id !== realPartnership.id
           );
           return { ...old, data: [realPartnership, ...filtered] };
         });
@@ -289,20 +259,15 @@ export const useSendPartnerRequest = () => {
         // Update the real partnership_id in search/suggested
         const searchQueryState = queryClient.getQueriesData({
           queryKey: [...partnersQueryKeys.all, "search-infinite"],
-          exact: false,
+          exact: false
         });
 
         searchQueryState.forEach(([key]) => {
-          updateUserInInfiniteQuery(
-            queryClient,
-            key as readonly string[],
-            data.partner_user_id,
-            {
-              request_status: "sent",
-              partnership_id: realPartnership.id,
-              has_pending_request: true,
-            },
-          );
+          updateUserInInfiniteQuery(queryClient, key as readonly string[], data.partner_user_id, {
+            request_status: "sent",
+            partnership_id: realPartnership.id,
+            has_pending_request: true
+          });
         });
 
         updateUserInInfiniteQuery(
@@ -312,11 +277,11 @@ export const useSendPartnerRequest = () => {
           {
             request_status: "sent",
             partnership_id: realPartnership.id,
-            has_pending_request: true,
-          },
+            has_pending_request: true
+          }
         );
       }
-    },
+    }
   });
 };
 
@@ -334,29 +299,27 @@ export const useAcceptPartnerRequest = () => {
     onMutate: async ({ partnershipId, userId }) => {
       // Cancel only specific queries we're about to update
       await queryClient.cancelQueries({
-        queryKey: partnersQueryKeys.pending(),
+        queryKey: partnersQueryKeys.pending()
       });
       await queryClient.cancelQueries({ queryKey: partnersQueryKeys.list() });
       await queryClient.cancelQueries({
         queryKey: [...partnersQueryKeys.all, "search-infinite"],
-        exact: false,
+        exact: false
       });
       await queryClient.cancelQueries({
-        queryKey: partnersQueryKeys.suggestedInfinite(),
+        queryKey: partnersQueryKeys.suggestedInfinite()
       });
 
-      const previousPending = queryClient.getQueryData(
-        partnersQueryKeys.pending(),
-      );
+      const previousPending = queryClient.getQueryData(partnersQueryKeys.pending());
       const previousList = queryClient.getQueryData(partnersQueryKeys.list());
 
       const searchQueryState = queryClient.getQueriesData({
         queryKey: [...partnersQueryKeys.all, "search-infinite"],
-        exact: false,
+        exact: false
       });
 
       const suggestedQueryState = queryClient.getQueriesData({
-        queryKey: partnersQueryKeys.suggestedInfinite(),
+        queryKey: partnersQueryKeys.suggestedInfinite()
       });
 
       // Find the request being accepted
@@ -368,7 +331,7 @@ export const useAcceptPartnerRequest = () => {
         acceptedPartner = old.data.find((p: Partner) => p.id === partnershipId);
         return {
           ...old,
-          data: old.data.filter((p: Partner) => p.id !== partnershipId),
+          data: old.data.filter((p: Partner) => p.id !== partnershipId)
         };
       });
 
@@ -380,71 +343,51 @@ export const useAcceptPartnerRequest = () => {
             return { data: [newPartner] };
           }
           // Check if already exists (from realtime race condition)
-          const exists = old.data.some(
-            (p: Partner) => p.id === acceptedPartner?.id,
-          );
+          const exists = old.data.some((p: Partner) => p.id === acceptedPartner?.id);
           if (exists) {
             // Update existing instead of adding duplicate
             return {
               ...old,
-              data: old.data.map((p: Partner) =>
-                p.id === acceptedPartner?.id ? newPartner : p,
-              ),
+              data: old.data.map((p: Partner) => (p.id === acceptedPartner?.id ? newPartner : p))
             };
           }
           return {
             ...old,
-            data: [...old.data, newPartner],
+            data: [...old.data, newPartner]
           };
         });
       }
 
       // Optimistically update the user in search/suggested to show "Partner" status
       searchQueryState.forEach(([key]) => {
-        updateUserInInfiniteQuery(
-          queryClient,
-          key as readonly string[],
-          userId,
-          {
-            request_status: "accepted",
-            partnership_id: partnershipId,
-            is_partner: true,
-            has_pending_request: false,
-          },
-        );
-      });
-
-      updateUserInInfiniteQuery(
-        queryClient,
-        partnersQueryKeys.suggestedInfinite(),
-        userId,
-        {
+        updateUserInInfiniteQuery(queryClient, key as readonly string[], userId, {
           request_status: "accepted",
           partnership_id: partnershipId,
           is_partner: true,
-          has_pending_request: false,
-        },
-      );
+          has_pending_request: false
+        });
+      });
+
+      updateUserInInfiniteQuery(queryClient, partnersQueryKeys.suggestedInfinite(), userId, {
+        request_status: "accepted",
+        partnership_id: partnershipId,
+        is_partner: true,
+        has_pending_request: false
+      });
 
       return {
         previousPending,
         previousList,
         searchQueryState,
-        suggestedQueryState,
+        suggestedQueryState
       };
     },
     onError: (err, params, context) => {
       if (context?.previousPending) {
-        queryClient.setQueryData(
-          partnersQueryKeys.pending(),
-          context.previousPending,
-        );
+        queryClient.setQueryData(partnersQueryKeys.pending(), context.previousPending);
       }
       if (context?.previousList) {
-        queryClient.setQueryData(
-          partnersQueryKeys.list(),
-          context.previousList,
-        );
+        queryClient.setQueryData(partnersQueryKeys.list(), context.previousList);
       }
       // Rollback search queries
       context?.searchQueryState?.forEach(([key, value]: [any, any]) => {
@@ -458,10 +401,10 @@ export const useAcceptPartnerRequest = () => {
     onSettled: () => {
       // Refetch to ensure consistency
       queryClient.invalidateQueries({
-        queryKey: partnersQueryKeys.pending(),
+        queryKey: partnersQueryKeys.pending()
       });
       queryClient.invalidateQueries({ queryKey: partnersQueryKeys.list() });
-    },
+    }
   });
 };
 
@@ -472,24 +415,21 @@ export const useRejectPartnerRequest = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (partnershipId: string) =>
-      partnersService.rejectRequest(partnershipId),
+    mutationFn: (partnershipId: string) => partnersService.rejectRequest(partnershipId),
     // Optimistic update
     onMutate: async (partnershipId) => {
       await queryClient.cancelQueries({
-        queryKey: partnersQueryKeys.pending(),
+        queryKey: partnersQueryKeys.pending()
       });
 
-      const previousPending = queryClient.getQueryData(
-        partnersQueryKeys.pending(),
-      );
+      const previousPending = queryClient.getQueryData(partnersQueryKeys.pending());
 
       // Remove from pending
       queryClient.setQueryData(partnersQueryKeys.pending(), (old: any) => {
         if (!old?.data) return old;
         return {
           ...old,
-          data: old.data.filter((p: Partner) => p.id !== partnershipId),
+          data: old.data.filter((p: Partner) => p.id !== partnershipId)
         };
       });
 
@@ -497,12 +437,9 @@ export const useRejectPartnerRequest = () => {
     },
     onError: (err, partnershipId, context) => {
       if (context?.previousPending) {
-        queryClient.setQueryData(
-          partnersQueryKeys.pending(),
-          context.previousPending,
-        );
+        queryClient.setQueryData(partnersQueryKeys.pending(), context.previousPending);
       }
-    },
+    }
   });
 };
 
@@ -520,32 +457,30 @@ export const useCancelPartnerRequest = () => {
     onMutate: async ({ partnershipId, userId }) => {
       // Cancel only specific queries we're about to update
       await queryClient.cancelQueries({
-        queryKey: partnersQueryKeys.pending(),
+        queryKey: partnersQueryKeys.pending()
       });
       await queryClient.cancelQueries({
-        queryKey: partnersQueryKeys.sent(),
+        queryKey: partnersQueryKeys.sent()
       });
       await queryClient.cancelQueries({
         queryKey: [...partnersQueryKeys.all, "search-infinite"],
-        exact: false,
+        exact: false
       });
       await queryClient.cancelQueries({
-        queryKey: partnersQueryKeys.suggestedInfinite(),
+        queryKey: partnersQueryKeys.suggestedInfinite()
       });
 
       // Snapshot previous data for rollback
-      const previousPending = queryClient.getQueryData(
-        partnersQueryKeys.pending(),
-      );
+      const previousPending = queryClient.getQueryData(partnersQueryKeys.pending());
       const previousSent = queryClient.getQueryData(partnersQueryKeys.sent());
 
       const searchQueryState = queryClient.getQueriesData({
         queryKey: [...partnersQueryKeys.all, "search-infinite"],
-        exact: false,
+        exact: false
       });
 
       const suggestedQueryState = queryClient.getQueriesData({
-        queryKey: partnersQueryKeys.suggestedInfinite(),
+        queryKey: partnersQueryKeys.suggestedInfinite()
       });
 
       // Remove from pending
@@ -553,7 +488,7 @@ export const useCancelPartnerRequest = () => {
         if (!old?.data) return old;
         return {
           ...old,
-          data: old.data.filter((p: Partner) => p.id !== partnershipId),
+          data: old.data.filter((p: Partner) => p.id !== partnershipId)
         };
       });
 
@@ -562,56 +497,40 @@ export const useCancelPartnerRequest = () => {
         if (!old?.data) return old;
         return {
           ...old,
-          data: old.data.filter((p: Partner) => p.id !== partnershipId),
+          data: old.data.filter((p: Partner) => p.id !== partnershipId)
         };
       });
 
       // Optimistically update the user in search/suggested to show "Request" button
       searchQueryState.forEach(([key]) => {
-        updateUserInInfiniteQuery(
-          queryClient,
-          key as readonly string[],
-          userId,
-          {
-            request_status: "none",
-            partnership_id: null,
-            has_pending_request: false,
-          },
-        );
-      });
-
-      updateUserInInfiniteQuery(
-        queryClient,
-        partnersQueryKeys.suggestedInfinite(),
-        userId,
-        {
+        updateUserInInfiniteQuery(queryClient, key as readonly string[], userId, {
           request_status: "none",
           partnership_id: null,
-          has_pending_request: false,
-        },
-      );
+          has_pending_request: false
+        });
+      });
+
+      updateUserInInfiniteQuery(queryClient, partnersQueryKeys.suggestedInfinite(), userId, {
+        request_status: "none",
+        partnership_id: null,
+        has_pending_request: false
+      });
 
       return {
         previousPending,
         previousSent,
         searchQueryState,
-        suggestedQueryState,
+        suggestedQueryState
       };
     },
     onError: (err, params, context) => {
       // Rollback pending list
       if (context?.previousPending) {
-        queryClient.setQueryData(
-          partnersQueryKeys.pending(),
-          context.previousPending,
-        );
+        queryClient.setQueryData(partnersQueryKeys.pending(), context.previousPending);
       }
       // Rollback sent list
       if (context?.previousSent) {
-        queryClient.setQueryData(
-          partnersQueryKeys.sent(),
-          context.previousSent,
-        );
+        queryClient.setQueryData(partnersQueryKeys.sent(), context.previousSent);
       }
       // Rollback search queries
       context?.searchQueryState?.forEach(([key, value]: [any, any]) => {
@@ -621,7 +540,7 @@ export const useCancelPartnerRequest = () => {
       context?.suggestedQueryState?.forEach(([key, value]: [any, any]) => {
         queryClient.setQueryData(key, value);
       });
-    },
+    }
   });
 };
 
@@ -632,8 +551,7 @@ export const useRemovePartner = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (partnershipId: string) =>
-      partnersService.removePartner(partnershipId),
+    mutationFn: (partnershipId: string) => partnersService.removePartner(partnershipId),
     // Optimistic update
     onMutate: async (partnershipId) => {
       await queryClient.cancelQueries({ queryKey: partnersQueryKeys.list() });
@@ -645,7 +563,7 @@ export const useRemovePartner = () => {
         if (!old?.data) return old;
         return {
           ...old,
-          data: old.data.filter((p: Partner) => p.id !== partnershipId),
+          data: old.data.filter((p: Partner) => p.id !== partnershipId)
         };
       });
 
@@ -653,12 +571,9 @@ export const useRemovePartner = () => {
     },
     onError: (err, partnershipId, context) => {
       if (context?.previousList) {
-        queryClient.setQueryData(
-          partnersQueryKeys.list(),
-          context.previousList,
-        );
+        queryClient.setQueryData(partnersQueryKeys.list(), context.previousList);
       }
-    },
+    }
   });
 };
 
@@ -674,9 +589,7 @@ export const usePartnerDashboard = (partnerUserId: string | undefined) => {
   return useQuery({
     queryKey: partnersQueryKeys.dashboard(partnerUserId || ""),
     queryFn: async () => {
-      const response = await partnersService.getPartnerDashboard(
-        partnerUserId!,
-      );
+      const response = await partnersService.getPartnerDashboard(partnerUserId!);
       if (response.status !== 200 || !response.data) {
         throw new Error(response.error || "Failed to get partner dashboard");
       }
@@ -685,7 +598,7 @@ export const usePartnerDashboard = (partnerUserId: string | undefined) => {
     enabled: !!partnerUserId,
     staleTime: 30 * 1000, // 30 seconds
     refetchOnMount: "always", // Always refetch when screen mounts
-    refetchOnWindowFocus: true, // Refetch when app comes to foreground
+    refetchOnWindowFocus: true // Refetch when app comes to foreground
   });
 };
 
@@ -702,7 +615,7 @@ export const usePartnerLimits = () => {
       }
       return response.data;
     },
-    staleTime: 60 * 1000, // 1 minute
+    staleTime: 60 * 1000 // 1 minute
   });
 };
 
@@ -746,9 +659,7 @@ export const usePartnerAccess = () => {
 
   // Remaining slots (if limit is not unlimited)
   const remainingSlots =
-    limit === null
-      ? null
-      : Math.max(0, limit - acceptedCount - pendingSentCount);
+    limit === null ? null : Math.max(0, limit - acceptedCount - pendingSentCount);
 
   return {
     // Feature access (immediate via subscriptionStore)
@@ -765,6 +676,6 @@ export const usePartnerAccess = () => {
     remainingSlots,
 
     // Actions
-    refetch, // Refetch limits from backend
+    refetch // Refetch limits from backend
   };
 };

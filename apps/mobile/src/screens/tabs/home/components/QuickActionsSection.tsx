@@ -15,10 +15,7 @@ interface QuickActionsSectionProps {
   isLoading: boolean;
 }
 
-export function QuickActionsSection({
-  hasActiveGoals,
-  isLoading,
-}: QuickActionsSectionProps) {
+export function QuickActionsSection({ hasActiveGoals, isLoading }: QuickActionsSectionProps) {
   const styles = useStyles(makeQuickActionsSectionStyles);
   const { colors, brandColors } = useTheme();
   const { t } = useTranslation();
@@ -72,10 +69,7 @@ export function QuickActionsSection({
   return (
     <View style={styles.container}>
       {hasActiveGoals && (
-        <TouchableOpacity
-          style={[styles.button, styles.primaryButton]}
-          onPress={handleCreateGoal}
-        >
+        <TouchableOpacity style={[styles.button, styles.primaryButton]} onPress={handleCreateGoal}>
           <Text style={styles.primaryButtonText}>{t("home.create_goal")}</Text>
         </TouchableOpacity>
       )}
@@ -84,38 +78,30 @@ export function QuickActionsSection({
           style={[styles.button, styles.secondaryButton]}
           onPress={handleViewAllGoals}
         >
-          <Text style={styles.secondaryButtonText}>
-            {t("home.view_all_goals")}
-          </Text>
+          <Text style={styles.secondaryButtonText}>{t("home.view_all_goals")}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.button, styles.secondaryButton]}
           onPress={handleViewProgress}
         >
-          <Text style={styles.secondaryButtonText}>
-            {t("home.view_progress")}
-          </Text>
+          <Text style={styles.secondaryButtonText}>{t("home.view_progress")}</Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 }
 
-const makeQuickActionsSectionStyles = (
-  tokens: any,
-  colors: any,
-  brand: any,
-) => ({
+const makeQuickActionsSectionStyles = (tokens: any, colors: any, brand: any) => ({
   container: {
     marginBottom: toRN(tokens.spacing[6]),
-    paddingHorizontal: toRN(tokens.spacing[4]),
+    paddingHorizontal: toRN(tokens.spacing[4])
   },
   button: {
     borderRadius: toRN(tokens.borderRadius.full),
     paddingVertical: toRN(tokens.spacing[3]),
     paddingHorizontal: toRN(tokens.spacing[6]),
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "center"
   },
   primaryButton: {
     backgroundColor: brand.primary,
@@ -124,26 +110,26 @@ const makeQuickActionsSectionStyles = (
     shadowOffset: { width: 0, height: 4 },
     shadowRadius: 8,
     shadowOpacity: 0.12,
-    elevation: 4,
+    elevation: 4
   },
   primaryButtonText: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.semiBold,
-    color: colors.text.onPrimary,
+    color: colors.text.onPrimary
   },
   secondaryButtons: {
     flexDirection: "row",
-    gap: toRN(tokens.spacing[3]),
+    gap: toRN(tokens.spacing[3])
   },
   secondaryButton: {
     flex: 1,
     backgroundColor: colors.bg.card,
     borderWidth: 1,
-    borderColor: colors.border.default,
+    borderColor: colors.border.default
   },
   secondaryButtonText: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.medium,
-    color: colors.text.primary,
-  },
+    color: colors.text.primary
+  }
 });

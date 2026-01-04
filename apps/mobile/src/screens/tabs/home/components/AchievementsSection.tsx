@@ -9,11 +9,7 @@ import { fontFamily } from "@/lib/fonts";
 import { useTranslation } from "@/lib/i18n";
 import { EmptyState } from "./EmptyState";
 import { SkeletonBox } from "@/components/ui/SkeletonBox";
-import {
-  useMyAchievements,
-  getRarityColor,
-  getBadgeIcon,
-} from "@/hooks/api/useAchievements";
+import { useMyAchievements, getRarityColor, getBadgeIcon } from "@/hooks/api/useAchievements";
 import { UserAchievement } from "@/services/api";
 
 interface AchievementsSectionProps {
@@ -39,11 +35,7 @@ export function AchievementsSection({ onViewAll }: AchievementsSectionProps) {
         <View style={styles.badgeGrid}>
           {[1, 2, 3].map((i) => (
             <View key={i} style={styles.badgeItem}>
-              <SkeletonBox
-                width={48}
-                height={48}
-                borderRadius={toRN(tokens.borderRadius.full)}
-              />
+              <SkeletonBox width={48} height={48} borderRadius={toRN(tokens.borderRadius.full)} />
               <SkeletonBox
                 width="80%"
                 height={toRN(tokens.typography.fontSize.xs)}
@@ -118,44 +110,38 @@ function AchievementBadge({ achievement }: { achievement: UserAchievement }) {
       <Text style={styles.badgeName} numberOfLines={1}>
         {achievement.badge_name}
       </Text>
-      <Text style={[styles.badgeRarity, { color: rarityColor }]}>
-        {achievement.rarity}
-      </Text>
+      <Text style={[styles.badgeRarity, { color: rarityColor }]}>{achievement.rarity}</Text>
     </View>
   );
 }
 
-const makeAchievementsSectionStyles = (
-  tokens: any,
-  colors: any,
-  brand: any,
-) => ({
+const makeAchievementsSectionStyles = (tokens: any, colors: any, brand: any) => ({
   card: {
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   header: {
     flexDirection: "row" as const,
     justifyContent: "space-between" as const,
     alignItems: "center" as const,
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   title: {
     fontSize: toRN(tokens.typography.fontSize.xl),
     fontFamily: fontFamily.bold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   viewAll: {
     fontSize: toRN(tokens.typography.fontSize.sm),
-    fontFamily: fontFamily.semiBold,
+    fontFamily: fontFamily.semiBold
   },
   badgeGrid: {
     flexDirection: "row" as const,
     justifyContent: "space-around" as const,
-    gap: toRN(tokens.spacing[2]),
+    gap: toRN(tokens.spacing[2])
   },
   badgeItem: {
     alignItems: "center" as const,
-    flex: 1,
+    flex: 1
   },
   badgeCircle: {
     width: 56,
@@ -164,22 +150,22 @@ const makeAchievementsSectionStyles = (
     backgroundColor: colors.bg.secondary,
     borderWidth: 3,
     justifyContent: "center" as const,
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   badgeIcon: {
-    fontSize: 24,
+    fontSize: 24
   },
   badgeName: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.semiBold,
     color: colors.text.primary,
     marginTop: toRN(tokens.spacing[1]),
-    textAlign: "center" as const,
+    textAlign: "center" as const
   },
   badgeRarity: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.regular,
-    textTransform: "capitalize" as const,
+    textTransform: "capitalize" as const
   },
   pointsContainer: {
     flexDirection: "row" as const,
@@ -188,16 +174,16 @@ const makeAchievementsSectionStyles = (
     marginTop: toRN(tokens.spacing[4]),
     paddingTop: toRN(tokens.spacing[3]),
     borderTopWidth: 1,
-    borderTopColor: colors.border.default,
+    borderTopColor: colors.border.default
   },
   pointsLabel: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
     color: colors.text.secondary,
-    marginRight: toRN(tokens.spacing[2]),
+    marginRight: toRN(tokens.spacing[2])
   },
   pointsValue: {
     fontSize: toRN(tokens.typography.fontSize.lg),
-    fontFamily: fontFamily.bold,
-  },
+    fontFamily: fontFamily.bold
+  }
 });

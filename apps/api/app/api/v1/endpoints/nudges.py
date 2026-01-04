@@ -4,14 +4,27 @@ Social Nudges API endpoints
 Handles sending nudges, cheers, and motivation messages between users.
 """
 
-from fastapi import APIRouter, HTTPException, status, Depends, Query
+from fastapi import APIRouter, HTTPException, status, Depends, Query, BackgroundTasks
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import date
 from app.core.flexible_auth import get_current_user
 from app.services.logger import logger
+from app.services.social_notification_service import (
+    send_partner_notification,
+    SocialNotificationType,
+)
 
 router = APIRouter(redirect_slashes=False)
+
+# Map nudge types to social notification types
+NUDGE_TYPE_TO_NOTIFICATION_TYPE = {
+    "nudge": SocialNotificationType.PARTNER_NUDGE,
+    "cheer": SocialNotificationType.PARTNER_CHEER,
+    "milestone": SocialNotificationType.PARTNER_MILESTONE,
+    "competitive": SocialNotificationType.PARTNER_NUDGE,  # Uses nudge template
+    "custom": SocialNotificationType.PARTNER_NUDGE,  # Uses nudge template
+}
 
 
 # =====================================================
@@ -60,6 +73,7 @@ class NudgeMarkReadRequest(BaseModel):
 @router.post("", response_model=NudgeResponse, status_code=status.HTTP_201_CREATED)
 async def send_nudge(
     data: NudgeCreate,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user),
 ):
     """
@@ -190,8 +204,62 @@ async def send_nudge(
         },
     )
 
-    # TODO: Send push notification to recipient
-    # await send_social_notification(...)
+    # Send push notification to recipient in background
+    notification_type = NUDGE_TYPE_TO_NOTIFICATION_TYPE.get(
+        data.nudge_type, SocialNotificationType.PARTNER_NUDGE
+    )
+
+    # Build message for notification
+    notification_message = data.message or ""
+    if data.emoji:
+        notification_message = f"{data.emoji} {notification_message}".strip()
+    if not notification_message:
+        # Default messages for each type
+        default_messages = {
+            "nudge": "Time to check in!",
+            "cheer": "Keep up the great work!",
+            "milestone": "Congratulations on your milestone!",
+            "competitive": "Game on!",
+            "custom": "sent you a message",
+        }
+        notification_message = default_messages.get(data.nudge_type, "sent you a nudge")
+
+    # Deep link always goes to ActivityScreen (nudge inbox)
+    # User can see the nudge details first, then tap to go to goal/challenge
+    deep_link = "/(user)/profile/activity"
+
+    async def send_notification_task():
+        try:
+            await send_partner_notification(
+                notification_type=notification_type,
+                recipient_id=data.recipient_id,
+                sender_id=sender_id,
+                sender_name=current_user.get("name", "Your partner"),
+                message=notification_message,
+                partnership_id=data.partnership_id,
+                goal_id=data.goal_id,
+                challenge_id=data.challenge_id,
+                entity_type="nudge",
+                entity_id=nudge["id"],
+                deep_link=deep_link,
+                supabase=supabase,
+            )
+        except Exception as e:
+            logger.error(f"Failed to send nudge notification: {e}")
+
+    background_tasks.add_task(send_notification_task)
+
+    # Check achievements for sender (non-blocking) - e.g., "nudge_sender" badge
+    try:
+        from app.services.tasks import check_achievements_task
+
+        check_achievements_task.delay(
+            user_id=sender_id,
+            source_type="nudge",
+            source_id=nudge["id"],
+        )
+    except Exception as e:
+        logger.error(f"Failed to queue achievement check for nudge: {e}")
 
     return NudgeResponse(
         id=nudge["id"],

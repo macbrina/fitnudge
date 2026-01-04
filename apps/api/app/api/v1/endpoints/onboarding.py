@@ -49,7 +49,25 @@ class FitnessProfileResponse(BaseModel):
     motivation_style: str
     biggest_challenge: str
     available_equipment: Optional[List[str]] = []
+    hydration_unit: Optional[str] = "ml"
+    hydration_daily_target_ml: Optional[int] = 2000
     completed_at: str
+
+
+class FitnessProfileUpdateRequest(BaseModel):
+    """Request model for partial fitness profile updates"""
+
+    biological_sex: Optional[str] = None
+    fitness_level: Optional[str] = None
+    primary_goal: Optional[str] = None
+    current_frequency: Optional[str] = None
+    preferred_location: Optional[str] = None
+    available_time: Optional[str] = None
+    motivation_style: Optional[str] = None
+    biggest_challenge: Optional[str] = None
+    available_equipment: Optional[List[str]] = None
+    hydration_unit: Optional[str] = None
+    hydration_daily_target_ml: Optional[int] = None
 
 
 class SuggestedGoalsStatusResponse(BaseModel):
@@ -163,6 +181,71 @@ async def get_fitness_profile(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to get fitness profile",
+        )
+
+
+@router.patch("/profile", response_model=FitnessProfileResponse)
+async def update_fitness_profile(
+    profile_data: FitnessProfileUpdateRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    supabase=Depends(get_supabase_client),
+):
+    """Update user's fitness profile with partial data (PATCH)"""
+    try:
+        user_id = current_user["id"]
+
+        # Check if profile exists
+        existing_profile = (
+            supabase.table("user_fitness_profiles")
+            .select("*")
+            .eq("user_id", user_id)
+            .execute()
+        )
+
+        if not existing_profile.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Fitness profile not found. Complete onboarding first.",
+            )
+
+        # Build update dict with only provided fields (exclude None values)
+        update_dict = {}
+        for field, value in profile_data.model_dump().items():
+            if value is not None:
+                update_dict[field] = value
+
+        if not update_dict:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No fields to update",
+            )
+
+        # Update the profile
+        result = (
+            supabase.table("user_fitness_profiles")
+            .update(update_dict)
+            .eq("user_id", user_id)
+            .execute()
+        )
+
+        if result.data:
+            return FitnessProfileResponse(**result.data[0])
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to update fitness profile",
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Error updating fitness profile for user {current_user.get('id')} {e}",
+            {"error": str(e), "user_id": current_user.get("id")},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update fitness profile",
         )
 
 

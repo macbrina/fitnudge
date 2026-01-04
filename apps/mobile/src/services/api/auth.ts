@@ -1,10 +1,6 @@
 import { BaseApiService, ApiResponse } from "./base";
 import { ROUTES } from "@/lib/routes";
-import {
-  getDeviceInfo,
-  getCachedDeviceInfo,
-  DeviceInfo,
-} from "@/utils/deviceInfo";
+import { getDeviceInfo, getCachedDeviceInfo, DeviceInfo } from "@/utils/deviceInfo";
 import { getLocales } from "expo-localization";
 
 // Auth Types
@@ -66,6 +62,11 @@ export interface AppleLoginPayload {
   };
 }
 
+export interface LinkAccountResponse {
+  message: string;
+  user: LoginResponse["user"];
+}
+
 // Auth Service
 export class AuthService extends BaseApiService {
   async login(credentials: LoginRequest): Promise<ApiResponse<LoginResponse>> {
@@ -74,15 +75,12 @@ export class AuthService extends BaseApiService {
 
     const response = await this.post<LoginResponse>(ROUTES.AUTH.LOGIN, {
       ...credentials,
-      device_info: deviceInfo,
+      device_info: deviceInfo
     });
 
     if (response.data) {
       const { TokenManager } = await import("./base");
-      await TokenManager.setTokens(
-        response.data.access_token,
-        response.data.refresh_token,
-      );
+      await TokenManager.setTokens(response.data.access_token, response.data.refresh_token);
     }
 
     return response;
@@ -90,8 +88,7 @@ export class AuthService extends BaseApiService {
 
   async signup(userData: SignupRequest): Promise<ApiResponse<LoginResponse>> {
     // Use device timezone if not provided
-    const timezone =
-      userData.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const timezone = userData.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
 
     // Use device locale region for country if not provided
     // getLocales() returns array of locale objects with regionCode (ISO 3166-1 alpha-2)
@@ -110,15 +107,12 @@ export class AuthService extends BaseApiService {
       // Include referral code if provided
       referral_code: userData.referral_code || undefined,
       // Include device info for session tracking
-      device_info: deviceInfo,
+      device_info: deviceInfo
     });
 
     if (response.data) {
       const { TokenManager } = await import("./base");
-      await TokenManager.setTokens(
-        response.data.access_token,
-        response.data.refresh_token,
-      );
+      await TokenManager.setTokens(response.data.access_token, response.data.refresh_token);
     }
 
     return response;
@@ -144,24 +138,19 @@ export class AuthService extends BaseApiService {
     if (!refreshToken) {
       return {
         status: 401,
-        error: "No refresh token available",
+        error: "No refresh token available"
       };
     }
 
-    const response = await this.post<RefreshTokenResponse>(
-      ROUTES.AUTH.REFRESH,
-      {
-        refresh_token: refreshToken,
-      },
-    );
+    const response = await this.post<RefreshTokenResponse>(ROUTES.AUTH.REFRESH, {
+      refresh_token: refreshToken
+    });
 
     if (response.data) {
       // Use the new refresh_token from the response (token rotation)
       // or fall back to the current one if not provided
       const newRefreshToken =
-        response.data.refresh_token ||
-        (await TokenManager.getRefreshToken()) ||
-        "";
+        response.data.refresh_token || (await TokenManager.getRefreshToken()) || "";
 
       // Update tokens in TokenManager
       await TokenManager.setTokens(response.data.access_token, newRefreshToken);
@@ -173,15 +162,12 @@ export class AuthService extends BaseApiService {
         if (authStore.user) {
           useAuthStore.setState({
             accessToken: response.data.access_token,
-            refreshToken: newRefreshToken,
+            refreshToken: newRefreshToken
           });
         }
       } catch (error) {
         // AuthStore might not be available in some contexts, ignore
-        console.warn(
-          "[Auth] Could not update authStore during token refresh:",
-          error,
-        );
+        console.warn("[Auth] Could not update authStore during token refresh:", error);
       }
     }
 
@@ -192,25 +178,20 @@ export class AuthService extends BaseApiService {
     return this.post(ROUTES.AUTH.FORGOT_PASSWORD, { email });
   }
 
-  async resetPassword(
-    token: string,
-    newPassword: string,
-  ): Promise<ApiResponse> {
+  async resetPassword(token: string, newPassword: string): Promise<ApiResponse> {
     return this.post(ROUTES.AUTH.RESET_PASSWORD, {
       token,
-      new_password: newPassword,
+      new_password: newPassword
     });
   }
 
-  async validateResetToken(
-    token: string,
-  ): Promise<ApiResponse<{ valid: boolean }>> {
+  async validateResetToken(token: string): Promise<ApiResponse<{ valid: boolean }>> {
     return this.post(ROUTES.AUTH.VALIDATE_RESET_TOKEN, { token });
   }
 
   async loginWithGoogle(
     idToken: string,
-    referralCode?: string,
+    referralCode?: string
   ): Promise<ApiResponse<LoginResponse>> {
     // Get device info for session tracking
     const deviceInfo = getCachedDeviceInfo() || (await getDeviceInfo());
@@ -218,15 +199,12 @@ export class AuthService extends BaseApiService {
     const response = await this.post<LoginResponse>(ROUTES.AUTH.OAUTH.GOOGLE, {
       id_token: idToken,
       device_info: deviceInfo,
-      referral_code: referralCode || undefined,
+      referral_code: referralCode || undefined
     });
 
     if (response.data) {
       const { TokenManager } = await import("./base");
-      await TokenManager.setTokens(
-        response.data.access_token,
-        response.data.refresh_token,
-      );
+      await TokenManager.setTokens(response.data.access_token, response.data.refresh_token);
     }
 
     return response;
@@ -234,7 +212,7 @@ export class AuthService extends BaseApiService {
 
   async loginWithApple(
     payload: AppleLoginPayload,
-    referralCode?: string,
+    referralCode?: string
   ): Promise<ApiResponse<LoginResponse>> {
     // Get device info for session tracking
     const deviceInfo = getCachedDeviceInfo() || (await getDeviceInfo());
@@ -245,27 +223,21 @@ export class AuthService extends BaseApiService {
       email: payload.email,
       full_name: payload.fullName,
       device_info: deviceInfo,
-      referral_code: referralCode || undefined,
+      referral_code: referralCode || undefined
     });
 
     if (response.data) {
       const { TokenManager } = await import("./base");
-      await TokenManager.setTokens(
-        response.data.access_token,
-        response.data.refresh_token,
-      );
+      await TokenManager.setTokens(response.data.access_token, response.data.refresh_token);
     }
 
     return response;
   }
 
-  async changePassword(
-    currentPassword: string,
-    newPassword: string,
-  ): Promise<ApiResponse> {
+  async changePassword(currentPassword: string, newPassword: string): Promise<ApiResponse> {
     return this.post(ROUTES.USERS.CHANGE_PASSWORD, {
       current_password: currentPassword,
-      new_password: newPassword,
+      new_password: newPassword
     });
   }
 
@@ -285,10 +257,7 @@ export class AuthService extends BaseApiService {
     return !!accessToken;
   }
 
-  async setRememberMePreference(
-    email: string,
-    remember: boolean,
-  ): Promise<void> {
+  async setRememberMePreference(email: string, remember: boolean): Promise<void> {
     const { TokenManager } = await import("./base");
     if (remember) {
       await TokenManager.setRememberMeEmail(email);
@@ -310,6 +279,44 @@ export class AuthService extends BaseApiService {
       return { email, enabled: true };
     }
     return null;
+  }
+
+  // ============================================================================
+  // Account Linking Methods
+  // ============================================================================
+
+  async linkWithGoogle(idToken: string): Promise<ApiResponse<LinkAccountResponse>> {
+    return this.post<LinkAccountResponse>(ROUTES.AUTH.LINK.GOOGLE, {
+      id_token: idToken
+    });
+  }
+
+  async linkWithApple(params: {
+    identityToken: string;
+    authorizationCode?: string;
+  }): Promise<ApiResponse<LinkAccountResponse>> {
+    return this.post<LinkAccountResponse>(ROUTES.AUTH.LINK.APPLE, {
+      identity_token: params.identityToken,
+      authorization_code: params.authorizationCode
+    });
+  }
+
+  async unlinkProvider(provider: "google" | "apple"): Promise<ApiResponse<LinkAccountResponse>> {
+    return this.delete<LinkAccountResponse>(ROUTES.AUTH.UNLINK(provider));
+  }
+
+  // ============================================================================
+  // Password Management Methods
+  // ============================================================================
+
+  /**
+   * Set a password for OAuth users who don't have one yet.
+   * This is different from change-password which requires the current password.
+   */
+  async setPassword(newPassword: string): Promise<ApiResponse<LinkAccountResponse>> {
+    return this.post<LinkAccountResponse>(ROUTES.AUTH.SET_PASSWORD, {
+      new_password: newPassword
+    });
   }
 }
 

@@ -204,16 +204,13 @@ class IPWhitelistMiddleware(BaseHTTPMiddleware):
 class AuditLoggingMiddleware(BaseHTTPMiddleware):
     """Audit logging for sensitive operations"""
 
-    SENSITIVE_ENDPOINTS = [
-        "/auth/login",
-        "/auth/signup",
-        "/auth/logout",
-        "/users/delete",
-        "/users/change-password",
-        "/media/upload",
-        "/goals",
-        "/check-ins",
-    ]
+    # Use centralized config for sensitive endpoints
+    # Imported at runtime to avoid circular imports
+    @property
+    def sensitive_endpoints(self) -> List[str]:
+        from app.core.security_config import SecurityConfig
+
+        return SecurityConfig.AUDIT_LOGGING.get("sensitive_endpoints", [])
 
     async def dispatch(self, request: Request, call_next):
         start_time = time.time()
@@ -230,7 +227,7 @@ class AuditLoggingMiddleware(BaseHTTPMiddleware):
 
     async def _log_request(self, request: Request):
         """Log incoming request"""
-        if any(endpoint in request.url.path for endpoint in self.SENSITIVE_ENDPOINTS):
+        if any(endpoint in request.url.path for endpoint in self.sensitive_endpoints):
             log_data = {
                 "timestamp": time.time(),
                 "method": request.method,
@@ -249,7 +246,7 @@ class AuditLoggingMiddleware(BaseHTTPMiddleware):
         self, request: Request, response: Response, duration: float
     ):
         """Log response"""
-        if any(endpoint in request.url.path for endpoint in self.SENSITIVE_ENDPOINTS):
+        if any(endpoint in request.url.path for endpoint in self.sensitive_endpoints):
             log_data = {
                 "timestamp": time.time(),
                 "method": request.method,

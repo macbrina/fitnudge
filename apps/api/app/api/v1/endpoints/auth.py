@@ -229,6 +229,10 @@ def get_linked_providers(
 def serialize_user(user: Dict[str, Any]) -> Dict[str, Any]:
     linked_providers = get_linked_providers(user["id"], user.get("auth_provider"))
 
+    # Check if user has a password set (OAuth users may not have one)
+    password_hash = user.get("password_hash")
+    has_password = password_hash is not None and len(str(password_hash)) > 0
+
     return {
         "id": user["id"],
         "email": user["email"],
@@ -242,6 +246,7 @@ def serialize_user(user: Dict[str, Any]) -> Dict[str, Any]:
         "created_at": user.get("created_at"),
         "last_login_at": user.get("last_login_at"),
         "linked_providers": linked_providers,
+        "has_password": has_password,
     }
 
 
@@ -464,9 +469,7 @@ async def signup(user_data: UserSignup, request: Request):
         from app.services.referral_service import (
             generate_referral_code,
             get_referrer_by_code,
-            process_referral_bonus,
         )
-        import asyncio
 
         # Generate referral code for new user
         new_referral_code = generate_referral_code(user_data.username)
@@ -482,17 +485,13 @@ async def signup(user_data: UserSignup, request: Request):
                     {"referral_code": user_data.referral_code},
                 )
 
-        # Update user with referral info
+        # Update user with referral info (bonus granted later when they subscribe)
         supabase.table("users").update(
             {
                 "referral_code": new_referral_code,
                 "referred_by_user_id": referrer_id,
             }
         ).eq("id", user["id"]).execute()
-
-        # Grant referral bonuses (async, fire-and-forget)
-        if referrer_id:
-            asyncio.create_task(process_referral_bonus(user["id"], referrer_id))
 
         # Create default audio preferences for workout music
         from app.api.v1.endpoints.audio_preferences import (
@@ -717,23 +716,19 @@ async def google_oauth(oauth_data: GoogleOAuth, request: Request):
             from app.services.referral_service import (
                 generate_referral_code,
                 get_referrer_by_code,
-                process_referral_bonus,
             )
-            import asyncio
 
             new_referral_code = generate_referral_code(username)
             referrer = await get_referrer_by_code(oauth_data.referral_code)
             referrer_id = referrer["id"] if referrer else None
 
+            # Store referral info (bonus granted later when they subscribe)
             supabase.table("users").update(
                 {
                     "referral_code": new_referral_code,
                     "referred_by_user_id": referrer_id,
                 }
             ).eq("id", user["id"]).execute()
-
-            if referrer_id:
-                asyncio.create_task(process_referral_bonus(user["id"], referrer_id))
 
         # Create default audio preferences for new OAuth user
         from app.api.v1.endpoints.audio_preferences import (
@@ -882,23 +877,19 @@ async def apple_oauth(oauth_data: AppleOAuth, request: Request):
             from app.services.referral_service import (
                 generate_referral_code,
                 get_referrer_by_code,
-                process_referral_bonus,
             )
-            import asyncio
 
             new_referral_code = generate_referral_code(username)
             referrer = await get_referrer_by_code(oauth_data.referral_code)
             referrer_id = referrer["id"] if referrer else None
 
+            # Store referral info (bonus granted later when they subscribe)
             supabase.table("users").update(
                 {
                     "referral_code": new_referral_code,
                     "referred_by_user_id": referrer_id,
                 }
             ).eq("id", user["id"]).execute()
-
-            if referrer_id:
-                asyncio.create_task(process_referral_bonus(user["id"], referrer_id))
 
         # Create default audio preferences for new Apple OAuth user
         from app.api.v1.endpoints.audio_preferences import (
@@ -1557,3 +1548,323 @@ async def reset_password(reset_data: PasswordResetConfirm):
     ).execute()
 
     return {"message": "Password reset successfully"}
+
+
+# ============================================================================
+# Account Linking Endpoints
+# ============================================================================
+
+
+class LinkGoogleRequest(BaseModel):
+    id_token: str
+
+
+class LinkAppleRequest(BaseModel):
+    identity_token: str
+    authorization_code: Optional[str] = None
+
+
+@router.post("/link/google")
+async def link_google_account(
+    link_data: LinkGoogleRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Link a Google account to the current user's account"""
+    user_id = current_user.get("id")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+        )
+
+    # Verify the Google token
+    token_data = await verify_google_id_token(link_data.id_token)
+    google_sub = token_data.get("sub")
+
+    if not google_sub:
+        logger.warning("Google token missing subject during linking", token_data)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Google credentials",
+        )
+
+    supabase = get_supabase_client()
+
+    # Check if this Google account is already linked to another user
+    existing_link = (
+        supabase.table("oauth_accounts")
+        .select("user_id")
+        .eq("provider", "google")
+        .eq("provider_user_id", google_sub)
+        .execute()
+    )
+
+    if existing_link.data:
+        linked_user_id = existing_link.data[0]["user_id"]
+        if linked_user_id != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This Google account is already linked to another user",
+            )
+        # Already linked to this user
+        user = await get_user_by_id(user_id)
+        return {
+            "message": "Google account already linked",
+            "user": serialize_user(user),
+        }
+
+    # Check if the Google email is already used by another user's primary account
+    # This prevents User B from linking a Google account whose email belongs to User A
+    google_email = token_data.get("email")
+    if google_email:
+        existing_user_with_email = get_user_by_email(google_email)
+        if existing_user_with_email and existing_user_with_email["id"] != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This email is already associated with another account",
+            )
+
+    # Link the Google account
+    email = token_data.get("email")
+    full_name = token_data.get("name") or token_data.get("given_name")
+    picture = token_data.get("picture")
+
+    upsert_oauth_account(
+        user_id=user_id,
+        provider="google",
+        provider_user_id=google_sub,
+        email=email,
+        name=full_name,
+        picture=picture,
+        raw=token_data,
+    )
+
+    logger.info(f"Google account linked for user {user_id}", {"google_sub": google_sub})
+
+    # Return updated user
+    user = await get_user_by_id(user_id)
+    return {
+        "message": "Google account linked successfully",
+        "user": serialize_user(user),
+    }
+
+
+@router.post("/link/apple")
+async def link_apple_account(
+    link_data: LinkAppleRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Link an Apple account to the current user's account"""
+    user_id = current_user.get("id")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+        )
+
+    # Verify the Apple token
+    payload = await verify_apple_identity_token(link_data.identity_token)
+    apple_sub = payload.get("sub")
+
+    if not apple_sub:
+        logger.warning("Apple identity token missing subject during linking", payload)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Apple credentials",
+        )
+
+    supabase = get_supabase_client()
+
+    # Check if this Apple account is already linked to another user
+    existing_link = (
+        supabase.table("oauth_accounts")
+        .select("user_id")
+        .eq("provider", "apple")
+        .eq("provider_user_id", apple_sub)
+        .execute()
+    )
+
+    if existing_link.data:
+        linked_user_id = existing_link.data[0]["user_id"]
+        if linked_user_id != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This Apple account is already linked to another user",
+            )
+        # Already linked to this user
+        user = await get_user_by_id(user_id)
+        return {
+            "message": "Apple account already linked",
+            "user": serialize_user(user),
+        }
+
+    # Check if the Apple email is already used by another user's primary account
+    # This prevents User B from linking an Apple account whose email belongs to User A
+    apple_email = payload.get("email")
+    if apple_email:
+        existing_user_with_email = get_user_by_email(apple_email)
+        if existing_user_with_email and existing_user_with_email["id"] != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This email is already associated with another account",
+            )
+
+    # Link the Apple account
+    email = payload.get("email")
+
+    upsert_oauth_account(
+        user_id=user_id,
+        provider="apple",
+        provider_user_id=apple_sub,
+        email=email,
+        raw={
+            "identity_token": payload,
+            "authorization_code": link_data.authorization_code,
+        },
+    )
+
+    logger.info(f"Apple account linked for user {user_id}", {"apple_sub": apple_sub})
+
+    # Return updated user
+    user = await get_user_by_id(user_id)
+    return {
+        "message": "Apple account linked successfully",
+        "user": serialize_user(user),
+    }
+
+
+@router.delete("/unlink/{provider}")
+async def unlink_account(
+    provider: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Unlink a social account from the current user's account"""
+    user_id = current_user.get("id")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+        )
+
+    # Validate provider
+    valid_providers = ["google", "apple"]
+    if provider not in valid_providers:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid provider. Must be one of: {', '.join(valid_providers)}",
+        )
+
+    # Cannot unlink primary provider
+    primary_provider = current_user.get("auth_provider")
+    if provider == primary_provider:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot unlink your primary sign-in method",
+        )
+
+    supabase = get_supabase_client()
+
+    # Check if the provider is linked
+    existing_link = (
+        supabase.table("oauth_accounts")
+        .select("id")
+        .eq("user_id", user_id)
+        .eq("provider", provider)
+        .execute()
+    )
+
+    if not existing_link.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"{provider.capitalize()} account is not linked",
+        )
+
+    # Delete the oauth account link
+    supabase.table("oauth_accounts").delete().eq("user_id", user_id).eq(
+        "provider", provider
+    ).execute()
+
+    logger.info(f"{provider.capitalize()} account unlinked for user {user_id}")
+
+    # Return updated user
+    user = await get_user_by_id(user_id)
+    return {
+        "message": f"{provider.capitalize()} account unlinked successfully",
+        "user": serialize_user(user),
+    }
+
+
+# ============================================================================
+# Set Password Endpoint (for OAuth users who don't have a password yet)
+# ============================================================================
+
+
+class SetPasswordRequest(BaseModel):
+    new_password: str
+
+
+@router.post("/set-password")
+async def set_password(
+    password_data: SetPasswordRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Set a password for OAuth users who don't have one yet.
+    This is different from change-password which requires the current password.
+    """
+    from app.core.auth import get_password_hash
+
+    user_id = current_user.get("id")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+        )
+
+    supabase = get_supabase_client()
+
+    # Get current user data to check if they already have a password
+    user_result = (
+        supabase.table("users")
+        .select("password_hash, auth_provider")
+        .eq("id", user_id)
+        .execute()
+    )
+
+    if not user_result.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    user_data = user_result.data[0]
+
+    # Check if user already has a password
+    if user_data.get("password_hash"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You already have a password. Use change-password instead.",
+        )
+
+    # Validate password strength
+    password_check = check_password_strength(password_data.new_password)
+    if not password_check["is_valid"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=password_check.get("message", "Password does not meet requirements"),
+        )
+
+    # Set the new password
+    new_password_hash = get_password_hash(password_data.new_password)
+    supabase.table("users").update({"password_hash": new_password_hash}).eq(
+        "id", user_id
+    ).execute()
+
+    logger.info(f"Password set for OAuth user {user_id}")
+
+    # Return updated user
+    user = await get_user_by_id(user_id)
+    return {
+        "message": "Password set successfully",
+        "user": serialize_user(user),
+    }

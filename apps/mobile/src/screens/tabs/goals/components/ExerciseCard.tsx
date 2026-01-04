@@ -55,11 +55,7 @@ export function ExerciseCard({ exercise, index }: ExerciseCardProps) {
             )}
             {exercise.target_muscle && (
               <View style={styles.muscleChip}>
-                <Ionicons
-                  name="fitness"
-                  size={12}
-                  color={brandColors.primary}
-                />
+                <Ionicons name="fitness" size={12} color={brandColors.primary} />
                 <Text style={styles.muscleText}>{exercise.target_muscle}</Text>
               </View>
             )}
@@ -67,11 +63,7 @@ export function ExerciseCard({ exercise, index }: ExerciseCardProps) {
         </View>
         {exerciseId && (
           <View style={styles.arrowContainer}>
-            <Ionicons
-              name="chevron-forward"
-              size={18}
-              color={brandColors.primary}
-            />
+            <Ionicons name="chevron-forward" size={18} color={brandColors.primary} />
           </View>
         )}
       </TouchableOpacity>
@@ -90,13 +82,13 @@ export function ExerciseCard({ exercise, index }: ExerciseCardProps) {
 const makeExerciseCardStyles = (tokens: any, colors: any, brand: any) => ({
   container: {
     borderBottomWidth: 1,
-    borderBottomColor: colors.border.subtle,
+    borderBottomColor: colors.border.subtle
   },
   row: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
     gap: toRN(tokens.spacing[3]),
-    paddingVertical: toRN(tokens.spacing[3]),
+    paddingVertical: toRN(tokens.spacing[3])
   },
   numberBadge: {
     width: toRN(tokens.spacing[6]),
@@ -105,34 +97,34 @@ const makeExerciseCardStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: brand.primary + "1A",
     alignItems: "center" as const,
     justifyContent: "center" as const,
-    flexShrink: 0,
+    flexShrink: 0
   },
   numberText: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.semiBold,
-    color: brand.primary,
+    color: brand.primary
   },
   content: {
     flex: 1,
-    gap: toRN(tokens.spacing[1]),
+    gap: toRN(tokens.spacing[1])
   },
   exerciseName: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.semiBold,
     color: colors.text.primary,
     lineHeight: toRN(tokens.typography.fontSize.base) * 1.3,
-    textTransform: "capitalize" as const,
+    textTransform: "capitalize" as const
   },
   meta: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
     flexWrap: "wrap" as const,
-    gap: toRN(tokens.spacing[2]),
+    gap: toRN(tokens.spacing[2])
   },
   setsReps: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
-    color: colors.text.secondary,
+    color: colors.text.secondary
   },
   muscleChip: {
     flexDirection: "row" as const,
@@ -141,18 +133,18 @@ const makeExerciseCardStyles = (tokens: any, colors: any, brand: any) => ({
     paddingVertical: toRN(tokens.spacing[0.5]),
     paddingHorizontal: toRN(tokens.spacing[2]),
     borderRadius: toRN(tokens.borderRadius.full),
-    backgroundColor: brand.primary + "10",
+    backgroundColor: brand.primary + "10"
   },
   muscleText: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.medium,
     color: brand.primary,
-    textTransform: "capitalize" as const,
+    textTransform: "capitalize" as const
   },
   arrowContainer: {
     width: toRN(tokens.spacing[6]),
     height: toRN(tokens.spacing[6]),
     alignItems: "center" as const,
-    justifyContent: "center" as const,
-  },
+    justifyContent: "center" as const
+  }
 });

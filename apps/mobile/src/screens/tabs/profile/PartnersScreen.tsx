@@ -1,8 +1,9 @@
 import { BackButton } from "@/components/ui/BackButton";
 import Button from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { NudgeSheet } from "@/components/social/NudgeSheet";
 import { useAlertModal } from "@/contexts/AlertModalContext";
-import { useSendNudge } from "@/hooks/api/useNudges";
+import { ApiError } from "@/services/api/base";
 import { fontFamily } from "@/lib/fonts";
 import { useTranslation } from "@/lib/i18n";
 import { MOBILE_ROUTES } from "@/lib/routes";
@@ -13,13 +14,13 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import {
-  ActivityIndicator,
   FlatList,
   Image,
   RefreshControl,
   Text,
   TouchableOpacity,
   View,
+  ActivityIndicator
 } from "react-native";
 
 // Hooks
@@ -30,7 +31,7 @@ import {
   usePartners,
   usePendingPartnerRequests,
   useRejectPartnerRequest,
-  useSentPartnerRequests,
+  useSentPartnerRequests
 } from "@/hooks/api/usePartners";
 import { Partner } from "@/services/api/partners";
 
@@ -45,15 +46,15 @@ export default function PartnersScreen() {
 
   const [activeTab, setActiveTab] = useState<PartnerSubTab>("partners");
   const [refreshing, setRefreshing] = useState(false);
+  const [nudgeTarget, setNudgeTarget] = useState<Partner | null>(null);
 
   // Data hooks
   const {
     data: partnersData,
     isLoading: loadingPartners,
-    refetch: refetchPartners,
+    refetch: refetchPartners
   } = usePartners();
-  const { data: pendingData, refetch: refetchPending } =
-    usePendingPartnerRequests();
+  const { data: pendingData, refetch: refetchPending } = usePendingPartnerRequests();
   const { data: sentData, refetch: refetchSent } = useSentPartnerRequests();
 
   // Access check
@@ -63,7 +64,6 @@ export default function PartnersScreen() {
   const cancelRequestMutation = useCancelPartnerRequest();
   const acceptRequestMutation = useAcceptPartnerRequest();
   const rejectRequestMutation = useRejectPartnerRequest();
-  const nudgeMutation = useSendNudge();
 
   const partners = partnersData?.data || [];
   const pendingRequests = pendingData?.data || [];
@@ -74,8 +74,7 @@ export default function PartnersScreen() {
   // 2. They have active partners or pending requests (someone with feature invited them)
   const { hasFeature } = useSubscriptionStore();
   const userHasFeature = hasFeature("social_accountability");
-  const hasAccess =
-    userHasFeature || partners.length > 0 || pendingRequests.length > 0;
+  const hasAccess = userHasFeature || partners.length > 0 || pendingRequests.length > 0;
 
   // Refresh all data
   const handleRefresh = useCallback(async () => {
@@ -100,7 +99,7 @@ export default function PartnersScreen() {
         confirmLabel: t("common.accept") || "Accept",
         cancelLabel: t("common.cancel"),
         size: "lg",
-        messageAlign: "left",
+        messageAlign: "left"
       });
 
       if (!confirmed) return;
@@ -108,18 +107,22 @@ export default function PartnersScreen() {
       try {
         await acceptRequestMutation.mutateAsync({
           partnershipId: request.id,
-          userId: request.partner_user_id,
+          userId: request.partner_user_id
         });
-      } catch (error) {
+      } catch (error: unknown) {
+        const errorMessage =
+          error instanceof ApiError
+            ? error.message
+            : t("partners.accept_error") || "Failed to accept request";
         showAlert({
           title: t("common.error"),
-          message: t("partners.accept_error") || "Failed to accept request",
+          message: errorMessage,
           variant: "error",
-          confirmLabel: t("common.ok"),
+          confirmLabel: t("common.ok")
         });
       }
     },
-    [acceptRequestMutation, showAlert, showConfirm, showToast, t],
+    [acceptRequestMutation, showAlert, showConfirm, showToast, t]
   );
 
   // Handle reject request
@@ -132,23 +135,27 @@ export default function PartnersScreen() {
           "Are you sure you want to decline this partner request?",
         variant: "warning",
         confirmLabel: t("common.decline") || "Decline",
-        cancelLabel: t("common.cancel"),
+        cancelLabel: t("common.cancel")
       });
 
       if (!confirmed) return;
 
       try {
         await rejectRequestMutation.mutateAsync(request.id);
-      } catch (error) {
+      } catch (error: unknown) {
+        const errorMessage =
+          error instanceof ApiError
+            ? error.message
+            : t("partners.reject_error") || "Failed to decline request";
         showAlert({
           title: t("common.error"),
-          message: t("partners.reject_error") || "Failed to decline request",
+          message: errorMessage,
           variant: "error",
-          confirmLabel: t("common.ok"),
+          confirmLabel: t("common.ok")
         });
       }
     },
-    [rejectRequestMutation, showConfirm, showAlert, t],
+    [rejectRequestMutation, showConfirm, showAlert, t]
   );
 
   // Handle cancel sent request
@@ -161,7 +168,7 @@ export default function PartnersScreen() {
           "Are you sure you want to cancel this partner request?",
         variant: "warning",
         confirmLabel: t("common.cancel_request") || "Cancel Request",
-        cancelLabel: t("common.keep") || "Keep",
+        cancelLabel: t("common.keep") || "Keep"
       });
 
       if (!confirmed) return;
@@ -169,60 +176,48 @@ export default function PartnersScreen() {
       try {
         await cancelRequestMutation.mutateAsync({
           partnershipId: request.id,
-          userId: request.partner_user_id,
+          userId: request.partner_user_id
         });
-      } catch (error) {
+      } catch (error: unknown) {
+        const errorMessage =
+          error instanceof ApiError
+            ? error.message
+            : t("partners.cancel_error") || "Failed to cancel request";
         showAlert({
           title: t("common.error"),
-          message: t("partners.cancel_error") || "Failed to cancel request",
+          message: errorMessage,
           variant: "error",
-          confirmLabel: t("common.ok"),
+          confirmLabel: t("common.ok")
         });
       }
     },
-    [cancelRequestMutation, showConfirm, showAlert, t],
+    [cancelRequestMutation, showConfirm, showAlert, t]
   );
 
-  // Handle nudge
-  const handleNudge = useCallback(
-    async (partner: Partner) => {
-      try {
-        await nudgeMutation.mutateAsync({
-          recipient_id: partner.partner_user_id,
-          partnership_id: partner.id,
-          nudge_type: "nudge",
-        });
-        showToast({
-          title: t("partners.nudge_sent") || "Nudge Sent",
-          message:
-            t("partners.nudge_sent_message", {
-              name: partner.partner?.name,
-            }) || `You nudged ${partner.partner?.name}!`,
-          variant: "success",
-        });
-      } catch (error) {
-        showAlert({
-          title: t("common.error"),
-          message: t("partners.nudge_error") || "Failed to send nudge",
-          variant: "error",
-          confirmLabel: t("common.ok"),
-        });
-      }
-    },
-    [nudgeMutation, showToast, showAlert, t],
-  );
+  // Handle nudge - opens NudgeSheet
+  const handleNudge = useCallback((partner: Partner) => {
+    setNudgeTarget(partner);
+  }, []);
+
+  const handleNudgeSuccess = useCallback(() => {
+    if (!nudgeTarget) return;
+    showToast({
+      title: t("partners.nudge_sent") || "Nudge Sent",
+      message:
+        t("partners.nudge_sent_message", {
+          name: nudgeTarget.partner?.name
+        }) || `You nudged ${nudgeTarget.partner?.name}!`,
+      variant: "success"
+    });
+    setNudgeTarget(null);
+  }, [nudgeTarget, showToast, t]);
 
   // Navigate to partner detail
   const handlePartnerPress = useCallback(
     (partner: Partner) => {
-      router.push(
-        MOBILE_ROUTES.PROFILE.PARTNER_DETAIL(
-          partner.partner_user_id,
-          partner.id,
-        ),
-      );
+      router.push(MOBILE_ROUTES.PROFILE.PARTNER_DETAIL(partner.partner_user_id, partner.id));
     },
-    [router],
+    [router]
   );
 
   // Navigate to find partner
@@ -234,7 +229,7 @@ export default function PartnersScreen() {
           t("partners.feature_required") ||
           "Accountability partners require a subscription. Upgrade to connect with others!",
         variant: "warning",
-        confirmLabel: t("common.ok"),
+        confirmLabel: t("common.ok")
       });
       return;
     }
@@ -243,18 +238,12 @@ export default function PartnersScreen() {
 
   // Render partner card
   const renderPartnerCard = ({ item }: { item: Partner }) => (
-    <TouchableOpacity
-      onPress={() => handlePartnerPress(item)}
-      activeOpacity={0.7}
-    >
+    <TouchableOpacity onPress={() => handlePartnerPress(item)} activeOpacity={0.7}>
       <Card style={styles.partnerCard}>
         <View style={styles.partnerRow}>
           {/* Avatar */}
           {item.partner?.profile_picture_url ? (
-            <Image
-              source={{ uri: item.partner.profile_picture_url }}
-              style={styles.avatar}
-            />
+            <Image source={{ uri: item.partner.profile_picture_url }} style={styles.avatar} />
           ) : (
             <View style={styles.avatarPlaceholder}>
               <Text style={styles.avatarInitial}>
@@ -275,27 +264,13 @@ export default function PartnersScreen() {
             </Text>
           </View>
 
-          {/* Nudge Button */}
-          <TouchableOpacity
-            style={styles.nudgeButton}
-            onPress={() => handleNudge(item)}
-            disabled={nudgeMutation.isPending}
-          >
-            {nudgeMutation.isPending ? (
-              <ActivityIndicator size="small" color={brandColors.primary} />
-            ) : (
-              <>
-                <Ionicons
-                  name="hand-right"
-                  size={14}
-                  color={brandColors.primary}
-                />
-                <Text style={styles.nudgeButtonText}>
-                  {t("partners.nudge") || "Nudge"}
-                </Text>
-              </>
-            )}
-          </TouchableOpacity>
+          {/* Nudge Button - only show if partner has active goals/challenges */}
+          {item.has_active_items && (
+            <TouchableOpacity style={styles.nudgeButton} onPress={() => handleNudge(item)}>
+              <Ionicons name="hand-right" size={14} color={brandColors.primary} />
+              <Text style={styles.nudgeButtonText}>{t("partners.nudge") || "Nudge"}</Text>
+            </TouchableOpacity>
+          )}
 
           {/* Chevron */}
           <Ionicons
@@ -315,10 +290,7 @@ export default function PartnersScreen() {
       <View style={styles.requestRow}>
         {/* Avatar */}
         {item.partner?.profile_picture_url ? (
-          <Image
-            source={{ uri: item.partner.profile_picture_url }}
-            style={styles.avatar}
-          />
+          <Image source={{ uri: item.partner.profile_picture_url }} style={styles.avatar} />
         ) : (
           <View style={styles.avatarPlaceholder}>
             <Text style={styles.avatarInitial}>
@@ -367,9 +339,7 @@ export default function PartnersScreen() {
           ) : (
             <>
               <Ionicons name="checkmark" size={18} color="#FFFFFF" />
-              <Text style={styles.acceptButtonText}>
-                {t("common.accept") || "Accept"}
-              </Text>
+              <Text style={styles.acceptButtonText}>{t("common.accept") || "Accept"}</Text>
             </>
           )}
         </TouchableOpacity>
@@ -383,10 +353,7 @@ export default function PartnersScreen() {
       <View style={styles.requestRow}>
         {/* Avatar */}
         {item.partner?.profile_picture_url ? (
-          <Image
-            source={{ uri: item.partner.profile_picture_url }}
-            style={styles.avatar}
-          />
+          <Image source={{ uri: item.partner.profile_picture_url }} style={styles.avatar} />
         ) : (
           <View style={styles.avatarPlaceholder}>
             <Text style={styles.avatarInitial}>
@@ -416,9 +383,7 @@ export default function PartnersScreen() {
           {cancelRequestMutation.isPending ? (
             <ActivityIndicator size="small" color={colors.text.tertiary} />
           ) : (
-            <Text style={styles.cancelButtonText}>
-              {t("common.cancel") || "Cancel"}
-            </Text>
+            <Text style={styles.cancelButtonText}>{t("common.cancel") || "Cancel"}</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -433,22 +398,22 @@ export default function PartnersScreen() {
         title: t("partners.no_partners_title") || "No partners yet",
         description:
           t("partners.no_partners_description") ||
-          "Find accountability partners to stay motivated together.",
+          "Find accountability partners to stay motivated together."
       },
       received: {
         icon: "mail-open-outline" as keyof typeof Ionicons.glyphMap,
         title: t("partners.no_requests_title") || "No requests",
         description:
           t("partners.no_requests_description") ||
-          "When someone sends you a partner request, it will appear here.",
+          "When someone sends you a partner request, it will appear here."
       },
       sent: {
         icon: "paper-plane-outline" as keyof typeof Ionicons.glyphMap,
         title: t("partners.no_sent_title") || "No pending requests",
         description:
           t("partners.no_sent_description") ||
-          "Requests you send will appear here until they're accepted.",
-      },
+          "Requests you send will appear here until they're accepted."
+      }
     };
 
     const config = emptyConfig[activeTab];
@@ -495,27 +460,23 @@ export default function PartnersScreen() {
     {
       id: "partners",
       label: t("partners.tab_partners") || "Partners",
-      count: partners.length,
+      count: partners.length
     },
     {
       id: "received",
       label: t("partners.tab_received") || "Received",
-      count: pendingRequests.length,
+      count: pendingRequests.length
     },
     {
       id: "sent",
       label: t("partners.tab_sent") || "Sent",
-      count: sentRequests.length,
-    },
+      count: sentRequests.length
+    }
   ];
 
   // Current data based on tab
   const currentData =
-    activeTab === "partners"
-      ? partners
-      : activeTab === "received"
-        ? pendingRequests
-        : sentRequests;
+    activeTab === "partners" ? partners : activeTab === "received" ? pendingRequests : sentRequests;
 
   const isLoading = loadingPartners;
 
@@ -527,15 +488,8 @@ export default function PartnersScreen() {
         onPress={() => router.back()}
         rightInput={
           hasAccess ? (
-            <TouchableOpacity
-              style={styles.headerAction}
-              onPress={handleFindPartner}
-            >
-              <Ionicons
-                name="person-add"
-                size={22}
-                color={brandColors.primary}
-              />
+            <TouchableOpacity style={styles.headerAction} onPress={handleFindPartner}>
+              <Ionicons name="person-add" size={22} color={brandColors.primary} />
             </TouchableOpacity>
           ) : null
         }
@@ -554,25 +508,15 @@ export default function PartnersScreen() {
                 style={[styles.tab, activeTab === tab.id && styles.tabActive]}
                 onPress={() => setActiveTab(tab.id as PartnerSubTab)}
               >
-                <Text
-                  style={[
-                    styles.tabText,
-                    activeTab === tab.id && styles.tabTextActive,
-                  ]}
-                >
+                <Text style={[styles.tabText, activeTab === tab.id && styles.tabTextActive]}>
                   {tab.label}
                 </Text>
                 {tab.count > 0 && (
-                  <View
-                    style={[
-                      styles.tabBadge,
-                      activeTab === tab.id && styles.tabBadgeActive,
-                    ]}
-                  >
+                  <View style={[styles.tabBadge, activeTab === tab.id && styles.tabBadgeActive]}>
                     <Text
                       style={[
                         styles.tabBadgeText,
-                        activeTab === tab.id && styles.tabBadgeTextActive,
+                        activeTab === tab.id && styles.tabBadgeTextActive
                       ]}
                     >
                       {tab.count}
@@ -613,6 +557,18 @@ export default function PartnersScreen() {
           )}
         </>
       )}
+
+      {/* Nudge Sheet */}
+      <NudgeSheet
+        visible={!!nudgeTarget}
+        onClose={() => setNudgeTarget(null)}
+        recipientId={nudgeTarget?.partner_user_id || ""}
+        recipientName={
+          nudgeTarget?.partner?.name || nudgeTarget?.partner?.username || t("partners.partner")
+        }
+        partnershipId={nudgeTarget?.id}
+        onSuccess={handleNudgeSuccess}
+      />
     </View>
   );
 }
@@ -620,13 +576,13 @@ export default function PartnersScreen() {
 const makeStyles = (tokens: any, colors: any, brand: any) => ({
   container: {
     flex: 1,
-    backgroundColor: colors.bg.canvas,
+    backgroundColor: colors.bg.canvas
   },
   header: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
     justifyContent: "space-between" as const,
-    paddingRight: toRN(tokens.spacing[4]),
+    paddingRight: toRN(tokens.spacing[4])
   },
   headerAction: {
     width: 40,
@@ -634,7 +590,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     borderRadius: 20,
     backgroundColor: `${brand.primary}15`,
     justifyContent: "center" as const,
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   // Tab Bar
   tabBar: {
@@ -642,7 +598,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: colors.bg.card,
     paddingHorizontal: toRN(tokens.spacing[4]),
     borderBottomWidth: 1,
-    borderBottomColor: colors.border.subtle,
+    borderBottomColor: colors.border.subtle
   },
   tab: {
     flexDirection: "row" as const,
@@ -650,20 +606,20 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     paddingVertical: toRN(tokens.spacing[3]),
     paddingHorizontal: toRN(tokens.spacing[3]),
     marginRight: toRN(tokens.spacing[2]),
-    gap: toRN(tokens.spacing[1.5]),
+    gap: toRN(tokens.spacing[1.5])
   },
   tabActive: {
     borderBottomWidth: 2,
-    borderBottomColor: brand.primary,
+    borderBottomColor: brand.primary
   },
   tabText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   tabTextActive: {
     fontFamily: fontFamily.semiBold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   tabBadge: {
     minWidth: 20,
@@ -672,44 +628,44 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: colors.bg.muted,
     justifyContent: "center" as const,
     alignItems: "center" as const,
-    paddingHorizontal: toRN(tokens.spacing[1.5]),
+    paddingHorizontal: toRN(tokens.spacing[1.5])
   },
   tabBadgeActive: {
-    backgroundColor: brand.primary,
+    backgroundColor: brand.primary
   },
   tabBadgeText: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.semiBold,
-    color: colors.text.secondary,
+    color: colors.text.secondary
   },
   tabBadgeTextActive: {
-    color: "#FFFFFF",
+    color: "#FFFFFF"
   },
   // Loading
   loadingContainer: {
     flex: 1,
     justifyContent: "center" as const,
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   // List
   listContent: {
     padding: toRN(tokens.spacing[4]),
-    flexGrow: 1,
+    flexGrow: 1
   },
   // Partner Card
   partnerCard: {
     marginBottom: toRN(tokens.spacing[3]),
-    padding: toRN(tokens.spacing[4]),
+    padding: toRN(tokens.spacing[4])
   },
   partnerRow: {
     flexDirection: "row" as const,
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   avatar: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    marginRight: toRN(tokens.spacing[3]),
+    marginRight: toRN(tokens.spacing[3])
   },
   avatarPlaceholder: {
     width: 48,
@@ -718,26 +674,26 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: brand.primary,
     justifyContent: "center" as const,
     alignItems: "center" as const,
-    marginRight: toRN(tokens.spacing[3]),
+    marginRight: toRN(tokens.spacing[3])
   },
   avatarInitial: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.bold,
-    color: "#FFFFFF",
+    color: "#FFFFFF"
   },
   partnerInfo: {
     flex: 1,
-    marginRight: toRN(tokens.spacing[2]),
+    marginRight: toRN(tokens.spacing[2])
   },
   partnerUsername: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
-    color: colors.text.secondary,
+    color: colors.text.secondary
   },
   partnerName: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.semiBold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   nudgeButton: {
     flexDirection: "row" as const,
@@ -747,40 +703,40 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: `${brand.primary}15`,
     borderRadius: toRN(tokens.borderRadius.full),
     gap: toRN(tokens.spacing[1]),
-    marginRight: toRN(tokens.spacing[2]),
+    marginRight: toRN(tokens.spacing[2])
   },
   nudgeButtonText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.semiBold,
-    color: brand.primary,
+    color: brand.primary
   },
   chevron: {
-    marginLeft: toRN(tokens.spacing[1]),
+    marginLeft: toRN(tokens.spacing[1])
   },
   // Request Card
   requestCard: {
     marginBottom: toRN(tokens.spacing[3]),
-    padding: toRN(tokens.spacing[4]),
+    padding: toRN(tokens.spacing[4])
   },
   requestRow: {
     flexDirection: "row" as const,
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   requestInfo: {
-    flex: 1,
+    flex: 1
   },
   requestMessage: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
     color: colors.text.tertiary,
-    marginTop: toRN(tokens.spacing[1]),
+    marginTop: toRN(tokens.spacing[1])
   },
   requestActions: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
     justifyContent: "flex-end" as const,
     marginTop: toRN(tokens.spacing[3]),
-    gap: toRN(tokens.spacing[2]),
+    gap: toRN(tokens.spacing[2])
   },
   declineButton: {
     width: 40,
@@ -788,7 +744,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     borderRadius: 20,
     backgroundColor: colors.bg.muted,
     justifyContent: "center" as const,
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   acceptButton: {
     flexDirection: "row" as const,
@@ -797,48 +753,48 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     paddingHorizontal: toRN(tokens.spacing[4]),
     backgroundColor: brand.primary,
     borderRadius: toRN(tokens.borderRadius.full),
-    gap: toRN(tokens.spacing[1]),
+    gap: toRN(tokens.spacing[1])
   },
   acceptButtonText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.semiBold,
-    color: "#FFFFFF",
+    color: "#FFFFFF"
   },
   cancelButton: {
     paddingVertical: toRN(tokens.spacing[2]),
     paddingHorizontal: toRN(tokens.spacing[3]),
     backgroundColor: colors.bg.muted,
-    borderRadius: toRN(tokens.borderRadius.full),
+    borderRadius: toRN(tokens.borderRadius.full)
   },
   cancelButtonText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
-    color: colors.text.secondary,
+    color: colors.text.secondary
   },
   pendingBadge: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
     marginTop: toRN(tokens.spacing[1]),
-    gap: toRN(tokens.spacing[1]),
+    gap: toRN(tokens.spacing[1])
   },
   pendingBadgeText: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.medium,
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   // Empty State
   emptyState: {
     flex: 1,
     justifyContent: "center" as const,
     alignItems: "center" as const,
-    paddingHorizontal: toRN(tokens.spacing[8]),
+    paddingHorizontal: toRN(tokens.spacing[8])
   },
   emptyTitle: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.semiBold,
     color: colors.text.primary,
     marginTop: toRN(tokens.spacing[4]),
-    marginBottom: toRN(tokens.spacing[2]),
+    marginBottom: toRN(tokens.spacing[2])
   },
   emptyDescription: {
     fontSize: toRN(tokens.typography.fontSize.sm),
@@ -846,17 +802,17 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     color: colors.text.tertiary,
     textAlign: "center" as const,
     maxWidth: 280,
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   findPartnerButton: {
-    marginTop: toRN(tokens.spacing[2]),
+    marginTop: toRN(tokens.spacing[2])
   },
   // Premium Gate
   premiumGate: {
     flex: 1,
     justifyContent: "center" as const,
     alignItems: "center" as const,
-    paddingHorizontal: toRN(tokens.spacing[8]),
+    paddingHorizontal: toRN(tokens.spacing[8])
   },
   premiumIconContainer: {
     width: 96,
@@ -865,14 +821,14 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: `${brand.primary}15`,
     justifyContent: "center" as const,
     alignItems: "center" as const,
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   premiumTitle: {
     fontSize: toRN(tokens.typography.fontSize["2xl"]),
     fontFamily: fontFamily.bold,
     color: colors.text.primary,
     marginBottom: toRN(tokens.spacing[2]),
-    textAlign: "center" as const,
+    textAlign: "center" as const
   },
   premiumDescription: {
     fontSize: toRN(tokens.typography.fontSize.base),
@@ -880,9 +836,9 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     color: colors.text.secondary,
     textAlign: "center" as const,
     lineHeight: toRN(tokens.typography.fontSize.base) * 1.5,
-    marginBottom: toRN(tokens.spacing[6]),
+    marginBottom: toRN(tokens.spacing[6])
   },
   upgradeButton: {
-    minWidth: 200,
-  },
+    minWidth: 200
+  }
 });

@@ -4,7 +4,7 @@ import { AppleLoginPayload } from "@/services/api/auth";
 
 // Query Keys
 export const authQueryKeys = {
-  isAuthenticated: ["auth", "isAuthenticated"] as const,
+  isAuthenticated: ["auth", "isAuthenticated"] as const
 } as const;
 
 // Auth Hooks
@@ -17,9 +17,9 @@ export const useLogin = () => {
       // Invalidate user queries after successful login
       queryClient.invalidateQueries({ queryKey: ["user"] });
       queryClient.invalidateQueries({
-        queryKey: authQueryKeys.isAuthenticated,
+        queryKey: authQueryKeys.isAuthenticated
       });
-    },
+    }
   });
 };
 
@@ -32,9 +32,9 @@ export const useSignup = () => {
       // Invalidate user queries after successful signup
       queryClient.invalidateQueries({ queryKey: ["user"] });
       queryClient.invalidateQueries({
-        queryKey: authQueryKeys.isAuthenticated,
+        queryKey: authQueryKeys.isAuthenticated
       });
-    },
+    }
   });
 };
 
@@ -46,7 +46,7 @@ export const useLogout = () => {
     onSuccess: () => {
       // Clear all cached data on logout
       queryClient.clear();
-    },
+    }
   });
 };
 
@@ -58,26 +58,20 @@ export const useRefreshToken = () => {
     onSuccess: () => {
       // Invalidate user queries after successful token refresh
       queryClient.invalidateQueries({ queryKey: ["user"] });
-    },
+    }
   });
 };
 
 export const useForgotPassword = () => {
   return useMutation({
-    mutationFn: ({ email }: { email: string }) =>
-      authService.forgotPassword(email),
+    mutationFn: ({ email }: { email: string }) => authService.forgotPassword(email)
   });
 };
 
 export const useResetPassword = () => {
   return useMutation({
-    mutationFn: ({
-      token,
-      new_password,
-    }: {
-      token: string;
-      new_password: string;
-    }) => authService.resetPassword(token, new_password),
+    mutationFn: ({ token, new_password }: { token: string; new_password: string }) =>
+      authService.resetPassword(token, new_password)
   });
 };
 
@@ -85,11 +79,11 @@ export const useChangePassword = () => {
   return useMutation({
     mutationFn: ({
       current_password,
-      new_password,
+      new_password
     }: {
       current_password: string;
       new_password: string;
-    }) => authService.changePassword(current_password, new_password),
+    }) => authService.changePassword(current_password, new_password)
   });
 };
 
@@ -102,13 +96,13 @@ export const useVerifyEmail = () => {
     onSuccess: () => {
       // Invalidate user queries after successful verification
       queryClient.invalidateQueries({ queryKey: ["user"] });
-    },
+    }
   });
 };
 
 export const useResendVerification = () => {
   return useMutation({
-    mutationFn: (email?: string) => authService.resendVerification(email),
+    mutationFn: (email?: string) => authService.resendVerification(email)
   });
 };
 
@@ -116,14 +110,13 @@ export const useLoginWithApple = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (appleToken: AppleLoginPayload) =>
-      authService.loginWithApple(appleToken),
+    mutationFn: (appleToken: AppleLoginPayload) => authService.loginWithApple(appleToken),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["user"] });
       queryClient.invalidateQueries({
-        queryKey: authQueryKeys.isAuthenticated,
+        queryKey: authQueryKeys.isAuthenticated
       });
-    },
+    }
   });
 };
 
@@ -131,14 +124,13 @@ export const useLoginWithGoogle = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (googleToken: string) =>
-      authService.loginWithGoogle(googleToken),
+    mutationFn: (googleToken: string) => authService.loginWithGoogle(googleToken),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["user"] });
       queryClient.invalidateQueries({
-        queryKey: authQueryKeys.isAuthenticated,
+        queryKey: authQueryKeys.isAuthenticated
       });
-    },
+    }
   });
 };
 
@@ -147,6 +139,63 @@ export const useIsAuthenticated = () => {
   return useQuery({
     queryKey: authQueryKeys.isAuthenticated,
     queryFn: () => authService.isAuthenticated(),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000 // 5 minutes
+  });
+};
+
+// ============================================================================
+// Account Linking Hooks
+// ============================================================================
+
+export const useLinkGoogle = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (idToken: string) => authService.linkWithGoogle(idToken),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["user"] });
+    }
+  });
+};
+
+export const useLinkApple = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (params: { identityToken: string; authorizationCode?: string }) =>
+      authService.linkWithApple(params),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["user"] });
+    }
+  });
+};
+
+export const useUnlinkProvider = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (provider: "google" | "apple") => authService.unlinkProvider(provider),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["user"] });
+    }
+  });
+};
+
+// ============================================================================
+// Password Management Hooks
+// ============================================================================
+
+/**
+ * Hook for OAuth users to set a password for the first time.
+ * Different from useChangePassword which requires the current password.
+ */
+export const useSetPassword = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (newPassword: string) => authService.setPassword(newPassword),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["user"] });
+    }
   });
 };

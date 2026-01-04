@@ -41,12 +41,7 @@ const extractMessageValue = (value: unknown, depth = 0): string | undefined => {
     return value;
   }
 
-  if (
-    value &&
-    typeof value === "object" &&
-    !Array.isArray(value) &&
-    depth < 3
-  ) {
+  if (value && typeof value === "object" && !Array.isArray(value) && depth < 3) {
     const record = value as Record<string, unknown>;
     for (const key of ["message", "error", "detail", "next_steps"] as const) {
       const candidate = extractMessageValue(record[key], depth + 1);
@@ -64,8 +59,7 @@ export class ApiError<T = any> extends Error {
   data?: T;
 
   constructor(status: number, detail: T, fallbackMessage?: string) {
-    const message =
-      extractMessageValue(detail) || fallbackMessage || "Request failed";
+    const message = extractMessageValue(detail) || fallbackMessage || "Request failed";
     super(message);
     this.name = "ApiError";
     this.status = status;
@@ -106,9 +100,7 @@ export const resolveBaseUrl = (): string => {
         if (ip !== "localhost" && ip !== "127.0.0.1") {
           const dynamicUrl = `http://${ip}:8000/api/v1`;
           if (__DEV__) {
-            console.log(
-              `[API] Using dynamic IP from Metro connection: ${dynamicUrl}`,
-            );
+            console.log(`[API] Using dynamic IP from Metro connection: ${dynamicUrl}`);
           }
           return dynamicUrl;
         }
@@ -124,7 +116,7 @@ export const resolveBaseUrl = (): string => {
     return Platform.select({
       ios: "http://172.20.10.2:8000/api/v1",
       android: "http://172.20.10.2:8000/api/v1",
-      default: "http://172.20.10.2:8000/api/v1",
+      default: "http://172.20.10.2:8000/api/v1"
     })!;
   }
 
@@ -132,14 +124,14 @@ export const resolveBaseUrl = (): string => {
   return Platform.select({
     ios: "http://localhost:8000/api/v1",
     android: "http://10.0.2.2:8000/api/v1",
-    default: "http://localhost:8000/api/v1",
+    default: "http://localhost:8000/api/v1"
   })!;
 };
 
 const API_CONFIG = {
   baseURL: resolveBaseUrl(),
   timeout: 60000, // 60 seconds - increased for AI generation endpoints
-  retryAttempts: 3,
+  retryAttempts: 3
 };
 
 export const resolveApiRootUrl = (): string => {
@@ -160,10 +152,10 @@ const PUBLIC_ENDPOINTS = new Set<string>([
   "/auth/resend-verification",
   "/auth/logout",
   "/auth/refresh",
-  "/health",
+  "/health"
 ]);
 
-const PUBLIC_ENDPOINT_PREFIXES = ["/auth/oauth/"];
+const PUBLIC_ENDPOINT_PREFIXES = ["/auth/oauth/", "/app-version/"];
 
 const isPublicEndpoint = (endpoint: string): boolean => {
   if (PUBLIC_ENDPOINTS.has(endpoint)) {
@@ -194,7 +186,7 @@ class TokenManager {
     try {
       const [cachedAccessToken, cachedRefreshToken] = await Promise.all([
         storageUtil.getItem<string>(this.ACCESS_TOKEN_KEY),
-        storageUtil.getItem<string>(this.REFRESH_TOKEN_KEY),
+        storageUtil.getItem<string>(this.REFRESH_TOKEN_KEY)
       ]);
 
       global.accessToken = cachedAccessToken || null;
@@ -230,10 +222,7 @@ class TokenManager {
     return token;
   }
 
-  static async setTokens(
-    accessToken: string,
-    refreshToken: string,
-  ): Promise<void> {
+  static async setTokens(accessToken: string, refreshToken: string): Promise<void> {
     // Update cache immediately
     global.accessToken = accessToken;
     global.refreshToken = refreshToken;
@@ -241,7 +230,7 @@ class TokenManager {
     // Persist to storage
     await Promise.all([
       storageUtil.setItem(this.ACCESS_TOKEN_KEY, accessToken),
-      storageUtil.setItem(this.REFRESH_TOKEN_KEY, refreshToken),
+      storageUtil.setItem(this.REFRESH_TOKEN_KEY, refreshToken)
     ]);
   }
 
@@ -253,7 +242,7 @@ class TokenManager {
     // Clear from storage
     await Promise.all([
       storageUtil.removeItem(this.ACCESS_TOKEN_KEY),
-      storageUtil.removeItem(this.REFRESH_TOKEN_KEY),
+      storageUtil.removeItem(this.REFRESH_TOKEN_KEY)
     ]);
   }
 
@@ -280,10 +269,7 @@ class TokenManager {
   }
 
   static async setRememberMeEnabled(enabled: boolean): Promise<void> {
-    await storageUtil.setSecureItem(
-      this.REMEMBER_ME_ENABLED_KEY,
-      enabled.toString(),
-    );
+    await storageUtil.setSecureItem(this.REMEMBER_ME_ENABLED_KEY, enabled.toString());
   }
 
   static async getRememberMeEnabled(): Promise<boolean> {
@@ -294,7 +280,7 @@ class TokenManager {
   static async clearRememberMe(): Promise<void> {
     await Promise.all([
       storageUtil.removeItem(this.REMEMBER_ME_EMAIL_KEY),
-      storageUtil.removeItem(this.REMEMBER_ME_ENABLED_KEY),
+      storageUtil.removeItem(this.REMEMBER_ME_ENABLED_KEY)
     ]);
   }
 }
@@ -310,10 +296,7 @@ export abstract class BaseApiService {
   }
 
   // Generic HTTP methods
-  protected async request<T>(
-    endpoint: string,
-    options: RequestInit = {},
-  ): Promise<ApiResponse<T>> {
+  protected async request<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
     // Skip all API requests if logout is in progress
     if (isLoggingOut && !isPublicEndpoint(endpoint)) {
       throw new ApiError(401, null, "Logout in progress");
@@ -324,9 +307,7 @@ export abstract class BaseApiService {
     // Use global token cache for fast, reliable access
     // If cache is not initialized, fallback to storage
     const token =
-      global.accessToken !== undefined
-        ? global.accessToken
-        : await TokenManager.getAccessToken();
+      global.accessToken !== undefined ? global.accessToken : await TokenManager.getAccessToken();
 
     // console.log("accessToken", token);
 
@@ -338,7 +319,7 @@ export abstract class BaseApiService {
     const defaultHeaders: HeadersInit = {
       "Content-Type": "application/json",
       Accept: "application/json",
-      "User-Agent": USER_AGENT,
+      "User-Agent": USER_AGENT
     };
 
     if (token) {
@@ -347,7 +328,7 @@ export abstract class BaseApiService {
 
     // Ensure headers are properly merged - convert to plain object
     const headersObj: Record<string, string> = {
-      ...defaultHeaders,
+      ...defaultHeaders
     };
 
     // Merge any additional headers from options
@@ -367,7 +348,7 @@ export abstract class BaseApiService {
 
     const config: RequestInit = {
       ...options,
-      headers: headersObj,
+      headers: headersObj
     };
 
     try {
@@ -376,7 +357,7 @@ export abstract class BaseApiService {
 
       const response = await fetch(url, {
         ...config,
-        signal: controller.signal,
+        signal: controller.signal
       });
 
       clearTimeout(timeoutId);
@@ -421,14 +402,14 @@ export abstract class BaseApiService {
               headersObj.Authorization = `Bearer ${newToken}`;
               const retryResponse = await fetch(url, {
                 ...config,
-                headers: headersObj,
+                headers: headersObj
               });
               const retryData = await retryResponse.json();
               if (retryResponse.ok) {
                 return {
                   status: retryResponse.status,
                   data: retryData as T,
-                  error: undefined,
+                  error: undefined
                 };
               }
             }
@@ -449,28 +430,24 @@ export abstract class BaseApiService {
             refreshPromise = null;
 
             if (refreshResponse.data && refreshResponse.data.access_token) {
-              console.log(
-                `[API] Token refreshed successfully, retrying original request...`,
-              );
+              console.log(`[API] Token refreshed successfully, retrying original request...`);
 
               // Update headers with new token from global cache
               // TokenManager.setTokens() already updated global.accessToken
-              const newToken =
-                global.accessToken || refreshResponse.data.access_token;
+              const newToken = global.accessToken || refreshResponse.data.access_token;
               headersObj.Authorization = `Bearer ${newToken}`;
 
               // Retry the request with the new token
               const retryResponse = await fetch(url, {
                 ...config,
                 headers: headersObj,
-                signal: controller.signal,
+                signal: controller.signal
               });
 
               clearTimeout(timeoutId);
 
               // Parse retry response
-              const retryContentType =
-                retryResponse.headers.get("content-type") || "";
+              const retryContentType = retryResponse.headers.get("content-type") || "";
               let retryData: any = null;
               try {
                 if (retryContentType.includes("application/json")) {
@@ -491,14 +468,14 @@ export abstract class BaseApiService {
                 throw new ApiError(
                   retryResponse.status,
                   retryData,
-                  `Request failed with status ${retryResponse.status}`,
+                  `Request failed with status ${retryResponse.status}`
                 );
               }
 
               return {
                 status: retryResponse.status,
                 data: retryData as T,
-                error: undefined,
+                error: undefined
               };
             } else {
               // Reset refresh flag
@@ -507,7 +484,7 @@ export abstract class BaseApiService {
 
               console.log(
                 `[API] Token refresh failed, returning ${refreshResponse.status}`,
-                refreshResponse,
+                refreshResponse
               );
               // Logout if refresh returns 404 (user not found) or 500 (Internal Server Error - user likely deleted)
               // Check error message to determine if it's a user-related issue
@@ -515,8 +492,7 @@ export abstract class BaseApiService {
               const errorLower = refreshError.toLowerCase();
               const isUserNotFound =
                 refreshResponse.status === 404 ||
-                (refreshResponse.status === 500 &&
-                  errorLower.includes("internal server error")) ||
+                (refreshResponse.status === 500 && errorLower.includes("internal server error")) ||
                 errorLower.includes("user not found");
 
               // Logout on 404 or 500 (user deleted - foreign key constraint violation)
@@ -527,9 +503,7 @@ export abstract class BaseApiService {
                 refreshResponse.status === 500
               ) {
                 try {
-                  const { handleAutoLogout } = await import(
-                    "@/utils/authUtils"
-                  );
+                  const { handleAutoLogout } = await import("@/utils/authUtils");
                   await handleAutoLogout("not_found");
                 } catch (error) {
                   console.error("[API] Failed to handle auto-logout:", error);
@@ -546,9 +520,7 @@ export abstract class BaseApiService {
           const userStatus = errorData.status || errorData.detail?.status;
 
           if (userStatus === "disabled" || userStatus === "suspended") {
-            console.log(
-              `[API] User status: ${userStatus}, triggering auto-logout`,
-            );
+            console.log(`[API] User status: ${userStatus}, triggering auto-logout`);
             try {
               const { handleAutoLogout } = await import("@/utils/authUtils");
               await handleAutoLogout(userStatus as "disabled" | "suspended");
@@ -578,9 +550,7 @@ export abstract class BaseApiService {
         // Special case: If refresh endpoint returns 404, user was deleted
         // Even though refresh is a "public" endpoint, 404 means user doesn't exist
         if (response.status === 404 && endpoint.includes("/auth/refresh")) {
-          console.log(
-            `[API] User not found during refresh, triggering auto-logout`,
-          );
+          console.log(`[API] User not found during refresh, triggering auto-logout`);
           try {
             const { handleAutoLogout } = await import("@/utils/authUtils");
             await handleAutoLogout("not_found");
@@ -603,19 +573,29 @@ export abstract class BaseApiService {
           }
         }
 
-        if (response.status === 503) {
-          useSystemStatusStore
-            .getState()
-            .setBackendStatus(
-              "offline",
-              (data && (data.detail || data.message || data.error)) ||
-                "Service temporarily unavailable",
-            );
+        // Handle gateway/server errors (502, 503, 504) - backend is offline
+        if (response.status === 502 || response.status === 503 || response.status === 504) {
+          // Check if it's a Cloudflare error page (HTML response)
+          const isCloudflareError =
+            contentType.includes("text/html") &&
+            typeof data?.message === "string" &&
+            (data.message.includes("cloudflare") ||
+              data.message.includes("Bad gateway") ||
+              data.message.includes("502") ||
+              data.message.includes("503") ||
+              data.message.includes("504"));
+
+          const errorReason = isCloudflareError
+            ? "Server is currently unavailable"
+            : (data && (data.detail || data.message || data.error)) ||
+              "Service temporarily unavailable";
+
+          useSystemStatusStore.getState().setBackendStatus("offline", errorReason);
         }
         throw new ApiError(
           response.status,
           errorPayload,
-          `Request failed with status ${response.status}`,
+          `Request failed with status ${response.status}`
         );
       }
 
@@ -623,29 +603,31 @@ export abstract class BaseApiService {
       return {
         status: response.status,
         data: data as T,
-        error: undefined, // Explicitly undefined on success
+        error: undefined // Explicitly undefined on success
       };
     } catch (error) {
       if (error instanceof ApiError) {
         throw error;
       }
       if (__DEV__) {
-        console.warn(
-          `[API] Request to ${url} failed. Is the backend running?`,
-          error,
-        );
+        console.warn(`[API] Request to ${url} failed. Is the backend running?`, error);
       }
       console.log("error", error);
-      if (
-        error instanceof Error &&
-        error.message.includes("Network request failed")
-      ) {
-        useSystemStatusStore
-          .getState()
-          .setBackendStatus(
-            "offline",
-            error instanceof Error ? error.message : "Network error",
-          );
+      // Detect network failures and mark as offline
+      if (error instanceof Error) {
+        const errorMsg = error.message.toLowerCase();
+        const isNetworkError =
+          errorMsg.includes("network request failed") ||
+          errorMsg.includes("network error") ||
+          errorMsg.includes("failed to fetch") ||
+          errorMsg.includes("unable to resolve host") ||
+          errorMsg.includes("no internet") ||
+          errorMsg.includes("connection refused") ||
+          errorMsg.includes("econnrefused");
+
+        if (isNetworkError) {
+          useSystemStatusStore.getState().setBackendStatus("offline", "Network error");
+        }
       }
       if (error instanceof Error) {
         if (error.name === "AbortError") {
@@ -657,8 +639,7 @@ export abstract class BaseApiService {
         typeof (error as Record<string, unknown>)?.status === "number"
           ? ((error as Record<string, unknown>).status as number)
           : 0;
-      const detail =
-        (error as Record<string, unknown>)?.error ?? "Unknown error occurred";
+      const detail = (error as Record<string, unknown>)?.error ?? "Unknown error occurred";
       throw new ApiError(status, detail, "Unknown error occurred");
     }
   }
@@ -667,23 +648,17 @@ export abstract class BaseApiService {
     return this.request<T>(endpoint, { method: "GET" });
   }
 
-  protected async post<T>(
-    endpoint: string,
-    data?: any,
-  ): Promise<ApiResponse<T>> {
+  protected async post<T>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, {
       method: "POST",
-      body: data ? JSON.stringify(data) : undefined,
+      body: data ? JSON.stringify(data) : undefined
     });
   }
 
-  protected async put<T>(
-    endpoint: string,
-    data?: any,
-  ): Promise<ApiResponse<T>> {
+  protected async put<T>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, {
       method: "PUT",
-      body: data ? JSON.stringify(data) : undefined,
+      body: data ? JSON.stringify(data) : undefined
     });
   }
 
@@ -691,13 +666,10 @@ export abstract class BaseApiService {
     return this.request<T>(endpoint, { method: "DELETE" });
   }
 
-  protected async patch<T>(
-    endpoint: string,
-    data?: any,
-  ): Promise<ApiResponse<T>> {
+  protected async patch<T>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, {
       method: "PATCH",
-      body: data ? JSON.stringify(data) : undefined,
+      body: data ? JSON.stringify(data) : undefined
     });
   }
 
@@ -710,7 +682,7 @@ export abstract class BaseApiService {
   async getAuthHeaders(): Promise<HeadersInit> {
     const token = await TokenManager.getAccessToken();
     return {
-      Authorization: token ? `Bearer ${token}` : "",
+      Authorization: token ? `Bearer ${token}` : ""
     };
   }
 }

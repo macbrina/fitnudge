@@ -1,8 +1,5 @@
 import { create } from "zustand";
-import {
-  subscriptionPlansApi,
-  SubscriptionPlan,
-} from "@/services/api/subscriptionPlans";
+import { subscriptionPlansApi, SubscriptionPlan } from "@/services/api/subscriptionPlans";
 import { logger } from "@/services/logger";
 
 interface PricingState {
@@ -39,11 +36,7 @@ export const usePricingStore = create<PricingState>((set, get) => ({
     const { lastFetched, plans } = get();
 
     // Check if we have recent data - return immediately without touching isLoading
-    if (
-      lastFetched &&
-      Date.now() - lastFetched < CACHE_DURATION &&
-      plans.length > 0
-    ) {
+    if (lastFetched && Date.now() - lastFetched < CACHE_DURATION && plans.length > 0) {
       return;
     }
 
@@ -62,19 +55,18 @@ export const usePricingStore = create<PricingState>((set, get) => ({
           plans,
           isLoading: false,
           error: null,
-          lastFetched: Date.now(),
+          lastFetched: Date.now()
         });
       } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
 
         logger.error("Failed to fetch subscription plans", {
-          error: errorMessage,
+          error: errorMessage
         });
 
         set({
           isLoading: false,
-          error: errorMessage,
+          error: errorMessage
         });
       } finally {
         fetchPromise = null;
@@ -114,7 +106,7 @@ export const usePricingStore = create<PricingState>((set, get) => ({
       plans: [],
       isLoading: false,
       error: null,
-      lastFetched: null,
+      lastFetched: null
     });
-  },
+  }
 }));

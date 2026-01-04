@@ -40,6 +40,7 @@ interface PrefetchConfig {
   staleTime: number;
   description: string;
   priority: "critical" | "high" | "normal";
+  isInfinite?: boolean; // For infinite queries
 }
 
 /**
@@ -78,7 +79,7 @@ const getPrefetchConfigs = (): PrefetchConfig[] => {
       },
       staleTime: 1 * 60 * 1000, // 1 minute
       description: "Home dashboard (items, stats, pending check-ins)",
-      priority: "critical",
+      priority: "critical"
     },
 
     // ==================== HIGH PRIORITY ====================
@@ -92,7 +93,7 @@ const getPrefetchConfigs = (): PrefetchConfig[] => {
       },
       staleTime: 5 * 60 * 1000, // 5 minutes
       description: "Current user profile",
-      priority: "high",
+      priority: "high"
     },
 
     {
@@ -103,7 +104,7 @@ const getPrefetchConfigs = (): PrefetchConfig[] => {
       },
       staleTime: 5 * 60 * 1000, // 5 minutes
       description: "User stats (streak, goals count, check-ins)",
-      priority: "high",
+      priority: "high"
     },
 
     {
@@ -114,7 +115,7 @@ const getPrefetchConfigs = (): PrefetchConfig[] => {
       },
       staleTime: 2 * 60 * 1000, // 2 minutes
       description: "Active goals list for Goals tab",
-      priority: "high",
+      priority: "high"
     },
 
     {
@@ -125,11 +126,11 @@ const getPrefetchConfigs = (): PrefetchConfig[] => {
       },
       staleTime: 5 * 60 * 1000, // 5 minutes
       description: "User's unlocked achievements",
-      priority: "high",
+      priority: "high"
     },
 
     {
-      queryKey: [...notificationHistoryQueryKeys.list(), "simple"],
+      queryKey: notificationHistoryQueryKeys.list(),
       queryFn: async () => {
         const response = await notificationsService.getHistory(20, 0);
         if (response.error) throw new Error(response.error);
@@ -138,6 +139,7 @@ const getPrefetchConfigs = (): PrefetchConfig[] => {
       staleTime: 1 * 60 * 1000, // 1 minute (notifications change frequently)
       description: "Notification history for Notifications tab",
       priority: "high",
+      isInfinite: true // Flag for infinite query
     },
 
     // ==================== NORMAL PRIORITY ====================
@@ -151,7 +153,7 @@ const getPrefetchConfigs = (): PrefetchConfig[] => {
       },
       staleTime: 24 * 60 * 60 * 1000, // 24 hours (exercises rarely change)
       description: "Popular exercises for workout picker",
-      priority: "normal",
+      priority: "normal"
     },
 
     {
@@ -162,8 +164,8 @@ const getPrefetchConfigs = (): PrefetchConfig[] => {
       },
       staleTime: 60 * 60 * 1000, // 1 hour
       description: "Audio preferences for workout player",
-      priority: "normal",
-    },
+      priority: "normal"
+    }
   ];
 };
 
@@ -176,9 +178,7 @@ const getPrefetchConfigs = (): PrefetchConfig[] => {
  * @param queryClient - The React Query client instance
  * @returns Promise that resolves when critical + high priority prefetching is done
  */
-export async function prefetchCriticalData(
-  queryClient: QueryClient,
-): Promise<void> {
+export async function prefetchCriticalData(queryClient: QueryClient): Promise<void> {
   const configs = getPrefetchConfigs();
 
   // Group configs by priority
@@ -187,16 +187,26 @@ export async function prefetchCriticalData(
   const normal = configs.filter((c) => c.priority === "normal");
 
   console.log(
-    `[Prefetch] Starting prefetch: ${critical.length} critical, ${high.length} high, ${normal.length} normal`,
+    `[Prefetch] Starting prefetch: ${critical.length} critical, ${high.length} high, ${normal.length} normal`
   );
 
   const prefetchOne = async (config: PrefetchConfig): Promise<void> => {
     try {
-      await queryClient.prefetchQuery({
-        queryKey: config.queryKey,
-        queryFn: config.queryFn,
-        staleTime: config.staleTime,
-      });
+      if (config.isInfinite) {
+        // Use prefetchInfiniteQuery for infinite queries
+        await queryClient.prefetchInfiniteQuery({
+          queryKey: config.queryKey,
+          queryFn: config.queryFn,
+          staleTime: config.staleTime,
+          initialPageParam: 0
+        });
+      } else {
+        await queryClient.prefetchQuery({
+          queryKey: config.queryKey,
+          queryFn: config.queryFn,
+          staleTime: config.staleTime
+        });
+      }
       console.log(`[Prefetch] ✓ ${config.description}`);
     } catch (error) {
       // Log but don't fail - prefetch is best-effort
@@ -235,13 +245,13 @@ export async function prefetchQuery<T>(
   queryClient: QueryClient,
   queryKey: readonly unknown[],
   queryFn: () => Promise<T>,
-  staleTime: number = 5 * 60 * 1000,
+  staleTime: number = 5 * 60 * 1000
 ): Promise<void> {
   try {
     await queryClient.prefetchQuery({
       queryKey,
       queryFn,
-      staleTime,
+      staleTime
     });
   } catch (error) {
     console.warn(`[Prefetch] Failed to prefetch ${queryKey.join("/")}:`, error);
@@ -253,10 +263,7 @@ export async function prefetchQuery<T>(
  *
  * Use this to avoid unnecessary prefetches
  */
-export function isQueryFresh(
-  queryClient: QueryClient,
-  queryKey: readonly unknown[],
-): boolean {
+export function isQueryFresh(queryClient: QueryClient, queryKey: readonly unknown[]): boolean {
   const state = queryClient.getQueryState(queryKey);
   if (!state || !state.data) return false;
 

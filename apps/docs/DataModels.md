@@ -27,7 +27,7 @@ CREATE TABLE users (
     username TEXT UNIQUE,
     profile_picture_url TEXT,
     bio TEXT,
-    plan TEXT DEFAULT 'free' CHECK (plan IN ('free', 'pro', 'elite')),
+    plan TEXT DEFAULT 'free' CHECK (plan IN ('free', 'premium')),
     timezone TEXT DEFAULT 'UTC',
     language TEXT DEFAULT 'en',
     is_active BOOLEAN DEFAULT true,
@@ -193,7 +193,7 @@ CREATE TABLE feed_preferences (
 CREATE TABLE subscriptions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    plan TEXT NOT NULL CHECK (plan IN ('free', 'pro', 'elite')),
+    plan TEXT NOT NULL CHECK (plan IN ('free', 'premium')),
     status TEXT NOT NULL CHECK (status IN ('active', 'cancelled', 'expired', 'past_due')),
     platform TEXT NOT NULL CHECK (platform IN ('ios', 'android')),
     product_id TEXT NOT NULL, -- Apple/Google product ID

@@ -18,6 +18,9 @@ export interface User {
   bio?: string;
   timezone: string;
   language: string;
+  country?: string;
+  linked_providers?: string[];
+  has_password?: boolean;
 }
 
 export interface UpdateUserRequest {
@@ -26,6 +29,7 @@ export interface UpdateUserRequest {
   bio?: string;
   timezone?: string;
   language?: string;
+  country?: string;
   profile_picture_url?: string;
 }
 
@@ -58,38 +62,48 @@ export class UserService extends BaseApiService {
     return this.delete(ROUTES.USERS.DELETE_ACCOUNT);
   }
 
-  async exportData(): Promise<ApiResponse<{ download_url: string }>> {
-    return this.get<{ download_url: string }>(ROUTES.USERS.EXPORT_DATA);
+  async requestDataExport(): Promise<
+    ApiResponse<{ success: boolean; message: string; export_id?: string }>
+  > {
+    return this.post<{ success: boolean; message: string; export_id?: string }>(
+      ROUTES.DATA_EXPORT.REQUEST,
+      {}
+    );
+  }
+
+  async getDataExportStatus(exportId: string): Promise<
+    ApiResponse<{
+      id: string;
+      status: string;
+      created_at: string;
+      completed_at?: string;
+      download_url?: string;
+      expires_at?: string;
+    }>
+  > {
+    return this.get(ROUTES.DATA_EXPORT.STATUS(exportId));
   }
 
   async getUserStats(userId?: string): Promise<ApiResponse<UserStats>> {
-    const endpoint = userId
-      ? ROUTES.USERS.STATS(userId)
-      : ROUTES.USERS.ME_STATS;
+    const endpoint = userId ? ROUTES.USERS.STATS(userId) : ROUTES.USERS.ME_STATS;
     return this.get<UserStats>(endpoint);
   }
 
-  async updatePassword(
-    currentPassword: string,
-    newPassword: string,
-  ): Promise<ApiResponse> {
+  async updatePassword(currentPassword: string, newPassword: string): Promise<ApiResponse> {
     return this.post(ROUTES.USERS.CHANGE_PASSWORD, {
       current_password: currentPassword,
-      new_password: newPassword,
+      new_password: newPassword
     });
   }
 
   async uploadProfilePicture(
-    imageUri: string,
+    imageUri: string
   ): Promise<ApiResponse<{ profile_picture_url: string }>> {
     // This would typically upload to your media service first
     // For now, we'll assume the imageUri is already uploaded
-    return this.post<{ profile_picture_url: string }>(
-      ROUTES.USERS.PROFILE_PICTURE,
-      {
-        image_url: imageUri,
-      },
-    );
+    return this.post<{ profile_picture_url: string }>(ROUTES.USERS.PROFILE_PICTURE, {
+      image_url: imageUri
+    });
   }
 
   async deleteProfilePicture(): Promise<ApiResponse> {

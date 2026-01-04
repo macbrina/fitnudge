@@ -1,10 +1,5 @@
 import { usePostHog as usePostHogBase } from "posthog-react-native";
-import {
-  captureEvent,
-  setUserProperties,
-  getFeatureFlag,
-  isFeatureEnabled,
-} from "@/lib/posthog";
+import { captureEvent, setUserProperties, getFeatureFlag, isFeatureEnabled } from "@/lib/posthog";
 
 export const usePostHog = (): {
   posthog: any;
@@ -35,7 +30,7 @@ export const usePostHog = (): {
     reset: posthog?.reset.bind(posthog),
     alias: posthog?.alias.bind(posthog),
     group: posthog?.group.bind(posthog),
-    flush: posthog?.flush.bind(posthog),
+    flush: posthog?.flush.bind(posthog)
   };
 };
 

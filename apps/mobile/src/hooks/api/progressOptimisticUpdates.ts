@@ -53,32 +53,32 @@ const TRACKING_TYPES = ["workout", "meal", "hydration", "checkin"] as const;
 export async function cancelProgressQueries(
   queryClient: QueryClient,
   entityId: string,
-  entityType: "goal" | "challenge" = "goal",
+  entityType: "goal" | "challenge" = "goal"
 ): Promise<void> {
   await queryClient.cancelQueries({
-    queryKey: progressQueryKeys.streak(entityId),
+    queryKey: progressQueryKeys.streak(entityId)
   });
   await queryClient.cancelQueries({
-    queryKey: progressQueryKeys.weekProgress(entityId),
+    queryKey: progressQueryKeys.weekProgress(entityId)
   });
   for (const period of PERIOD_OPTIONS) {
     await queryClient.cancelQueries({
-      queryKey: [...progressQueryKeys.all, "chain", entityId, period],
+      queryKey: [...progressQueryKeys.all, "chain", entityId, period]
     });
   }
   await queryClient.cancelQueries({
-    queryKey: checkInsQueryKeys.today(),
+    queryKey: checkInsQueryKeys.today()
   });
   await queryClient.cancelQueries({
-    queryKey: checkInsQueryKeys.list(entityId),
+    queryKey: checkInsQueryKeys.list(entityId)
   });
   // Cancel home dashboard to prevent race conditions
   await queryClient.cancelQueries({
-    queryKey: homeDashboardQueryKeys.dashboard(),
+    queryKey: homeDashboardQueryKeys.dashboard()
   });
   // Cancel tracking stats for all types and periods
   await queryClient.cancelQueries({
-    queryKey: trackingStatsQueryKeys.entity(entityType, entityId),
+    queryKey: trackingStatsQueryKeys.entity(entityType, entityId)
   });
 }
 
@@ -89,18 +89,13 @@ export function snapshotProgressData(
   queryClient: QueryClient,
   entityId: string,
   logDate: string,
-  entityType: "goal" | "challenge" = "goal",
+  entityType: "goal" | "challenge" = "goal"
 ): ProgressOptimisticContext {
   const previousHabitChains = new Map<number, any>();
   for (const period of PERIOD_OPTIONS) {
     previousHabitChains.set(
       period,
-      queryClient.getQueryData([
-        ...progressQueryKeys.all,
-        "chain",
-        entityId,
-        period,
-      ]),
+      queryClient.getQueryData([...progressQueryKeys.all, "chain", entityId, period])
     );
   }
 
@@ -112,36 +107,23 @@ export function snapshotProgressData(
       previousTrackingStats.set(
         key,
         queryClient.getQueryData(
-          trackingStatsQueryKeys.stats(
-            entityType,
-            entityId,
-            trackingType,
-            period,
-          ),
-        ),
+          trackingStatsQueryKeys.stats(entityType, entityId, trackingType, period)
+        )
       );
     }
   }
 
   return {
-    previousStreakInfo: queryClient.getQueryData(
-      progressQueryKeys.streak(entityId),
-    ),
-    previousWeekProgress: queryClient.getQueryData(
-      progressQueryKeys.weekProgress(entityId),
-    ),
+    previousStreakInfo: queryClient.getQueryData(progressQueryKeys.streak(entityId)),
+    previousWeekProgress: queryClient.getQueryData(progressQueryKeys.weekProgress(entityId)),
     previousHabitChains,
     previousTodayCheckIns: queryClient.getQueryData(checkInsQueryKeys.today()),
-    previousGoalCheckIns: queryClient.getQueryData(
-      checkInsQueryKeys.list(entityId),
-    ),
-    previousDashboard: queryClient.getQueryData(
-      homeDashboardQueryKeys.dashboard(),
-    ),
+    previousGoalCheckIns: queryClient.getQueryData(checkInsQueryKeys.list(entityId)),
+    previousDashboard: queryClient.getQueryData(homeDashboardQueryKeys.dashboard()),
     previousTrackingStats,
     entityId,
     entityType,
-    logDate,
+    logDate
   };
 }
 
@@ -152,7 +134,7 @@ export function snapshotProgressData(
 export function optimisticallyUpdateProgress(
   queryClient: QueryClient,
   entityId: string,
-  logDate: string,
+  logDate: string
 ): void {
   console.log("[optimisticallyUpdateProgress] 🚀 START", { entityId, logDate });
 
@@ -163,7 +145,7 @@ export function optimisticallyUpdateProgress(
   if (!isToday) {
     console.log("[optimisticallyUpdateProgress] ⚠️ Not today, skipping", {
       logDate,
-      today,
+      today
     });
     return;
   }
@@ -178,7 +160,7 @@ export function optimisticallyUpdateProgress(
         current_streak: 1,
         longest_streak: 1,
         last_check_in_date: today,
-        goal_id: entityId,
+        goal_id: entityId
       };
     }
 
@@ -210,7 +192,7 @@ export function optimisticallyUpdateProgress(
       ...old,
       current_streak: newCurrentStreak,
       longest_streak: Math.max(old.longest_streak || 0, newCurrentStreak),
-      last_check_in_date: today,
+      last_check_in_date: today
     };
     return result;
   });
@@ -227,8 +209,8 @@ export function optimisticallyUpdateProgress(
           check_in_date: today,
           completed: true,
           goal_id: entityId,
-          created_at: new Date().toISOString(),
-        },
+          created_at: new Date().toISOString()
+        }
       ];
     }
 
@@ -261,8 +243,8 @@ export function optimisticallyUpdateProgress(
         check_in_date: today,
         completed: true,
         goal_id: entityId,
-        created_at: new Date().toISOString(),
-      },
+        created_at: new Date().toISOString()
+      }
     ];
   });
 
@@ -278,8 +260,8 @@ export function optimisticallyUpdateProgress(
             check_in_date: today,
             completed: true,
             goal_id: entityId,
-            created_at: new Date().toISOString(),
-          },
+            created_at: new Date().toISOString()
+          }
         ];
       }
 
@@ -309,8 +291,8 @@ export function optimisticallyUpdateProgress(
           check_in_date: today,
           completed: true,
           goal_id: entityId,
-          created_at: new Date().toISOString(),
-        },
+          created_at: new Date().toISOString()
+        }
       ];
     });
   }
@@ -320,9 +302,7 @@ export function optimisticallyUpdateProgress(
     if (!old?.data) return old;
 
     // Check if this goal already has a completed check-in today
-    const existingCheckIn = old.data.find(
-      (ci: any) => ci.goal_id === entityId && ci.is_checked_in,
-    );
+    const existingCheckIn = old.data.find((ci: any) => ci.goal_id === entityId && ci.is_checked_in);
     if (existingCheckIn) return old;
 
     // Find existing uncompleted check-in for this goal and mark as completed
@@ -332,7 +312,7 @@ export function optimisticallyUpdateProgress(
           ...ci,
           is_checked_in: true,
           completed: true,
-          updated_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         };
       }
       return ci;
@@ -358,10 +338,8 @@ export function optimisticallyUpdateProgress(
       return {
         ...old,
         data: old.data.map((ci: any) =>
-          ci.id === todayCheckIn.id
-            ? { ...ci, completed: true, is_checked_in: true }
-            : ci,
-        ),
+          ci.id === todayCheckIn.id ? { ...ci, completed: true, is_checked_in: true } : ci
+        )
       };
     }
 
@@ -372,7 +350,7 @@ export function optimisticallyUpdateProgress(
       completed: true,
       is_checked_in: true,
       goal_id: entityId,
-      created_at: new Date().toISOString(),
+      created_at: new Date().toISOString()
     };
 
     return { ...old, data: [...old.data, optimisticCheckIn] };
@@ -392,7 +370,7 @@ export function optimisticallyUpdateProgress(
       (pc: any) =>
         pc.type === "goal" &&
         (pc.data?.goal_id === entityId || pc.item?.id === entityId) &&
-        !pc.data?.is_checked_in,
+        !pc.data?.is_checked_in
     );
 
     if (!hasPendingForGoal) {
@@ -406,16 +384,13 @@ export function optimisticallyUpdateProgress(
       stats: {
         ...stats,
         current_streak: currentStreak + 1,
-        total_check_ins: totalCheckIns + 1,
+        total_check_ins: totalCheckIns + 1
       },
       // Mark the pending check-in as completed
       today_pending_checkins: old.today_pending_checkins?.filter(
         (pc: any) =>
-          !(
-            pc.type === "goal" &&
-            (pc.data?.goal_id === entityId || pc.item?.id === entityId)
-          ),
-      ),
+          !(pc.type === "goal" && (pc.data?.goal_id === entityId || pc.item?.id === entityId))
+      )
     };
   });
 }
@@ -431,11 +406,10 @@ export function optimisticallyUpdateWorkoutStats(
     durationSeconds: number;
     exercisesCompleted: number;
     caloriesBurned?: number;
-  },
+  }
 ): void {
   const durationMinutes = Math.round(workoutData.durationSeconds / 60);
-  const calories =
-    workoutData.caloriesBurned || Math.round(durationMinutes * 6.5);
+  const calories = workoutData.caloriesBurned || Math.round(durationMinutes * 6.5);
 
   // Update tracking stats for all periods
   for (const period of PERIOD_OPTIONS) {
@@ -453,15 +427,14 @@ export function optimisticallyUpdateWorkoutStats(
               exercises_completed: workoutData.exercisesCompleted,
               rest_days: period - 1,
               period_days: period,
-              total_calories_burned: calories,
-            },
+              total_calories_burned: calories
+            }
           };
         }
 
         const workout = old.workout || {};
         const newTotalWorkouts = (workout.total_workouts || 0) + 1;
-        const newTotalDuration =
-          (workout.total_duration_minutes || 0) + durationMinutes;
+        const newTotalDuration = (workout.total_duration_minutes || 0) + durationMinutes;
 
         return {
           ...old,
@@ -470,17 +443,13 @@ export function optimisticallyUpdateWorkoutStats(
             total_workouts: newTotalWorkouts,
             total_duration_minutes: newTotalDuration,
             workouts_this_week: (workout.workouts_this_week || 0) + 1,
-            avg_duration_minutes: Math.round(
-              newTotalDuration / newTotalWorkouts,
-            ),
+            avg_duration_minutes: Math.round(newTotalDuration / newTotalWorkouts),
             exercises_completed:
-              (workout.exercises_completed || 0) +
-              workoutData.exercisesCompleted,
-            total_calories_burned:
-              (workout.total_calories_burned || 0) + calories,
-          },
+              (workout.exercises_completed || 0) + workoutData.exercisesCompleted,
+            total_calories_burned: (workout.total_calories_burned || 0) + calories
+          }
         };
-      },
+      }
     );
   }
 }
@@ -493,7 +462,7 @@ export function optimisticallyUpdateHydrationStats(
   entityId: string,
   entityType: "goal" | "challenge",
   amountMl: number,
-  dailyTargetMl: number = 2000,
+  dailyTargetMl: number = 2000
 ): void {
   for (const period of PERIOD_OPTIONS) {
     queryClient.setQueryData(
@@ -509,8 +478,8 @@ export function optimisticallyUpdateHydrationStats(
               total_logs: 1,
               daily_target_ml: dailyTargetMl,
               period_days: period,
-              today_intake_ml: amountMl,
-            },
+              today_intake_ml: amountMl
+            }
           };
         }
 
@@ -526,12 +495,10 @@ export function optimisticallyUpdateHydrationStats(
             total_intake_ml: newTotalIntake,
             today_intake_ml: newTodayIntake,
             total_logs: newTotalLogs,
-            avg_daily_ml: Math.round(
-              newTotalIntake / Math.max(1, hydration.period_days || 1),
-            ),
-          },
+            avg_daily_ml: Math.round(newTotalIntake / Math.max(1, hydration.period_days || 1))
+          }
         };
-      },
+      }
     );
   }
 }
@@ -547,7 +514,7 @@ export function optimisticallyUpdateMealStats(
     calories?: number;
     protein?: number;
     isHealthy?: boolean;
-  },
+  }
 ): void {
   for (const period of PERIOD_OPTIONS) {
     queryClient.setQueryData(
@@ -561,15 +528,14 @@ export function optimisticallyUpdateMealStats(
               total_protein: mealData.protein || 0,
               avg_calories_per_meal: mealData.calories || 0,
               healthy_meal_count: mealData.isHealthy ? 1 : 0,
-              period_days: period,
-            },
+              period_days: period
+            }
           };
         }
 
         const meal = old.meal || {};
         const newTotalMeals = (meal.total_meals || 0) + 1;
-        const newTotalCalories =
-          (meal.total_calories || 0) + (mealData.calories || 0);
+        const newTotalCalories = (meal.total_calories || 0) + (mealData.calories || 0);
 
         return {
           ...old,
@@ -579,11 +545,10 @@ export function optimisticallyUpdateMealStats(
             total_calories: newTotalCalories,
             total_protein: (meal.total_protein || 0) + (mealData.protein || 0),
             avg_calories_per_meal: Math.round(newTotalCalories / newTotalMeals),
-            healthy_meal_count:
-              (meal.healthy_meal_count || 0) + (mealData.isHealthy ? 1 : 0),
-          },
+            healthy_meal_count: (meal.healthy_meal_count || 0) + (mealData.isHealthy ? 1 : 0)
+          }
         };
-      },
+      }
     );
   }
 }
@@ -593,7 +558,7 @@ export function optimisticallyUpdateMealStats(
  */
 export function rollbackProgressData(
   queryClient: QueryClient,
-  context: ProgressOptimisticContext,
+  context: ProgressOptimisticContext
 ): void {
   const {
     entityId,
@@ -604,29 +569,20 @@ export function rollbackProgressData(
     previousTodayCheckIns,
     previousGoalCheckIns,
     previousDashboard,
-    previousTrackingStats,
+    previousTrackingStats
   } = context;
 
   if (previousStreakInfo !== undefined) {
-    queryClient.setQueryData(
-      progressQueryKeys.streak(entityId),
-      previousStreakInfo,
-    );
+    queryClient.setQueryData(progressQueryKeys.streak(entityId), previousStreakInfo);
   }
 
   if (previousWeekProgress !== undefined) {
-    queryClient.setQueryData(
-      progressQueryKeys.weekProgress(entityId),
-      previousWeekProgress,
-    );
+    queryClient.setQueryData(progressQueryKeys.weekProgress(entityId), previousWeekProgress);
   }
 
   for (const [period, data] of previousHabitChains) {
     if (data !== undefined) {
-      queryClient.setQueryData(
-        [...progressQueryKeys.all, "chain", entityId, period],
-        data,
-      );
+      queryClient.setQueryData([...progressQueryKeys.all, "chain", entityId, period], data);
     }
   }
 
@@ -635,17 +591,11 @@ export function rollbackProgressData(
   }
 
   if (previousGoalCheckIns !== undefined) {
-    queryClient.setQueryData(
-      checkInsQueryKeys.list(entityId),
-      previousGoalCheckIns,
-    );
+    queryClient.setQueryData(checkInsQueryKeys.list(entityId), previousGoalCheckIns);
   }
 
   if (previousDashboard !== undefined) {
-    queryClient.setQueryData(
-      homeDashboardQueryKeys.dashboard(),
-      previousDashboard,
-    );
+    queryClient.setQueryData(homeDashboardQueryKeys.dashboard(), previousDashboard);
   }
 
   // Rollback tracking stats
@@ -655,13 +605,8 @@ export function rollbackProgressData(
         const [trackingType, periodStr] = key.split("-");
         const period = parseInt(periodStr, 10);
         queryClient.setQueryData(
-          trackingStatsQueryKeys.stats(
-            entityType,
-            entityId,
-            trackingType,
-            period,
-          ),
-          data,
+          trackingStatsQueryKeys.stats(entityType, entityId, trackingType, period),
+          data
         );
       }
     }

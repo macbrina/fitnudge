@@ -17,12 +17,12 @@ const getSkeletonColors = (isDark: boolean) => {
   if (isDark) {
     return {
       base: "#2a3342", // Dark gray-blue, visible on dark background
-      highlight: "#3a4555", // Lighter gray-blue for shimmer
+      highlight: "#3a4555" // Lighter gray-blue for shimmer
     };
   } else {
     return {
       base: "#e2e8f0", // Light gray, visible on white background
-      highlight: "#f1f5f9", // Lighter gray for shimmer
+      highlight: "#f1f5f9" // Lighter gray for shimmer
     };
   }
 };
@@ -33,7 +33,7 @@ export const SkeletonBox: React.FC<SkeletonBoxProps> = ({
   borderRadius = 4,
   style,
   animated = true,
-  duration = 1500,
+  duration = 1500
 }) => {
   const { colors, isDark } = useTheme();
   const animatedValue = useRef(new Animated.Value(0)).current;
@@ -46,14 +46,14 @@ export const SkeletonBox: React.FC<SkeletonBoxProps> = ({
           Animated.timing(animatedValue, {
             toValue: 1,
             duration: duration,
-            useNativeDriver: false,
+            useNativeDriver: false
           }),
           Animated.timing(animatedValue, {
             toValue: 0,
             duration: duration,
-            useNativeDriver: false,
-          }),
-        ]),
+            useNativeDriver: false
+          })
+        ])
       );
       animation.start();
 
@@ -64,7 +64,7 @@ export const SkeletonBox: React.FC<SkeletonBoxProps> = ({
   const backgroundColor = animated
     ? animatedValue.interpolate({
         inputRange: [0, 1],
-        outputRange: [skeletonColors.base, skeletonColors.highlight],
+        outputRange: [skeletonColors.base, skeletonColors.highlight]
       })
     : skeletonColors.base;
 
@@ -75,9 +75,9 @@ export const SkeletonBox: React.FC<SkeletonBoxProps> = ({
           width,
           height,
           backgroundColor,
-          borderRadius: toRN(borderRadius),
+          borderRadius: toRN(borderRadius)
         },
-        style,
+        style
       ]}
     />
   );
@@ -100,7 +100,7 @@ export const SkeletonText: React.FC<{
           height={height}
           borderRadius={4}
           style={{
-            marginBottom: index < lines - 1 ? toRN(spacing) : 0,
+            marginBottom: index < lines - 1 ? toRN(spacing) : 0
           }}
         />
       ))}
@@ -126,23 +126,18 @@ export const SkeletonCard: React.FC<{
           backgroundColor: colors.bg.card,
           borderRadius: toRN(12),
           borderWidth: 1,
-          borderColor: colors.border.default,
+          borderColor: colors.border.default
         },
-        style,
+        style
       ]}
     >
-      <SkeletonBox
-        width="70%"
-        height={20}
-        borderRadius={4}
-        style={{ marginBottom: toRN(8) }}
-      />
+      <SkeletonBox width="70%" height={20} borderRadius={4} style={{ marginBottom: toRN(8) }} />
       <SkeletonText lines={2} width="100%" height={14} spacing={6} />
       <View
         style={{
           flexDirection: "row",
           justifyContent: "space-between",
-          marginTop: toRN(12),
+          marginTop: toRN(12)
         }}
       >
         <SkeletonBox width="30%" height={12} borderRadius={6} />
@@ -158,14 +153,7 @@ export const SkeletonButton: React.FC<{
   borderRadius?: number;
   style?: ViewStyle;
 }> = ({ width = "100%", height = 48, borderRadius = 8, style }) => {
-  return (
-    <SkeletonBox
-      width={width}
-      height={height}
-      borderRadius={borderRadius}
-      style={style}
-    />
-  );
+  return <SkeletonBox width={width} height={height} borderRadius={borderRadius} style={style} />;
 };
 
 export const SkeletonAvatar: React.FC<{
@@ -188,7 +176,7 @@ export const SkeletonList: React.FC<{
           height={itemHeight}
           borderRadius={8}
           style={{
-            marginBottom: index < items - 1 ? toRN(spacing) : 0,
+            marginBottom: index < items - 1 ? toRN(spacing) : 0
           }}
         />
       ))}

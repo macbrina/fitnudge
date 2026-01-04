@@ -34,22 +34,16 @@ export function HydrationPlanCard({ plan }: HydrationPlanCardProps) {
         <View style={styles.iconContainer}>
           <Ionicons name="water" size={28} color={brandColors.primary} />
         </View>
-        <Text style={styles.cardTitle}>
-          {t("goals.plan.hydration_title") || "Hydration Plan"}
-        </Text>
+        <Text style={styles.cardTitle}>{t("goals.plan.hydration_title") || "Hydration Plan"}</Text>
       </View>
 
       {/* Daily Target */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>
-          {t("goals.plan.daily_target") || "Daily Target"}
-        </Text>
+        <Text style={styles.sectionTitle}>{t("goals.plan.daily_target") || "Daily Target"}</Text>
         <View style={styles.targetCard}>
           <View style={styles.targetMain}>
             <Text style={styles.targetValue}>{targetGlasses}</Text>
-            <Text style={styles.targetUnit}>
-              {t("goals.plan.glasses") || "glasses"}
-            </Text>
+            <Text style={styles.targetUnit}>{t("goals.plan.glasses") || "glasses"}</Text>
           </View>
           <View style={styles.targetDivider} />
           <View style={styles.targetSecondary}>
@@ -62,50 +56,37 @@ export function HydrationPlanCard({ plan }: HydrationPlanCardProps) {
       </View>
 
       {/* Reminder Schedule */}
-      {reminderSchedule.suggested_times &&
-        reminderSchedule.suggested_times.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
-              {t("goals.plan.reminder_schedule") || "Reminder Schedule"}
-            </Text>
-            <View style={styles.timesContainer}>
-              {reminderSchedule.suggested_times.map(
-                (time: string, index: number) => (
-                  <View key={index} style={styles.timeChip}>
-                    <Ionicons
-                      name="notifications-outline"
-                      size={14}
-                      color={brandColors.primary}
-                    />
-                    <Text style={styles.timeText}>{time}</Text>
-                  </View>
-                ),
-              )}
-            </View>
-            {reminderSchedule.frequency && (
-              <Text style={styles.frequencyNote}>
-                {reminderSchedule.frequency === "every_2_hours"
-                  ? t("goals.plan.every_2_hours") || "Every 2 hours"
-                  : reminderSchedule.frequency}
-              </Text>
-            )}
+      {reminderSchedule.suggested_times && reminderSchedule.suggested_times.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>
+            {t("goals.plan.reminder_schedule") || "Reminder Schedule"}
+          </Text>
+          <View style={styles.timesContainer}>
+            {reminderSchedule.suggested_times.map((time: string, index: number) => (
+              <View key={index} style={styles.timeChip}>
+                <Ionicons name="notifications-outline" size={14} color={brandColors.primary} />
+                <Text style={styles.timeText}>{time}</Text>
+              </View>
+            ))}
           </View>
-        )}
+          {reminderSchedule.frequency && (
+            <Text style={styles.frequencyNote}>
+              {reminderSchedule.frequency === "every_2_hours"
+                ? t("goals.plan.every_2_hours") || "Every 2 hours"
+                : reminderSchedule.frequency}
+            </Text>
+          )}
+        </View>
+      )}
 
       {/* Hydration Tips */}
       {hydrationTips.length > 0 && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            {t("goals.plan.quick_tips") || "Quick Tips"}
-          </Text>
+          <Text style={styles.sectionTitle}>{t("goals.plan.quick_tips") || "Quick Tips"}</Text>
           <View style={styles.tipsContainer}>
             {hydrationTips.slice(0, 3).map((tip: string, index: number) => (
               <View key={index} style={styles.tipRow}>
-                <Ionicons
-                  name="checkmark-circle"
-                  size={16}
-                  color={brandColors.primary}
-                />
+                <Ionicons name="checkmark-circle" size={16} color={brandColors.primary} />
                 <Text style={styles.tipText}>{tip}</Text>
               </View>
             ))}
@@ -118,7 +99,7 @@ export function HydrationPlanCard({ plan }: HydrationPlanCardProps) {
 
 const makeHydrationPlanCardStyles = (tokens: any, colors: any, brand: any) => ({
   card: {
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   header: {
     flexDirection: "row" as const,
@@ -126,7 +107,7 @@ const makeHydrationPlanCardStyles = (tokens: any, colors: any, brand: any) => ({
     marginBottom: toRN(tokens.spacing[4]),
     paddingBottom: toRN(tokens.spacing[3]),
     borderBottomWidth: 1,
-    borderBottomColor: colors.border.default,
+    borderBottomColor: colors.border.default
   },
   iconContainer: {
     width: toRN(tokens.spacing[10]),
@@ -135,21 +116,21 @@ const makeHydrationPlanCardStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: "#3B82F6" + "1A", // Blue tint for water
     alignItems: "center" as const,
     justifyContent: "center" as const,
-    marginRight: toRN(tokens.spacing[3]),
+    marginRight: toRN(tokens.spacing[3])
   },
   cardTitle: {
     fontSize: toRN(tokens.typography.fontSize.xl),
     fontFamily: fontFamily.groteskBold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   section: {
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   sectionTitle: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.groteskSemiBold,
     color: colors.text.primary,
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
 
   // Target Card
@@ -160,50 +141,50 @@ const makeHydrationPlanCardStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: "#3B82F6" + "10", // Light blue background
     borderRadius: toRN(tokens.borderRadius.lg),
     borderWidth: 1,
-    borderColor: "#3B82F6" + "20",
+    borderColor: "#3B82F6" + "20"
   },
   targetMain: {
     alignItems: "center" as const,
-    flex: 1,
+    flex: 1
   },
   targetValue: {
     fontSize: toRN(tokens.typography.fontSize["4xl"]),
     fontFamily: fontFamily.groteskBold,
-    color: "#3B82F6",
+    color: "#3B82F6"
   },
   targetUnit: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.groteskMedium,
     color: colors.text.secondary,
-    marginTop: toRN(tokens.spacing[0.5]),
+    marginTop: toRN(tokens.spacing[0.5])
   },
   targetDivider: {
     width: 1,
     height: "60%",
     backgroundColor: colors.border.default,
-    marginHorizontal: toRN(tokens.spacing[4]),
+    marginHorizontal: toRN(tokens.spacing[4])
   },
   targetSecondary: {
     alignItems: "center" as const,
-    flex: 1,
+    flex: 1
   },
   targetMl: {
     fontSize: toRN(tokens.typography.fontSize.xl),
     fontFamily: fontFamily.groteskBold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   targetSubtext: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.groteskRegular,
     color: colors.text.tertiary,
-    marginTop: toRN(tokens.spacing[0.5]),
+    marginTop: toRN(tokens.spacing[0.5])
   },
 
   // Times
   timesContainer: {
     flexDirection: "row" as const,
     flexWrap: "wrap" as const,
-    gap: toRN(tokens.spacing[2]),
+    gap: toRN(tokens.spacing[2])
   },
   timeChip: {
     flexDirection: "row" as const,
@@ -212,35 +193,35 @@ const makeHydrationPlanCardStyles = (tokens: any, colors: any, brand: any) => ({
     paddingVertical: toRN(tokens.spacing[2]),
     paddingHorizontal: toRN(tokens.spacing[3]),
     backgroundColor: brand.primary + "1A",
-    borderRadius: toRN(tokens.borderRadius.full),
+    borderRadius: toRN(tokens.borderRadius.full)
   },
   timeText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.groteskSemiBold,
     color: brand.primary,
-    textTransform: "capitalize" as const,
+    textTransform: "capitalize" as const
   },
   frequencyNote: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.groteskRegular,
     color: colors.text.tertiary,
-    marginTop: toRN(tokens.spacing[2]),
+    marginTop: toRN(tokens.spacing[2])
   },
 
   // Tips
   tipsContainer: {
-    gap: toRN(tokens.spacing[2]),
+    gap: toRN(tokens.spacing[2])
   },
   tipRow: {
     flexDirection: "row" as const,
     alignItems: "flex-start" as const,
-    gap: toRN(tokens.spacing[2]),
+    gap: toRN(tokens.spacing[2])
   },
   tipText: {
     flex: 1,
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.groteskRegular,
     color: colors.text.secondary,
-    lineHeight: toRN(tokens.typography.fontSize.sm) * 1.4,
-  },
+    lineHeight: toRN(tokens.typography.fontSize.sm) * 1.4
+  }
 });

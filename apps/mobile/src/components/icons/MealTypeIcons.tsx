@@ -17,13 +17,7 @@ interface MealTypeIconProps {
  * Flaticon search: "sunrise", "morning", "breakfast"
  * Recommended: Simple sunrise with rays
  */
-const BreakfastIcon = ({
-  size = 24,
-  color,
-}: {
-  size: number;
-  color: string;
-}) => (
+const BreakfastIcon = ({ size = 24, color }: { size: number; color: string }) => (
   <Svg width={size} height={size} viewBox="0 0 512 512">
     <G>
       <G>
@@ -351,13 +345,7 @@ const SnackIcon = ({ size = 24, color }: { size: number; color: string }) => (
  * Flaticon search: "plate", "dish", "cutlery", "fork knife"
  * Recommended: Plate with fork and knife
  */
-const OtherMealIcon = ({
-  size = 24,
-  color,
-}: {
-  size: number;
-  color: string;
-}) => (
+const OtherMealIcon = ({ size = 24, color }: { size: number; color: string }) => (
   <Svg height={size} viewBox="0 0 512 512" width={size}>
     <Path
       d="m470 344h-13.63c-4.01-93.85-72.82-171.2-162.72-188.34a40.456 40.456 0 0 0 -79.93.94c-87.63 18.88-154.15 95.17-158.09 187.4h-13.63a18.021 18.021 0 0 0 -18 18v12a18.021 18.021 0 0 0 18 18h428a18.021 18.021 0 0 0 18-18v-12a18.021 18.021 0 0 0 -18-18zm-216.24-206.06a24.481 24.481 0 0 1 22.63 15.19 202.452 202.452 0 0 0 -45.48.53 24.516 24.516 0 0 1 22.85-15.72zm2.24 30.16c98.87 0 179.82 78.14 184.36 175.9h-336.15a152.55 152.55 0 0 1 2.83-22.41 8 8 0 0 0 -15.68-3.18 168.352 168.352 0 0 0 -3.17 25.59h-16.55c4.54-97.76 85.49-175.9 184.36-175.9zm216 205.9a2.006 2.006 0 0 1 -2 2h-428a2.006 2.006 0 0 1 -2-2v-12a2.006 2.006 0 0 1 2-2h428a2.006 2.006 0 0 1 2 2z"
@@ -379,17 +367,11 @@ const OtherMealIcon = ({
  * Main MealTypeIcon component
  * Renders the appropriate icon based on meal type
  */
-export function MealTypeIcon({
-  type,
-  size = 24,
-  color,
-  selected = false,
-}: MealTypeIconProps) {
+export function MealTypeIcon({ type, size = 24, color, selected = false }: MealTypeIconProps) {
   const { colors, brandColors } = useTheme();
 
   // Use provided color or default based on selection state
-  const iconColor =
-    color || (selected ? brandColors.onPrimary : colors.text.primary);
+  const iconColor = color || (selected ? brandColors.onPrimary : colors.text.primary);
 
   switch (type) {
     case "breakfast":
@@ -415,7 +397,7 @@ export const MEAL_TYPES: { key: MealType; label: string }[] = [
   { key: "lunch", label: "Lunch" },
   { key: "dinner", label: "Dinner" },
   { key: "snack", label: "Snack" },
-  { key: "other", label: "Other" },
+  { key: "other", label: "Other" }
 ];
 
 // Export individual icons for direct use if needed

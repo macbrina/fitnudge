@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   Image,
   ActivityIndicator,
-  RefreshControl,
+  RefreshControl
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -19,6 +19,7 @@ import { Tabs, TabItem } from "@/components/ui/Tabs";
 import { Card } from "@/components/ui/Card";
 import { SkeletonBox } from "@/components/ui/SkeletonBox";
 import { useAlertModal } from "@/contexts/AlertModalContext";
+import { ApiError } from "@/services/api/base";
 import { useTranslation } from "@/lib/i18n";
 import { useStyles, useTheme } from "@/themes";
 import { toRN } from "@/lib/units";
@@ -30,7 +31,7 @@ import {
   useSendPartnerRequest,
   useCancelPartnerRequest,
   useAcceptPartnerRequest,
-  usePartnerAccess,
+  usePartnerAccess
 } from "@/hooks/api/usePartners";
 import { SearchUserResult, RequestStatus } from "@/services/api/partners";
 
@@ -52,9 +53,9 @@ export const FindPartnerScreen: React.FC = () => {
   const tabs: TabItem[] = useMemo(
     () => [
       { id: "search", label: t("social.tabs.search") },
-      { id: "suggested", label: t("social.tabs.suggested") },
+      { id: "suggested", label: t("social.tabs.suggested") }
     ],
-    [t],
+    [t]
   );
 
   // Debounce search query
@@ -75,7 +76,7 @@ export const FindPartnerScreen: React.FC = () => {
     fetchNextPage: fetchNextSearchPage,
     hasNextPage: hasNextSearchPage,
     isFetchingNextPage: isFetchingNextSearchPage,
-    isLoading: isSearchLoading,
+    isLoading: isSearchLoading
   } = useSearchPartnersInfinite(debouncedQuery);
 
   // Suggested users query
@@ -84,7 +85,7 @@ export const FindPartnerScreen: React.FC = () => {
     fetchNextPage: fetchNextSuggestedPage,
     hasNextPage: hasNextSuggestedPage,
     isFetchingNextPage: isFetchingNextSuggestedPage,
-    isLoading: isSuggestedLoading,
+    isLoading: isSuggestedLoading
   } = useSuggestedPartnersInfinite();
 
   // Mutations
@@ -98,13 +99,11 @@ export const FindPartnerScreen: React.FC = () => {
     canSendRequest,
     acceptedCount,
     pendingSentCount,
-    limit: partnerLimit,
+    limit: partnerLimit
   } = usePartnerAccess();
 
   // Track which users are currently being processed (for showing loading on specific buttons)
-  const [processingUsers, setProcessingUsers] = useState<Set<string>>(
-    new Set(),
-  );
+  const [processingUsers, setProcessingUsers] = useState<Set<string>>(new Set());
 
   // Track manual refresh state (don't show RefreshControl for background refetches)
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
@@ -122,14 +121,10 @@ export const FindPartnerScreen: React.FC = () => {
 
   // Get current data based on active tab
   const currentUsers = activeTab === "search" ? searchUsers : suggestedUsers;
-  const isLoading =
-    activeTab === "search" ? isSearchLoading : isSuggestedLoading;
+  const isLoading = activeTab === "search" ? isSearchLoading : isSuggestedLoading;
   const isFetchingNextPage =
-    activeTab === "search"
-      ? isFetchingNextSearchPage
-      : isFetchingNextSuggestedPage;
-  const hasNextPage =
-    activeTab === "search" ? hasNextSearchPage : hasNextSuggestedPage;
+    activeTab === "search" ? isFetchingNextSearchPage : isFetchingNextSuggestedPage;
+  const hasNextPage = activeTab === "search" ? hasNextSearchPage : hasNextSuggestedPage;
 
   const handleLoadMore = useCallback(() => {
     if (!isFetchingNextPage && hasNextPage) {
@@ -139,13 +134,7 @@ export const FindPartnerScreen: React.FC = () => {
         fetchNextSuggestedPage();
       }
     }
-  }, [
-    activeTab,
-    isFetchingNextPage,
-    hasNextPage,
-    fetchNextSearchPage,
-    fetchNextSuggestedPage,
-  ]);
+  }, [activeTab, isFetchingNextPage, hasNextPage, fetchNextSearchPage, fetchNextSuggestedPage]);
 
   const handleRefresh = useCallback(async () => {
     setIsManualRefreshing(true);
@@ -153,12 +142,12 @@ export const FindPartnerScreen: React.FC = () => {
       if (activeTab === "search") {
         // Invalidate search query to force fresh fetch
         await queryClient.invalidateQueries({
-          queryKey: partnersQueryKeys.searchInfinite(debouncedQuery),
+          queryKey: partnersQueryKeys.searchInfinite(debouncedQuery)
         });
       } else {
         // Invalidate suggested query to force fresh fetch
         await queryClient.invalidateQueries({
-          queryKey: partnersQueryKeys.suggestedInfinite(),
+          queryKey: partnersQueryKeys.suggestedInfinite()
         });
       }
     } finally {
@@ -191,7 +180,7 @@ export const FindPartnerScreen: React.FC = () => {
             t("partners.feature_required") ||
             "Accountability partners require a subscription. Upgrade to connect with others!",
           variant: "warning",
-          confirmLabel: t("common.ok"),
+          confirmLabel: t("common.ok")
         });
         return;
       }
@@ -204,11 +193,11 @@ export const FindPartnerScreen: React.FC = () => {
             t("partners.limit_reached_message", {
               limit: partnerLimit ?? 0,
               accepted: acceptedCount,
-              pending: pendingSentCount,
+              pending: pendingSentCount
             }) ||
             `You have reached your partner limit (${partnerLimit}). You have ${acceptedCount} partners and ${pendingSentCount} pending requests.`,
           variant: "warning",
-          confirmLabel: t("common.ok"),
+          confirmLabel: t("common.ok")
         });
         return;
       }
@@ -223,7 +212,7 @@ export const FindPartnerScreen: React.FC = () => {
         cancelLabel: t("partners.send_request_cancel") || "Cancel",
         variant: "info",
         size: "lg",
-        messageAlign: "left",
+        messageAlign: "left"
       });
 
       if (!confirmed) return;
@@ -231,15 +220,16 @@ export const FindPartnerScreen: React.FC = () => {
       addProcessingUser(user.id);
       try {
         await sendRequestMutation.mutateAsync({
-          partner_user_id: user.id,
+          partner_user_id: user.id
         });
         // No need to refresh - optimistic update handles button state
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const errorMessage = error instanceof ApiError ? error.message : t("social.request_failed");
         showAlert({
           title: t("common.error"),
-          message: error?.message || t("social.request_failed"),
+          message: errorMessage,
           variant: "error",
-          confirmLabel: t("common.ok"),
+          confirmLabel: t("common.ok")
         });
       } finally {
         removeProcessingUser(user.id);
@@ -256,8 +246,8 @@ export const FindPartnerScreen: React.FC = () => {
       canSendRequest,
       partnerLimit,
       acceptedCount,
-      pendingSentCount,
-    ],
+      pendingSentCount
+    ]
   );
 
   const handleCancelRequest = useCallback(
@@ -268,27 +258,22 @@ export const FindPartnerScreen: React.FC = () => {
       try {
         await cancelRequestMutation.mutateAsync({
           partnershipId: user.partnership_id,
-          userId: user.id,
+          userId: user.id
         });
         // No need to refresh - optimistic update handles button state
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const errorMessage = error instanceof ApiError ? error.message : t("social.cancel_failed");
         showAlert({
           title: t("common.error"),
-          message: error?.message || t("social.cancel_failed"),
+          message: errorMessage,
           variant: "error",
-          confirmLabel: t("common.ok"),
+          confirmLabel: t("common.ok")
         });
       } finally {
         removeProcessingUser(user.id);
       }
     },
-    [
-      cancelRequestMutation,
-      showAlert,
-      t,
-      addProcessingUser,
-      removeProcessingUser,
-    ],
+    [cancelRequestMutation, showAlert, t, addProcessingUser, removeProcessingUser]
   );
 
   const handleAcceptRequest = useCallback(
@@ -299,27 +284,22 @@ export const FindPartnerScreen: React.FC = () => {
       try {
         await acceptRequestMutation.mutateAsync({
           partnershipId: user.partnership_id,
-          userId: user.id,
+          userId: user.id
         });
         // No need to refresh - optimistic update handles button state
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const errorMessage = error instanceof ApiError ? error.message : t("social.accept_failed");
         showAlert({
           title: t("common.error"),
-          message: error?.message || t("social.accept_failed"),
+          message: errorMessage,
           variant: "error",
-          confirmLabel: t("common.ok"),
+          confirmLabel: t("common.ok")
         });
       } finally {
         removeProcessingUser(user.id);
       }
     },
-    [
-      acceptRequestMutation,
-      showAlert,
-      t,
-      addProcessingUser,
-      removeProcessingUser,
-    ],
+    [acceptRequestMutation, showAlert, t, addProcessingUser, removeProcessingUser]
   );
 
   const renderUserCard = useCallback(
@@ -334,14 +314,8 @@ export const FindPartnerScreen: React.FC = () => {
             // Already partners - show badge
             return (
               <View style={styles.partnerBadge}>
-                <Ionicons
-                  name="checkmark-circle"
-                  size={16}
-                  color={colors.feedback.success}
-                />
-                <Text style={styles.partnerBadgeText}>
-                  {t("social.partner_badge")}
-                </Text>
+                <Ionicons name="checkmark-circle" size={16} color={colors.feedback.success} />
+                <Text style={styles.partnerBadgeText}>{t("social.partner_badge")}</Text>
               </View>
             );
 
@@ -355,20 +329,11 @@ export const FindPartnerScreen: React.FC = () => {
                 activeOpacity={0.7}
               >
                 {isProcessing ? (
-                  <ActivityIndicator
-                    size="small"
-                    color={colors.text.tertiary}
-                  />
+                  <ActivityIndicator size="small" color={colors.text.tertiary} />
                 ) : (
                   <>
-                    <Ionicons
-                      name="time-outline"
-                      size={14}
-                      color={colors.text.tertiary}
-                    />
-                    <Text style={styles.requestedButtonText}>
-                      {t("social.requested_button")}
-                    </Text>
+                    <Ionicons name="time-outline" size={14} color={colors.text.tertiary} />
+                    <Text style={styles.requestedButtonText}>{t("social.requested_button")}</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -388,9 +353,7 @@ export const FindPartnerScreen: React.FC = () => {
                 ) : (
                   <>
                     <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-                    <Text style={styles.acceptButtonText}>
-                      {t("social.accept_button")}
-                    </Text>
+                    <Text style={styles.acceptButtonText}>{t("social.accept_button")}</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -410,14 +373,8 @@ export const FindPartnerScreen: React.FC = () => {
                   <ActivityIndicator size="small" color={brandColors.primary} />
                 ) : (
                   <>
-                    <Ionicons
-                      name="person-add"
-                      size={16}
-                      color={brandColors.primary}
-                    />
-                    <Text style={styles.addButtonText}>
-                      {t("social.request_button")}
-                    </Text>
+                    <Ionicons name="person-add" size={16} color={brandColors.primary} />
+                    <Text style={styles.addButtonText}>{t("social.request_button")}</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -431,17 +388,9 @@ export const FindPartnerScreen: React.FC = () => {
             {/* Avatar */}
             <View style={styles.avatarContainer}>
               {item.profile_picture_url ? (
-                <Image
-                  source={{ uri: item.profile_picture_url }}
-                  style={styles.avatar}
-                />
+                <Image source={{ uri: item.profile_picture_url }} style={styles.avatar} />
               ) : (
-                <View
-                  style={[
-                    styles.avatarPlaceholder,
-                    { backgroundColor: brandColors.primary },
-                  ]}
-                >
+                <View style={[styles.avatarPlaceholder, { backgroundColor: brandColors.primary }]}>
                   <Text style={styles.avatarInitial}>
                     {item.name?.charAt(0)?.toUpperCase() ||
                       item.username?.charAt(0)?.toUpperCase() ||
@@ -477,8 +426,8 @@ export const FindPartnerScreen: React.FC = () => {
       handleAcceptRequest,
       processingUsers,
       styles,
-      t,
-    ],
+      t
+    ]
   );
 
   const renderEmptyState = useCallback(() => {
@@ -489,9 +438,7 @@ export const FindPartnerScreen: React.FC = () => {
             <Ionicons name="search" size={48} color={colors.text.tertiary} />
           </View>
           <Text style={styles.emptyTitle}>{t("social.search_for_users")}</Text>
-          <Text style={styles.emptyDescription}>
-            {t("social.search_description")}
-          </Text>
+          <Text style={styles.emptyDescription}>{t("social.search_description")}</Text>
         </View>
       );
     }
@@ -503,16 +450,10 @@ export const FindPartnerScreen: React.FC = () => {
     return (
       <View style={styles.emptyState}>
         <View style={styles.emptyIconContainer}>
-          <Ionicons
-            name="people-outline"
-            size={48}
-            color={colors.text.tertiary}
-          />
+          <Ionicons name="people-outline" size={48} color={colors.text.tertiary} />
         </View>
         <Text style={styles.emptyTitle}>
-          {activeTab === "search"
-            ? t("social.no_users_found")
-            : t("social.no_suggestions")}
+          {activeTab === "search" ? t("social.no_users_found") : t("social.no_suggestions")}
         </Text>
         <Text style={styles.emptyDescription}>
           {activeTab === "search"
@@ -541,32 +482,23 @@ export const FindPartnerScreen: React.FC = () => {
             <SkeletonBox width={48} height={48} borderRadius={24} />
             <View style={styles.skeletonContent}>
               <SkeletonBox width={120} height={16} borderRadius={4} />
-              <SkeletonBox
-                width={80}
-                height={12}
-                borderRadius={4}
-                style={{ marginTop: 4 }}
-              />
+              <SkeletonBox width={80} height={12} borderRadius={4} style={{ marginTop: 4 }} />
             </View>
             <SkeletonBox width={60} height={32} borderRadius={16} />
           </View>
         ))}
       </View>
     ),
-    [styles],
+    [styles]
   );
 
   // Show skeleton loading for initial load
-  const showSkeleton =
-    isLoading && (activeTab === "suggested" || debouncedQuery.length >= 2);
+  const showSkeleton = isLoading && (activeTab === "suggested" || debouncedQuery.length >= 2);
 
   return (
     <View style={styles.container}>
       {/* Header */}
-      <BackButton
-        title={t("social.find_partner")}
-        onPress={() => router.back()}
-      />
+      <BackButton title={t("social.find_partner")} onPress={() => router.back()} />
 
       {/* Tabs */}
       <View style={styles.tabsContainer}>
@@ -621,7 +553,7 @@ export const FindPartnerScreen: React.FC = () => {
       <View style={styles.inviteSection}>
         <Button
           title={t("social.invite_friends")}
-          onPress={() => router.push(MOBILE_ROUTES.SOCIAL.REFERRAL)}
+          onPress={() => router.push(MOBILE_ROUTES.PROFILE.REFERRAL)}
           variant="outline"
           leftIcon="share-outline"
           fullWidth
@@ -634,74 +566,74 @@ export const FindPartnerScreen: React.FC = () => {
 const makeStyles = (tokens: any, colors: any, brand: any) => ({
   container: {
     flex: 1,
-    backgroundColor: colors.bg.canvas,
+    backgroundColor: colors.bg.canvas
   },
   tabsContainer: {
     paddingHorizontal: toRN(tokens.spacing[4]),
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   searchContainer: {
     paddingHorizontal: toRN(tokens.spacing[4]),
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   contentWrapper: {
-    flex: 1,
+    flex: 1
   },
   listContent: {
     paddingHorizontal: toRN(tokens.spacing[4]),
     paddingBottom: toRN(tokens.spacing[8]),
-    flexGrow: 1,
+    flexGrow: 1
   },
   separator: {
-    height: toRN(tokens.spacing[3]),
+    height: toRN(tokens.spacing[3])
   },
 
   // User Card
   userCard: {
-    padding: toRN(tokens.spacing[4]),
+    padding: toRN(tokens.spacing[4])
   },
   userRow: {
     flexDirection: "row" as const,
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   avatarContainer: {
-    marginRight: toRN(tokens.spacing[3]),
+    marginRight: toRN(tokens.spacing[3])
   },
   avatar: {
     width: 48,
     height: 48,
-    borderRadius: 24,
+    borderRadius: 24
   },
   avatarPlaceholder: {
     width: 48,
     height: 48,
     borderRadius: 24,
     justifyContent: "center" as const,
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   avatarInitial: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.bold,
-    color: "#fff",
+    color: "#fff"
   },
   userInfo: {
     flex: 1,
-    marginRight: toRN(tokens.spacing[3]),
+    marginRight: toRN(tokens.spacing[3])
   },
   userName: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.semiBold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   userUsername: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
     color: colors.text.secondary,
-    marginTop: toRN(tokens.spacing[0.5]),
+    marginTop: toRN(tokens.spacing[0.5])
   },
   actionContainer: {
     minWidth: 80,
-    alignItems: "flex-end" as const,
+    alignItems: "flex-end" as const
   },
   addButton: {
     flexDirection: "row" as const,
@@ -710,12 +642,12 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     paddingHorizontal: toRN(tokens.spacing[3]),
     backgroundColor: `${brand.primary}15`,
     borderRadius: toRN(tokens.borderRadius.full),
-    gap: toRN(tokens.spacing[1]),
+    gap: toRN(tokens.spacing[1])
   },
   addButtonText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.semiBold,
-    color: brand.primary,
+    color: brand.primary
   },
   partnerBadge: {
     flexDirection: "row" as const,
@@ -724,12 +656,12 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     paddingHorizontal: toRN(tokens.spacing[2]),
     backgroundColor: `${colors.feedback.success}15`,
     borderRadius: toRN(tokens.borderRadius.full),
-    gap: toRN(tokens.spacing[1]),
+    gap: toRN(tokens.spacing[1])
   },
   partnerBadgeText: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.medium,
-    color: colors.feedback.success,
+    color: colors.feedback.success
   },
   pendingBadge: {
     flexDirection: "row" as const,
@@ -738,12 +670,12 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     paddingHorizontal: toRN(tokens.spacing[2]),
     backgroundColor: colors.bg.muted,
     borderRadius: toRN(tokens.borderRadius.full),
-    gap: toRN(tokens.spacing[1]),
+    gap: toRN(tokens.spacing[1])
   },
   pendingBadgeText: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.medium,
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   requestedButton: {
     flexDirection: "row" as const,
@@ -752,12 +684,12 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     paddingHorizontal: toRN(tokens.spacing[3]),
     backgroundColor: colors.bg.muted,
     borderRadius: toRN(tokens.borderRadius.full),
-    gap: toRN(tokens.spacing[1]),
+    gap: toRN(tokens.spacing[1])
   },
   requestedButtonText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   acceptButton: {
     flexDirection: "row" as const,
@@ -766,12 +698,12 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     paddingHorizontal: toRN(tokens.spacing[3]),
     backgroundColor: brand.primary,
     borderRadius: toRN(tokens.borderRadius.full),
-    gap: toRN(tokens.spacing[1]),
+    gap: toRN(tokens.spacing[1])
   },
   acceptButtonText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.semiBold,
-    color: "#FFFFFF",
+    color: "#FFFFFF"
   },
 
   // Empty State
@@ -780,7 +712,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     justifyContent: "center" as const,
     alignItems: "center" as const,
     paddingHorizontal: toRN(tokens.spacing[8]),
-    paddingVertical: toRN(tokens.spacing[12]),
+    paddingVertical: toRN(tokens.spacing[12])
   },
   emptyIconContainer: {
     width: 80,
@@ -789,21 +721,21 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: colors.bg.muted,
     justifyContent: "center" as const,
     alignItems: "center" as const,
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   emptyTitle: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.semiBold,
     color: colors.text.primary,
     textAlign: "center" as const,
-    marginBottom: toRN(tokens.spacing[2]),
+    marginBottom: toRN(tokens.spacing[2])
   },
   emptyDescription: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
     color: colors.text.secondary,
     textAlign: "center" as const,
-    lineHeight: toRN(tokens.typography.fontSize.sm) * 1.5,
+    lineHeight: toRN(tokens.typography.fontSize.sm) * 1.5
   },
 
   // Loading
@@ -812,17 +744,17 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     justifyContent: "center" as const,
     alignItems: "center" as const,
     paddingVertical: toRN(tokens.spacing[4]),
-    gap: toRN(tokens.spacing[2]),
+    gap: toRN(tokens.spacing[2])
   },
   loadingText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
-    color: colors.text.secondary,
+    color: colors.text.secondary
   },
 
   // Skeleton
   skeletonContainer: {
-    paddingHorizontal: toRN(tokens.spacing[4]),
+    paddingHorizontal: toRN(tokens.spacing[4])
   },
   skeletonCard: {
     flexDirection: "row" as const,
@@ -830,12 +762,12 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     padding: toRN(tokens.spacing[4]),
     backgroundColor: colors.bg.card,
     borderRadius: toRN(tokens.borderRadius.lg),
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   skeletonContent: {
     flex: 1,
     marginLeft: toRN(tokens.spacing[3]),
-    marginRight: toRN(tokens.spacing[3]),
+    marginRight: toRN(tokens.spacing[3])
   },
 
   // Invite Section
@@ -843,8 +775,8 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     padding: toRN(tokens.spacing[4]),
     borderTopWidth: 1,
     borderTopColor: colors.border.default,
-    marginBottom: toRN(tokens.spacing[3]),
-  },
+    marginBottom: toRN(tokens.spacing[3])
+  }
 });
 
 export default FindPartnerScreen;

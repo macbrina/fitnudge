@@ -18,7 +18,7 @@ export function SearchBar({
   value,
   onChangeText,
   placeholder = "Search...",
-  style,
+  style
 }: SearchBarProps) {
   const styles = useStyles(makeSearchBarStyles);
   const { colors } = useTheme();
@@ -41,10 +41,7 @@ export function SearchBar({
         autoCorrect={false}
       />
       {value.length > 0 && (
-        <TouchableOpacity
-          onPress={() => onChangeText("")}
-          style={styles.clearButton}
-        >
+        <TouchableOpacity onPress={() => onChangeText("")} style={styles.clearButton}>
           <Ionicons
             name="close-circle"
             size={toRN(tokens.typography.fontSize.base)}
@@ -65,20 +62,20 @@ const makeSearchBarStyles = (tokens: any, colors: any, brand: any) => ({
     paddingHorizontal: toRN(tokens.spacing[4]),
     paddingVertical: toRN(tokens.spacing[3]),
     borderWidth: 1,
-    borderColor: colors.border.default,
+    borderColor: colors.border.default
   },
   searchIcon: {
-    marginRight: toRN(tokens.spacing[2]),
+    marginRight: toRN(tokens.spacing[2])
   },
   input: {
     flex: 1,
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.regular,
     color: colors.text.primary,
-    padding: 0,
+    padding: 0
   },
   clearButton: {
     marginLeft: toRN(tokens.spacing[2]),
-    padding: toRN(tokens.spacing[1]),
-  },
+    padding: toRN(tokens.spacing[1])
+  }
 });

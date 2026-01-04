@@ -4,7 +4,7 @@ import type {
   WarmupCooldownExercise,
   WorkoutPlan,
   WorkoutPhase,
-  WorkoutTimerState,
+  WorkoutTimerState
 } from "@/types/workout";
 
 // Re-export for backward compatibility
@@ -115,13 +115,7 @@ export function useWorkoutTimer(plan?: WorkoutPlan) {
       return coolDownExercises[currentExerciseIndex] as WarmupCooldownExercise;
     }
     return exercises[currentExerciseIndex];
-  }, [
-    phase,
-    currentExerciseIndex,
-    exercises,
-    warmUpExercises,
-    coolDownExercises,
-  ]);
+  }, [phase, currentExerciseIndex, exercises, warmUpExercises, coolDownExercises]);
 
   // Current phase exercises
   const currentPhaseExercises = useMemo(() => {
@@ -151,19 +145,10 @@ export function useWorkoutTimer(plan?: WorkoutPlan) {
       if ("duration_seconds" in currentExercise) {
         return currentExercise.duration_seconds || DEFAULT_WORK_DURATION;
       }
-      return (
-        (currentExercise as WorkoutExercise).work_duration_seconds ||
-        DEFAULT_WORK_DURATION
-      );
+      return (currentExercise as WorkoutExercise).work_duration_seconds || DEFAULT_WORK_DURATION;
     }
     return DEFAULT_WORK_DURATION;
-  }, [
-    phase,
-    currentExercise,
-    restTimeRemaining,
-    restBetweenExercises,
-    showReadyCountdown,
-  ]);
+  }, [phase, currentExercise, restTimeRemaining, restBetweenExercises, showReadyCountdown]);
 
   // Is current exercise timed or rep-based?
   const isCurrentExerciseTimed = useMemo(() => {
@@ -177,9 +162,7 @@ export function useWorkoutTimer(plan?: WorkoutPlan) {
   // Progress calculation (overall workout progress 0-100)
   const progress = useMemo(() => {
     const totalPhases =
-      warmUpExercises.length +
-      exercises.length * maxSets +
-      coolDownExercises.length;
+      warmUpExercises.length + exercises.length * maxSets + coolDownExercises.length;
     if (totalPhases === 0) return 0;
 
     let completed = 0;
@@ -216,7 +199,7 @@ export function useWorkoutTimer(plan?: WorkoutPlan) {
     warmUpExercises,
     exercises,
     coolDownExercises,
-    maxSets,
+    maxSets
   ]);
 
   // Total sets calculation - includes warmup, workout (with rounds), and cooldown
@@ -243,18 +226,10 @@ export function useWorkoutTimer(plan?: WorkoutPlan) {
       return currentExerciseIndex;
     } else if (phase === "workout" || phase === "rest") {
       // Warmup completed + previous rounds completed + current exercise in current round
-      return (
-        warmUpExercises.length +
-        (currentRound - 1) * exercises.length +
-        currentExerciseIndex
-      );
+      return warmUpExercises.length + (currentRound - 1) * exercises.length + currentExerciseIndex;
     } else if (phase === "cooldown") {
       // Warmup + all main workout rounds completed + current cooldown exercise
-      return (
-        warmUpExercises.length +
-        exercises.length * maxSets +
-        currentExerciseIndex
-      );
+      return warmUpExercises.length + exercises.length * maxSets + currentExerciseIndex;
     } else if (phase === "completed") {
       return totalExercisesCount;
     }
@@ -266,7 +241,7 @@ export function useWorkoutTimer(plan?: WorkoutPlan) {
     warmUpExercises,
     exercises,
     maxSets,
-    totalExercisesCount,
+    totalExercisesCount
   ]);
 
   // Exercises remaining (includes all rounds/sets)
@@ -298,16 +273,15 @@ export function useWorkoutTimer(plan?: WorkoutPlan) {
     warmUpExercises,
     exercises,
     coolDownExercises,
-    maxSets,
+    maxSets
   ]);
 
   // Workout statistics
   const workoutStats = useMemo<WorkoutStats>(() => {
     return {
       totalDurationSeconds: workoutStartRef.current
-        ? Math.floor(
-            (new Date().getTime() - workoutStartRef.current.getTime()) / 1000,
-          ) - pausedDuration
+        ? Math.floor((new Date().getTime() - workoutStartRef.current.getTime()) / 1000) -
+          pausedDuration
         : 0,
       exercisesCompleted: setsCompleted,
       exercisesSkipped,
@@ -315,7 +289,7 @@ export function useWorkoutTimer(plan?: WorkoutPlan) {
       totalSets,
       pausedDurationSeconds: pausedDuration,
       startedAt: workoutStartRef.current,
-      completedAt: phase === "completed" ? new Date() : null,
+      completedAt: phase === "completed" ? new Date() : null
     };
   }, [setsCompleted, exercisesSkipped, totalSets, pausedDuration, phase]);
 
@@ -344,7 +318,7 @@ export function useWorkoutTimer(plan?: WorkoutPlan) {
         nextPhaseRef.current = {
           phase: "warmup",
           exerciseIndex: nextIndex,
-          time: warmUpExercises[nextIndex].duration_seconds || 30,
+          time: warmUpExercises[nextIndex].duration_seconds || 30
         };
       } else {
         // Move to main workout - go to rest first (use warmup rest time)
@@ -358,7 +332,7 @@ export function useWorkoutTimer(plan?: WorkoutPlan) {
             exerciseIndex: 0,
             time: exercises[0].work_duration_seconds || DEFAULT_WORK_DURATION,
             setIndex: 0,
-            round: 1,
+            round: 1
           };
         } else {
           setPhase("completed");
@@ -400,8 +374,7 @@ export function useWorkoutTimer(plan?: WorkoutPlan) {
         setPhase("workout");
         const nextEx = exercises[nextIndex];
         // Show 3-2-1 countdown before next exercise
-        resumeTimeRef.current =
-          nextEx.work_duration_seconds || DEFAULT_WORK_DURATION;
+        resumeTimeRef.current = nextEx.work_duration_seconds || DEFAULT_WORK_DURATION;
         // Ensure workout is playing when showing countdown
         setIsPlaying(true);
         setIsPaused(false);
@@ -418,8 +391,7 @@ export function useWorkoutTimer(plan?: WorkoutPlan) {
           setPhase("workout");
           const firstEx = exercises[0];
           // Show 3-2-1 countdown before first exercise of new round
-          resumeTimeRef.current =
-            firstEx.work_duration_seconds || DEFAULT_WORK_DURATION;
+          resumeTimeRef.current = firstEx.work_duration_seconds || DEFAULT_WORK_DURATION;
           // Ensure workout is playing when showing countdown
           setIsPlaying(true);
           setIsPaused(false);
@@ -490,7 +462,7 @@ export function useWorkoutTimer(plan?: WorkoutPlan) {
     warmUpExercises,
     coolDownExercises,
     restBetweenExercises,
-    maxSets,
+    maxSets
   ]);
 
   // Timer tick
@@ -510,21 +482,18 @@ export function useWorkoutTimer(plan?: WorkoutPlan) {
                 // If resuming, use restored values
                 if (isResumingRef.current) {
                   isResumingRef.current = false;
-                  resumeTimeRef.current =
-                    resumeTimeRef.current || DEFAULT_WORK_DURATION;
+                  resumeTimeRef.current = resumeTimeRef.current || DEFAULT_WORK_DURATION;
                 } else {
                   // Set up for first exercise
                   if (warmUpExercises.length > 0) {
                     setPhase("warmup");
                     setCurrentExerciseIndex(0);
-                    resumeTimeRef.current =
-                      warmUpExercises[0].duration_seconds || 30;
+                    resumeTimeRef.current = warmUpExercises[0].duration_seconds || 30;
                   } else if (exercises.length > 0) {
                     setPhase("workout");
                     setCurrentExerciseIndex(0);
                     resumeTimeRef.current =
-                      exercises[0].work_duration_seconds ||
-                      DEFAULT_WORK_DURATION;
+                      exercises[0].work_duration_seconds || DEFAULT_WORK_DURATION;
                   }
                 }
 
@@ -558,7 +527,7 @@ export function useWorkoutTimer(plan?: WorkoutPlan) {
     advanceWorkout,
     clearTimer,
     warmUpExercises,
-    exercises,
+    exercises
   ]);
 
   // Start workout
@@ -598,8 +567,7 @@ export function useWorkoutTimer(plan?: WorkoutPlan) {
       } else if (exercises.length > 0) {
         setPhase("workout");
         setCurrentExerciseIndex(0);
-        resumeTimeRef.current =
-          exercises[0].work_duration_seconds || DEFAULT_WORK_DURATION;
+        resumeTimeRef.current = exercises[0].work_duration_seconds || DEFAULT_WORK_DURATION;
       }
     }
 
@@ -626,18 +594,11 @@ export function useWorkoutTimer(plan?: WorkoutPlan) {
     // Get current exercise duration based on phase
     let exerciseTime = DEFAULT_WORK_DURATION;
     if (phase === "warmup" && warmUpExercises[currentExerciseIndex]) {
-      exerciseTime =
-        warmUpExercises[currentExerciseIndex].duration_seconds || 30;
+      exerciseTime = warmUpExercises[currentExerciseIndex].duration_seconds || 30;
     } else if (phase === "workout" && exercises[currentExerciseIndex]) {
-      exerciseTime =
-        exercises[currentExerciseIndex].work_duration_seconds ||
-        DEFAULT_WORK_DURATION;
-    } else if (
-      phase === "cooldown" &&
-      coolDownExercises[currentExerciseIndex]
-    ) {
-      exerciseTime =
-        coolDownExercises[currentExerciseIndex].duration_seconds || 30;
+      exerciseTime = exercises[currentExerciseIndex].work_duration_seconds || DEFAULT_WORK_DURATION;
+    } else if (phase === "cooldown" && coolDownExercises[currentExerciseIndex]) {
+      exerciseTime = coolDownExercises[currentExerciseIndex].duration_seconds || 30;
     } else if (phase === "rest") {
       // If in rest, go back to the previous exercise
       exerciseTime = restBetweenExercises;
@@ -659,7 +620,7 @@ export function useWorkoutTimer(plan?: WorkoutPlan) {
     warmUpExercises,
     exercises,
     coolDownExercises,
-    restBetweenExercises,
+    restBetweenExercises
   ]);
 
   // Mark rep-based exercise as done
@@ -696,7 +657,7 @@ export function useWorkoutTimer(plan?: WorkoutPlan) {
   const resumeWorkout = useCallback(() => {
     if (pauseStartRef.current) {
       const pausedTime = Math.floor(
-        (new Date().getTime() - pauseStartRef.current.getTime()) / 1000,
+        (new Date().getTime() - pauseStartRef.current.getTime()) / 1000
       );
       setPausedDuration((prev) => prev + pausedTime);
       pauseStartRef.current = null;
@@ -718,8 +679,7 @@ export function useWorkoutTimer(plan?: WorkoutPlan) {
       if (storedNext) {
         setPhase(storedNext.phase);
         setCurrentExerciseIndex(storedNext.exerciseIndex);
-        if (storedNext.setIndex !== undefined)
-          setCurrentSetIndex(storedNext.setIndex);
+        if (storedNext.setIndex !== undefined) setCurrentSetIndex(storedNext.setIndex);
         if (storedNext.round !== undefined) setCurrentRound(storedNext.round);
         resumeTimeRef.current = storedNext.time;
         // Ensure workout is playing
@@ -766,8 +726,7 @@ export function useWorkoutTimer(plan?: WorkoutPlan) {
       if (exercises.length > 0) {
         setPhase("workout");
         const time =
-          exercises[currentExerciseIndex]?.work_duration_seconds ||
-          DEFAULT_WORK_DURATION;
+          exercises[currentExerciseIndex]?.work_duration_seconds || DEFAULT_WORK_DURATION;
         resumeTimeRef.current = time;
         showCountdown(time);
       }
@@ -788,8 +747,7 @@ export function useWorkoutTimer(plan?: WorkoutPlan) {
         // Previous exercise in current round
         const prevIndex = currentExerciseIndex - 1;
         setCurrentExerciseIndex(prevIndex);
-        const time =
-          exercises[prevIndex].work_duration_seconds || DEFAULT_WORK_DURATION;
+        const time = exercises[prevIndex].work_duration_seconds || DEFAULT_WORK_DURATION;
         resumeTimeRef.current = time;
         showCountdown(time);
       } else if (currentRound > 1) {
@@ -798,8 +756,7 @@ export function useWorkoutTimer(plan?: WorkoutPlan) {
         const lastExIndex = exercises.length - 1;
         setCurrentRound(prevRound);
         setCurrentExerciseIndex(lastExIndex);
-        const time =
-          exercises[lastExIndex].work_duration_seconds || DEFAULT_WORK_DURATION;
+        const time = exercises[lastExIndex].work_duration_seconds || DEFAULT_WORK_DURATION;
         resumeTimeRef.current = time;
         showCountdown(time);
       } else if (warmUpExercises.length > 0) {
@@ -824,9 +781,7 @@ export function useWorkoutTimer(plan?: WorkoutPlan) {
         setPhase("workout");
         setCurrentRound(maxSets);
         setCurrentExerciseIndex(exercises.length - 1);
-        const time =
-          exercises[exercises.length - 1].work_duration_seconds ||
-          DEFAULT_WORK_DURATION;
+        const time = exercises[exercises.length - 1].work_duration_seconds || DEFAULT_WORK_DURATION;
         resumeTimeRef.current = time;
         showCountdown(time);
       }
@@ -838,7 +793,7 @@ export function useWorkoutTimer(plan?: WorkoutPlan) {
     maxSets,
     warmUpExercises,
     exercises,
-    coolDownExercises,
+    coolDownExercises
   ]);
 
   // Complete workout manually
@@ -869,8 +824,7 @@ export function useWorkoutTimer(plan?: WorkoutPlan) {
         // Warmup phase
         targetPhase = "warmup";
         targetExerciseIndex = globalIndex;
-        exerciseTime =
-          warmUpExercises[targetExerciseIndex]?.duration_seconds || 30;
+        exerciseTime = warmUpExercises[targetExerciseIndex]?.duration_seconds || 30;
       } else if (globalIndex < warmupCount + workoutCount) {
         // Main workout phase
         targetPhase = "workout";
@@ -878,14 +832,12 @@ export function useWorkoutTimer(plan?: WorkoutPlan) {
         targetRound = Math.floor(workoutIndex / exercises.length) + 1;
         targetExerciseIndex = workoutIndex % exercises.length;
         exerciseTime =
-          exercises[targetExerciseIndex]?.work_duration_seconds ||
-          DEFAULT_WORK_DURATION;
+          exercises[targetExerciseIndex]?.work_duration_seconds || DEFAULT_WORK_DURATION;
       } else if (globalIndex < warmupCount + workoutCount + cooldownCount) {
         // Cooldown phase
         targetPhase = "cooldown";
         targetExerciseIndex = globalIndex - warmupCount - workoutCount;
-        exerciseTime =
-          coolDownExercises[targetExerciseIndex]?.duration_seconds || 30;
+        exerciseTime = coolDownExercises[targetExerciseIndex]?.duration_seconds || 30;
       } else {
         // Beyond the end - go to cooldown end or complete
         completeWorkout();
@@ -910,14 +862,7 @@ export function useWorkoutTimer(plan?: WorkoutPlan) {
       setIsPlaying(true);
       setIsPaused(false);
     },
-    [
-      clearTimer,
-      warmUpExercises,
-      exercises,
-      coolDownExercises,
-      maxSets,
-      completeWorkout,
-    ],
+    [clearTimer, warmUpExercises, exercises, coolDownExercises, maxSets, completeWorkout]
   );
 
   // Resume from saved progress
@@ -975,18 +920,12 @@ export function useWorkoutTimer(plan?: WorkoutPlan) {
       // Calculate and store the time for the resumed exercise (used after countdown)
       let exerciseTime = DEFAULT_WORK_DURATION;
       if (targetPhase === "warmup" && warmUpExercises[targetExerciseIndex]) {
-        exerciseTime =
-          warmUpExercises[targetExerciseIndex].duration_seconds || 30;
+        exerciseTime = warmUpExercises[targetExerciseIndex].duration_seconds || 30;
       } else if (targetPhase === "workout" && exercises[targetExerciseIndex]) {
         exerciseTime =
-          exercises[targetExerciseIndex].work_duration_seconds ||
-          DEFAULT_WORK_DURATION;
-      } else if (
-        targetPhase === "cooldown" &&
-        coolDownExercises[targetExerciseIndex]
-      ) {
-        exerciseTime =
-          coolDownExercises[targetExerciseIndex].duration_seconds || 30;
+          exercises[targetExerciseIndex].work_duration_seconds || DEFAULT_WORK_DURATION;
+      } else if (targetPhase === "cooldown" && coolDownExercises[targetExerciseIndex]) {
+        exerciseTime = coolDownExercises[targetExerciseIndex].duration_seconds || 30;
       }
 
       // Store the time for after countdown ends
@@ -1001,7 +940,7 @@ export function useWorkoutTimer(plan?: WorkoutPlan) {
       setIsPlaying(true);
       setIsPaused(false);
     },
-    [warmUpExercises, exercises, coolDownExercises, maxSets],
+    [warmUpExercises, exercises, coolDownExercises, maxSets]
   );
 
   // Cleanup on unmount
@@ -1027,7 +966,7 @@ export function useWorkoutTimer(plan?: WorkoutPlan) {
           exercise,
           phase: next.phase,
           exerciseIndex: next.exerciseIndex,
-          round: next.round || currentRound,
+          round: next.round || currentRound
         };
       }
     }
@@ -1039,7 +978,7 @@ export function useWorkoutTimer(plan?: WorkoutPlan) {
         exercise: exercises[nextIndex],
         phase: "workout" as WorkoutPhase,
         exerciseIndex: nextIndex,
-        round: currentRound,
+        round: currentRound
       };
     }
 
@@ -1050,7 +989,7 @@ export function useWorkoutTimer(plan?: WorkoutPlan) {
         exercise: exercises[0],
         phase: "workout" as WorkoutPhase,
         exerciseIndex: 0,
-        round: nextRound,
+        round: nextRound
       };
     }
 
@@ -1060,19 +999,12 @@ export function useWorkoutTimer(plan?: WorkoutPlan) {
         exercise: coolDownExercises[0],
         phase: "cooldown" as WorkoutPhase,
         exerciseIndex: 0,
-        round: currentRound,
+        round: currentRound
       };
     }
 
     return null;
-  }, [
-    warmUpExercises,
-    exercises,
-    coolDownExercises,
-    currentExerciseIndex,
-    currentRound,
-    maxSets,
-  ]);
+  }, [warmUpExercises, exercises, coolDownExercises, currentExerciseIndex, currentRound, maxSets]);
 
   return {
     // State
@@ -1117,6 +1049,6 @@ export function useWorkoutTimer(plan?: WorkoutPlan) {
     extendRest,
     skipRest,
     resumeFromProgress,
-    getNextExerciseInfo,
+    getNextExerciseInfo
   };
 }

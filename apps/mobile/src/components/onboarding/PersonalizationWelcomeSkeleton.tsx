@@ -49,18 +49,8 @@ export default function PersonalizationWelcomeSkeleton() {
 
         {/* Title Section Skeleton */}
         <View style={styles.titleSection}>
-          <SkeletonBox
-            width="70%"
-            height={36}
-            borderRadius={8}
-            style={styles.titleSkeleton}
-          />
-          <SkeletonBox
-            width="90%"
-            height={20}
-            borderRadius={8}
-            style={styles.subtitleSkeleton}
-          />
+          <SkeletonBox width="70%" height={36} borderRadius={8} style={styles.titleSkeleton} />
+          <SkeletonBox width="90%" height={20} borderRadius={8} style={styles.subtitleSkeleton} />
         </View>
 
         {/* Benefits Cards Skeleton */}
@@ -83,37 +73,28 @@ export default function PersonalizationWelcomeSkeleton() {
 
       {/* Footer with Skeleton Button */}
       <View style={styles.footer}>
-        <SkeletonBox
-          width="100%"
-          height={48}
-          borderRadius={12}
-          style={styles.buttonSkeleton}
-        />
+        <SkeletonBox width="100%" height={48} borderRadius={12} style={styles.buttonSkeleton} />
       </View>
     </View>
   );
 }
 
-const makePersonalizationWelcomeSkeletonStyles = (
-  tokens: any,
-  colors: any,
-  brand: any,
-) => {
+const makePersonalizationWelcomeSkeletonStyles = (tokens: any, colors: any, brand: any) => {
   return {
     container: {
       flex: 1,
-      backgroundColor: colors.bg.canvas,
+      backgroundColor: colors.bg.canvas
     },
     header: {
       paddingHorizontal: toRN(tokens.spacing[6]),
-      paddingBottom: toRN(tokens.spacing[5]),
+      paddingBottom: toRN(tokens.spacing[5])
     },
     progressContainer: {
       alignItems: "center" as const,
-      width: "100%",
+      width: "100%"
     },
     progressTextSkeleton: {
-      marginBottom: toRN(tokens.spacing[3]),
+      marginBottom: toRN(tokens.spacing[3])
     },
     progressBar: {
       width: "100%",
@@ -122,13 +103,13 @@ const makePersonalizationWelcomeSkeletonStyles = (
       borderRadius: 3,
       overflow: "hidden" as const,
       justifyContent: "flex-start" as const,
-      alignItems: "flex-start" as const,
+      alignItems: "flex-start" as const
     },
     progressFillSkeleton: {
-      height: "100%",
+      height: "100%"
     },
     content: {
-      flex: 1,
+      flex: 1
     },
     contentContainer: {
       flexGrow: 1,
@@ -136,11 +117,11 @@ const makePersonalizationWelcomeSkeletonStyles = (
       alignItems: "center" as const,
       justifyContent: "flex-start" as const,
       paddingTop: toRN(tokens.spacing[8]),
-      paddingBottom: toRN(tokens.spacing[6]),
+      paddingBottom: toRN(tokens.spacing[6])
     },
     iconContainer: {
       marginBottom: toRN(tokens.spacing[10]),
-      alignItems: "center" as const,
+      alignItems: "center" as const
     },
     iconWrapper: {
       width: 120,
@@ -152,27 +133,27 @@ const makePersonalizationWelcomeSkeletonStyles = (
       shadowColor: colors.shadow.default,
       shadowOffset: {
         width: 0,
-        height: 4,
+        height: 4
       },
       shadowOpacity: 0.1,
       shadowRadius: 12,
-      elevation: 4,
+      elevation: 4
     },
     titleSection: {
       alignItems: "center" as const,
       marginBottom: toRN(tokens.spacing[10]),
       paddingHorizontal: toRN(tokens.spacing[4]),
-      width: "100%",
+      width: "100%"
     },
     titleSkeleton: {
-      marginBottom: toRN(tokens.spacing[4]),
+      marginBottom: toRN(tokens.spacing[4])
     },
     subtitleSkeleton: {
-      paddingHorizontal: toRN(tokens.spacing[2]),
+      paddingHorizontal: toRN(tokens.spacing[2])
     },
     benefitsContainer: {
       width: "100%",
-      gap: toRN(tokens.spacing[4]),
+      gap: toRN(tokens.spacing[4])
     },
     benefitCard: {
       flexDirection: "row" as const,
@@ -184,11 +165,11 @@ const makePersonalizationWelcomeSkeletonStyles = (
       shadowColor: colors.shadow.default,
       shadowOffset: {
         width: 0,
-        height: 2,
+        height: 2
       },
       shadowOpacity: 0.08,
       shadowRadius: 8,
-      elevation: 2,
+      elevation: 2
     },
     benefitIconContainer: {
       width: 48,
@@ -197,16 +178,16 @@ const makePersonalizationWelcomeSkeletonStyles = (
       backgroundColor: colors.bg.muted,
       alignItems: "center" as const,
       justifyContent: "center" as const,
-      marginRight: toRN(tokens.spacing[4]),
+      marginRight: toRN(tokens.spacing[4])
     },
     benefitTextSkeleton: {
-      flex: 1,
+      flex: 1
     },
     footer: {
-      paddingHorizontal: toRN(tokens.spacing[6]),
+      paddingHorizontal: toRN(tokens.spacing[6])
     },
     buttonSkeleton: {
-      width: "100%",
-    },
+      width: "100%"
+    }
   };
 };

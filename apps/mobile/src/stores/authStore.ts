@@ -18,8 +18,10 @@ interface User {
   created_at: string;
   linked_providers?: string[];
   profile_picture_url?: string;
+  bio?: string;
   country?: string;
   language?: string;
+  has_password?: boolean; // Whether user has a password set (OAuth users may not)
 }
 
 export type LogoutReason = "not_found" | "disabled" | "suspended" | null;
@@ -36,11 +38,7 @@ interface AuthState {
 }
 
 interface AuthActions {
-  login: (
-    user: User,
-    accessToken: string,
-    refreshToken: string,
-  ) => Promise<void>;
+  login: (user: User, accessToken: string, refreshToken: string) => Promise<void>;
   logout: (reason?: LogoutReason) => Promise<boolean>;
   updateUser: (user: Partial<User>) => void;
   setLoading: (loading: boolean) => void;
@@ -69,7 +67,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           refreshToken,
           isAuthenticated: true,
           isLoading: false,
-          isLoggingOut: false,
+          isLoggingOut: false
         });
 
         // Store tokens securely using TokenManager
@@ -88,7 +86,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           isAuthenticated: false,
           user: null,
           accessToken: null,
-          refreshToken: null,
+          refreshToken: null
         });
 
         // Clear tokens from cache immediately
@@ -108,7 +106,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
             } catch (notificationError) {
               console.warn(
                 "[AuthStore] Failed to unregister device during logout:",
-                notificationError,
+                notificationError
               );
             }
 
@@ -120,7 +118,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
               success = true;
             } else {
               console.warn(
-                `[AuthStore] Logout request returned status ${response.status}: ${response.error}`,
+                `[AuthStore] Logout request returned status ${response.status}: ${response.error}`
               );
             }
           }
@@ -131,17 +129,14 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           try {
             await TokenManager.clearRememberMe();
           } catch (tokenError) {
-            console.warn(
-              "[AuthStore] Failed to clear remember me during logout:",
-              tokenError,
-            );
+            console.warn("[AuthStore] Failed to clear remember me during logout:", tokenError);
           }
 
           // Ensure state is cleared (already done above, but confirm)
           set({
             isLoading: false,
             isLoggingOut: false,
-            logoutReason: reason || null,
+            logoutReason: reason || null
           });
         }
 
@@ -152,7 +147,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         const currentUser = get().user;
         if (currentUser) {
           set({
-            user: { ...currentUser, ...userData },
+            user: { ...currentUser, ...userData }
           });
         }
       },
@@ -167,7 +162,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
 
       clearLogoutReason: () => {
         set({ logoutReason: null });
-      },
+      }
     }),
     {
       name: "auth-storage",
@@ -175,8 +170,8 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       partialize: (state) => ({
         user: state.user,
         isAuthenticated: state.isAuthenticated,
-        logoutReason: state.logoutReason,
-      }),
-    },
-  ),
+        logoutReason: state.logoutReason
+      })
+    }
+  )
 );

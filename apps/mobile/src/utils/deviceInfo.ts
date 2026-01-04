@@ -68,7 +68,7 @@ export async function getDeviceInfo(): Promise<DeviceInfo> {
   return {
     device_name: deviceName,
     device_id: deviceId,
-    device_type: deviceType,
+    device_type: deviceType
   };
 }
 

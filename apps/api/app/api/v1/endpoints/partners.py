@@ -97,6 +97,7 @@ class PartnerResponse(BaseModel):
     initiated_by_user_id: str  # user_id who sent the request
     created_at: str
     accepted_at: Optional[str] = None
+    has_active_items: bool = False  # Whether partner has active goals or challenges
 
 
 class PartnerSearchResult(BaseModel):
@@ -262,40 +263,97 @@ async def get_partners(
             .execute()
         )
 
-        partners = []
+        # Collect all partner user IDs for batch query
+        partner_user_ids = []
+        partner_info_map = {}  # partner_user_id -> partner_info, partner_status
+
         for row in result.data or []:
-            # Determine which user is the partner (not the current user)
-            # The "partner" from current user's perspective is the OTHER user
             if row["user_id"] == user_id:
-                # Current user is user_id, so partner is partner_user_id
                 partner_info = row.get("partner", {})
                 actual_partner_user_id = row["partner_user_id"]
             else:
-                # Current user is partner_user_id, so partner is user_id
                 partner_info = row.get("user", {})
                 actual_partner_user_id = row["user_id"]
 
-            # Skip partners with inactive/suspended/disabled accounts
             partner_status = partner_info.get("status", "active")
             if partner_status != "active":
                 continue
+
+            partner_user_ids.append(actual_partner_user_id)
+            partner_info_map[actual_partner_user_id] = {
+                "row": row,
+                "partner_info": partner_info,
+                "partner_status": partner_status,
+                "actual_partner_user_id": actual_partner_user_id,
+            }
+
+        # Batch query: Get active goals count per partner
+        active_goals_map = {}  # user_id -> count
+        if partner_user_ids:
+            goals_result = (
+                supabase.table("goals")
+                .select("user_id")
+                .in_("user_id", partner_user_ids)
+                .eq("status", "active")
+                .execute()
+            )
+            for g in goals_result.data or []:
+                uid = g.get("user_id")
+                if uid:
+                    active_goals_map[uid] = active_goals_map.get(uid, 0) + 1
+
+        # Batch query: Get active challenges count per partner (via challenge_participants)
+        active_challenges_map = {}  # user_id -> count
+        if partner_user_ids:
+            challenges_result = (
+                supabase.table("challenge_participants")
+                .select(
+                    """
+                    user_id,
+                    challenges!inner(status)
+                """
+                )
+                .in_("user_id", partner_user_ids)
+                .execute()
+            )
+            for cp in challenges_result.data or []:
+                challenge = cp.get("challenges", {})
+                if challenge and challenge.get("status") in ["active", "upcoming"]:
+                    uid = cp.get("user_id")
+                    if uid:
+                        active_challenges_map[uid] = (
+                            active_challenges_map.get(uid, 0) + 1
+                        )
+
+        # Build response with has_active_items
+        partners = []
+        for partner_user_id in partner_user_ids:
+            data = partner_info_map[partner_user_id]
+            row = data["row"]
+            partner_info = data["partner_info"]
+            actual_partner_user_id = data["actual_partner_user_id"]
+
+            goals_count = active_goals_map.get(actual_partner_user_id, 0)
+            challenges_count = active_challenges_map.get(actual_partner_user_id, 0)
+            has_active_items = goals_count > 0 or challenges_count > 0
 
             partners.append(
                 {
                     "id": row["id"],
                     "user_id": row["user_id"],
-                    "partner_user_id": actual_partner_user_id,  # Always the OTHER user's ID
+                    "partner_user_id": actual_partner_user_id,
                     "partner": {
                         "id": partner_info.get("id"),
                         "name": partner_info.get("name"),
                         "username": partner_info.get("username"),
                         "profile_picture_url": partner_info.get("profile_picture_url"),
-                        "is_active": partner_status == "active",
+                        "is_active": data["partner_status"] == "active",
                     },
                     "status": row["status"],
                     "initiated_by_user_id": row["initiated_by_user_id"],
                     "created_at": row["created_at"],
                     "accepted_at": row.get("accepted_at"),
+                    "has_active_items": has_active_items,
                 }
             )
 
@@ -952,6 +1010,29 @@ async def accept_partner_request(
                         "original_sender_id": original_sender_id,
                     },
                 )
+            )
+
+        # Check achievements for both users (non-blocking) - e.g., "first_partner" badge
+        try:
+            from app.services.tasks import check_achievements_task
+
+            # Check for accepter
+            check_achievements_task.delay(
+                user_id=user_id,
+                source_type="partner",
+                source_id=partnership_id,
+            )
+            # Check for sender
+            if original_sender_id:
+                check_achievements_task.delay(
+                    user_id=original_sender_id,
+                    source_type="partner",
+                    source_id=partnership_id,
+                )
+        except Exception as e:
+            logger.warning(
+                f"Failed to queue achievement check for partner acceptance: {e}",
+                {"partnership_id": partnership_id},
             )
 
         return {"message": "Partner request accepted"}

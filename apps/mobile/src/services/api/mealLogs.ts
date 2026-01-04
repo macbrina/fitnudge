@@ -85,12 +85,9 @@ class MealLogsService extends BaseApiService {
    * Estimate nutrition for a meal using AI
    */
   async estimateNutrition(
-    request: EstimateNutritionRequest,
+    request: EstimateNutritionRequest
   ): Promise<ApiResponse<NutritionEstimation>> {
-    return this.post<NutritionEstimation>(
-      ROUTES.MEALS.ESTIMATE_NUTRITION,
-      request,
-    );
+    return this.post<NutritionEstimation>(ROUTES.MEALS.ESTIMATE_NUTRITION, request);
   }
 
   /**
@@ -116,8 +113,7 @@ class MealLogsService extends BaseApiService {
     if (params?.start_date) queryParams.append("start_date", params.start_date);
     if (params?.end_date) queryParams.append("end_date", params.end_date);
     if (params?.goal_id) queryParams.append("goal_id", params.goal_id);
-    if (params?.challenge_id)
-      queryParams.append("challenge_id", params.challenge_id);
+    if (params?.challenge_id) queryParams.append("challenge_id", params.challenge_id);
     if (params?.meal_type) queryParams.append("meal_type", params.meal_type);
     if (params?.limit) queryParams.append("limit", params.limit.toString());
     if (params?.offset) queryParams.append("offset", params.offset.toString());
@@ -134,7 +130,7 @@ class MealLogsService extends BaseApiService {
    */
   async updateMealLog(
     mealLogId: string,
-    data: UpdateMealLogRequest,
+    data: UpdateMealLogRequest
   ): Promise<ApiResponse<MealLog>> {
     return this.put<MealLog>(ROUTES.MEALS.UPDATE(mealLogId), data);
   }
@@ -149,13 +145,10 @@ class MealLogsService extends BaseApiService {
   /**
    * Get paginated meal history for infinite scroll
    */
-  async getMealHistory(
-    params: MealHistoryParams,
-  ): Promise<ApiResponse<MealHistoryResponse>> {
+  async getMealHistory(params: MealHistoryParams): Promise<ApiResponse<MealHistoryResponse>> {
     const queryParams = new URLSearchParams();
     if (params.goal_id) queryParams.append("goal_id", params.goal_id);
-    if (params.challenge_id)
-      queryParams.append("challenge_id", params.challenge_id);
+    if (params.challenge_id) queryParams.append("challenge_id", params.challenge_id);
     if (params.page) queryParams.append("page", params.page.toString());
     if (params.limit) queryParams.append("limit", params.limit.toString());
 

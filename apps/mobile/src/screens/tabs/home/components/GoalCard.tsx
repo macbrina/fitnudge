@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/Card";
 import {
   BottomMenuSheet,
   BottomMenuOption,
-  BottomMenuSection,
+  BottomMenuSection
 } from "@/components/ui/BottomMenuSheet";
 import { useStyles } from "@/themes";
 import { useTheme } from "@/themes";
@@ -13,17 +13,16 @@ import { tokens } from "@/themes/tokens";
 import { toRN } from "@/lib/units";
 import { fontFamily } from "@/lib/fonts";
 import { useTranslation } from "@/lib/i18n";
-import {
-  usePlanStatus,
-  useRetryPlanGeneration,
-} from "@/hooks/api/useActionablePlans";
+import { usePlanStatus, useRetryPlanGeneration } from "@/hooks/api/useActionablePlans";
 import { useActivateGoal, useDeactivateGoal } from "@/hooks/api/useGoals";
 import { useAlertModal } from "@/contexts/AlertModalContext";
 import { useSubscriptionStore } from "@/stores/subscriptionStore";
 import { PlanStatusBadge } from "@/screens/tabs/goals/components/PlanStatusBadge";
+import { EditGoalForm } from "@/screens/tabs/goals/components/EditGoalForm";
 import { Ionicons } from "@expo/vector-icons";
 import { MOBILE_ROUTES } from "@/lib/routes";
 import { PlanStatus } from "@/services/api/actionablePlans";
+import { Goal } from "@/services/api/goals";
 
 interface PlanStatusData {
   status: PlanStatus;
@@ -34,7 +33,11 @@ interface GoalCardProps {
   goal: {
     id: string;
     title: string;
+    description?: string;
     category: string;
+    frequency?: string;
+    days_of_week?: number[];
+    reminder_times?: string[];
     current_streak?: number;
     status?: string;
     archived_reason?: string | null;
@@ -55,20 +58,21 @@ export function GoalCard({
   onPress,
   showMenu = false,
   activeGoalsCount = 0,
-  style,
+  style
 }: GoalCardProps) {
   const styles = useStyles(makeGoalCardStyles);
   const { colors, brandColors } = useTheme();
   const { t } = useTranslation();
   const { showConfirm, showAlert } = useAlertModal();
   const [showActionSheet, setShowActionSheet] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const router = useRouter();
 
   // Hooks
   // Use passed planStatus if available, otherwise fetch (for backward compatibility with HomeScreen)
   const { data: fetchedPlanStatus } = usePlanStatus(
     goal.id,
-    !planStatusProp, // Only fetch if not passed from parent
+    !planStatusProp // Only fetch if not passed from parent
   );
   const planStatus = planStatusProp || fetchedPlanStatus;
 
@@ -84,9 +88,7 @@ export function GoalCard({
   const isCardDisabled = planStatus?.status !== "completed";
 
   // Get active goal limit and feature access from subscription
-  const activeGoalLimit = useSubscriptionStore(
-    (state) => state.getActiveGoalLimit?.() ?? 1,
-  );
+  const activeGoalLimit = useSubscriptionStore((state) => state.getActiveGoalLimit?.() ?? 1);
   const hasFeature = useSubscriptionStore((state) => state.hasFeature);
 
   // Category info with icon, label, and color
@@ -98,15 +100,15 @@ export function GoalCard({
     nutrition: {
       icon: "nutrition-outline",
       label: "Nutrition",
-      color: "#22C55E",
+      color: "#22C55E"
     },
     wellness: { icon: "leaf-outline", label: "Wellness", color: "#8B5CF6" },
     mindfulness: {
       icon: "flower-outline",
       label: "Mindfulness",
-      color: "#3B82F6",
+      color: "#3B82F6"
     },
-    sleep: { icon: "moon-outline", label: "Sleep", color: "#6366F1" },
+    sleep: { icon: "moon-outline", label: "Sleep", color: "#6366F1" }
   };
 
   // Goal type info
@@ -115,7 +117,7 @@ export function GoalCard({
   // Goals are now habits only - show streak
   const progressDisplay = {
     type: "habit" as const,
-    streak: goal.current_streak || 0,
+    streak: goal.current_streak || 0
   };
 
   const handleResume = async () => {
@@ -124,10 +126,10 @@ export function GoalCard({
       await showAlert({
         title: t("goals.active_limit_reached_title"),
         message: t("goals.active_limit_reached_message", {
-          limit: activeGoalLimit,
+          limit: activeGoalLimit
         }),
         variant: "warning",
-        confirmLabel: t("common.ok"),
+        confirmLabel: t("common.ok")
       });
       return;
     }
@@ -140,7 +142,7 @@ export function GoalCard({
           t("goals.plan_not_ready_message") ||
           "Your goal plan is still being generated. Please wait until it's ready.",
         variant: "warning",
-        confirmLabel: t("common.ok"),
+        confirmLabel: t("common.ok")
       });
       return;
     }
@@ -149,14 +151,12 @@ export function GoalCard({
       await activateGoal.mutateAsync(goal.id);
     } catch (error: any) {
       const errorMessage =
-        error?.response?.data?.detail ||
-        t("goals.resume_goal_error") ||
-        "Failed to resume goal";
+        error?.response?.data?.detail || t("goals.resume_goal_error") || "Failed to resume goal";
       await showAlert({
         title: t("common.error"),
         message: errorMessage,
         variant: "error",
-        confirmLabel: t("common.ok"),
+        confirmLabel: t("common.ok")
       });
     }
   };
@@ -166,14 +166,12 @@ export function GoalCard({
       await deactivateGoal.mutateAsync(goal.id);
     } catch (error: any) {
       const errorMessage =
-        error?.response?.data?.detail ||
-        t("goals.pause_goal_error") ||
-        "Failed to pause goal";
+        error?.response?.data?.detail || t("goals.pause_goal_error") || "Failed to pause goal";
       await showAlert({
         title: t("common.error"),
         message: errorMessage,
         variant: "error",
-        confirmLabel: t("common.ok"),
+        confirmLabel: t("common.ok")
       });
     }
   };
@@ -190,16 +188,34 @@ export function GoalCard({
         title: t("common.error"),
         message: errorMessage,
         variant: "error",
-        confirmLabel: t("common.ok"),
+        confirmLabel: t("common.ok")
       });
     }
+  };
+
+  // Handle edit goal
+  const handleEdit = () => {
+    setShowActionSheet(false);
+    setShowEditModal(true);
   };
 
   // Build menu sections dynamically based on goal state
   const buildMenuSections = (): BottomMenuSection[] => {
     const sections: BottomMenuSection[] = [];
 
-    // === Section 1: Primary Actions (Pause/Resume) ===
+    // === Section 1: Edit Action (always available) ===
+    const editOptions: BottomMenuOption[] = [
+      {
+        id: "edit",
+        label: t("goals.edit_goal") || "Edit Goal",
+        description: t("goals.edit_goal_desc") || "Edit title, description, days, or reminders",
+        icon: "create-outline",
+        onPress: handleEdit
+      }
+    ];
+    sections.push({ id: "edit", options: editOptions });
+
+    // === Section 2: Primary Actions (Pause/Resume) ===
     const primaryOptions: BottomMenuOption[] = [];
 
     // Active goals can be paused
@@ -207,10 +223,9 @@ export function GoalCard({
       primaryOptions.push({
         id: "pause",
         label: t("goals.pause_goal") || "Pause Goal",
-        description:
-          t("goals.pause_goal_desc") || "Temporarily stop tracking this goal",
+        description: t("goals.pause_goal_desc") || "Temporarily stop tracking this goal",
         icon: "pause-circle-outline",
-        onPress: handlePause,
+        onPress: handlePause
       });
     }
 
@@ -219,10 +234,9 @@ export function GoalCard({
       primaryOptions.push({
         id: "resume",
         label: t("goals.resume_goal") || "Resume Goal",
-        description:
-          t("goals.resume_goal_desc") || "Continue tracking this goal",
+        description: t("goals.resume_goal_desc") || "Continue tracking this goal",
         icon: "play-circle-outline",
-        onPress: handleResume,
+        onPress: handleResume
       });
     }
 
@@ -245,16 +259,10 @@ export function GoalCard({
     if (progressDisplay.streak > 0 && planStatus?.status === "completed") {
       return (
         <View style={styles.streakContainer}>
-          <Ionicons
-            name="flame"
-            size={toRN(tokens.typography.fontSize.sm)}
-            color="#F59E0B"
-          />
+          <Ionicons name="flame" size={toRN(tokens.typography.fontSize.sm)} color="#F59E0B" />
           <Text style={styles.streakText}>
             {progressDisplay.streak}{" "}
-            {progressDisplay.streak === 1
-              ? t("home.streak_day")
-              : t("home.streak_days")}
+            {progressDisplay.streak === 1 ? t("home.streak_day") : t("home.streak_days")}
           </Text>
         </View>
       );
@@ -268,20 +276,12 @@ export function GoalCard({
   // will appear when data loads, avoiding double-loading visual effect.
 
   return (
-    <TouchableOpacity
-      onPress={!isCardDisabled ? onPress : undefined}
-      activeOpacity={0.7}
-    >
+    <TouchableOpacity onPress={!isCardDisabled ? onPress : undefined} activeOpacity={0.7}>
       <Card shadow="sm" style={[styles.card, style]} disabled={isCardDisabled}>
         {/* Header Row */}
         <View style={styles.header}>
           {/* Icon */}
-          <View
-            style={[
-              styles.iconContainer,
-              { backgroundColor: `${categoryInfo.color}12` },
-            ]}
-          >
+          <View style={[styles.iconContainer, { backgroundColor: `${categoryInfo.color}12` }]}>
             <Ionicons
               name={categoryInfo.icon}
               size={toRN(tokens.typography.fontSize.xl)}
@@ -295,27 +295,14 @@ export function GoalCard({
               {goal.title}
             </Text>
             <View style={styles.metaRow}>
-              <View
-                style={[
-                  styles.categoryPill,
-                  { backgroundColor: `${categoryInfo.color}15` },
-                ]}
-              >
-                <Text
-                  style={[styles.categoryText, { color: categoryInfo.color }]}
-                >
+              <View style={[styles.categoryPill, { backgroundColor: `${categoryInfo.color}15` }]}>
+                <Text style={[styles.categoryText, { color: categoryInfo.color }]}>
                   {categoryInfo.label}
                 </Text>
               </View>
               <View style={styles.typePill}>
-                <Ionicons
-                  name="refresh-outline"
-                  size={10}
-                  color={colors.text.tertiary}
-                />
-                <Text style={styles.typeText}>
-                  {t("goals.habit") || "Habit"}
-                </Text>
+                <Ionicons name="refresh-outline" size={10} color={colors.text.tertiary} />
+                <Text style={styles.typeText}>{t("goals.habit") || "Habit"}</Text>
               </View>
             </View>
           </View>
@@ -350,27 +337,16 @@ export function GoalCard({
               style={[
                 styles.planStatusRow,
                 {
-                  justifyContent:
-                    planStatus.status === "completed"
-                      ? "flex-end"
-                      : "space-between",
-                },
+                  justifyContent: planStatus.status === "completed" ? "flex-end" : "space-between"
+                }
               ]}
             >
               {planStatus.status !== "completed" && (
-                <PlanStatusBadge
-                  status={isGoalFailed ? "failed" : planStatus.status}
-                  size="sm"
-                />
+                <PlanStatusBadge status={isGoalFailed ? "failed" : planStatus.status} size="sm" />
               )}
               {planStatus.status === "completed" && !isGoalFailed && (
-                <TouchableOpacity
-                  onPress={onPress}
-                  style={styles.viewPlanButton}
-                >
-                  <Text style={styles.viewPlanText}>
-                    {t("goals.view_plan")}
-                  </Text>
+                <TouchableOpacity onPress={onPress} style={styles.viewPlanButton}>
+                  <Text style={styles.viewPlanText}>{t("goals.view_plan")}</Text>
                   <Ionicons
                     name="chevron-forward"
                     size={toRN(tokens.typography.fontSize.xs)}
@@ -407,6 +383,14 @@ export function GoalCard({
         sections={menuSections}
         onClose={() => setShowActionSheet(false)}
       />
+
+      {/* Edit Goal Modal */}
+      <EditGoalForm
+        visible={showEditModal}
+        goal={goal as Goal}
+        onSuccess={() => setShowEditModal(false)}
+        onClose={() => setShowEditModal(false)}
+      />
     </TouchableOpacity>
   );
 }
@@ -414,15 +398,15 @@ export function GoalCard({
 const makeGoalCardStyles = (tokens: any, colors: any, brand: any) => ({
   card: {
     minWidth: 220,
-    marginRight: toRN(tokens.spacing[3]),
+    marginRight: toRN(tokens.spacing[3])
   },
   header: {
     flexDirection: "row" as const,
-    alignItems: "flex-start" as const,
+    alignItems: "flex-start" as const
   },
   menuButton: {
     padding: toRN(tokens.spacing[1]),
-    marginLeft: toRN(tokens.spacing[1]),
+    marginLeft: toRN(tokens.spacing[1])
   },
   iconContainer: {
     width: toRN(44),
@@ -430,33 +414,33 @@ const makeGoalCardStyles = (tokens: any, colors: any, brand: any) => ({
     borderRadius: toRN(tokens.borderRadius.lg),
     alignItems: "center" as const,
     justifyContent: "center" as const,
-    marginRight: toRN(tokens.spacing[3]),
+    marginRight: toRN(tokens.spacing[3])
   },
   titleContainer: {
     flex: 1,
-    paddingRight: toRN(tokens.spacing[2]),
+    paddingRight: toRN(tokens.spacing[2])
   },
   title: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.semiBold,
     color: colors.text.primary,
     lineHeight: toRN(tokens.typography.fontSize.base) * 1.3,
-    marginBottom: toRN(tokens.spacing[1.5] || 6),
+    marginBottom: toRN(tokens.spacing[1.5] || 6)
   },
   metaRow: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
     flexWrap: "wrap" as const,
-    gap: toRN(tokens.spacing[1.5] || 6),
+    gap: toRN(tokens.spacing[1.5] || 6)
   },
   categoryPill: {
     paddingHorizontal: toRN(tokens.spacing[2]),
     paddingVertical: 3,
-    borderRadius: toRN(tokens.borderRadius.full),
+    borderRadius: toRN(tokens.borderRadius.full)
   },
   categoryText: {
     fontSize: toRN(tokens.typography.fontSize.xs),
-    fontFamily: fontFamily.medium,
+    fontFamily: fontFamily.medium
   },
   typePill: {
     flexDirection: "row" as const,
@@ -465,55 +449,55 @@ const makeGoalCardStyles = (tokens: any, colors: any, brand: any) => ({
     paddingHorizontal: toRN(tokens.spacing[2]),
     paddingVertical: 3,
     borderRadius: toRN(tokens.borderRadius.full),
-    backgroundColor: colors.bg.muted,
+    backgroundColor: colors.bg.muted
   },
   typeText: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.regular,
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   // Progress section
   progressSection: {
     marginTop: toRN(tokens.spacing[3]),
     paddingTop: toRN(tokens.spacing[3]),
     borderTopWidth: 1,
-    borderTopColor: colors.border.default + "40",
+    borderTopColor: colors.border.default + "40"
   },
   progressRow: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
     justifyContent: "space-between" as const,
-    marginBottom: toRN(tokens.spacing[2]),
+    marginBottom: toRN(tokens.spacing[2])
   },
   progressStats: {
     flexDirection: "row" as const,
     alignItems: "baseline" as const,
-    gap: toRN(tokens.spacing[2]),
+    gap: toRN(tokens.spacing[2])
   },
   progressValue: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.bold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   progressTotal: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   progressSubtext: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   progressBarContainer: {
     height: 6,
     backgroundColor: colors.bg.muted,
     borderRadius: 3,
-    overflow: "hidden" as const,
+    overflow: "hidden" as const
   },
   progressBar: {
     height: "100%" as const,
-    borderRadius: 3,
+    borderRadius: 3
   },
   // Streak (habit)
   streakContainer: {
@@ -523,12 +507,12 @@ const makeGoalCardStyles = (tokens: any, colors: any, brand: any) => ({
     marginTop: toRN(tokens.spacing[3]),
     paddingTop: toRN(tokens.spacing[3]),
     borderTopWidth: 1,
-    borderTopColor: colors.border.default + "40",
+    borderTopColor: colors.border.default + "40"
   },
   streakText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
-    color: colors.text.secondary,
+    color: colors.text.secondary
   },
   // Plan status
   planStatusRow: {
@@ -538,17 +522,17 @@ const makeGoalCardStyles = (tokens: any, colors: any, brand: any) => ({
     borderTopColor: colors.border.default + "40",
     flexDirection: "row" as const,
     justifyContent: "space-between" as const,
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   viewPlanButton: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    gap: 2,
+    gap: 2
   },
   viewPlanText: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.medium,
-    color: brand.primary,
+    color: brand.primary
   },
   retryButton: {
     flexDirection: "row" as const,
@@ -557,11 +541,11 @@ const makeGoalCardStyles = (tokens: any, colors: any, brand: any) => ({
     paddingHorizontal: toRN(tokens.spacing[2]),
     paddingVertical: toRN(tokens.spacing[1]),
     borderRadius: toRN(tokens.borderRadius.md),
-    backgroundColor: `${brand.primary}15`,
+    backgroundColor: `${brand.primary}15`
   },
   retryButtonText: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.medium,
-    color: brand.primary,
-  },
+    color: brand.primary
+  }
 });

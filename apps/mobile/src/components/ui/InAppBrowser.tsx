@@ -87,7 +87,7 @@ export const InAppBrowser = {
       controlsColor = "#FFFFFF",
       showTitle = true,
       enableBarCollapsing = false,
-      showInRecents = false,
+      showInRecents = false
     } = options;
 
     try {
@@ -104,7 +104,7 @@ export const InAppBrowser = {
         enableBarCollapsing,
         showInRecents,
         // Add custom toolbar color for Android
-        ...(Platform.OS === "android" && { toolbarColor }),
+        ...(Platform.OS === "android" && { toolbarColor })
       };
 
       // Open the browser
@@ -133,7 +133,7 @@ export const InAppBrowser = {
           message: t("browser.unable_to_open_in_app"),
           variant: "warning",
           confirmLabel: t("browser.open_in_browser"),
-          cancelLabel: t("common.cancel"),
+          cancelLabel: t("common.cancel")
         });
         if (confirmed) {
           await Linking.openURL(url);
@@ -144,7 +144,7 @@ export const InAppBrowser = {
           title: t("common.error"),
           message: t("browser.unable_to_open_link"),
           variant: "error",
-          confirmLabel: t("common.ok"),
+          confirmLabel: t("common.ok")
         });
       } else {
         // Fallback to console if no alert callbacks provided
@@ -169,14 +169,14 @@ export const InAppBrowser = {
         message: t("browser.would_like_external"),
         variant: "info",
         confirmLabel: t("browser.external_browser"),
-        cancelLabel: t("browser.in_app"),
+        cancelLabel: t("browser.in_app")
       });
       if (choice) {
         await Linking.openURL(url);
       } else {
         await InAppBrowser.open({
           ...options,
-          alertCallbacks: options.alertCallbacks,
+          alertCallbacks: options.alertCallbacks
         });
       }
     } else {
@@ -213,7 +213,7 @@ export const InAppBrowser = {
     } catch {
       return false;
     }
-  },
+  }
 };
 
 /**
@@ -227,7 +227,7 @@ export const useInAppBrowser = () => {
   const alertCallbacks: AlertCallbacks = {
     showAlert,
     showConfirm,
-    t,
+    t
   };
 
   const openBrowser = async (options: InAppBrowserOptions) => {
@@ -255,12 +255,9 @@ export const useInAppBrowser = () => {
     } catch (error) {
       await showAlert({
         title: t("common.error"),
-        message:
-          error instanceof Error
-            ? error.message
-            : t("browser.unable_to_open_link"),
+        message: error instanceof Error ? error.message : t("browser.unable_to_open_link"),
         variant: "error",
-        confirmLabel: t("common.ok"),
+        confirmLabel: t("common.ok")
       });
     } finally {
       setIsLoading(false);
@@ -271,7 +268,7 @@ export const useInAppBrowser = () => {
     openBrowser,
     openWithChoice,
     openExternal,
-    isLoading,
+    isLoading
   };
 };
 

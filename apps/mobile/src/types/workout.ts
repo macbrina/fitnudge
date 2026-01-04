@@ -5,12 +5,7 @@
  */
 
 // Workout phases
-export type WorkoutPhase =
-  | "warmup"
-  | "workout"
-  | "cooldown"
-  | "rest"
-  | "completed";
+export type WorkoutPhase = "warmup" | "workout" | "cooldown" | "rest" | "completed";
 
 // Quit reasons for feedback
 export type QuitReason =

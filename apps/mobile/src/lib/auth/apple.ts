@@ -21,7 +21,7 @@ export const performNativeAppleSignIn = async () => {
   return AppleAuthentication.signInAsync({
     requestedScopes: [
       AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-      AppleAuthentication.AppleAuthenticationScope.EMAIL,
-    ],
+      AppleAuthentication.AppleAuthenticationScope.EMAIL
+    ]
   });
 };

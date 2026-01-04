@@ -47,7 +47,7 @@ interface ExitOfferState {
   getTimeRemaining: () => number;
 
   // Exit Intent Modal visibility actions
-  openExitIntentModal: () => void;
+  openExitIntentModal: () => Promise<boolean>;
   closeExitIntentModal: () => void;
 
   // Proactive offer logic
@@ -77,19 +77,48 @@ export const useExitOfferStore = create<ExitOfferState>((set, get) => ({
   setExitOffer: (expiryTime: Date) => {
     set({
       expiryTime,
-      isActive: true,
+      isActive: true
     });
   },
 
   clearExitOffer: () => {
     set({
       expiryTime: null,
-      isActive: false,
+      isActive: false
     });
   },
 
-  openExitIntentModal: () => {
+  /**
+   * Open exit intent modal with eligibility check.
+   * Returns true if modal was opened, false if user is not eligible.
+   */
+  openExitIntentModal: async () => {
+    // Check if user has ever subscribed from backend (survives app reinstall)
+    const { useSubscriptionStore } = await import("@/stores/subscriptionStore");
+    const hasEverSubscribedBackend = useSubscriptionStore.getState().hasEverSubscribed();
+    if (hasEverSubscribedBackend) {
+      console.info(
+        "[ExitOfferStore] User has subscribed before (backend) - not showing exit offer"
+      );
+      return false;
+    }
+
+    // Also check local storage as fallback
+    const localHasSubscribed = await storageUtil.getItem(HAS_EVER_SUBSCRIBED);
+    if (localHasSubscribed === "true") {
+      console.info("[ExitOfferStore] User has subscribed before (local) - not showing exit offer");
+      return false;
+    }
+
+    // Check show count limit
+    const showCount = await storageUtil.getItem<number>(EXIT_OFFER_SHOW_COUNT);
+    if (showCount !== null && showCount >= MAX_SHOW_COUNT) {
+      console.info("[ExitOfferStore] Max show count reached - not showing exit offer");
+      return false;
+    }
+
     set({ showExitIntentModal: true });
+    return true;
   },
 
   closeExitIntentModal: () => {
@@ -101,10 +130,7 @@ export const useExitOfferStore = create<ExitOfferState>((set, get) => ({
     if (!expiryTime || !isActive) return 0;
 
     const now = Date.now();
-    const remaining = Math.max(
-      0,
-      Math.floor((expiryTime.getTime() - now) / 1000),
-    );
+    const remaining = Math.max(0, Math.floor((expiryTime.getTime() - now) / 1000));
 
     // Auto-clear if expired
     if (remaining <= 0) {
@@ -125,16 +151,23 @@ export const useExitOfferStore = create<ExitOfferState>((set, get) => ({
   /**
    * Check if we can show the offer
    * - User has never subscribed
-   * - Not shown more than 3 times total
+   * - Not shown more than 5 times total
    * - At least 7 days since last shown
    */
   canShowOffer: async (hasEverSubscribed: boolean) => {
-    // Never show to users who have ever subscribed
+    // Never show to users who have ever subscribed (from RevenueCat)
     if (hasEverSubscribed) {
       return false;
     }
 
-    // Also check local storage flag
+    // Also check backend subscription history (survives app reinstall)
+    const { useSubscriptionStore } = await import("@/stores/subscriptionStore");
+    const hasEverSubscribedBackend = useSubscriptionStore.getState().hasEverSubscribed();
+    if (hasEverSubscribedBackend) {
+      return false;
+    }
+
+    // Also check local storage flag as fallback
     const localHasSubscribed = await storageUtil.getItem(HAS_EVER_SUBSCRIBED);
     if (localHasSubscribed === "true") {
       return false;
@@ -147,13 +180,10 @@ export const useExitOfferStore = create<ExitOfferState>((set, get) => ({
     }
 
     // Check last shown date
-    const lastShownStr = await storageUtil.getItem<string>(
-      EXIT_OFFER_LAST_SHOWN,
-    );
+    const lastShownStr = await storageUtil.getItem<string>(EXIT_OFFER_LAST_SHOWN);
     if (lastShownStr) {
       const lastShown = new Date(lastShownStr);
-      const daysSinceLastShown =
-        (Date.now() - lastShown.getTime()) / (1000 * 60 * 60 * 24);
+      const daysSinceLastShown = (Date.now() - lastShown.getTime()) / (1000 * 60 * 60 * 24);
 
       if (daysSinceLastShown < SHOW_INTERVAL_DAYS) {
         return false;
@@ -171,9 +201,7 @@ export const useExitOfferStore = create<ExitOfferState>((set, get) => ({
     await storageUtil.setItem(EXIT_OFFER_LAST_SHOWN, new Date().toISOString());
 
     // Increment show count
-    const currentCount = await storageUtil.getItem<number>(
-      EXIT_OFFER_SHOW_COUNT,
-    );
+    const currentCount = await storageUtil.getItem<number>(EXIT_OFFER_SHOW_COUNT);
     await storageUtil.setItem(EXIT_OFFER_SHOW_COUNT, (currentCount || 0) + 1);
   },
 
@@ -213,7 +241,7 @@ export const useExitOfferStore = create<ExitOfferState>((set, get) => ({
       hasCheckedProactive,
       canShowOffer,
       recordOfferShown,
-      hasExitIntentBeenDismissed,
+      hasExitIntentBeenDismissed
     } = get();
 
     // Don't check again if already checked this session or offer is active
@@ -240,7 +268,7 @@ export const useExitOfferStore = create<ExitOfferState>((set, get) => ({
     const expiryTime = new Date(Date.now() + COUNTDOWN_MINUTES * 60 * 1000);
     set({
       expiryTime,
-      isActive: true,
+      isActive: true
     });
 
     // Record that we showed the offer
@@ -266,7 +294,7 @@ export const useExitOfferStore = create<ExitOfferState>((set, get) => ({
       expiryTime: null,
       isActive: false,
       hasCheckedProactive: false,
-      showExitIntentModal: false,
+      showExitIntentModal: false
     });
 
     console.info("[ExitOfferStore] Reset for testing - all state cleared");
@@ -280,5 +308,5 @@ export const useExitOfferStore = create<ExitOfferState>((set, get) => ({
   hasEverBeenShown: async () => {
     const showCount = await storageUtil.getItem<number>(EXIT_OFFER_SHOW_COUNT);
     return showCount !== null && showCount > 0;
-  },
+  }
 }));

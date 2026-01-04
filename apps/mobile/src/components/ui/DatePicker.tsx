@@ -22,21 +22,21 @@ interface DatePickerProps {
 const makeDatePickerStyles = (tokens: any, colors: any, brand: any) => {
   return {
     container: {
-      marginBottom: toRN(tokens.spacing[4]),
+      marginBottom: toRN(tokens.spacing[4])
     },
     labelRow: {
-      marginBottom: toRN(tokens.spacing[2]),
+      marginBottom: toRN(tokens.spacing[2])
     },
     label: {
       fontSize: toRN(tokens.typography.fontSize.base),
       fontFamily: fontFamily.semiBold,
-      color: colors.text.primary,
+      color: colors.text.primary
     },
     description: {
       fontSize: toRN(tokens.typography.fontSize.xs),
       fontFamily: fontFamily.regular,
       color: colors.text.tertiary,
-      marginTop: toRN(tokens.spacing[1]),
+      marginTop: toRN(tokens.spacing[1])
     },
     inputContainer: {
       flexDirection: "row" as const,
@@ -48,41 +48,41 @@ const makeDatePickerStyles = (tokens: any, colors: any, brand: any) => {
       backgroundColor: colors.bg.surface,
       paddingHorizontal: toRN(tokens.spacing[4]),
       paddingVertical: toRN(tokens.spacing[3]),
-      minHeight: 52,
+      minHeight: 52
     },
     inputContainerError: {
-      borderColor: colors.feedback?.error || "#ef4444",
+      borderColor: colors.feedback?.error || "#ef4444"
     },
     inputContainerDisabled: {
-      opacity: 0.6,
+      opacity: 0.6
     },
     dateText: {
       fontSize: toRN(tokens.typography.fontSize.base),
       fontFamily: fontFamily.medium,
-      color: colors.text.primary,
+      color: colors.text.primary
     },
     iconContainer: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
-      gap: toRN(tokens.spacing[2]),
+      gap: toRN(tokens.spacing[2])
     },
     errorText: {
       fontSize: toRN(tokens.typography.fontSize.sm),
       color: colors.feedback?.error || "#ef4444",
       marginTop: toRN(tokens.spacing[1]),
-      fontFamily: fontFamily.regular,
+      fontFamily: fontFamily.regular
     },
     // iOS Modal styles
     iosModalOverlay: {
       flex: 1,
       justifyContent: "flex-end" as const,
-      backgroundColor: "rgba(0, 0, 0, 0.5)",
+      backgroundColor: "rgba(0, 0, 0, 0.5)"
     },
     iosPickerContainer: {
       backgroundColor: colors.bg.card,
       borderTopLeftRadius: toRN(tokens.borderRadius["2xl"]),
       borderTopRightRadius: toRN(tokens.borderRadius["2xl"]),
-      paddingBottom: toRN(tokens.spacing[8]),
+      paddingBottom: toRN(tokens.spacing[8])
     },
     iosPickerHeader: {
       flexDirection: "row" as const,
@@ -91,20 +91,20 @@ const makeDatePickerStyles = (tokens: any, colors: any, brand: any) => {
       paddingHorizontal: toRN(tokens.spacing[4]),
       paddingVertical: toRN(tokens.spacing[3]),
       borderBottomWidth: 1,
-      borderBottomColor: colors.border.default,
+      borderBottomColor: colors.border.default
     },
     iosPickerButton: {
       paddingHorizontal: toRN(tokens.spacing[3]),
-      paddingVertical: toRN(tokens.spacing[2]),
+      paddingVertical: toRN(tokens.spacing[2])
     },
     iosPickerButtonText: {
       fontSize: toRN(tokens.typography.fontSize.base),
       fontFamily: fontFamily.semiBold,
-      color: brand.primary,
+      color: brand.primary
     },
     iosPickerCancelText: {
-      color: colors.text.secondary,
-    },
+      color: colors.text.secondary
+    }
   };
 };
 
@@ -116,10 +116,10 @@ export function DatePicker({
   error,
   disabled = false,
   minimumDate,
-  maximumDate,
+  maximumDate
 }: DatePickerProps) {
   const styles = useStyles(makeDatePickerStyles);
-  const { colors, brandColors } = useTheme();
+  const { colors, brandColors, isDark } = useTheme();
   const [showPicker, setShowPicker] = useState(false);
   const [tempDate, setTempDate] = useState(value);
 
@@ -129,7 +129,7 @@ export function DatePicker({
       weekday: "short",
       month: "short",
       day: "numeric",
-      year: "numeric",
+      year: "numeric"
     });
   };
 
@@ -172,25 +172,17 @@ export function DatePicker({
           {description && <Text style={styles.description}>{description}</Text>}
         </View>
       )}
-      <TouchableOpacity
-        onPress={openPicker}
-        disabled={disabled}
-        activeOpacity={0.7}
-      >
+      <TouchableOpacity onPress={openPicker} disabled={disabled} activeOpacity={0.7}>
         <View
           style={[
             styles.inputContainer,
             error && styles.inputContainerError,
-            disabled && styles.inputContainerDisabled,
+            disabled && styles.inputContainerDisabled
           ]}
         >
           <Text style={styles.dateText}>{formatDate(value)}</Text>
           <View style={styles.iconContainer}>
-            <Ionicons
-              name="calendar-outline"
-              size={20}
-              color={brandColors.primary}
-            />
+            <Ionicons name="calendar-outline" size={20} color={brandColors.primary} />
           </View>
         </View>
       </TouchableOpacity>
@@ -205,6 +197,7 @@ export function DatePicker({
           onChange={handleDateChange}
           minimumDate={minimumDate}
           maximumDate={maximumDate}
+          themeVariant={isDark ? "dark" : "light"}
         />
       )}
 
@@ -217,30 +210,15 @@ export function DatePicker({
           onRequestClose={handleIOSCancel}
         >
           <View style={styles.iosModalOverlay}>
-            <TouchableOpacity
-              style={{ flex: 1 }}
-              onPress={handleIOSCancel}
-              activeOpacity={1}
-            />
+            <TouchableOpacity style={{ flex: 1 }} onPress={handleIOSCancel} activeOpacity={1} />
             <View style={styles.iosPickerContainer}>
               <View style={styles.iosPickerHeader}>
-                <TouchableOpacity
-                  style={styles.iosPickerButton}
-                  onPress={handleIOSCancel}
-                >
-                  <Text
-                    style={[
-                      styles.iosPickerButtonText,
-                      styles.iosPickerCancelText,
-                    ]}
-                  >
+                <TouchableOpacity style={styles.iosPickerButton} onPress={handleIOSCancel}>
+                  <Text style={[styles.iosPickerButtonText, styles.iosPickerCancelText]}>
                     Cancel
                   </Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.iosPickerButton}
-                  onPress={handleIOSConfirm}
-                >
+                <TouchableOpacity style={styles.iosPickerButton} onPress={handleIOSConfirm}>
                   <Text style={styles.iosPickerButtonText}>Done</Text>
                 </TouchableOpacity>
               </View>
@@ -252,6 +230,7 @@ export function DatePicker({
                 minimumDate={minimumDate}
                 maximumDate={maximumDate}
                 style={{ height: 200 }}
+                themeVariant={isDark ? "dark" : "light"}
               />
             </View>
           </View>

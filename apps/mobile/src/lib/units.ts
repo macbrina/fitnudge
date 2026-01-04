@@ -35,7 +35,7 @@ export const toRN = (v: number | string): number => {
  */
 export const getLineHeight = (
   fontSize: number | string,
-  lineHeightMultiplier: number | string,
+  lineHeightMultiplier: number | string
 ): number => {
   const fontSizePx = toRN(fontSize);
   const multiplier = parseFloat(String(lineHeightMultiplier));
@@ -82,7 +82,7 @@ export const getScreenDimensions = () => ({
   height: screenHeight,
   isSmallDevice: screenWidth < 375,
   isMediumDevice: screenWidth >= 375 && screenWidth < 414,
-  isLargeDevice: screenWidth >= 414,
+  isLargeDevice: screenWidth >= 414
 });
 
 /**
@@ -97,5 +97,5 @@ export const getSafeAreaDimensions = () => ({
   top: 44, // Default iOS status bar height
   bottom: 34, // Default iOS home indicator height
   left: 0,
-  right: 0,
+  right: 0
 });

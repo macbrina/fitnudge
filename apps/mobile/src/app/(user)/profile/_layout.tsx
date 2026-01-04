@@ -8,7 +8,7 @@ export default function ProfileLayout() {
     <Stack
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: colors.bg.canvas },
+        contentStyle: { backgroundColor: colors.bg.canvas }
       }}
     />
   );

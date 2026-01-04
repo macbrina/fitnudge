@@ -1,48 +1,37 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
-import {
-  exercisesService,
-  Exercise,
-  SearchExercisesParams,
-} from "@/services/api/exercises";
+import { exercisesService, Exercise, SearchExercisesParams } from "@/services/api/exercises";
 
 // Query keys
 export const exercisesQueryKeys = {
   all: ["exercises"] as const,
   detail: (id: string) => ["exercises", "detail", id] as const,
-  search: (params: SearchExercisesParams) =>
-    ["exercises", "search", params] as const,
-  popular: (limit: number) => ["exercises", "popular", limit] as const,
+  search: (params: SearchExercisesParams) => ["exercises", "search", params] as const,
+  popular: (limit: number) => ["exercises", "popular", limit] as const
 };
 
 /**
  * Hook to fetch exercise details by ID
  */
-export const useExerciseDetails = (
-  exerciseId: string | undefined,
-  enabled = true,
-) => {
+export const useExerciseDetails = (exerciseId: string | undefined, enabled = true) => {
   return useQuery({
     queryKey: exercisesQueryKeys.detail(exerciseId || ""),
     queryFn: () => exercisesService.getExerciseById(exerciseId!),
     enabled: enabled && !!exerciseId,
     staleTime: 60 * 60 * 1000, // 1 hour (exercise data rarely changes)
-    gcTime: 24 * 60 * 60 * 1000, // 24 hours cache
+    gcTime: 24 * 60 * 60 * 1000 // 24 hours cache
   });
 };
 
 /**
  * Hook to search exercises with filters
  */
-export const useSearchExercises = (
-  params: SearchExercisesParams,
-  enabled = true,
-) => {
+export const useSearchExercises = (params: SearchExercisesParams, enabled = true) => {
   return useQuery({
     queryKey: exercisesQueryKeys.search(params),
     queryFn: () => exercisesService.searchExercises(params),
     enabled,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000 // 5 minutes
   });
 };
 
@@ -54,7 +43,7 @@ export const usePopularExercises = (limit: number = 20, enabled = true) => {
     queryKey: exercisesQueryKeys.popular(limit),
     queryFn: () => exercisesService.getPopularExercises(limit),
     enabled,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000 // 5 minutes
   });
 };
 
@@ -71,10 +60,10 @@ export const useInvalidateExercises = () => {
   const invalidateDetail = useCallback(
     (exerciseId: string) => {
       queryClient.invalidateQueries({
-        queryKey: exercisesQueryKeys.detail(exerciseId),
+        queryKey: exercisesQueryKeys.detail(exerciseId)
       });
     },
-    [queryClient],
+    [queryClient]
   );
 
   return { invalidateAll, invalidateDetail };

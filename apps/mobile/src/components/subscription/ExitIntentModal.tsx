@@ -66,7 +66,7 @@ export function ExitIntentModal({
   onContinueFree,
   onSelectPlan,
   plans,
-  expiryTime,
+  expiryTime
 }: ExitIntentModalProps) {
   const { t } = useTranslation();
   const { brandColors, colors } = useTheme();
@@ -85,10 +85,7 @@ export function ExitIntentModal({
 
     const updateTimer = () => {
       const now = Date.now();
-      const remaining = Math.max(
-        0,
-        Math.floor((expiryTime.getTime() - now) / 1000),
-      );
+      const remaining = Math.max(0, Math.floor((expiryTime.getTime() - now) / 1000));
       setTimeRemaining(remaining);
 
       // Auto-close when expired
@@ -121,20 +118,17 @@ export function ExitIntentModal({
     return Math.round(((original - discounted) / original) * 100);
   };
 
-  // PRO-ONLY STRATEGY: Only show Pro plan for exit offer
-  // - Pro has voice AI (the hook that creates stickiness)
+  // PREMIUM-ONLY STRATEGY (2-tier system)
   // - One clear choice = higher conversion
-  // - Users who experience voice AI are more likely to renew
-  const proPlan = plans.find(
-    (p) => p.id === "pro" && (p.exit_offer_enabled ?? true),
-  );
+  // - Users who experience premium features are more likely to renew
+  const premiumPlan = plans.find((p) => p.id === "premium" && (p.exit_offer_enabled ?? true));
 
-  // Only show modal if Pro plan exists and has exit offer enabled
-  if (!proPlan) {
+  // Only show modal if Premium plan exists and has exit offer enabled
+  if (!premiumPlan) {
     return null;
   }
 
-  const bestPlan = proPlan;
+  const bestPlan = premiumPlan;
 
   const originalPrice = bestPlan.annual_price;
   const discountedPrice = getExitOfferPrice(bestPlan);
@@ -152,17 +146,13 @@ export function ExitIntentModal({
     >
       <View style={styles.overlay}>
         {/* Backdrop */}
-        <TouchableOpacity
-          style={styles.backdrop}
-          activeOpacity={1}
-          onPress={onContinueFree}
-        />
+        <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onContinueFree} />
 
         {/* Modal Content - Apple-style centered card */}
         <View
           style={[
             styles.modalContainer,
-            { paddingBottom: Math.max(insets.bottom, toRN(tokens.spacing[6])) },
+            { paddingBottom: Math.max(insets.bottom, toRN(tokens.spacing[6])) }
           ]}
         >
           {/* Close button */}
@@ -185,40 +175,25 @@ export function ExitIntentModal({
           </View>
 
           {/* Title */}
-          <Text style={styles.title}>
-            {t("onboarding.subscription.exit_offer.title")}
-          </Text>
+          <Text style={styles.title}>{t("onboarding.subscription.exit_offer.title")}</Text>
 
           {/* Subtitle */}
-          <Text style={styles.subtitle}>
-            {t("onboarding.subscription.exit_offer.subtitle")}
-          </Text>
+          <Text style={styles.subtitle}>{t("onboarding.subscription.exit_offer.subtitle")}</Text>
 
           {/* Price Card - Featured Offer */}
-          <View
-            style={[styles.offerCard, { borderColor: brandColors.primary }]}
-          >
+          <View style={[styles.offerCard, { borderColor: brandColors.primary }]}>
             {/* Plan Name & Badge */}
             <View style={styles.offerHeader}>
               <Text style={styles.planName}>{bestPlan.name}</Text>
-              <View
-                style={[
-                  styles.bestValueBadge,
-                  { backgroundColor: brandColors.primary },
-                ]}
-              >
+              <View style={[styles.bestValueBadge, { backgroundColor: brandColors.primary }]}>
                 <Text style={styles.bestValueText}>BEST VALUE</Text>
               </View>
             </View>
 
             {/* Price Display */}
             <View style={styles.priceContainer}>
-              <Text style={styles.originalPrice}>
-                ${originalPrice.toFixed(2)}
-              </Text>
-              <Text
-                style={[styles.discountedPrice, { color: brandColors.primary }]}
-              >
+              <Text style={styles.originalPrice}>${originalPrice.toFixed(2)}</Text>
+              <Text style={[styles.discountedPrice, { color: brandColors.primary }]}>
                 ${discountedPrice.toFixed(2)}
               </Text>
               <Text style={styles.perYear}>/year</Text>
@@ -226,36 +201,23 @@ export function ExitIntentModal({
 
             {/* Monthly breakdown */}
             <Text style={styles.monthlyBreakdown}>
-              Just ${monthlyEquivalent.toFixed(2)}/month • Save $
-              {savings.toFixed(0)}
+              Just ${monthlyEquivalent.toFixed(2)}/month • Save ${savings.toFixed(0)}
             </Text>
 
             {/* Features preview - AI Chat is the key hook */}
             <View style={styles.featuresPreview}>
               <View style={styles.featureRow}>
-                <Ionicons
-                  name="checkmark-circle"
-                  size={18}
-                  color={brandColors.primary}
-                />
+                <Ionicons name="checkmark-circle" size={18} color={brandColors.primary} />
                 <Text style={[styles.featureText, styles.featureHighlight]}>
                   AI Chat Motivation
                 </Text>
               </View>
               <View style={styles.featureRow}>
-                <Ionicons
-                  name="checkmark-circle"
-                  size={18}
-                  color={brandColors.primary}
-                />
+                <Ionicons name="checkmark-circle" size={18} color={brandColors.primary} />
                 <Text style={styles.featureText}>Unlimited goals</Text>
               </View>
               <View style={styles.featureRow}>
-                <Ionicons
-                  name="checkmark-circle"
-                  size={18}
-                  color={brandColors.primary}
-                />
+                <Ionicons name="checkmark-circle" size={18} color={brandColors.primary} />
                 <Text style={styles.featureText}>Advanced analytics</Text>
               </View>
             </View>
@@ -271,30 +233,16 @@ export function ExitIntentModal({
 
           {/* Countdown Timer */}
           {timeRemaining !== null && timeRemaining > 0 && (
-            <View
-              style={[
-                styles.countdownContainer,
-                { backgroundColor: colors.bg.warning },
-              ]}
-            >
-              <Ionicons
-                name="alarm-outline"
-                size={18}
-                color={colors.text.onWarning}
-              />
-              <Text
-                style={[styles.countdownText, { color: colors.text.onWarning }]}
-              >
+            <View style={[styles.countdownContainer, { backgroundColor: colors.bg.warning }]}>
+              <Ionicons name="alarm-outline" size={18} color={colors.text.onWarning} />
+              <Text style={[styles.countdownText, { color: colors.text.onWarning }]}>
                 Offer expires in {formatTimeRemaining(timeRemaining)}
               </Text>
             </View>
           )}
 
           {/* No thanks link */}
-          <TouchableOpacity
-            style={styles.noThanksButton}
-            onPress={onContinueFree}
-          >
+          <TouchableOpacity style={styles.noThanksButton} onPress={onContinueFree}>
             <Text style={styles.noThanksText}>
               {t("onboarding.subscription.exit_offer.continue_free")}
             </Text>
@@ -309,7 +257,7 @@ const makeExitIntentModalStyles = (tokens: any, colors: any, brand: any) => ({
   overlay: {
     flex: 1,
     justifyContent: "center" as const,
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   backdrop: {
     position: "absolute" as const,
@@ -317,7 +265,7 @@ const makeExitIntentModalStyles = (tokens: any, colors: any, brand: any) => ({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: colors.bg.overlay,
+    backgroundColor: colors.bg.overlay
   },
   modalContainer: {
     backgroundColor: colors.bg.card,
@@ -332,7 +280,7 @@ const makeExitIntentModalStyles = (tokens: any, colors: any, brand: any) => ({
     shadowOffset: { width: 0, height: 20 },
     shadowOpacity: 0.25,
     shadowRadius: 30,
-    elevation: 20,
+    elevation: 20
   },
   closeButton: {
     position: "absolute" as const,
@@ -343,7 +291,7 @@ const makeExitIntentModalStyles = (tokens: any, colors: any, brand: any) => ({
     borderRadius: toRN(tokens.borderRadius.full),
     backgroundColor: colors.bg.muted,
     justifyContent: "center" as const,
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   discountBadge: {
     position: "absolute" as const,
@@ -351,21 +299,21 @@ const makeExitIntentModalStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: colors.bg.success,
     paddingHorizontal: toRN(tokens.spacing[4]),
     paddingVertical: toRN(tokens.spacing[1.5]),
-    borderRadius: toRN(tokens.borderRadius.full),
+    borderRadius: toRN(tokens.borderRadius.full)
   },
   discountText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontWeight: "700" as const,
     fontFamily: fontFamily.groteskBold,
     color: colors.text.onSuccess,
-    letterSpacing: 0.5,
+    letterSpacing: 0.5
   },
   iconContainer: {
     marginTop: toRN(tokens.spacing[4]),
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   emoji: {
-    fontSize: 48,
+    fontSize: 48
   },
   title: {
     fontSize: toRN(tokens.typography.fontSize["2xl"]),
@@ -373,7 +321,7 @@ const makeExitIntentModalStyles = (tokens: any, colors: any, brand: any) => ({
     fontFamily: fontFamily.groteskBold,
     color: colors.text.primary,
     textAlign: "center" as const,
-    marginBottom: toRN(tokens.spacing[2]),
+    marginBottom: toRN(tokens.spacing[2])
   },
   subtitle: {
     fontSize: toRN(tokens.typography.fontSize.base),
@@ -382,7 +330,7 @@ const makeExitIntentModalStyles = (tokens: any, colors: any, brand: any) => ({
     textAlign: "center" as const,
     lineHeight: toRN(tokens.typography.fontSize.base) * 1.5,
     marginBottom: toRN(tokens.spacing[5]),
-    paddingHorizontal: toRN(tokens.spacing[2]),
+    paddingHorizontal: toRN(tokens.spacing[2])
   },
   offerCard: {
     width: "100%",
@@ -390,81 +338,81 @@ const makeExitIntentModalStyles = (tokens: any, colors: any, brand: any) => ({
     borderRadius: toRN(tokens.borderRadius.xl),
     borderWidth: 2,
     backgroundColor: colors.bg.surface,
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   offerHeader: {
     flexDirection: "row" as const,
     justifyContent: "space-between" as const,
     alignItems: "center" as const,
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   planName: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontWeight: "600" as const,
     fontFamily: fontFamily.groteskSemiBold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   bestValueBadge: {
     paddingHorizontal: toRN(tokens.spacing[2]),
     paddingVertical: toRN(tokens.spacing[0.5]),
-    borderRadius: toRN(tokens.borderRadius.md),
+    borderRadius: toRN(tokens.borderRadius.md)
   },
   bestValueText: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontWeight: "700" as const,
     fontFamily: fontFamily.groteskBold,
     color: colors.text.onPrimary,
-    letterSpacing: 0.5,
+    letterSpacing: 0.5
   },
   priceContainer: {
     flexDirection: "row" as const,
     alignItems: "baseline" as const,
-    marginBottom: toRN(tokens.spacing[1]),
+    marginBottom: toRN(tokens.spacing[1])
   },
   originalPrice: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.groteskRegular,
     color: colors.text.tertiary,
     textDecorationLine: "line-through" as const,
-    marginRight: toRN(tokens.spacing[2]),
+    marginRight: toRN(tokens.spacing[2])
   },
   discountedPrice: {
     fontSize: toRN(tokens.typography.fontSize["3xl"]),
     fontWeight: "700" as const,
-    fontFamily: fontFamily.groteskBold,
+    fontFamily: fontFamily.groteskBold
   },
   perYear: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.groteskRegular,
     color: colors.text.secondary,
-    marginLeft: toRN(tokens.spacing[0.5]),
+    marginLeft: toRN(tokens.spacing[0.5])
   },
   monthlyBreakdown: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.groteskMedium,
     color: colors.text.secondary,
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   featuresPreview: {
-    gap: toRN(tokens.spacing[2]),
+    gap: toRN(tokens.spacing[2])
   },
   featureRow: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    gap: toRN(tokens.spacing[2]),
+    gap: toRN(tokens.spacing[2])
   },
   featureText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.groteskRegular,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   featureHighlight: {
     fontFamily: fontFamily.groteskSemiBold,
-    fontWeight: "600" as const,
+    fontWeight: "600" as const
   },
   ctaContainer: {
     width: "100%",
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   countdownContainer: {
     flexDirection: "row" as const,
@@ -475,21 +423,21 @@ const makeExitIntentModalStyles = (tokens: any, colors: any, brand: any) => ({
     paddingHorizontal: toRN(tokens.spacing[4]),
     borderRadius: toRN(tokens.borderRadius.lg),
     marginBottom: toRN(tokens.spacing[3]),
-    width: "100%",
+    width: "100%"
   },
   countdownText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontWeight: "600" as const,
-    fontFamily: fontFamily.groteskSemiBold,
+    fontFamily: fontFamily.groteskSemiBold
   },
   noThanksButton: {
-    paddingVertical: toRN(tokens.spacing[2]),
+    paddingVertical: toRN(tokens.spacing[2])
   },
   noThanksText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.groteskMedium,
-    color: colors.text.tertiary,
-  },
+    color: colors.text.tertiary
+  }
 });
 
 export default ExitIntentModal;

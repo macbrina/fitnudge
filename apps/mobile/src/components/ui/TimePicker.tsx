@@ -1,11 +1,5 @@
 import React, { useState } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  Platform,
-} from "react-native";
+import { View, Text, TouchableOpacity, Platform, Modal } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useStyles } from "@/themes/makeStyles";
 import { useTheme } from "@/themes";
@@ -18,57 +12,103 @@ interface TimePickerProps {
   value: string; // HH:MM format
   onChange: (time: string) => void;
   label?: string;
+  description?: string;
   error?: string;
   disabled?: boolean;
+  is24Hour?: boolean;
 }
 
 const makeTimePickerStyles = (tokens: any, colors: any, brand: any) => {
   return {
     container: {
-      marginBottom: toRN(tokens.spacing[4]),
+      marginBottom: toRN(tokens.spacing[4])
+    },
+    labelRow: {
+      marginBottom: toRN(tokens.spacing[2])
     },
     label: {
       fontSize: toRN(tokens.typography.fontSize.base),
-      fontWeight: tokens.typography.fontWeight.semibold,
-      color: colors.text.primary,
-      marginBottom: toRN(tokens.spacing[2]),
-      fontFamily: fontFamily.groteskSemiBold,
+      fontFamily: fontFamily.semiBold,
+      color: colors.text.primary
+    },
+    description: {
+      fontSize: toRN(tokens.typography.fontSize.xs),
+      fontFamily: fontFamily.regular,
+      color: colors.text.tertiary,
+      marginTop: toRN(tokens.spacing[1])
     },
     inputContainer: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
+      justifyContent: "space-between" as const,
       borderWidth: 1,
       borderColor: colors.border.default,
       borderRadius: toRN(tokens.borderRadius.lg),
       backgroundColor: colors.bg.surface,
       paddingHorizontal: toRN(tokens.spacing[4]),
       paddingVertical: toRN(tokens.spacing[3]),
-      minHeight: 48,
-    },
-    inputContainerFocused: {
-      borderColor: brand.primary,
-      borderWidth: 2,
+      minHeight: 52
     },
     inputContainerError: {
-      borderColor: colors.error || "#ef4444",
+      borderColor: colors.feedback?.error || "#ef4444"
     },
-    input: {
-      flex: 1,
+    inputContainerDisabled: {
+      opacity: 0.6
+    },
+    timeText: {
       fontSize: toRN(tokens.typography.fontSize.base),
-      color: colors.text.primary,
-      fontFamily: fontFamily.groteskMedium,
-      padding: 0,
+      fontFamily: fontFamily.medium,
+      color: colors.text.primary
     },
-    iconButton: {
-      padding: toRN(tokens.spacing[2]),
-      marginLeft: toRN(tokens.spacing[2]),
+    placeholderText: {
+      fontSize: toRN(tokens.typography.fontSize.base),
+      fontFamily: fontFamily.regular,
+      color: colors.text.tertiary
+    },
+    iconContainer: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: toRN(tokens.spacing[2])
     },
     errorText: {
       fontSize: toRN(tokens.typography.fontSize.sm),
-      color: colors.error || "#ef4444",
+      color: colors.feedback?.error || "#ef4444",
       marginTop: toRN(tokens.spacing[1]),
-      fontFamily: fontFamily.groteskRegular,
+      fontFamily: fontFamily.regular
     },
+    // iOS Modal styles
+    iosModalOverlay: {
+      flex: 1,
+      justifyContent: "flex-end" as const,
+      backgroundColor: "rgba(0, 0, 0, 0.5)"
+    },
+    iosPickerContainer: {
+      backgroundColor: colors.bg.card,
+      borderTopLeftRadius: toRN(tokens.borderRadius["2xl"]),
+      borderTopRightRadius: toRN(tokens.borderRadius["2xl"]),
+      paddingBottom: toRN(tokens.spacing[8])
+    },
+    iosPickerHeader: {
+      flexDirection: "row" as const,
+      justifyContent: "space-between" as const,
+      alignItems: "center" as const,
+      paddingHorizontal: toRN(tokens.spacing[4]),
+      paddingVertical: toRN(tokens.spacing[3]),
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border.default
+    },
+    iosPickerButton: {
+      paddingHorizontal: toRN(tokens.spacing[3]),
+      paddingVertical: toRN(tokens.spacing[2])
+    },
+    iosPickerButtonText: {
+      fontSize: toRN(tokens.typography.fontSize.base),
+      fontFamily: fontFamily.semiBold,
+      color: brand.primary
+    },
+    iosPickerCancelText: {
+      color: colors.text.secondary
+    }
   };
 };
 
@@ -76,16 +116,18 @@ export function TimePicker({
   value,
   onChange,
   label,
+  description,
   error,
   disabled = false,
+  is24Hour = false
 }: TimePickerProps) {
   const styles = useStyles(makeTimePickerStyles);
-  const { colors, brandColors } = useTheme();
+  const { colors, brandColors, isDark } = useTheme();
   const [showPicker, setShowPicker] = useState(false);
-  const [isFocused, setIsFocused] = useState(false);
+  const [tempTime, setTempTime] = useState<Date>(() => getDateFromTime(value));
 
   // Parse HH:MM to Date object for picker
-  const getDateFromTime = (timeStr: string): Date => {
+  function getDateFromTime(timeStr: string): Date {
     if (!timeStr || !timeStr.includes(":")) {
       const now = new Date();
       return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 9, 0);
@@ -98,135 +140,137 @@ export function TimePicker({
     date.setSeconds(0);
     date.setMilliseconds(0);
     return date;
-  };
+  }
 
   // Format Date to HH:MM
-  const formatTime = (date: Date): string => {
+  const formatTimeForStorage = (date: Date): string => {
     const hours = String(date.getHours()).padStart(2, "0");
     const minutes = String(date.getMinutes()).padStart(2, "0");
     return `${hours}:${minutes}`;
   };
 
+  // Format time for display (12-hour or 24-hour format)
+  const formatTimeForDisplay = (timeStr: string): string => {
+    if (!timeStr || !timeStr.includes(":")) return "";
+
+    const [hours, minutes] = timeStr.split(":").map(Number);
+
+    if (is24Hour) {
+      return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+    }
+
+    const period = hours >= 12 ? "PM" : "AM";
+    const displayHours = hours % 12 || 12;
+    return `${displayHours}:${String(minutes).padStart(2, "0")} ${period}`;
+  };
+
   const handleTimeChange = (event: any, selectedDate?: Date) => {
     if (Platform.OS === "android") {
       setShowPicker(false);
-    }
-
-    if (selectedDate) {
-      const timeStr = formatTime(selectedDate);
-      onChange(timeStr);
-    }
-  };
-
-  const handleTextChange = (text: string) => {
-    // Allow only digits and colon
-    const cleaned = text.replace(/[^\d:]/g, "");
-
-    // Auto-format as user types
-    if (cleaned.length <= 2) {
-      // Just hours
-      onChange(cleaned);
-    } else if (cleaned.length === 3 && !cleaned.includes(":")) {
-      // Insert colon: "123" -> "12:3"
-      onChange(`${cleaned.slice(0, 2)}:${cleaned.slice(2)}`);
-    } else if (cleaned.length <= 5) {
-      // HH:MM format
-      const parts = cleaned.split(":");
-      if (parts[0] && parseInt(parts[0]) > 23) {
-        parts[0] = "23";
+      if (event.type === "set" && selectedDate) {
+        onChange(formatTimeForStorage(selectedDate));
       }
-      if (parts[1] && parseInt(parts[1]) > 59) {
-        parts[1] = "59";
+    } else {
+      // iOS - just update temp time, don't close yet
+      if (selectedDate) {
+        setTempTime(selectedDate);
       }
-      onChange(cleaned);
     }
   };
 
-  const handleBlur = () => {
-    setIsFocused(false);
-    // Validate and format on blur
-    if (value) {
-      const parts = value.split(":");
-      if (parts.length === 2) {
-        const hours = String(parseInt(parts[0] || "0")).padStart(2, "0");
-        const minutes = String(parseInt(parts[1] || "0")).padStart(2, "0");
-        const formatted = `${hours}:${minutes}`;
-        if (formatted !== value) {
-          onChange(formatted);
-        }
-      }
+  const handleIOSConfirm = () => {
+    onChange(formatTimeForStorage(tempTime));
+    setShowPicker(false);
+  };
+
+  const handleIOSCancel = () => {
+    setTempTime(getDateFromTime(value));
+    setShowPicker(false);
+  };
+
+  const openPicker = () => {
+    if (!disabled) {
+      setTempTime(getDateFromTime(value));
+      setShowPicker(true);
     }
   };
 
   return (
     <View style={styles.container}>
-      {label && <Text style={styles.label}>{label}</Text>}
-      <View
-        style={[
-          styles.inputContainer,
-          isFocused && styles.inputContainerFocused,
-          error && styles.inputContainerError,
-          disabled && { opacity: 0.6 },
-        ]}
-      >
-        <TextInput
-          style={styles.input}
-          value={value}
-          onChangeText={handleTextChange}
-          onFocus={() => setIsFocused(true)}
-          onBlur={handleBlur}
-          placeholder="09:00"
-          placeholderTextColor={colors.text.tertiary}
-          keyboardType="numeric"
-          maxLength={5}
-          editable={!disabled}
-        />
-        {Platform.OS === "ios" && (
-          <TouchableOpacity
-            style={styles.iconButton}
-            onPress={() => setShowPicker(true)}
-            disabled={disabled}
-          >
-            <Ionicons
-              name="time-outline"
-              size={24}
-              color={brandColors.primary}
-            />
-          </TouchableOpacity>
-        )}
-        {Platform.OS === "android" && (
-          <TouchableOpacity
-            style={styles.iconButton}
-            onPress={() => setShowPicker(true)}
-            disabled={disabled}
-          >
-            <Ionicons
-              name="time-outline"
-              size={24}
-              color={brandColors.primary}
-            />
-          </TouchableOpacity>
-        )}
-      </View>
-      {error && <Text style={styles.errorText}>{error}</Text>}
-      {showPicker && (
-        <DateTimePicker
-          value={getDateFromTime(value)}
-          mode="time"
-          is24Hour={true}
-          display={Platform.OS === "ios" ? "spinner" : "default"}
-          onChange={handleTimeChange}
-        />
+      {(label || description) && (
+        <View style={styles.labelRow}>
+          {label && <Text style={styles.label}>{label}</Text>}
+          {description && <Text style={styles.description}>{description}</Text>}
+        </View>
       )}
+      <TouchableOpacity onPress={openPicker} disabled={disabled} activeOpacity={0.7}>
+        <View
+          style={[
+            styles.inputContainer,
+            error && styles.inputContainerError,
+            disabled && styles.inputContainerDisabled
+          ]}
+        >
+          {value ? (
+            <Text style={styles.timeText}>{formatTimeForDisplay(value)}</Text>
+          ) : (
+            <Text style={styles.placeholderText}>Select time</Text>
+          )}
+          <View style={styles.iconContainer}>
+            <Ionicons name="time-outline" size={20} color={brandColors.primary} />
+          </View>
+        </View>
+      </TouchableOpacity>
+      {error && <Text style={styles.errorText}>{error}</Text>}
+
+      {/* Android TimePicker - shows directly */}
       {Platform.OS === "android" && showPicker && (
         <DateTimePicker
           value={getDateFromTime(value)}
           mode="time"
-          is24Hour={true}
+          is24Hour={is24Hour}
           display="default"
           onChange={handleTimeChange}
+          themeVariant={isDark ? "dark" : "light"}
         />
+      )}
+
+      {/* iOS TimePicker - shows in a modal */}
+      {Platform.OS === "ios" && (
+        <Modal
+          visible={showPicker}
+          transparent
+          animationType="slide"
+          onRequestClose={handleIOSCancel}
+        >
+          <View style={styles.iosModalOverlay}>
+            <TouchableOpacity style={{ flex: 1 }} onPress={handleIOSCancel} activeOpacity={1} />
+            <View style={styles.iosPickerContainer}>
+              <View style={styles.iosPickerHeader}>
+                <TouchableOpacity style={styles.iosPickerButton} onPress={handleIOSCancel}>
+                  <Text style={[styles.iosPickerButtonText, styles.iosPickerCancelText]}>
+                    Cancel
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.iosPickerButton} onPress={handleIOSConfirm}>
+                  <Text style={styles.iosPickerButtonText}>Done</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={tempTime}
+                mode="time"
+                is24Hour={is24Hour}
+                display="spinner"
+                onChange={handleTimeChange}
+                style={{ height: 200 }}
+                themeVariant={isDark ? "dark" : "light"}
+              />
+            </View>
+          </View>
+        </Modal>
       )}
     </View>
   );
 }
+
+export default TimePicker;

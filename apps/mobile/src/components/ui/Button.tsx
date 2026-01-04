@@ -5,7 +5,7 @@ import {
   ViewStyle,
   TextStyle,
   ActivityIndicator,
-  View,
+  View
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useStyles, useTheme } from "@/themes";
@@ -64,7 +64,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
   base: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "center"
   },
 
   // Shadow styles for solid background variants
@@ -73,7 +73,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     shadowOffset: { width: 0, height: toRN(2) },
     shadowOpacity: 0.1,
     shadowRadius: toRN(4),
-    elevation: 2,
+    elevation: 2
   },
 
   // No shadow styles for transparent variants
@@ -82,189 +82,189 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     elevation: 0,
     shadowColor: "transparent",
     shadowOffset: { width: 0, height: 0 },
-    shadowRadius: 0,
+    shadowRadius: 0
   },
 
   // Variant styles
   primary: {
     backgroundColor: brand.primary,
-    borderWidth: 0,
+    borderWidth: 0
   },
   secondary: {
     backgroundColor: colors.bg.muted,
-    borderWidth: 0,
+    borderWidth: 0
   },
   outline: {
     backgroundColor: "transparent",
     borderWidth: 1,
-    borderColor: brand.primary,
+    borderColor: brand.primary
   },
   ghost: {
     backgroundColor: "transparent",
-    borderWidth: 0,
+    borderWidth: 0
   },
   danger: {
     backgroundColor: colors.feedback.error,
-    borderWidth: 0,
+    borderWidth: 0
   },
   success: {
     backgroundColor: colors.feedback.success,
-    borderWidth: 0,
+    borderWidth: 0
   },
 
   // Size styles
   xs: {
     paddingHorizontal: toRN(tokens.spacing[3]),
     paddingVertical: toRN(tokens.spacing[2]),
-    minHeight: toRN(28),
+    minHeight: toRN(28)
   },
   sm: {
     paddingHorizontal: toRN(tokens.spacing[4]),
     paddingVertical: toRN(tokens.spacing[2]),
-    minHeight: toRN(36),
+    minHeight: toRN(36)
   },
   md: {
     paddingHorizontal: toRN(tokens.spacing[5]),
     paddingVertical: toRN(tokens.spacing[3]),
-    minHeight: toRN(44),
+    minHeight: toRN(44)
   },
   lg: {
     paddingHorizontal: toRN(tokens.spacing[6]),
     paddingVertical: toRN(tokens.spacing[4]),
-    minHeight: toRN(52),
+    minHeight: toRN(52)
   },
   xl: {
     paddingHorizontal: toRN(tokens.spacing[7]),
     paddingVertical: toRN(tokens.spacing[5]),
-    minHeight: toRN(60),
+    minHeight: toRN(60)
   },
 
   // Text styles
   text: {
     fontFamily: fontFamily.groteskMedium,
-    textAlign: "center",
+    textAlign: "center"
   },
 
   // Variant text styles
   primaryText: {
-    color: brand.onPrimary,
+    color: brand.onPrimary
   },
   secondaryText: {
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   outlineText: {
-    color: brand.primary,
+    color: brand.primary
   },
   ghostText: {
     color: brand.primary,
-    fontFamily: fontFamily.groteskBold,
+    fontFamily: fontFamily.groteskBold
   },
   dangerText: {
-    color: brand.onPrimary,
+    color: brand.onPrimary
   },
   successText: {
-    color: brand.onPrimary,
+    color: brand.onPrimary
   },
   textText: {
     color: brand.primary,
     textDecorationLine: "underline",
-    fontFamily: fontFamily.groteskRegular,
+    fontFamily: fontFamily.groteskRegular
   },
 
   // Size text styles
   xsText: {
-    fontSize: toRN(tokens.typography.fontSize.xs),
+    fontSize: toRN(tokens.typography.fontSize.xs)
   },
   smText: {
-    fontSize: toRN(tokens.typography.fontSize.sm),
+    fontSize: toRN(tokens.typography.fontSize.sm)
   },
   mdText: {
-    fontSize: toRN(tokens.typography.fontSize.base),
+    fontSize: toRN(tokens.typography.fontSize.base)
   },
   lgText: {
-    fontSize: toRN(tokens.typography.fontSize.lg),
+    fontSize: toRN(tokens.typography.fontSize.lg)
   },
   xlText: {
-    fontSize: toRN(tokens.typography.fontSize.xl),
+    fontSize: toRN(tokens.typography.fontSize.xl)
   },
 
   // State styles
   disabled: {
     opacity: 0.6,
     shadowOpacity: 0.05,
-    elevation: 1,
+    elevation: 1
   },
   disabledText: {
-    color: brand.onPrimary,
+    color: brand.onPrimary
   },
   // Disabled text styles for specific variants
   outlineDisabledText: {
-    color: brand.primary,
+    color: brand.primary
   },
   ghostDisabledText: {
-    color: brand.primary,
+    color: brand.primary
   },
   textDisabledText: {
     color: colors.text.secondary,
-    textDecorationLine: "none",
+    textDecorationLine: "none"
   },
 
   // Border radius styles
   borderRadiusNone: {
-    borderRadius: 0,
+    borderRadius: 0
   },
   borderRadiusSm: {
-    borderRadius: toRN(tokens.borderRadius.sm),
+    borderRadius: toRN(tokens.borderRadius.sm)
   },
   borderRadiusMd: {
-    borderRadius: toRN(tokens.borderRadius.md),
+    borderRadius: toRN(tokens.borderRadius.md)
   },
   borderRadiusLg: {
-    borderRadius: toRN(tokens.borderRadius.lg),
+    borderRadius: toRN(tokens.borderRadius.lg)
   },
   borderRadiusXl: {
-    borderRadius: toRN(tokens.borderRadius.xl),
+    borderRadius: toRN(tokens.borderRadius.xl)
   },
   borderRadiusFull: {
-    borderRadius: toRN(tokens.borderRadius.full),
+    borderRadius: toRN(tokens.borderRadius.full)
   },
 
   // Layout styles
   fullWidth: {
-    width: "100%",
+    width: "100%"
   },
 
   // Minimal padding for text and ghost variants
   minimalPadding: {
     paddingHorizontal: toRN(tokens.spacing[1]),
     paddingVertical: toRN(tokens.spacing[1]),
-    minHeight: "auto",
+    minHeight: "auto"
   },
 
   // Content styles
   contentContainer: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "center"
   },
   leftIcon: {
-    marginRight: toRN(tokens.spacing[2]),
+    marginRight: toRN(tokens.spacing[2])
   },
   rightIcon: {
-    marginLeft: toRN(tokens.spacing[2]),
+    marginLeft: toRN(tokens.spacing[2])
   },
 
   // Loading styles
   loadingContainer: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "center"
   },
   loadingText: {
-    marginLeft: toRN(tokens.spacing[2]),
+    marginLeft: toRN(tokens.spacing[2])
   },
   disabledSpinner: {
-    marginLeft: toRN(tokens.spacing[2]),
+    marginLeft: toRN(tokens.spacing[2])
   },
 
   // Action button small style
@@ -274,11 +274,11 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     borderRadius: 18,
     minHeight: 36,
     paddingHorizontal: 0,
-    paddingVertical: 0,
+    paddingVertical: 0
   },
   flex: {
-    flex: 1,
-  },
+    flex: 1
+  }
 });
 
 export default function Button({
@@ -310,7 +310,7 @@ export default function Button({
 
   // Accessibility
   accessibilityLabel,
-  accessibilityHint,
+  accessibilityHint
 }: ButtonProps) {
   // Get theme and styles
   const { colors, brandColors } = useTheme();
@@ -320,9 +320,7 @@ export default function Button({
   const isDisabled = disabled || loading;
 
   // Determine if variant should have shadow (only solid background variants)
-  const hasShadow = ["primary", "secondary", "danger", "success"].includes(
-    variant,
-  );
+  const hasShadow = ["primary", "secondary", "danger", "success"].includes(variant);
 
   // Determine if variant should explicitly have no shadow (transparent variants)
   const hasNoShadow = ["outline", "ghost", "text"].includes(variant);
@@ -336,16 +334,14 @@ export default function Button({
     styles[variant],
     !hasMinimalPadding && styles[size], // Skip size padding for minimal variants
     hasMinimalPadding && styles.minimalPadding, // Use minimal padding instead
-    styles[
-      `borderRadius${borderRadius.charAt(0).toUpperCase() + borderRadius.slice(1)}`
-    ],
+    styles[`borderRadius${borderRadius.charAt(0).toUpperCase() + borderRadius.slice(1)}`],
     hasShadow && styles.shadow,
     hasNoShadow && styles.noShadow,
     fullWidth && styles.fullWidth,
     flex && styles.flex,
     isDisabled && styles.disabled,
     icon && styles.actionButtonSmall, // Apply actionButtonSmall style when icon prop is used
-    style,
+    style
   ];
 
   const buttonTextStyle = [
@@ -360,7 +356,7 @@ export default function Button({
           : variant === "text"
             ? styles.textDisabledText
             : styles.disabledText),
-    textStyle,
+    textStyle
   ];
 
   // Get icon size based on button size
@@ -390,9 +386,7 @@ export default function Button({
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size={iconSize} color={iconColor} />
-          {!iconOnly && (
-            <Text style={[buttonTextStyle, styles.loadingText]}>{title}</Text>
-          )}
+          {!iconOnly && <Text style={[buttonTextStyle, styles.loadingText]}>{title}</Text>}
         </View>
       ) : (
         <View style={styles.contentContainer}>
@@ -401,21 +395,12 @@ export default function Button({
 
           {/* Left Icon */}
           {leftIcon && !iconOnly && !icon && (
-            <Ionicons
-              name={leftIcon}
-              size={iconSize}
-              color={iconColor}
-              style={styles.leftIcon}
-            />
+            <Ionicons name={leftIcon} size={iconSize} color={iconColor} style={styles.leftIcon} />
           )}
 
           {/* Icon Only */}
           {iconOnly && !icon && (leftIcon || rightIcon) && (
-            <Ionicons
-              name={leftIcon || rightIcon!}
-              size={iconSize}
-              color={iconColor}
-            />
+            <Ionicons name={leftIcon || rightIcon!} size={iconSize} color={iconColor} />
           )}
 
           {/* Text (if not icon only and not using simple icon) */}
@@ -423,21 +408,12 @@ export default function Button({
 
           {/* Right Icon */}
           {rightIcon && !iconOnly && !icon && (
-            <Ionicons
-              name={rightIcon}
-              size={iconSize}
-              color={iconColor}
-              style={styles.rightIcon}
-            />
+            <Ionicons name={rightIcon} size={iconSize} color={iconColor} style={styles.rightIcon} />
           )}
 
           {/* Disabled spinner indicator */}
           {!iconOnly && !icon && loading && (
-            <ActivityIndicator
-              size={iconSize}
-              color={iconColor}
-              style={styles.disabledSpinner}
-            />
+            <ActivityIndicator size={iconSize} color={iconColor} style={styles.disabledSpinner} />
           )}
         </View>
       )}
@@ -467,14 +443,9 @@ function getIconColor(
   variant: ButtonVariant,
   isDisabled: boolean,
   colors: any,
-  brandColors: any,
+  brandColors: any
 ): string {
-  if (
-    isDisabled &&
-    variant !== "outline" &&
-    variant !== "ghost" &&
-    variant !== "text"
-  )
+  if (isDisabled && variant !== "outline" && variant !== "ghost" && variant !== "text")
     return brandColors.onPrimary;
 
   switch (variant) {

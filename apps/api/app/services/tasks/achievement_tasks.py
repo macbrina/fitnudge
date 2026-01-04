@@ -58,6 +58,8 @@ def check_achievements_task(
 
         # Send push notifications for each newly unlocked achievement
         if newly_unlocked:
+            supabase = get_supabase_client()
+
             try:
                 from app.services.expo_push_service import send_push_to_user
 
@@ -111,6 +113,82 @@ def check_achievements_task(
             except Exception as e:
                 logger.warning(
                     f"Failed to send achievement notifications for user {user_id}",
+                    {"error": str(e), "user_id": user_id},
+                )
+
+            # Notify partners of milestone achievements (PARTNER_MILESTONE notification)
+            try:
+                from app.services.social_notification_service import (
+                    send_partner_notification,
+                    SocialNotificationType,
+                )
+
+                # Get user's name for notification
+                user_result = (
+                    supabase.table("users")
+                    .select("name")
+                    .eq("id", user_id)
+                    .maybe_single()
+                    .execute()
+                )
+                user_name = (
+                    user_result.data.get("name", "Your partner")
+                    if user_result.data
+                    else "Your partner"
+                )
+
+                # Batch fetch all partners (SCALABILITY: 1 query for all partners)
+                partners_result = (
+                    supabase.table("accountability_partners")
+                    .select("user_id, partner_user_id")
+                    .or_(f"user_id.eq.{user_id},partner_user_id.eq.{user_id}")
+                    .eq("status", "accepted")
+                    .execute()
+                )
+
+                partner_ids = set()
+                for p in partners_result.data or []:
+                    # Get the OTHER user in the partnership
+                    if p["user_id"] == user_id:
+                        partner_ids.add(p["partner_user_id"])
+                    else:
+                        partner_ids.add(p["user_id"])
+
+                # Notify each partner about ALL achievements (batch message)
+                if partner_ids and len(newly_unlocked) > 0:
+                    # Build a summary message
+                    if len(newly_unlocked) == 1:
+                        achievement_msg = newly_unlocked[0].get(
+                            "badge_name", "a new achievement"
+                        )
+                    else:
+                        achievement_msg = f"{len(newly_unlocked)} new achievements"
+
+                    for partner_id in partner_ids:
+                        try:
+                            loop.run_until_complete(
+                                send_partner_notification(
+                                    notification_type=SocialNotificationType.PARTNER_MILESTONE,
+                                    recipient_id=partner_id,
+                                    sender_id=user_id,
+                                    sender_name=user_name,
+                                    message=f"🏆 {user_name} unlocked {achievement_msg}!",
+                                    entity_type="achievement",
+                                    entity_id=newly_unlocked[0].get("id"),
+                                    deep_link="/(user)/profile/partners",  # Partner can see their partner's dashboard
+                                    supabase=supabase,
+                                )
+                            )
+                        except Exception as partner_notify_error:
+                            # Don't fail if partner notification fails
+                            logger.warning(
+                                f"Failed to notify partner {partner_id} of achievement",
+                                {"error": str(partner_notify_error)},
+                            )
+
+            except Exception as e:
+                logger.warning(
+                    f"Failed to notify partners of achievements for user {user_id}",
                     {"error": str(e), "user_id": user_id},
                 )
 

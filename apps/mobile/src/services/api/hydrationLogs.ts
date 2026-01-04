@@ -6,7 +6,7 @@ export const HYDRATION_PRESETS = {
   glass: 237, // 1 glass = 8 oz = 237 ml
   bottle: 500, // Small bottle = 500 ml (16 oz)
   large_bottle: 750, // Large bottle = 750 ml (25 oz)
-  liter: 1000, // 1 liter
+  liter: 1000 // 1 liter
 } as const;
 
 export interface HydrationLog {
@@ -55,9 +55,7 @@ class HydrationLogsService extends BaseApiService {
   /**
    * Log water intake
    */
-  async logHydration(
-    data: CreateHydrationLogRequest,
-  ): Promise<ApiResponse<HydrationLog>> {
+  async logHydration(data: CreateHydrationLogRequest): Promise<ApiResponse<HydrationLog>> {
     return this.post<HydrationLog>(ROUTES.HYDRATION.CREATE, data);
   }
 
@@ -72,11 +70,9 @@ class HydrationLogsService extends BaseApiService {
     offset?: number;
   }): Promise<ApiResponse<HydrationLog[]>> {
     const queryParams = new URLSearchParams();
-    if (params?.logged_date)
-      queryParams.append("logged_date", params.logged_date);
+    if (params?.logged_date) queryParams.append("logged_date", params.logged_date);
     if (params?.goal_id) queryParams.append("goal_id", params.goal_id);
-    if (params?.challenge_id)
-      queryParams.append("challenge_id", params.challenge_id);
+    if (params?.challenge_id) queryParams.append("challenge_id", params.challenge_id);
     if (params?.limit) queryParams.append("limit", params.limit.toString());
     if (params?.offset) queryParams.append("offset", params.offset.toString());
 
@@ -92,12 +88,11 @@ class HydrationLogsService extends BaseApiService {
    */
   async getDailyHydrationSummary(
     date: string,
-    params?: { goal_id?: string; challenge_id?: string },
+    params?: { goal_id?: string; challenge_id?: string }
   ): Promise<ApiResponse<DailyHydrationSummary>> {
     const queryParams = new URLSearchParams();
     if (params?.goal_id) queryParams.append("goal_id", params.goal_id);
-    if (params?.challenge_id)
-      queryParams.append("challenge_id", params.challenge_id);
+    if (params?.challenge_id) queryParams.append("challenge_id", params.challenge_id);
 
     const url = queryParams.toString()
       ? `${ROUTES.HYDRATION.SUMMARY(date)}?${queryParams.toString()}`
@@ -118,42 +113,33 @@ class HydrationLogsService extends BaseApiService {
   /**
    * Log one glass of water (237ml / 8oz)
    */
-  async logGlass(
-    goalId?: string,
-    challengeId?: string,
-  ): Promise<ApiResponse<HydrationLog>> {
+  async logGlass(goalId?: string, challengeId?: string): Promise<ApiResponse<HydrationLog>> {
     return this.logHydration({
       amount_ml: HYDRATION_PRESETS.glass,
       goal_id: goalId,
-      challenge_id: challengeId,
+      challenge_id: challengeId
     });
   }
 
   /**
    * Log one bottle of water (500ml / 16oz)
    */
-  async logBottle(
-    goalId?: string,
-    challengeId?: string,
-  ): Promise<ApiResponse<HydrationLog>> {
+  async logBottle(goalId?: string, challengeId?: string): Promise<ApiResponse<HydrationLog>> {
     return this.logHydration({
       amount_ml: HYDRATION_PRESETS.bottle,
       goal_id: goalId,
-      challenge_id: challengeId,
+      challenge_id: challengeId
     });
   }
 
   /**
    * Log one large bottle of water (750ml / 25oz)
    */
-  async logLargeBottle(
-    goalId?: string,
-    challengeId?: string,
-  ): Promise<ApiResponse<HydrationLog>> {
+  async logLargeBottle(goalId?: string, challengeId?: string): Promise<ApiResponse<HydrationLog>> {
     return this.logHydration({
       amount_ml: HYDRATION_PRESETS.large_bottle,
       goal_id: goalId,
-      challenge_id: challengeId,
+      challenge_id: challengeId
     });
   }
 }

@@ -5,7 +5,7 @@ import type {
   SaveProgressRequest,
   SubmitFeedbackRequest,
   WorkoutStats,
-  WorkoutPhase,
+  WorkoutPhase
 } from "@/types/workout";
 
 // API route helpers
@@ -25,7 +25,7 @@ const ROUTES = {
   HISTORY: "/workout-sessions/history",
   STATS: "/workout-sessions/stats",
   FEEDBACK: "/workout-sessions/feedback",
-  REFLECTION: "/workout-sessions/reflection",
+  REFLECTION: "/workout-sessions/reflection"
 };
 
 // Request types
@@ -138,9 +138,7 @@ export class WorkoutSessionsService extends BaseApiService {
   /**
    * Start a new workout session
    */
-  async startSession(
-    data: StartSessionRequest,
-  ): Promise<ApiResponse<WorkoutSession>> {
+  async startSession(data: StartSessionRequest): Promise<ApiResponse<WorkoutSession>> {
     return this.post<WorkoutSession>(ROUTES.START, data);
   }
 
@@ -149,7 +147,7 @@ export class WorkoutSessionsService extends BaseApiService {
    */
   async updateSession(
     sessionId: string,
-    data: UpdateSessionRequest,
+    data: UpdateSessionRequest
   ): Promise<ApiResponse<WorkoutSession>> {
     return this.patch<WorkoutSession>(ROUTES.UPDATE(sessionId), data);
   }
@@ -159,7 +157,7 @@ export class WorkoutSessionsService extends BaseApiService {
    */
   async saveProgress(
     sessionId: string,
-    data: SaveProgressRequest,
+    data: SaveProgressRequest
   ): Promise<ApiResponse<WorkoutSession>> {
     return this.post<WorkoutSession>(ROUTES.SAVE_PROGRESS(sessionId), data);
   }
@@ -169,20 +167,15 @@ export class WorkoutSessionsService extends BaseApiService {
    */
   async completeSession(
     sessionId: string,
-    data: CompleteSessionRequest,
+    data: CompleteSessionRequest
   ): Promise<ApiResponse<CompletedSessionResponse>> {
-    return this.post<CompletedSessionResponse>(
-      ROUTES.COMPLETE(sessionId),
-      data,
-    );
+    return this.post<CompletedSessionResponse>(ROUTES.COMPLETE(sessionId), data);
   }
 
   /**
    * Check if user can start a session (or if it would be practice)
    */
-  async canStartSession(
-    goalId: string,
-  ): Promise<ApiResponse<CanStartSessionResponse>> {
+  async canStartSession(goalId: string): Promise<ApiResponse<CanStartSessionResponse>> {
     return this.get<CanStartSessionResponse>(ROUTES.CAN_START(goalId));
   }
 
@@ -191,19 +184,17 @@ export class WorkoutSessionsService extends BaseApiService {
    */
   async updateFeedback(
     sessionId: string,
-    feedback: "hard" | "just_right" | "easy",
+    feedback: "hard" | "just_right" | "easy"
   ): Promise<ApiResponse<WorkoutSession>> {
     return this.patch<WorkoutSession>(ROUTES.UPDATE(sessionId), {
-      feedback_rating: feedback,
+      feedback_rating: feedback
     });
   }
 
   /**
    * Get active session for a goal (legacy - for backward compatibility)
    */
-  async getActiveSession(
-    goalId: string,
-  ): Promise<ApiResponse<ActiveSessionResponse>> {
+  async getActiveSession(goalId: string): Promise<ApiResponse<ActiveSessionResponse>> {
     return this.get<ActiveSessionResponse>(ROUTES.ACTIVE(goalId));
   }
 
@@ -214,11 +205,9 @@ export class WorkoutSessionsService extends BaseApiService {
    */
   async getActiveSessionByEntity(
     entityId: string,
-    entityType: "goal" | "challenge",
+    entityType: "goal" | "challenge"
   ): Promise<ApiResponse<ActiveSessionResponse>> {
-    return this.get<ActiveSessionResponse>(
-      ROUTES.ACTIVE_ENTITY(entityId, entityType),
-    );
+    return this.get<ActiveSessionResponse>(ROUTES.ACTIVE_ENTITY(entityId, entityType));
   }
 
   /**
@@ -228,19 +217,15 @@ export class WorkoutSessionsService extends BaseApiService {
    */
   async canStartSessionByEntity(
     entityId: string,
-    entityType: "goal" | "challenge",
+    entityType: "goal" | "challenge"
   ): Promise<ApiResponse<CanStartSessionResponse>> {
-    return this.get<CanStartSessionResponse>(
-      ROUTES.CAN_START_ENTITY(entityId, entityType),
-    );
+    return this.get<CanStartSessionResponse>(ROUTES.CAN_START_ENTITY(entityId, entityType));
   }
 
   /**
    * Get workout history
    */
-  async getHistory(
-    params?: WorkoutHistoryParams,
-  ): Promise<ApiResponse<WorkoutHistoryResponse>> {
+  async getHistory(params?: WorkoutHistoryParams): Promise<ApiResponse<WorkoutHistoryResponse>> {
     const queryParams = new URLSearchParams();
     if (params?.limit) queryParams.append("limit", String(params.limit));
     if (params?.offset) queryParams.append("offset", String(params.offset));
@@ -248,9 +233,7 @@ export class WorkoutSessionsService extends BaseApiService {
     if (params?.goal_id) queryParams.append("goal_id", params.goal_id);
 
     const query = queryParams.toString();
-    return this.get<WorkoutHistoryResponse>(
-      query ? `${ROUTES.HISTORY}?${query}` : ROUTES.HISTORY,
-    );
+    return this.get<WorkoutHistoryResponse>(query ? `${ROUTES.HISTORY}?${query}` : ROUTES.HISTORY);
   }
 
   /**
@@ -263,9 +246,7 @@ export class WorkoutSessionsService extends BaseApiService {
   /**
    * Submit workout feedback
    */
-  async submitFeedback(
-    data: SubmitFeedbackRequest,
-  ): Promise<ApiResponse<FeedbackResponse>> {
+  async submitFeedback(data: SubmitFeedbackRequest): Promise<ApiResponse<FeedbackResponse>> {
     return this.post<FeedbackResponse>(ROUTES.FEEDBACK, data);
   }
 
@@ -273,9 +254,7 @@ export class WorkoutSessionsService extends BaseApiService {
    * Save workout reflection (mood, notes, photo) after completion
    * This updates the check-in that was auto-created when workout finished
    */
-  async saveReflection(
-    data: SaveReflectionRequest,
-  ): Promise<ApiResponse<SaveReflectionResponse>> {
+  async saveReflection(data: SaveReflectionRequest): Promise<ApiResponse<SaveReflectionResponse>> {
     return this.post<SaveReflectionResponse>(ROUTES.REFLECTION, data);
   }
 }

@@ -2,7 +2,7 @@ import { Svg, Path, G } from "react-native-svg";
 
 export const DumbellIcon = ({
   size = 24,
-  color = "currentColor",
+  color = "currentColor"
 }: {
   size?: number;
   color?: string;

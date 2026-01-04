@@ -9,7 +9,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   audioPreferencesService,
   type AudioPreferences,
-  type UpdateAudioPreferencesRequest,
+  type UpdateAudioPreferencesRequest
 } from "@/services/api/audioPreferences";
 
 const QUERY_KEY = ["audio-preferences"];
@@ -23,7 +23,7 @@ export function useAudioPreferences() {
     queryKey: QUERY_KEY,
     queryFn: () => audioPreferencesService.getPreferences(),
     staleTime: 1000 * 60 * 60, // 1 hour - preferences don't change often
-    gcTime: 1000 * 60 * 60 * 24, // 24 hours
+    gcTime: 1000 * 60 * 60 * 24 // 24 hours
   });
 }
 
@@ -44,14 +44,13 @@ export function useUpdateAudioPreferences() {
       await queryClient.cancelQueries({ queryKey: QUERY_KEY });
 
       // Snapshot current value
-      const previousPrefs =
-        queryClient.getQueryData<AudioPreferences>(QUERY_KEY);
+      const previousPrefs = queryClient.getQueryData<AudioPreferences>(QUERY_KEY);
 
       // Optimistically update
       if (previousPrefs) {
         queryClient.setQueryData<AudioPreferences>(QUERY_KEY, {
           ...previousPrefs,
-          ...updates,
+          ...updates
         });
       }
 
@@ -68,7 +67,7 @@ export function useUpdateAudioPreferences() {
     // Always refetch after error or success
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEY });
-    },
+    }
   });
 }
 
@@ -92,7 +91,7 @@ export function usePrefetchAudioPreferences() {
     queryClient.prefetchQuery({
       queryKey: QUERY_KEY,
       queryFn: () => audioPreferencesService.getPreferences(),
-      staleTime: 1000 * 60 * 60, // 1 hour
+      staleTime: 1000 * 60 * 60 // 1 hour
     });
   }, [queryClient]);
 

@@ -165,6 +165,24 @@ export interface CreateChallengeRequest {
   metadata?: Record<string, unknown>;
 }
 
+/**
+ * Restricted edit request for creator-only challenge edits.
+ * Only allowed when challenge status === 'upcoming'.
+ *
+ * Allowed edits:
+ * - title, description: Safe (plan was based on original, user is warned)
+ * - join_deadline: EXTEND only (>= original, >= now, < start_date)
+ * - max_participants: INCREASE only (>= current participants_count)
+ * - reminder_times: Just notification preferences
+ */
+export interface EditChallengeRequest {
+  title?: string;
+  description?: string;
+  join_deadline?: string; // Format: YYYY-MM-DD, extend only
+  max_participants?: number; // Increase only
+  reminder_times?: string[];
+}
+
 class ChallengesService extends BaseApiService {
   /**
    * Get list of all challenges (legacy - may return all public challenges)
@@ -178,9 +196,7 @@ class ChallengesService extends BaseApiService {
    * This creates a challenge directly without needing a goal first.
    * The backend will generate an actionable plan if category is provided.
    */
-  async createChallenge(
-    data: CreateChallengeRequest,
-  ): Promise<ApiResponse<Challenge>> {
+  async createChallenge(data: CreateChallengeRequest): Promise<ApiResponse<Challenge>> {
     return this.post<Challenge>(ROUTES.CHALLENGES.CREATE, data);
   }
 
@@ -226,12 +242,25 @@ class ChallengesService extends BaseApiService {
    */
   async cancelChallenge(
     id: string,
-    reason?: string,
+    reason?: string
   ): Promise<ApiResponse<{ message: string; challenge_id: string }>> {
     return this.post<{ message: string; challenge_id: string }>(
       ROUTES.CHALLENGES.CANCEL(id),
-      reason ? { reason } : {},
+      reason ? { reason } : {}
     );
+  }
+
+  /**
+   * Edit a challenge (creator only, status === 'upcoming')
+   *
+   * Only allows changes that don't affect the AI-generated plan:
+   * - title, description: Safe (plan was based on original, user is warned)
+   * - join_deadline: EXTEND only
+   * - max_participants: INCREASE only
+   * - reminder_times: Just notification preferences
+   */
+  async editChallenge(id: string, edits: EditChallengeRequest): Promise<ApiResponse<Challenge>> {
+    return this.patch<Challenge>(`${ROUTES.CHALLENGES.GET(id)}/edit`, edits);
   }
 
   /**
@@ -239,34 +268,23 @@ class ChallengesService extends BaseApiService {
    */
   async checkIn(
     challengeId: string,
-    data: ChallengeCheckInRequest = {},
+    data: ChallengeCheckInRequest = {}
   ): Promise<ApiResponse<ChallengeCheckInResponse>> {
-    return this.post<ChallengeCheckInResponse>(
-      ROUTES.CHALLENGES.CHECK_IN(challengeId),
-      data,
-    );
+    return this.post<ChallengeCheckInResponse>(ROUTES.CHALLENGES.CHECK_IN(challengeId), data);
   }
 
   /**
    * Get all check-ins for a challenge
    */
-  async getCheckIns(
-    challengeId: string,
-  ): Promise<ApiResponse<ChallengeCheckIn[]>> {
-    return this.get<ChallengeCheckIn[]>(
-      ROUTES.CHALLENGES.CHECK_INS(challengeId),
-    );
+  async getCheckIns(challengeId: string): Promise<ApiResponse<ChallengeCheckIn[]>> {
+    return this.get<ChallengeCheckIn[]>(ROUTES.CHALLENGES.CHECK_INS(challengeId));
   }
 
   /**
    * Get my check-ins for a challenge
    */
-  async getMyCheckIns(
-    challengeId: string,
-  ): Promise<ApiResponse<ChallengeCheckIn[]>> {
-    return this.get<ChallengeCheckIn[]>(
-      ROUTES.CHALLENGES.MY_CHECK_INS(challengeId),
-    );
+  async getMyCheckIns(challengeId: string): Promise<ApiResponse<ChallengeCheckIn[]>> {
+    return this.get<ChallengeCheckIn[]>(ROUTES.CHALLENGES.MY_CHECK_INS(challengeId));
   }
 
   /**
@@ -275,11 +293,11 @@ class ChallengesService extends BaseApiService {
   async updateCheckIn(
     challengeId: string,
     checkInId: string,
-    data: { notes?: string; mood?: string; photo_url?: string },
+    data: { notes?: string; mood?: string; photo_url?: string }
   ): Promise<ApiResponse<ChallengeCheckIn>> {
     return this.put<ChallengeCheckIn>(
       ROUTES.CHALLENGES.UPDATE_CHECK_IN(challengeId, checkInId),
-      data,
+      data
     );
   }
 
@@ -288,7 +306,7 @@ class ChallengesService extends BaseApiService {
    */
   async deleteCheckIn(
     challengeId: string,
-    checkInId: string,
+    checkInId: string
   ): Promise<
     ApiResponse<{
       message: string;
@@ -297,31 +315,21 @@ class ChallengesService extends BaseApiService {
       remaining_check_ins: number;
     }>
   > {
-    return this.delete(
-      ROUTES.CHALLENGES.DELETE_CHECK_IN(challengeId, checkInId),
-    );
+    return this.delete(ROUTES.CHALLENGES.DELETE_CHECK_IN(challengeId, checkInId));
   }
 
   /**
    * Get challenge leaderboard
    */
-  async getLeaderboard(
-    challengeId: string,
-  ): Promise<ApiResponse<LeaderboardEntry[]>> {
-    return this.get<LeaderboardEntry[]>(
-      ROUTES.CHALLENGES.LEADERBOARD(challengeId),
-    );
+  async getLeaderboard(challengeId: string): Promise<ApiResponse<LeaderboardEntry[]>> {
+    return this.get<LeaderboardEntry[]>(ROUTES.CHALLENGES.LEADERBOARD(challengeId));
   }
 
   /**
    * Get challenge participants
    */
-  async getParticipants(
-    challengeId: string,
-  ): Promise<ApiResponse<ChallengeParticipant[]>> {
-    return this.get<ChallengeParticipant[]>(
-      ROUTES.CHALLENGES.PARTICIPANTS(challengeId),
-    );
+  async getParticipants(challengeId: string): Promise<ApiResponse<ChallengeParticipant[]>> {
+    return this.get<ChallengeParticipant[]>(ROUTES.CHALLENGES.PARTICIPANTS(challengeId));
   }
 
   /**
@@ -329,22 +337,17 @@ class ChallengesService extends BaseApiService {
    */
   async shareGoalAsChallenge(
     goalId: string,
-    data: ShareAsChallengeRequest,
+    data: ShareAsChallengeRequest
   ): Promise<ApiResponse<ShareAsChallengeResponse>> {
-    return this.post<ShareAsChallengeResponse>(
-      ROUTES.GOALS.SHARE_AS_CHALLENGE(goalId),
-      data,
-    );
+    return this.post<ShareAsChallengeResponse>(ROUTES.GOALS.SHARE_AS_CHALLENGE(goalId), data);
   }
 
   /**
    * Join a challenge via invite code
    */
   async joinViaInviteCode(
-    inviteCode: string,
-  ): Promise<
-    ApiResponse<{ message: string; challenge: { id: string; title: string } }>
-  > {
+    inviteCode: string
+  ): Promise<ApiResponse<{ message: string; challenge: { id: string; title: string } }>> {
     return this.post<{
       message: string;
       challenge: { id: string; title: string };
@@ -356,11 +359,11 @@ class ChallengesService extends BaseApiService {
    */
   async sendInvite(
     challengeId: string,
-    userId: string,
+    userId: string
   ): Promise<ApiResponse<{ message: string; invite_id: string }>> {
     return this.post<{ message: string; invite_id: string }>(
       ROUTES.CHALLENGES.INVITE(challengeId),
-      { user_id: userId },
+      { user_id: userId }
     );
   }
 
@@ -399,10 +402,8 @@ class ChallengesService extends BaseApiService {
    * Accept a challenge invite
    */
   async acceptInvite(
-    inviteId: string,
-  ): Promise<
-    ApiResponse<{ message: string; challenge: { id: string; title: string } }>
-  > {
+    inviteId: string
+  ): Promise<ApiResponse<{ message: string; challenge: { id: string; title: string } }>> {
     return this.post<{
       message: string;
       challenge: { id: string; title: string };
@@ -412,24 +413,15 @@ class ChallengesService extends BaseApiService {
   /**
    * Decline a challenge invite
    */
-  async declineInvite(
-    inviteId: string,
-  ): Promise<ApiResponse<{ message: string }>> {
-    return this.post<{ message: string }>(
-      ROUTES.CHALLENGES.INVITE_DECLINE(inviteId),
-      {},
-    );
+  async declineInvite(inviteId: string): Promise<ApiResponse<{ message: string }>> {
+    return this.post<{ message: string }>(ROUTES.CHALLENGES.INVITE_DECLINE(inviteId), {});
   }
 
   /**
    * Cancel a challenge invite that the current user sent
    */
-  async cancelInvite(
-    inviteId: string,
-  ): Promise<ApiResponse<{ message: string }>> {
-    return this.delete<{ message: string }>(
-      ROUTES.CHALLENGES.INVITE_CANCEL(inviteId),
-    );
+  async cancelInvite(inviteId: string): Promise<ApiResponse<{ message: string }>> {
+    return this.delete<{ message: string }>(ROUTES.CHALLENGES.INVITE_CANCEL(inviteId));
   }
 }
 

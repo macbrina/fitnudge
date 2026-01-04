@@ -12,11 +12,7 @@ interface LoadingContainerProps {
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
-const makeLoadingContainerStyles = (
-  tokens: any,
-  colors: any,
-  brandColors: any,
-) => {
+const makeLoadingContainerStyles = (tokens: any, colors: any, brandColors: any) => {
   return {
     container: {
       position: "absolute",
@@ -29,33 +25,33 @@ const makeLoadingContainerStyles = (
       backgroundColor: colors.bg.canvas,
       zIndex: 9999,
       justifyContent: "center",
-      alignItems: "center",
+      alignItems: "center"
     },
     image: {
       width: 150,
-      height: 150,
+      height: 150
     },
     text: {
       fontSize: 28,
-      fontWeight: "bold" as const,
+      fontWeight: "bold" as const
     },
     textContainer: {
-      marginTop: 20,
+      marginTop: 20
     },
     textStyle: {
       fontSize: 28,
       fontWeight: "bold" as const,
       color: colors.text.primary,
       textAlign: "center" as const,
-      fontFamily: fontFamily.groteskBold,
-    },
+      fontFamily: fontFamily.groteskBold
+    }
   };
 };
 
 export const LoadingContainer: React.FC<LoadingContainerProps> = ({
   visible = true,
   showText = true,
-  text = "FitNudge",
+  text = "FitNudge"
 }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
@@ -73,7 +69,7 @@ export const LoadingContainer: React.FC<LoadingContainerProps> = ({
       Animated.timing(fadeAnim, {
         toValue: 1,
         duration: 300,
-        useNativeDriver: true,
+        useNativeDriver: true
       }).start();
 
       // Scale animation
@@ -81,13 +77,13 @@ export const LoadingContainer: React.FC<LoadingContainerProps> = ({
         Animated.timing(scaleAnim, {
           toValue: 1.1,
           duration: 600,
-          useNativeDriver: true,
+          useNativeDriver: true
         }),
         Animated.timing(scaleAnim, {
           toValue: 1,
           duration: 300,
-          useNativeDriver: true,
-        }),
+          useNativeDriver: true
+        })
       ]).start();
 
       // Text animations (delayed start)
@@ -97,14 +93,14 @@ export const LoadingContainer: React.FC<LoadingContainerProps> = ({
           Animated.timing(textFadeAnim, {
             toValue: 1,
             duration: 600,
-            useNativeDriver: true,
+            useNativeDriver: true
           }),
           Animated.timing(textScaleAnim, {
             toValue: 1,
             duration: 600,
-            useNativeDriver: true,
-          }),
-        ]),
+            useNativeDriver: true
+          })
+        ])
       ]).start();
 
       // Continuous text animation (pulse effect) - separate from initial scale
@@ -113,14 +109,14 @@ export const LoadingContainer: React.FC<LoadingContainerProps> = ({
           Animated.timing(textPulseAnim, {
             toValue: 1.1,
             duration: 1000,
-            useNativeDriver: true,
+            useNativeDriver: true
           }),
           Animated.timing(textPulseAnim, {
             toValue: 1,
             duration: 1000,
-            useNativeDriver: true,
-          }),
-        ]),
+            useNativeDriver: true
+          })
+        ])
       );
       textPulseAnimation.start();
 
@@ -129,8 +125,8 @@ export const LoadingContainer: React.FC<LoadingContainerProps> = ({
         Animated.timing(rotateAnim, {
           toValue: 1,
           duration: 2000,
-          useNativeDriver: true,
-        }),
+          useNativeDriver: true
+        })
       );
       rotateAnimation.start();
 
@@ -142,14 +138,14 @@ export const LoadingContainer: React.FC<LoadingContainerProps> = ({
       Animated.timing(fadeAnim, {
         toValue: 0,
         duration: 300,
-        useNativeDriver: true,
+        useNativeDriver: true
       }).start();
     }
   }, [visible, fadeAnim, scaleAnim, rotateAnim]);
 
   const rotate = rotateAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: ["0deg", "360deg"],
+    outputRange: ["0deg", "360deg"]
   });
 
   if (!visible) return null;
@@ -159,7 +155,7 @@ export const LoadingContainer: React.FC<LoadingContainerProps> = ({
       <Animated.View
         style={{
           opacity: fadeAnim,
-          transform: [{ scale: scaleAnim }, { rotate: rotate }],
+          transform: [{ scale: scaleAnim }, { rotate: rotate }]
         }}
       >
         <Image
@@ -174,13 +170,11 @@ export const LoadingContainer: React.FC<LoadingContainerProps> = ({
         <Animated.View
           style={{
             opacity: textFadeAnim,
-            transform: [{ scale: textScaleAnim }, { scale: textPulseAnim }],
+            transform: [{ scale: textScaleAnim }, { scale: textPulseAnim }]
             // marginTop: toRN(tokens.spacing[4]),
           }}
         >
-          <Text style={styles.textStyle}>
-            {text === "FitNudge" ? t("common.app_name") : text}
-          </Text>
+          <Text style={styles.textStyle}>{text === "FitNudge" ? t("common.app_name") : text}</Text>
         </Animated.View>
       )}
     </View>

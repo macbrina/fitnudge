@@ -2,7 +2,7 @@ import { Path, Svg } from "react-native-svg";
 
 export const TabsIcon = ({
   size = 24,
-  color = "currentColor",
+  color = "currentColor"
 }: {
   size?: number;
   color?: string;

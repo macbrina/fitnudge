@@ -42,13 +42,13 @@ const languageDetector = {
     } catch {
       // Fallback if AsyncStorage is not available
     }
-  },
+  }
 };
 
 const resources = {
   en: { translation: en },
   es: { translation: es },
-  fr: { translation: fr },
+  fr: { translation: fr }
 };
 
 // Initialize i18next
@@ -67,18 +67,15 @@ i18next
     defaultNS: "translation",
     debug: false,
     interpolation: {
-      escapeValue: false, // React already escapes values
+      escapeValue: false // React already escapes values
     },
     react: {
-      useSuspense: false, // React Native doesn't support Suspense yet
+      useSuspense: false // React Native doesn't support Suspense yet
     },
     saveMissing: true,
     missingKeyHandler: (lng, ns, key, fallbackValue) => {
-      console.warn(
-        `Missing translation key: ${lng}.${ns}.${key}`,
-        fallbackValue,
-      );
-    },
+      console.warn(`Missing translation key: ${lng}.${ns}.${key}`, fallbackValue);
+    }
   });
 
 export const setAppLanguage = (lng: SupportedLanguage) => {

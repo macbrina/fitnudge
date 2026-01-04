@@ -282,6 +282,7 @@ async def send_partner_notification(
     challenge_id: Optional[str] = None,
     entity_type: Optional[str] = None,
     entity_id: Optional[str] = None,
+    deep_link: Optional[str] = None,
     supabase=None,
 ) -> bool:
     """Convenience function for partner notifications
@@ -299,6 +300,7 @@ async def send_partner_notification(
         challenge_id: ID of related challenge (if any)
         entity_type: Entity type for notification_history (e.g., 'partner_request', 'goal', 'challenge')
         entity_id: Entity ID for notification_history
+        deep_link: Deep link URL for navigation (e.g., '/goal?id=xxx', '/activity')
         supabase: Supabase client
     """
     data = {
@@ -311,6 +313,7 @@ async def send_partner_notification(
         "challenge_id": challenge_id,
         "entity_type": entity_type,
         "entity_id": entity_id,
+        "deepLink": deep_link,  # Use camelCase for frontend compatibility
     }
     return await send_social_notification(
         notification_type, recipient_id, sender_id, data, supabase

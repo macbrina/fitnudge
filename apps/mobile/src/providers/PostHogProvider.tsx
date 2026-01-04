@@ -7,9 +7,7 @@ interface PostHogProviderProps {
   children: React.ReactNode;
 }
 
-export const PostHogProvider: React.FC<PostHogProviderProps> = ({
-  children,
-}) => {
+export const PostHogProvider: React.FC<PostHogProviderProps> = ({ children }) => {
   const { user, isAuthenticated } = useAuthStore();
 
   // Handle user identification when auth state changes
@@ -19,7 +17,7 @@ export const PostHogProvider: React.FC<PostHogProviderProps> = ({
       identifyUser(user.id, {
         email: user.email,
         username: user.username,
-        created_at: user.created_at,
+        created_at: user.created_at
         // Add any other user properties you want to track
       });
     } else if (!isAuthenticated) {

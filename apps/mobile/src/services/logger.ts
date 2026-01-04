@@ -67,7 +67,7 @@ class VendorLogger {
         Sentry.setUser({
           id: user.id,
           email: user.email,
-          username: user.username,
+          username: user.username
         });
 
         // Set additional context
@@ -228,14 +228,10 @@ class VendorLogger {
   captureMessage(
     message: string,
     level: "debug" | "info" | "warning" | "error" | "fatal" = "info",
-    context?: Record<string, any>,
+    context?: Record<string, any>
   ): void {
     if (!this.initialized) {
-      console.log(
-        `[VendorLogger Fallback ${level.toUpperCase()}]`,
-        message,
-        context,
-      );
+      console.log(`[VendorLogger Fallback ${level.toUpperCase()}]`, message, context);
       return;
     }
 
@@ -257,11 +253,7 @@ class VendorLogger {
       }
     } catch (error) {
       console.error("[VendorLogger] Failed to capture message:", error);
-      console.log(
-        `[VendorLogger Fallback ${level.toUpperCase()}]`,
-        message,
-        context,
-      );
+      console.log(`[VendorLogger Fallback ${level.toUpperCase()}]`, message, context);
     }
   }
 
@@ -280,7 +272,7 @@ class VendorLogger {
         category: breadcrumb.category || "vendor",
         level: breadcrumb.level || "info",
         data: breadcrumb.data,
-        timestamp: Date.now() / 1000,
+        timestamp: Date.now() / 1000
       });
     } catch (error) {
       console.error("[VendorLogger] Failed to add breadcrumb:", error);
@@ -323,11 +315,8 @@ class VendorLogger {
       return {
         finish: (result?: any) => {
           const duration = Date.now() - startTime;
-          console.log(
-            `[VendorLogger Span] ${context.operation}: ${duration}ms`,
-            result,
-          );
-        },
+          console.log(`[VendorLogger Span] ${context.operation}: ${duration}ms`, result);
+        }
       };
     }
 
@@ -340,7 +329,7 @@ class VendorLogger {
         message: `Started: ${context.operation}`,
         category: "performance",
         level: "info",
-        data: context.tags,
+        data: context.tags
       });
 
       return {
@@ -356,20 +345,17 @@ class VendorLogger {
               data: {
                 ...context.tags,
                 duration: `${duration}ms`,
-                result: result ? "success" : "completed",
-              },
+                result: result ? "success" : "completed"
+              }
             });
 
             if (__DEV__) {
-              console.log(
-                `[VendorLogger Span] ${context.operation}: ${duration}ms`,
-                result,
-              );
+              console.log(`[VendorLogger Span] ${context.operation}: ${duration}ms`, result);
             }
           } catch (error) {
             console.error("[VendorLogger] Failed to finish span:", error);
           }
-        },
+        }
       };
     } catch (error) {
       console.error("[VendorLogger] Failed to start span:", error);
@@ -377,11 +363,8 @@ class VendorLogger {
       return {
         finish: (result?: any) => {
           const duration = Date.now() - startTime;
-          console.log(
-            `[VendorLogger Span] ${context.operation}: ${duration}ms`,
-            result,
-          );
-        },
+          console.log(`[VendorLogger Span] ${context.operation}: ${duration}ms`, result);
+        }
       };
     }
   }
@@ -400,9 +383,7 @@ export const logger = new VendorLogger();
 // Export convenience functions for direct use
 export const setUser = (user: UserContext | null) => logger.setUser(user);
 export const clearUser = () => logger.clearUser();
-export const addBreadcrumb = (breadcrumb: Breadcrumb) =>
-  logger.addBreadcrumb(breadcrumb);
+export const addBreadcrumb = (breadcrumb: Breadcrumb) => logger.addBreadcrumb(breadcrumb);
 export const setTag = (key: string, value: string) => logger.setTag(key, value);
-export const setExtra = (key: string, value: any) =>
-  logger.setExtra(key, value);
+export const setExtra = (key: string, value: any) => logger.setExtra(key, value);
 export const startSpan = (context: SpanContext) => logger.startSpan(context);

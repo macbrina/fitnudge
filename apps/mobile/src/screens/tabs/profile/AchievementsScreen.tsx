@@ -1,11 +1,5 @@
 import React from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  RefreshControl,
-} from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, RefreshControl } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -20,7 +14,7 @@ import {
   useMyAchievements,
   useAchievementStats,
   getRarityColor,
-  getBadgeIcon,
+  getBadgeIcon
 } from "@/hooks/api/useAchievements";
 import { UserAchievement } from "@/services/api";
 
@@ -29,12 +23,7 @@ export default function AchievementsScreen() {
   const { colors, brandColors } = useTheme();
   const { t } = useTranslation();
 
-  const {
-    data: achievements,
-    isLoading,
-    refetch,
-    isRefetching,
-  } = useMyAchievements();
+  const { data: achievements, isLoading, refetch, isRefetching } = useMyAchievements();
 
   const { data: stats } = useAchievementStats();
 
@@ -42,10 +31,7 @@ export default function AchievementsScreen() {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={styles.backButton}
-          >
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{t("achievements.title")}</Text>
@@ -58,11 +44,7 @@ export default function AchievementsScreen() {
           <View style={styles.badgeGrid}>
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <View key={i} style={styles.badgeItem}>
-                <SkeletonBox
-                  width={72}
-                  height={72}
-                  borderRadius={toRN(tokens.borderRadius.full)}
-                />
+                <SkeletonBox width={72} height={72} borderRadius={toRN(tokens.borderRadius.full)} />
                 <SkeletonBox
                   width="80%"
                   height={14}
@@ -77,18 +59,14 @@ export default function AchievementsScreen() {
     );
   }
 
-  const totalPoints =
-    achievements?.reduce((sum, a) => sum + (a.points || 0), 0) || 0;
+  const totalPoints = achievements?.reduce((sum, a) => sum + (a.points || 0), 0) || 0;
   const totalAchievements = achievements?.length || 0;
 
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={styles.backButton}
-        >
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t("achievements.title")}</Text>
@@ -112,34 +90,22 @@ export default function AchievementsScreen() {
               <Text style={[styles.statValue, { color: brandColors.primary }]}>
                 {totalAchievements}
               </Text>
-              <Text style={styles.statLabel}>
-                {t("achievements.badges_earned")}
-              </Text>
+              <Text style={styles.statLabel}>{t("achievements.badges_earned")}</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={[styles.statValue, { color: brandColors.primary }]}>
-                {totalPoints}
-              </Text>
-              <Text style={styles.statLabel}>
-                {t("achievements.total_points")}
-              </Text>
+              <Text style={[styles.statValue, { color: brandColors.primary }]}>{totalPoints}</Text>
+              <Text style={styles.statLabel}>{t("achievements.total_points")}</Text>
             </View>
           </View>
 
           {/* Rarity breakdown */}
           {stats?.by_rarity && (
             <View style={styles.rarityRow}>
-              <RarityBadge
-                rarity="common"
-                count={stats.by_rarity.common || 0}
-              />
+              <RarityBadge rarity="common" count={stats.by_rarity.common || 0} />
               <RarityBadge rarity="rare" count={stats.by_rarity.rare || 0} />
               <RarityBadge rarity="epic" count={stats.by_rarity.epic || 0} />
-              <RarityBadge
-                rarity="legendary"
-                count={stats.by_rarity.legendary || 0}
-              />
+              <RarityBadge rarity="legendary" count={stats.by_rarity.legendary || 0} />
             </View>
           )}
         </Card>
@@ -147,27 +113,18 @@ export default function AchievementsScreen() {
         {/* Achievements Grid */}
         {achievements && achievements.length > 0 ? (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
-              {t("achievements.your_badges")}
-            </Text>
+            <Text style={styles.sectionTitle}>{t("achievements.your_badges")}</Text>
             <View style={styles.badgeGrid}>
               {achievements.map((achievement) => (
-                <AchievementBadge
-                  key={achievement.id}
-                  achievement={achievement}
-                />
+                <AchievementBadge key={achievement.id} achievement={achievement} />
               ))}
             </View>
           </View>
         ) : (
           <Card shadow="md" style={styles.emptyCard}>
             <Text style={styles.emptyIcon}>🏆</Text>
-            <Text style={styles.emptyTitle}>
-              {t("achievements.no_achievements")}
-            </Text>
-            <Text style={styles.emptyMessage}>
-              {t("achievements.no_achievements_message")}
-            </Text>
+            <Text style={styles.emptyTitle}>{t("achievements.no_achievements")}</Text>
+            <Text style={styles.emptyMessage}>{t("achievements.no_achievements_message")}</Text>
           </Card>
         )}
 
@@ -191,9 +148,7 @@ function AchievementBadge({ achievement }: { achievement: UserAchievement }) {
       <Text style={styles.badgeName} numberOfLines={2}>
         {achievement.badge_name}
       </Text>
-      <Text style={[styles.badgeRarity, { color: rarityColor }]}>
-        {achievement.rarity}
-      </Text>
+      <Text style={[styles.badgeRarity, { color: rarityColor }]}>{achievement.rarity}</Text>
       <Text style={styles.badgePoints}>+{achievement.points} pts</Text>
     </View>
   );
@@ -215,7 +170,7 @@ function RarityBadge({ rarity, count }: { rarity: string; count: number }) {
 const makeStyles = (tokens: any, colors: any, brand: any) => ({
   container: {
     flex: 1,
-    backgroundColor: colors.bg.canvas,
+    backgroundColor: colors.bg.canvas
   },
   header: {
     flexDirection: "row" as const,
@@ -224,50 +179,50 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     paddingHorizontal: toRN(tokens.spacing[4]),
     paddingVertical: toRN(tokens.spacing[3]),
     borderBottomWidth: 1,
-    borderBottomColor: colors.border.default,
+    borderBottomColor: colors.border.default
   },
   backButton: {
     width: 40,
     height: 40,
     alignItems: "center" as const,
-    justifyContent: "center" as const,
+    justifyContent: "center" as const
   },
   headerTitle: {
     fontSize: toRN(tokens.typography.fontSize.xl),
     fontFamily: fontFamily.bold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   content: {
     flex: 1,
     paddingHorizontal: toRN(tokens.spacing[4]),
-    paddingTop: toRN(tokens.spacing[4]),
+    paddingTop: toRN(tokens.spacing[4])
   },
   statsCard: {
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   statsRow: {
     flexDirection: "row" as const,
     justifyContent: "space-around" as const,
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   statItem: {
     alignItems: "center" as const,
-    flex: 1,
+    flex: 1
   },
   statValue: {
     fontSize: toRN(tokens.typography.fontSize["3xl"]),
-    fontFamily: fontFamily.bold,
+    fontFamily: fontFamily.bold
   },
   statLabel: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
     color: colors.text.secondary,
-    marginTop: toRN(tokens.spacing[1]),
+    marginTop: toRN(tokens.spacing[1])
   },
   statDivider: {
     width: 1,
     height: 40,
-    backgroundColor: colors.border.default,
+    backgroundColor: colors.border.default
   },
   rarityRow: {
     flexDirection: "row" as const,
@@ -275,47 +230,47 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     marginTop: toRN(tokens.spacing[4]),
     paddingTop: toRN(tokens.spacing[3]),
     borderTopWidth: 1,
-    borderTopColor: colors.border.default,
+    borderTopColor: colors.border.default
   },
   rarityItem: {
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   rarityDot: {
     width: 12,
     height: 12,
-    borderRadius: 6,
+    borderRadius: 6
   },
   rarityCount: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.bold,
     color: colors.text.primary,
-    marginTop: toRN(tokens.spacing[1]),
+    marginTop: toRN(tokens.spacing[1])
   },
   rarityLabel: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.regular,
     color: colors.text.tertiary,
-    textTransform: "capitalize" as const,
+    textTransform: "capitalize" as const
   },
   section: {
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   sectionTitle: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.semiBold,
     color: colors.text.primary,
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   badgeGrid: {
     flexDirection: "row" as const,
     flexWrap: "wrap" as const,
     justifyContent: "flex-start" as const,
-    gap: toRN(tokens.spacing[3]),
+    gap: toRN(tokens.spacing[3])
   },
   badgeItem: {
     width: "30%" as const,
     alignItems: "center" as const,
-    marginBottom: toRN(tokens.spacing[2]),
+    marginBottom: toRN(tokens.spacing[2])
   },
   badgeCircle: {
     width: 72,
@@ -324,49 +279,49 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: colors.bg.secondary,
     borderWidth: 3,
     justifyContent: "center" as const,
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   badgeIcon: {
-    fontSize: 32,
+    fontSize: 32
   },
   badgeName: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.semiBold,
     color: colors.text.primary,
     marginTop: toRN(tokens.spacing[2]),
-    textAlign: "center" as const,
+    textAlign: "center" as const
   },
   badgeRarity: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.regular,
     textTransform: "capitalize" as const,
-    marginTop: toRN(tokens.spacing[0.5]),
+    marginTop: toRN(tokens.spacing[0.5])
   },
   badgePoints: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.medium,
     color: colors.text.tertiary,
-    marginTop: toRN(tokens.spacing[0.5]),
+    marginTop: toRN(tokens.spacing[0.5])
   },
   emptyCard: {
     alignItems: "center" as const,
-    paddingVertical: toRN(tokens.spacing[8]),
+    paddingVertical: toRN(tokens.spacing[8])
   },
   emptyIcon: {
     fontSize: 48,
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   emptyTitle: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.semiBold,
     color: colors.text.primary,
-    marginBottom: toRN(tokens.spacing[2]),
+    marginBottom: toRN(tokens.spacing[2])
   },
   emptyMessage: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
     color: colors.text.secondary,
     textAlign: "center" as const,
-    paddingHorizontal: toRN(tokens.spacing[4]),
-  },
+    paddingHorizontal: toRN(tokens.spacing[4])
+  }
 });

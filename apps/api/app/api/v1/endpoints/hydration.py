@@ -178,6 +178,21 @@ async def log_hydration(
                     f"Failed to auto-complete check-in after hydration log: {checkin_error}"
                 )
 
+        # Check achievements in background (non-blocking) - e.g., "first_hydration" badge
+        try:
+            from app.services.tasks import check_achievements_task
+
+            check_achievements_task.delay(
+                user_id=user_id,
+                source_type="hydration",
+                source_id=result.data[0].get("id"),
+            )
+        except Exception as e:
+            logger.warning(
+                f"Failed to queue achievement check for hydration log: {e}",
+                {"user_id": user_id},
+            )
+
         return result.data[0]
 
     except HTTPException:

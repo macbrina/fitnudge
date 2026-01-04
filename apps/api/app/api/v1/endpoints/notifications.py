@@ -203,7 +203,7 @@ async def update_notification_preferences(
 
         supabase = get_supabase_client()
 
-        # Upsert notification preferences
+        # Upsert notification preferences (use user_id for conflict resolution)
         result = (
             supabase.table("notification_preferences")
             .upsert(
@@ -229,7 +229,8 @@ async def update_notification_preferences(
                     "social_challenge_nudges": preferences.social_challenge_nudges,
                     "social_challenge_reminders": preferences.social_challenge_reminders,
                     "social_motivation_messages": preferences.social_motivation_messages,
-                }
+                },
+                on_conflict="user_id",
             )
             .execute()
         )
@@ -260,6 +261,7 @@ async def update_notification_preferences(
     except HTTPException:
         raise
     except Exception as e:
+        print(f"Failed to update notification preferences: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to update notification preferences: {str(e)}",

@@ -26,20 +26,14 @@ export function HabitPlanCard({ plan }: HabitPlanCardProps) {
     <Card shadow="lg" style={styles.card}>
       <View style={styles.header}>
         <View style={styles.iconContainer}>
-          <Ionicons
-            name="checkmark-done"
-            size={28}
-            color={brandColors.primary}
-          />
+          <Ionicons name="checkmark-done" size={28} color={brandColors.primary} />
         </View>
         <Text style={styles.cardTitle}>{t("goals.plan.habit_title")}</Text>
       </View>
 
       {/* Tracking Info */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>
-          {t("goals.plan.tracking_frequency")}
-        </Text>
+        <Text style={styles.sectionTitle}>{t("goals.plan.tracking_frequency")}</Text>
         <View style={styles.frequencyCard}>
           <Ionicons name="calendar" size={20} color={brandColors.primary} />
           <View style={styles.frequencyInfo}>
@@ -50,8 +44,7 @@ export function HabitPlanCard({ plan }: HabitPlanCardProps) {
             </Text>
             {habitTracking.target_days_per_week && (
               <Text style={styles.frequencySubtext}>
-                {habitTracking.target_days_per_week}{" "}
-                {t("goals.plan.days_per_week")}
+                {habitTracking.target_days_per_week} {t("goals.plan.days_per_week")}
               </Text>
             )}
           </View>
@@ -61,17 +54,11 @@ export function HabitPlanCard({ plan }: HabitPlanCardProps) {
       {/* Optimal Times */}
       {reminders.optimal_times && reminders.optimal_times.length > 0 && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            {t("goals.plan.optimal_times")}
-          </Text>
+          <Text style={styles.sectionTitle}>{t("goals.plan.optimal_times")}</Text>
           <View style={styles.timesContainer}>
             {reminders.optimal_times.map((time: string, index: number) => (
               <View key={index} style={styles.timeChip}>
-                <Ionicons
-                  name="time-outline"
-                  size={16}
-                  color={brandColors.primary}
-                />
+                <Ionicons name="time-outline" size={16} color={brandColors.primary} />
                 <Text style={styles.timeText}>{time}</Text>
               </View>
             ))}
@@ -84,7 +71,7 @@ export function HabitPlanCard({ plan }: HabitPlanCardProps) {
 
 const makeHabitPlanCardStyles = (tokens: any, colors: any, brand: any) => ({
   card: {
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   header: {
     flexDirection: "row" as const,
@@ -92,7 +79,7 @@ const makeHabitPlanCardStyles = (tokens: any, colors: any, brand: any) => ({
     marginBottom: toRN(tokens.spacing[4]),
     paddingBottom: toRN(tokens.spacing[3]),
     borderBottomWidth: 1,
-    borderBottomColor: colors.border.default,
+    borderBottomColor: colors.border.default
   },
   iconContainer: {
     width: toRN(tokens.spacing[10]),
@@ -101,21 +88,21 @@ const makeHabitPlanCardStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: brand.primary + "1A",
     alignItems: "center" as const,
     justifyContent: "center" as const,
-    marginRight: toRN(tokens.spacing[3]),
+    marginRight: toRN(tokens.spacing[3])
   },
   cardTitle: {
     fontSize: toRN(tokens.typography.fontSize.xl),
     fontFamily: fontFamily.groteskBold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   section: {
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   sectionTitle: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.groteskSemiBold,
     color: colors.text.primary,
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   frequencyCard: {
     flexDirection: "row" as const,
@@ -123,26 +110,26 @@ const makeHabitPlanCardStyles = (tokens: any, colors: any, brand: any) => ({
     gap: toRN(tokens.spacing[3]),
     padding: toRN(tokens.spacing[4]),
     backgroundColor: colors.bg.muted,
-    borderRadius: toRN(tokens.borderRadius.lg),
+    borderRadius: toRN(tokens.borderRadius.lg)
   },
   frequencyInfo: {
-    flex: 1,
+    flex: 1
   },
   frequencyValue: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.groteskBold,
     color: colors.text.primary,
-    marginBottom: toRN(tokens.spacing[0.5]),
+    marginBottom: toRN(tokens.spacing[0.5])
   },
   frequencySubtext: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.groteskMedium,
-    color: colors.text.secondary,
+    color: colors.text.secondary
   },
   timesContainer: {
     flexDirection: "row" as const,
     flexWrap: "wrap" as const,
-    gap: toRN(tokens.spacing[2]),
+    gap: toRN(tokens.spacing[2])
   },
   timeChip: {
     flexDirection: "row" as const,
@@ -151,11 +138,11 @@ const makeHabitPlanCardStyles = (tokens: any, colors: any, brand: any) => ({
     paddingVertical: toRN(tokens.spacing[2]),
     paddingHorizontal: toRN(tokens.spacing[3]),
     backgroundColor: brand.primary + "1A",
-    borderRadius: toRN(tokens.borderRadius.full),
+    borderRadius: toRN(tokens.borderRadius.full)
   },
   timeText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.groteskSemiBold,
-    color: brand.primary,
-  },
+    color: brand.primary
+  }
 });

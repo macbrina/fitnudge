@@ -31,35 +31,17 @@ export function TrackingTypeStats({
   entityId,
   entityType = "goal",
   trackingType,
-  period = 30,
+  period = 30
 }: TrackingTypeStatsProps) {
   switch (trackingType) {
     case "workout":
-      return (
-        <WorkoutProgressStats
-          entityId={entityId}
-          entityType={entityType}
-          period={period}
-        />
-      );
+      return <WorkoutProgressStats entityId={entityId} entityType={entityType} period={period} />;
 
     case "meal":
-      return (
-        <MealProgressStats
-          entityId={entityId}
-          entityType={entityType}
-          period={period}
-        />
-      );
+      return <MealProgressStats entityId={entityId} entityType={entityType} period={period} />;
 
     case "hydration":
-      return (
-        <HydrationProgressStats
-          entityId={entityId}
-          entityType={entityType}
-          period={period}
-        />
-      );
+      return <HydrationProgressStats entityId={entityId} entityType={entityType} period={period} />;
 
     case "checkin":
     default:

@@ -278,6 +278,21 @@ async def log_meal(
                     f"Failed to auto-complete check-in after meal log: {checkin_error}"
                 )
 
+        # Check achievements in background (non-blocking) - e.g., "first_meal" badge
+        try:
+            from app.services.tasks import check_achievements_task
+
+            check_achievements_task.delay(
+                user_id=current_user["id"],
+                source_type="meal",
+                source_id=result.get("id"),
+            )
+        except Exception as e:
+            logger.warning(
+                f"Failed to queue achievement check for meal log: {e}",
+                {"user_id": current_user["id"]},
+            )
+
         return result
 
     except ValueError as e:

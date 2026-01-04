@@ -6,7 +6,7 @@
     "version": "1.0.0",
     "orientation": "default",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
@@ -184,7 +184,7 @@
         {
           "icon": "./assets/notification-icon.png",
           "color": "#2563EB",
-          "sounds": ["./assets/sounds/motivation_call.mp3"]
+          "sounds": ["./assets/sounds/notification_sound.wav"]
         }
       ],
       "expo-web-browser",

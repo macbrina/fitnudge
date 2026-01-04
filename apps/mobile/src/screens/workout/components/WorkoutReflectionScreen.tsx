@@ -10,7 +10,7 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator,
+  ActivityIndicator
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -37,10 +37,7 @@ interface WorkoutReflectionScreenProps {
   onSkip: () => void;
 }
 
-export function WorkoutReflectionScreen({
-  onContinue,
-  onSkip,
-}: WorkoutReflectionScreenProps) {
+export function WorkoutReflectionScreen({ onContinue, onSkip }: WorkoutReflectionScreenProps) {
   const styles = useStyles(makeStyles);
   const { colors, brandColors } = useTheme();
   const insets = useSafeAreaInsets();
@@ -59,7 +56,7 @@ export function WorkoutReflectionScreen({
     hasLibraryPermission,
     hasCameraPermission,
     requestLibraryPermission,
-    requestCameraPermission,
+    requestCameraPermission
   } = useMediaPermissions();
 
   // Upload hook
@@ -74,14 +71,14 @@ export function WorkoutReflectionScreen({
       Animated.timing(fadeAnim, {
         toValue: 1,
         duration: 400,
-        useNativeDriver: true,
+        useNativeDriver: true
       }),
       Animated.spring(slideAnim, {
         toValue: 0,
         friction: 8,
         tension: 80,
-        useNativeDriver: true,
-      }),
+        useNativeDriver: true
+      })
     ]).start();
   }, []);
 
@@ -96,9 +93,8 @@ export function WorkoutReflectionScreen({
       showAlert({
         title: t("common.permission_required") || "Permission Required",
         message:
-          t("common.photo_library_permission") ||
-          "Please allow access to your photo library",
-        variant: "warning",
+          t("common.photo_library_permission") || "Please allow access to your photo library",
+        variant: "warning"
       });
       return;
     }
@@ -107,7 +103,7 @@ export function WorkoutReflectionScreen({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [4, 3],
-      quality: 0.8,
+      quality: 0.8
     });
 
     if (!result.canceled && result.assets[0]) {
@@ -124,9 +120,8 @@ export function WorkoutReflectionScreen({
     if (!hasPermission) {
       showAlert({
         title: t("common.permission_required") || "Permission Required",
-        message:
-          t("common.camera_permission") || "Please allow access to your camera",
-        variant: "warning",
+        message: t("common.camera_permission") || "Please allow access to your camera",
+        variant: "warning"
       });
       return;
     }
@@ -134,7 +129,7 @@ export function WorkoutReflectionScreen({
     const result = await ImagePicker.launchCameraAsync({
       allowsEditing: true,
       aspect: [4, 3],
-      quality: 0.8,
+      quality: 0.8
     });
 
     if (!result.canceled && result.assets[0]) {
@@ -148,8 +143,8 @@ export function WorkoutReflectionScreen({
       const uploadResult = await uploadMedia({
         fileUri: uri,
         options: {
-          mediaType: "checkin",
-        },
+          mediaType: "checkin"
+        }
       });
 
       if (uploadResult?.data?.url) {
@@ -157,7 +152,7 @@ export function WorkoutReflectionScreen({
         showToast({
           title: t("common.success") || "Success",
           message: t("common.photo_uploaded") || "Photo uploaded",
-          variant: "success",
+          variant: "success"
         });
       }
     } catch (error) {
@@ -165,7 +160,7 @@ export function WorkoutReflectionScreen({
       showAlert({
         title: t("common.error") || "Error",
         message: t("common.upload_failed") || "Failed to upload photo",
-        variant: "error",
+        variant: "error"
       });
     } finally {
       setIsUploading(false);
@@ -186,7 +181,7 @@ export function WorkoutReflectionScreen({
     onContinue({
       mood: selectedMood || undefined,
       notes: notes.trim() || undefined,
-      photo_url: photoUrl || undefined,
+      photo_url: photoUrl || undefined
     });
   };
 
@@ -199,7 +194,7 @@ export function WorkoutReflectionScreen({
         style={styles.scrollView}
         contentContainerStyle={[
           styles.contentContainer,
-          { paddingBottom: insets.bottom + toRN(24) },
+          { paddingBottom: insets.bottom + toRN(24) }
         ]}
         keyboardShouldPersistTaps="handled"
       >
@@ -210,16 +205,15 @@ export function WorkoutReflectionScreen({
             {
               opacity: fadeAnim,
               transform: [{ translateY: slideAnim }],
-              marginTop: insets.top + toRN(20),
-            },
+              marginTop: insets.top + toRN(20)
+            }
           ]}
         >
           <Text style={styles.title}>
             {t("completion.reflection.title") || "How was your workout?"}
           </Text>
           <Text style={styles.subtitle}>
-            {t("completion.reflection.subtitle") ||
-              "Take a moment to reflect (optional)"}
+            {t("completion.reflection.subtitle") || "Take a moment to reflect (optional)"}
           </Text>
         </Animated.View>
 
@@ -228,8 +222,8 @@ export function WorkoutReflectionScreen({
           style={[
             styles.section,
             {
-              opacity: fadeAnim,
-            },
+              opacity: fadeAnim
+            }
           ]}
         >
           <Text style={styles.sectionTitle}>
@@ -241,26 +235,12 @@ export function WorkoutReflectionScreen({
               return (
                 <TouchableOpacity
                   key={mood.value}
-                  style={[
-                    styles.moodOption,
-                    isSelected && styles.moodOptionSelected,
-                  ]}
-                  onPress={() =>
-                    setSelectedMood(isSelected ? null : mood.value)
-                  }
+                  style={[styles.moodOption, isSelected && styles.moodOptionSelected]}
+                  onPress={() => setSelectedMood(isSelected ? null : mood.value)}
                   activeOpacity={0.7}
                 >
-                  <MoodIcon
-                    mood={mood.value as MoodType}
-                    size={32}
-                    selected={isSelected}
-                  />
-                  <Text
-                    style={[
-                      styles.moodLabel,
-                      isSelected && styles.moodLabelSelected,
-                    ]}
-                  >
+                  <MoodIcon mood={mood.value as MoodType} size={32} selected={isSelected} />
+                  <Text style={[styles.moodLabel, isSelected && styles.moodLabelSelected]}>
                     {t(`checkin.mood.${mood.value}`) || mood.label}
                   </Text>
                 </TouchableOpacity>
@@ -274,8 +254,8 @@ export function WorkoutReflectionScreen({
           style={[
             styles.section,
             {
-              opacity: fadeAnim,
-            },
+              opacity: fadeAnim
+            }
           ]}
         >
           <Text style={styles.sectionTitle}>
@@ -301,8 +281,8 @@ export function WorkoutReflectionScreen({
           style={[
             styles.section,
             {
-              opacity: fadeAnim,
-            },
+              opacity: fadeAnim
+            }
           ]}
         >
           <Text style={styles.sectionTitle}>
@@ -312,10 +292,7 @@ export function WorkoutReflectionScreen({
           {photoUrl ? (
             <View style={styles.photoPreviewContainer}>
               <Image source={{ uri: photoUrl }} style={styles.photoPreview} />
-              <TouchableOpacity
-                style={styles.removePhotoButton}
-                onPress={handleRemovePhoto}
-              >
+              <TouchableOpacity style={styles.removePhotoButton} onPress={handleRemovePhoto}>
                 <Ionicons name="close-circle" size={28} color="#FF3B30" />
               </TouchableOpacity>
             </View>
@@ -329,11 +306,7 @@ export function WorkoutReflectionScreen({
                 <ActivityIndicator color={brandColors.primary} />
               ) : (
                 <>
-                  <Ionicons
-                    name="camera-outline"
-                    size={32}
-                    color={colors.text.tertiary}
-                  />
+                  <Ionicons name="camera-outline" size={32} color={colors.text.tertiary} />
                   <Text style={styles.addPhotoText}>
                     {t("completion.reflection.add_photo") || "Tap to add photo"}
                   </Text>
@@ -346,15 +319,11 @@ export function WorkoutReflectionScreen({
         {/* Buttons */}
         <View style={styles.buttonsContainer}>
           <Pressable style={styles.continueButton} onPress={handleContinue}>
-            <Text style={styles.continueButtonText}>
-              {t("common.continue") || "Continue"}
-            </Text>
+            <Text style={styles.continueButtonText}>{t("common.continue") || "Continue"}</Text>
           </Pressable>
 
           <TouchableOpacity style={styles.skipButton} onPress={onSkip}>
-            <Text style={styles.skipButtonText}>
-              {t("common.skip") || "Skip"}
-            </Text>
+            <Text style={styles.skipButtonText}>{t("common.skip") || "Skip"}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -372,7 +341,7 @@ export function WorkoutReflectionScreen({
             onPress: () => {
               setShowPhotoOptions(false);
               handleTakePhoto();
-            },
+            }
           },
           {
             id: "choose-library",
@@ -381,8 +350,8 @@ export function WorkoutReflectionScreen({
             onPress: () => {
               setShowPhotoOptions(false);
               handlePickPhoto();
-            },
-          },
+            }
+          }
         ]}
       />
     </KeyboardAvoidingView>
@@ -392,62 +361,62 @@ export function WorkoutReflectionScreen({
 const makeStyles = (tokens: any, colors: any, brand: any) => ({
   container: {
     flex: 1,
-    backgroundColor: colors.bg.canvas,
+    backgroundColor: colors.bg.canvas
   },
   scrollView: {
-    flex: 1,
+    flex: 1
   },
   contentContainer: {
     flexGrow: 1,
-    paddingHorizontal: toRN(tokens.spacing[5]),
+    paddingHorizontal: toRN(tokens.spacing[5])
   },
   header: {
-    marginBottom: toRN(tokens.spacing[6]),
+    marginBottom: toRN(tokens.spacing[6])
   },
   title: {
     fontSize: toRN(tokens.typography.fontSize["3xl"]),
     fontFamily: fontFamily.groteskBold,
     color: colors.text.primary,
-    marginBottom: toRN(tokens.spacing[2]),
+    marginBottom: toRN(tokens.spacing[2])
   },
   subtitle: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.medium,
-    color: colors.text.secondary,
+    color: colors.text.secondary
   },
   section: {
-    marginBottom: toRN(tokens.spacing[6]),
+    marginBottom: toRN(tokens.spacing[6])
   },
   sectionTitle: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.semiBold,
     color: colors.text.primary,
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   moodContainer: {
     flexDirection: "row" as const,
-    justifyContent: "space-between" as const,
+    justifyContent: "space-between" as const
   },
   moodOption: {
     alignItems: "center" as const,
     padding: toRN(tokens.spacing[2]),
     borderRadius: toRN(tokens.borderRadius.lg),
     minWidth: toRN(60),
-    gap: toRN(tokens.spacing[1]),
+    gap: toRN(tokens.spacing[1])
   },
   moodOptionSelected: {
     backgroundColor: brand.primary + "20",
     borderWidth: 2,
-    borderColor: brand.primary,
+    borderColor: brand.primary
   },
   moodLabel: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.medium,
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   moodLabelSelected: {
     color: brand.primary,
-    fontFamily: fontFamily.semiBold,
+    fontFamily: fontFamily.semiBold
   },
   notesInput: {
     backgroundColor: colors.bg.secondary,
@@ -458,7 +427,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     color: colors.text.primary,
     minHeight: toRN(120),
     borderWidth: 1,
-    borderColor: colors.border.subtle,
+    borderColor: colors.border.subtle
   },
   addPhotoButton: {
     backgroundColor: colors.bg.secondary,
@@ -469,58 +438,58 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     padding: toRN(tokens.spacing[6]),
     alignItems: "center" as const,
     justifyContent: "center" as const,
-    minHeight: toRN(120),
+    minHeight: toRN(120)
   },
   addPhotoText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
     color: colors.text.tertiary,
-    marginTop: toRN(tokens.spacing[2]),
+    marginTop: toRN(tokens.spacing[2])
   },
   photoPreviewContainer: {
     position: "relative" as const,
     borderRadius: toRN(tokens.borderRadius.lg),
-    overflow: "hidden" as const,
+    overflow: "hidden" as const
   },
   photoPreview: {
     width: "100%",
     height: toRN(200),
-    borderRadius: toRN(tokens.borderRadius.lg),
+    borderRadius: toRN(tokens.borderRadius.lg)
   },
   removePhotoButton: {
     position: "absolute" as const,
     top: toRN(tokens.spacing[2]),
     right: toRN(tokens.spacing[2]),
     backgroundColor: "rgba(255,255,255,0.9)",
-    borderRadius: toRN(14),
+    borderRadius: toRN(14)
   },
   buttonsContainer: {
     marginTop: "auto" as const,
     paddingTop: toRN(tokens.spacing[4]),
-    gap: toRN(tokens.spacing[3]),
+    gap: toRN(tokens.spacing[3])
   },
   continueButton: {
     width: "100%",
     paddingVertical: toRN(tokens.spacing[4]),
     borderRadius: toRN(tokens.borderRadius.xl),
     backgroundColor: brand.primary,
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   continueButtonText: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.bold,
-    color: "#FFFFFF",
+    color: "#FFFFFF"
   },
   skipButton: {
     width: "100%",
     paddingVertical: toRN(tokens.spacing[3]),
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   skipButtonText: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.medium,
-    color: colors.text.tertiary,
-  },
+    color: colors.text.tertiary
+  }
 });
 
 export default WorkoutReflectionScreen;

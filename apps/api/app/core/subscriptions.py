@@ -27,7 +27,7 @@ def get_user_effective_plan(
         supabase: Optional supabase client (creates new if not provided)
 
     Returns:
-        Plan ID: 'free', 'starter', 'pro', or 'elite'
+        Plan ID: 'free' or 'premium'
     """
     if supabase is None:
         supabase = get_supabase_client()
@@ -66,11 +66,11 @@ def get_user_plan_tier(plan: str, supabase=None) -> int:
     Get the tier number for a plan (for feature access checking).
 
     Args:
-        plan: Plan ID ('free', 'starter', 'pro', 'elite')
+        plan: Plan ID ('free' or 'premium')
         supabase: Optional supabase client
 
     Returns:
-        Tier number (0=free, 1=starter, 2=pro, 3=elite)
+        Tier number (0=free, 1=premium)
     """
     if supabase is None:
         supabase = get_supabase_client()
@@ -91,11 +91,10 @@ def get_user_plan_tier(plan: str, supabase=None) -> int:
         pass
 
     # Fallback to hardcoded tiers if query fails
+    # 2-tier system: free (0) and premium (1)
     tier_map = {
         "free": 0,
-        "starter": 1,
-        "pro": 2,
-        "elite": 3,
+        "premium": 1,
     }
     return tier_map.get(plan.lower(), 0)
 

@@ -19,7 +19,7 @@ export function TimerRing({
   totalTime,
   isResting = false,
   size = 200,
-  strokeWidth = 12,
+  strokeWidth = 12
 }: TimerRingProps) {
   const styles = useStyles(makeStyles);
   const { colors, brandColors } = useTheme();
@@ -90,28 +90,28 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
   container: {
     position: "relative" as const,
     alignItems: "center" as const,
-    justifyContent: "center" as const,
+    justifyContent: "center" as const
   },
   svg: {
-    transform: [{ rotateZ: "0deg" }],
+    transform: [{ rotateZ: "0deg" }]
   },
   timeContainer: {
     position: "absolute" as const,
     alignItems: "center" as const,
-    justifyContent: "center" as const,
+    justifyContent: "center" as const
   },
   timeText: {
     fontSize: toRN(tokens.typography.fontSize["4xl"]),
     fontFamily: fontFamily.groteskBold,
-    color: brand.primary,
+    color: brand.primary
   },
   timeTextResting: {
-    color: colors.feedback.success,
+    color: colors.feedback.success
   },
   totalTimeText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
     color: colors.text.tertiary,
-    marginTop: toRN(tokens.spacing[1]),
-  },
+    marginTop: toRN(tokens.spacing[1])
+  }
 });

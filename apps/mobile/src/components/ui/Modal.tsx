@@ -5,7 +5,7 @@ import {
   Modal as RNModal,
   TouchableOpacity,
   ScrollView,
-  ViewStyle,
+  ViewStyle
 } from "react-native";
 import { useTranslation } from "@/lib/i18n";
 import { fontFamily } from "@/lib/fonts";
@@ -45,7 +45,7 @@ export default function Modal({
   maxWidth = 400,
   maxHeight = "80%",
   containerStyle,
-  animationType = "fade",
+  animationType = "fade"
 }: ModalProps) {
   const { t } = useTranslation();
   const styles = useStyles(makeModalStyles);
@@ -60,22 +60,13 @@ export default function Modal({
       onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>
-        <View
-          style={[
-            styles.modalContainer,
-            { maxWidth, maxHeight },
-            containerStyle,
-          ]}
-        >
+        <View style={[styles.modalContainer, { maxWidth, maxHeight }, containerStyle]}>
           {/* Modal Header */}
           {(title || showCloseButton) && (
             <View style={styles.modalHeader}>
               {title && <Text style={styles.modalTitle}>{title}</Text>}
               {showCloseButton && (
-                <TouchableOpacity
-                  onPress={onClose}
-                  style={styles.modalCloseButton}
-                >
+                <TouchableOpacity onPress={onClose} style={styles.modalCloseButton}>
                   <Text style={styles.modalCloseText}>✕</Text>
                 </TouchableOpacity>
               )}
@@ -122,7 +113,7 @@ const makeModalStyles = (tokens: any, colors: any, brand: any) => {
       backgroundColor: "rgba(0, 0, 0, 0.5)",
       justifyContent: "center" as const,
       alignItems: "center" as const,
-      paddingHorizontal: toRN(tokens.spacing[5]),
+      paddingHorizontal: toRN(tokens.spacing[5])
     },
     modalContainer: {
       backgroundColor: colors.bg.card,
@@ -134,7 +125,7 @@ const makeModalStyles = (tokens: any, colors: any, brand: any) => {
       shadowOpacity: 0.25,
       shadowRadius: 12,
       elevation: 8,
-      flexDirection: "column" as const,
+      flexDirection: "column" as const
     },
     modalHeader: {
       flexDirection: "row" as const,
@@ -144,14 +135,14 @@ const makeModalStyles = (tokens: any, colors: any, brand: any) => {
       paddingTop: toRN(tokens.spacing[6]),
       paddingBottom: toRN(tokens.spacing[4]),
       borderBottomWidth: 1,
-      borderBottomColor: colors.border.default,
+      borderBottomColor: colors.border.default
     },
     modalTitle: {
       fontSize: toRN(tokens.typography.fontSize.xl),
       fontWeight: tokens.typography.fontWeight.bold,
       color: colors.text.primary,
       fontFamily: fontFamily.groteskBold,
-      flex: 1,
+      flex: 1
     },
     modalCloseButton: {
       width: 32,
@@ -160,30 +151,30 @@ const makeModalStyles = (tokens: any, colors: any, brand: any) => {
       backgroundColor: colors.bg.muted,
       justifyContent: "center" as const,
       alignItems: "center" as const,
-      marginLeft: toRN(tokens.spacing[4]),
+      marginLeft: toRN(tokens.spacing[4])
     },
     modalCloseText: {
       fontSize: toRN(tokens.typography.fontSize.lg),
       color: colors.text.primary,
-      fontFamily: fontFamily.groteskMedium,
+      fontFamily: fontFamily.groteskMedium
     },
     modalScrollView: {
       flexShrink: 1,
-      flexGrow: 0,
+      flexGrow: 0
     },
     modalScrollContent: {
       padding: toRN(tokens.spacing[6]),
       flexGrow: 1,
-      paddingBottom: toRN(tokens.spacing[4]),
+      paddingBottom: toRN(tokens.spacing[4])
     },
     modalContent: {
       padding: toRN(tokens.spacing[6]),
-      flexGrow: 1,
+      flexGrow: 1
     },
     modalFooter: {
       padding: toRN(tokens.spacing[6]),
       borderTopWidth: 1,
-      borderTopColor: colors.border.default,
-    },
+      borderTopColor: colors.border.default
+    }
   };
 };

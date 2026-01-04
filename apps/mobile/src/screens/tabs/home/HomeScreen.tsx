@@ -1,8 +1,4 @@
-import {
-  ExitIntentModal,
-  FloatingOfferButton,
-  UpgradeBanner,
-} from "@/components/subscription";
+import { ExitIntentModal, FloatingOfferButton } from "@/components/subscription";
 import { LoadingOverlay } from "@/components/ui/LoadingOverlay";
 import { useRevenueCat } from "@/contexts/RevenueCatContext";
 import { usePricing } from "@/hooks/usePricing";
@@ -24,6 +20,7 @@ import { AchievementsSection } from "./components/AchievementsSection";
 import { TodaysActionsCard } from "./components/TodaysActionsCard";
 import { PartnersCard } from "./components/PartnersCard";
 import { useHomeScreenData } from "./hooks/useHomeScreenData";
+import Button from "@/components/ui/Button";
 
 export default function HomeScreen() {
   const styles = useStyles(makeHomeScreenStyles);
@@ -46,48 +43,45 @@ export default function HomeScreen() {
     showExitIntentModal,
     openExitIntentModal,
     closeExitIntentModal,
-    markExitIntentDismissed,
+    markExitIntentDismissed
   } = useExitOfferStore();
 
-  // Calculate discount percentage for exit offer (Pro plan)
+  // Calculate discount percentage for exit offer (Premium plan)
   const exitOfferDiscountPercent = useMemo(() => {
-    const proPlan = plans.find((p) => p.id === "pro");
+    const proPlan = plans.find((p) => p.id === "premium");
     if (!proPlan) return 50;
 
     const originalPrice = proPlan.annual_price;
-    const discountedPrice =
-      proPlan.exit_offer_annual_price ?? originalPrice * 0.5;
+    const discountedPrice = proPlan.exit_offer_annual_price ?? originalPrice * 0.5;
     if (originalPrice <= 0) return 50;
 
-    return Math.round(
-      ((originalPrice - discountedPrice) / originalPrice) * 100,
-    );
+    return Math.round(((originalPrice - discountedPrice) / originalPrice) * 100);
   }, [plans]);
 
   // RevenueCat for checking subscription history
   const { subscriptionStatus, isReady: isRevenueCatReady } = useRevenueCat();
 
-  const {
-    activeItems,
-    todayPendingCheckIns,
-    dashboardStats,
-    isLoading,
-    refetch,
-  } = useHomeScreenData();
+  const { activeItems, todayPendingCheckIns, dashboardStats, isLoading, refetch } =
+    useHomeScreenData();
 
   const [refreshing, setRefreshing] = useState(false);
 
   // Check if user has seen subscription modal
+  // Only show for free users who haven't seen it yet
   useEffect(() => {
     const checkSubscriptionStatus = async () => {
-      try {
-        const hasSeenSubscription = await storageUtil.getItem(
-          STORAGE_KEYS.HAS_SEEN_SUBSCRIPTION,
-        );
+      // Wait for RevenueCat to be ready before checking
+      if (!isRevenueCatReady) return;
 
-        const hasSeenExitIntent = await storageUtil.getItem(
-          STORAGE_KEYS.HAS_DISMISSED_EXIT_INTENT,
-        );
+      try {
+        // Don't show subscription modal if user is on a paid plan
+        if (subscriptionStatus.isActive || subscriptionStatus.tier !== "free") {
+          return;
+        }
+
+        const hasSeenSubscription = await storageUtil.getItem(STORAGE_KEYS.HAS_SEEN_SUBSCRIPTION);
+
+        const hasSeenExitIntent = await storageUtil.getItem(STORAGE_KEYS.HAS_DISMISSED_EXIT_INTENT);
 
         if (hasSeenExitIntent) {
           setHasSeenExitIntentModal(true);
@@ -102,15 +96,13 @@ export default function HomeScreen() {
     };
 
     checkSubscriptionStatus();
-  }, []);
+  }, [isRevenueCatReady, subscriptionStatus.isActive, subscriptionStatus.tier]);
 
   // Re-check exit intent status when subscription modal or exit intent modal closes
   useEffect(() => {
     if (!showSubscriptionModal || !showExitIntentModal) {
       const recheckExitIntent = async () => {
-        const hasSeenExitIntent = await storageUtil.getItem(
-          STORAGE_KEYS.HAS_DISMISSED_EXIT_INTENT,
-        );
+        const hasSeenExitIntent = await storageUtil.getItem(STORAGE_KEYS.HAS_DISMISSED_EXIT_INTENT);
         if (hasSeenExitIntent) {
           setHasSeenExitIntentModal(true);
         }
@@ -124,8 +116,7 @@ export default function HomeScreen() {
     const checkProactiveOffer = async () => {
       if (!isRevenueCatReady) return;
 
-      const hasEverSubscribed =
-        subscriptionStatus.isActive || subscriptionStatus.tier !== "free";
+      const hasEverSubscribed = subscriptionStatus.isActive || subscriptionStatus.tier !== "free";
 
       if (subscriptionStatus.isActive) {
         await markAsSubscribed();
@@ -136,12 +127,7 @@ export default function HomeScreen() {
     };
 
     checkProactiveOffer();
-  }, [
-    isRevenueCatReady,
-    subscriptionStatus,
-    checkAndShowProactiveOffer,
-    markAsSubscribed,
-  ]);
+  }, [isRevenueCatReady, subscriptionStatus, checkAndShowProactiveOffer, markAsSubscribed]);
 
   // Navigate to detail screen for check-ins (all actions go to detail screens)
   const handleTodaysCheckInPress = useCallback(
@@ -152,7 +138,7 @@ export default function HomeScreen() {
         router.push(`${MOBILE_ROUTES.GOALS.DETAILS}?id=${entityId}`);
       }
     },
-    [router],
+    [router]
   );
 
   // Navigate to detail screen for meal/hydration tracking (they have access to plan targets)
@@ -164,7 +150,7 @@ export default function HomeScreen() {
         router.push(`${MOBILE_ROUTES.GOALS.DETAILS}?id=${entityId}`);
       }
     },
-    [router],
+    [router]
   );
 
   const handleTodaysHydrationPress = useCallback(
@@ -175,7 +161,7 @@ export default function HomeScreen() {
         router.push(`${MOBILE_ROUTES.GOALS.DETAILS}?id=${entityId}`);
       }
     },
-    [router],
+    [router]
   );
 
   const handleCloseSubscriptionModal = async () => {
@@ -189,15 +175,18 @@ export default function HomeScreen() {
 
   const currentStreak = dashboardStats?.current_streak || 0;
 
-  // Handle upgrade banner tap
-  const handleUpgradeTap = useCallback(() => {
-    setShowSubscriptionModal(true);
-  }, []);
+  // Handle floating offer button tap - check eligibility before opening
+  const handleFloatingOfferTap = useCallback(async () => {
+    // Re-check eligibility before showing (in case user subscribed in another session)
+    if (subscriptionStatus.isActive || subscriptionStatus.tier !== "free") {
+      // User is now subscribed - don't show exit offer
+      await markAsSubscribed();
+      return;
+    }
 
-  // Handle floating offer button tap - opens exit offer modal directly
-  const handleFloatingOfferTap = useCallback(() => {
-    openExitIntentModal();
-  }, [openExitIntentModal]);
+    // openExitIntentModal also checks eligibility internally
+    await openExitIntentModal();
+  }, [openExitIntentModal, subscriptionStatus, markAsSubscribed]);
 
   // Handle exit offer modal close (user declined)
   const handleExitOfferClose = useCallback(async () => {
@@ -228,10 +217,7 @@ export default function HomeScreen() {
           clearExitOffer();
         }
       } catch (error) {
-        console.error(
-          "[HomeScreen] Error in handleExitOfferSelectPlan:",
-          error,
-        );
+        console.error("[HomeScreen] Error in handleExitOfferSelectPlan:", error);
       } finally {
         setIsExitOfferPurchasing(false);
       }
@@ -241,8 +227,8 @@ export default function HomeScreen() {
       clearExitOffer,
       purchaseProExitOffer,
       markAsSubscribed,
-      markExitIntentDismissed,
-    ],
+      markExitIntentDismissed
+    ]
   );
 
   const handleRefresh = async () => {
@@ -273,9 +259,6 @@ export default function HomeScreen() {
       >
         <HeroSection userName={user?.name} />
 
-        {/* Upgrade Banner for free users - hide while loading */}
-        {!isLoading && <UpgradeBanner onUpgrade={handleUpgradeTap} />}
-
         <View style={styles.content}>
           <TodaysActionsCard
             pendingCheckIns={todayPendingCheckIns}
@@ -285,10 +268,7 @@ export default function HomeScreen() {
             onHydrationPress={handleTodaysHydrationPress}
           />
 
-          <QuickStatsGrid
-            dashboardStats={dashboardStats}
-            isLoading={isLoading}
-          />
+          <QuickStatsGrid dashboardStats={dashboardStats} isLoading={isLoading} />
 
           <MotivationCard currentStreak={currentStreak} />
 
@@ -296,24 +276,21 @@ export default function HomeScreen() {
 
           <PartnersCard isLoading={isLoading} />
 
-          <AchievementsSection
-            onViewAll={() => router.push(MOBILE_ROUTES.ACHIEVEMENTS.LIST)}
-          />
+          <AchievementsSection onViewAll={() => router.push(MOBILE_ROUTES.ACHIEVEMENTS.LIST)} />
         </View>
       </ScrollView>
 
       {/* Subscription Modal */}
-      <SubscriptionScreen
-        visible={showSubscriptionModal}
-        onClose={handleCloseSubscriptionModal}
-      />
+      <SubscriptionScreen visible={showSubscriptionModal} onClose={handleCloseSubscriptionModal} />
 
       {/* Floating Offer Button - shows when exit offer countdown is active */}
       {!isLoading &&
         !showSubscriptionModal &&
         !showExitIntentModal &&
         hasSeenExitIntentModal &&
-        !isExitOfferPurchasing && (
+        !isExitOfferPurchasing &&
+        !subscriptionStatus.isActive &&
+        subscriptionStatus.tier === "free" && (
           <FloatingOfferButton
             onPress={handleFloatingOfferTap}
             discountPercent={exitOfferDiscountPercent}
@@ -334,7 +311,7 @@ export default function HomeScreen() {
           trial_days: p.trial_days ?? undefined,
           exit_offer_enabled: p.exit_offer_enabled,
           exit_offer_monthly_price: p.exit_offer_monthly_price,
-          exit_offer_annual_price: p.exit_offer_annual_price,
+          exit_offer_annual_price: p.exit_offer_annual_price
         }))}
         expiryTime={expiryTime}
       />
@@ -348,14 +325,14 @@ export default function HomeScreen() {
 const makeHomeScreenStyles = (tokens: any, colors: any, brand: any) => ({
   container: {
     flex: 1,
-    backgroundColor: colors.bg.canvas,
+    backgroundColor: colors.bg.canvas
   },
   scrollView: {
-    flex: 1,
+    flex: 1
   },
   scrollContent: {},
   content: {
     paddingHorizontal: toRN(tokens.spacing[4]),
-    paddingBottom: toRN(tokens.spacing[6]),
-  },
+    paddingBottom: toRN(tokens.spacing[6])
+  }
 });

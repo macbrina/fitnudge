@@ -1,6 +1,7 @@
 import { tokens } from "./tokens";
 
 export type BrandName = "fitnudge";
+export type ThemeMode = "light" | "dark";
 
 // Simple luminance function for contrast calculation
 function getLuminance(hex: string): number {
@@ -12,12 +13,9 @@ function getLuminance(hex: string): number {
   const gsRGB = g / 255;
   const bsRGB = b / 255;
 
-  const rLinear =
-    rsRGB <= 0.03928 ? rsRGB / 12.92 : ((rsRGB + 0.055) / 1.055) ** 2.4;
-  const gLinear =
-    gsRGB <= 0.03928 ? gsRGB / 12.92 : ((gsRGB + 0.055) / 1.055) ** 2.4;
-  const bLinear =
-    bsRGB <= 0.03928 ? bsRGB / 12.92 : ((bsRGB + 0.055) / 1.055) ** 2.4;
+  const rLinear = rsRGB <= 0.03928 ? rsRGB / 12.92 : ((rsRGB + 0.055) / 1.055) ** 2.4;
+  const gLinear = gsRGB <= 0.03928 ? gsRGB / 12.92 : ((gsRGB + 0.055) / 1.055) ** 2.4;
+  const bLinear = bsRGB <= 0.03928 ? bsRGB / 12.92 : ((bsRGB + 0.055) / 1.055) ** 2.4;
 
   return 0.2126 * rLinear + 0.7152 * gLinear + 0.0722 * bLinear;
 }
@@ -29,14 +27,41 @@ function getOnPrimaryColor(primaryHex: string): string {
   return luminance < 0.5 ? "#ffffff" : "#0f172a";
 }
 
-// User brand variant
-export const brandUser = {
+// Brand colors interface
+export interface BrandColors {
+  primary: string;
+  primaryHover: string;
+  primaryActive: string;
+  onPrimary: string;
+  onPrimaryActive: string;
+}
+
+// Brand colors for light mode
+const brandLight: BrandColors = {
   primary: tokens.colors.light.primary, // #2563eb - Main brand color
-  primaryHover: tokens.colors.dark.primary, // #3b82f6 - Hover state
+  primaryHover: tokens.colors.dark.primary, // #60a5fa - Hover state
   primaryActive: tokens.colors.light.destructive, // #ef4444 - Active state
   onPrimary: getOnPrimaryColor(tokens.colors.light.primary), // Text color on primary
-  onPrimaryActive: getOnPrimaryColor(tokens.colors.light.destructive), // Text color on primary active
-} as const;
+  onPrimaryActive: getOnPrimaryColor(tokens.colors.light.destructive) // Text color on primary active
+};
 
-// Export types
-export type BrandColors = typeof brandUser;
+// Brand colors for dark mode (lighter primary for better visibility)
+const brandDark: BrandColors = {
+  primary: tokens.colors.dark.primary, // #60a5fa - Lighter blue for dark backgrounds
+  primaryHover: tokens.colors.light.primary, // #2563eb - Hover state
+  primaryActive: tokens.colors.dark.destructive, // #dc2626 - Active state
+  onPrimary: getOnPrimaryColor(tokens.colors.dark.primary), // Text color on primary
+  onPrimaryActive: getOnPrimaryColor(tokens.colors.dark.destructive) // Text color on primary active
+};
+
+/**
+ * Get brand colors based on current theme mode
+ * @param mode - "light" or "dark"
+ * @returns Brand colors appropriate for the theme
+ */
+export function getBrandColors(mode: ThemeMode): BrandColors {
+  return mode === "dark" ? brandDark : brandLight;
+}
+
+// Default export for backwards compatibility (uses light mode)
+export const brandUser: BrandColors = brandLight;

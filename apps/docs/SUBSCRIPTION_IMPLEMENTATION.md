@@ -4,12 +4,14 @@ This document outlines the subscription system implementation for FitNudge using
 
 ## Overview
 
+**2-Tier System (Free + Premium)** - Simplified subscription model for better conversion and easier maintenance.
+
 The subscription system includes:
 
 1. **RevenueCat Integration** - Handles all IAP operations, receipt validation, and subscription management
 2. **Upgrade UI Components** - Banner, prompt modal, exit intent discount
-3. **Feature Gating** - Check user's subscription tier before allowing access
-4. **Promotional Offers** - 50% off exit intent offer for Pro Annual (iOS)
+3. **Feature Gating** - Check user's subscription tier (free vs premium)
+4. **Promotional Offers** - 50% off exit intent offer for Premium Annual (iOS)
 
 ## Architecture
 
@@ -59,32 +61,28 @@ The subscription system includes:
 - `src/stores/subscriptionStore.ts` - Local subscription state and feature gating
 - `src/stores/exitOfferStore.ts` - Exit offer countdown state
 
-## Product IDs
+## Product IDs (2-Tier System)
 
 Same product IDs for both iOS and Android:
 
 | Plan    | Monthly                        | Annual                        |
 | ------- | ------------------------------ | ----------------------------- |
-| Starter | `com.fitnudge.starter.monthly` | `com.fitnudge.starter.annual` |
-| Pro     | `com.fitnudge.pro.monthly`     | `com.fitnudge.pro.annual`     |
-| Elite   | `com.fitnudge.elite.monthly`   | `com.fitnudge.elite.annual`   |
+| Premium | `com.fitnudge.premium.monthly` | `com.fitnudge.premium.annual` |
 
 ## RevenueCat Entitlements
 
 | Entitlement ID   | Tier    |
 | ---------------- | ------- |
-| `starter_access` | Starter |
-| `pro_access`     | Pro     |
-| `elite_access`   | Elite   |
+| `premium_access` | Premium |
 
-## Exit Offer (Pro Only)
+## Exit Offer (Premium Only)
 
-The exit offer provides 50% off Pro Annual when users try to close the subscription screen:
+The exit offer provides 50% off Premium Annual when users try to close the subscription screen:
 
-| Platform | Product ID                | Exit Offer Method                |
-| -------- | ------------------------- | -------------------------------- |
-| iOS      | `com.fitnudge.pro.annual` | Promotional Offer: `pro_exit_50` |
-| Android  | `com.fitnudge.pro.annual` | Discounted Base Plan             |
+| Platform | Product ID                    | Exit Offer Method                    |
+| -------- | ----------------------------- | ------------------------------------ |
+| iOS      | `com.fitnudge.premium.annual` | Promotional Offer: `premium_exit_50` |
+| Android  | `com.fitnudge.premium.annual` | Discounted Base Plan                 |
 
 **Exit Offer Logic:**
 
@@ -115,7 +113,7 @@ EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID=goog_xxxxxxxxxx
 
 1. Create project in RevenueCat
 2. Add iOS and Android apps
-3. Create entitlements: `starter_access`, `pro_access`, `elite_access`
+3. Create entitlements: `premium_access`
 4. Import products from stores
 5. Create offerings with packages
 6. Upload `.p8` key for iOS promotional offers
@@ -217,8 +215,8 @@ The subscription store provides methods for feature gating:
 
 - `hasFeature(featureKey)` - Check if user has access to a feature
 - `canCreateGoal(currentCount)` - Check if user can create more goals
-- `getPlan()` - Get current plan name ('free', 'starter', 'pro', 'elite')
-- `getTier()` - Get tier number (0, 1, 2, 3)
+- `getPlan()` - Get current plan name ('free', 'premium')
+- `getTier()` - Get tier number (0=free, 1=premium)
 
 ## Analytics Events
 
@@ -268,11 +266,9 @@ await storageUtil.multiRemove([
 
 ## Pricing
 
-| Tier    | Monthly | Annual  | Exit Offer (Annual)  |
-| ------- | ------- | ------- | -------------------- |
-| Starter | $6.99   | $54.99  | -                    |
-| Pro     | $12.99  | $99.99  | **$49.99** (50% off) |
-| Elite   | $19.99  | $159.99 | -                    |
+| Tier    | Monthly | Annual | Exit Offer (Annual)  |
+| ------- | ------- | ------ | -------------------- |
+| Premium | $9.99   | $79.99 | **$39.99** (50% off) |
 
 See `apps/docs/Marketing.md` for detailed pricing strategy and setup guides.
 

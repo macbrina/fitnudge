@@ -2,12 +2,7 @@ import { BaseApiService } from "./base";
 import { ROUTES } from "@/lib/routes";
 
 export type AchievementRarity = "common" | "rare" | "epic" | "legendary";
-export type AchievementCategory =
-  | "streak"
-  | "milestone"
-  | "consistency"
-  | "social"
-  | "special";
+export type AchievementCategory = "streak" | "milestone" | "consistency" | "social" | "special";
 
 export interface AchievementType {
   id: string;
@@ -53,9 +48,7 @@ class AchievementsService extends BaseApiService {
    * Get all available achievement types
    */
   async getAchievementTypes(): Promise<AchievementType[]> {
-    const response = await this.get<AchievementType[]>(
-      ROUTES.ACHIEVEMENTS.TYPES,
-    );
+    const response = await this.get<AchievementType[]>(ROUTES.ACHIEVEMENTS.TYPES);
     return response.data || [];
   }
 
@@ -63,9 +56,7 @@ class AchievementsService extends BaseApiService {
    * Get user's unlocked achievements
    */
   async getMyAchievements(): Promise<UserAchievement[]> {
-    const response = await this.get<UserAchievement[]>(
-      ROUTES.ACHIEVEMENTS.MY_ACHIEVEMENTS,
-    );
+    const response = await this.get<UserAchievement[]>(ROUTES.ACHIEVEMENTS.MY_ACHIEVEMENTS);
     return response.data || [];
   }
 
@@ -73,10 +64,7 @@ class AchievementsService extends BaseApiService {
    * Manually trigger achievement check
    */
   async checkAchievements(): Promise<UserAchievement[]> {
-    const response = await this.post<UserAchievement[]>(
-      ROUTES.ACHIEVEMENTS.CHECK,
-      {},
-    );
+    const response = await this.post<UserAchievement[]>(ROUTES.ACHIEVEMENTS.CHECK, {});
     return response.data || [];
   }
 
@@ -84,14 +72,12 @@ class AchievementsService extends BaseApiService {
    * Get achievement statistics
    */
   async getAchievementStats(): Promise<AchievementStats> {
-    const response = await this.get<AchievementStats>(
-      ROUTES.ACHIEVEMENTS.STATS,
-    );
+    const response = await this.get<AchievementStats>(ROUTES.ACHIEVEMENTS.STATS);
     return (
       response.data || {
         total_achievements: 0,
         total_points: 0,
-        by_rarity: { common: 0, rare: 0, epic: 0, legendary: 0 },
+        by_rarity: { common: 0, rare: 0, epic: 0, legendary: 0 }
       }
     );
   }

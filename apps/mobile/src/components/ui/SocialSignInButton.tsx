@@ -14,11 +14,7 @@ interface SocialSignInButtonProps {
   style?: any;
 }
 
-const makeSocialSignInButtonStyles = (
-  tokens: any,
-  colors: any,
-  brandColors: any,
-) => {
+const makeSocialSignInButtonStyles = (tokens: any, colors: any, brandColors: any) => {
   return {
     button: {
       flexDirection: "row" as const,
@@ -29,36 +25,36 @@ const makeSocialSignInButtonStyles = (
       paddingHorizontal: toRN(tokens.spacing[6]),
       borderWidth: 1,
       borderRadius: toRN(tokens.borderRadius.full),
-      marginBottom: toRN(tokens.spacing[6]),
+      marginBottom: toRN(tokens.spacing[6])
     },
     googleButton: {
       borderColor: "#e5e7eb",
-      backgroundColor: "#ffffff",
+      backgroundColor: "#ffffff"
     },
     appleButton: {
       borderColor: "#000000",
-      backgroundColor: "#000000",
+      backgroundColor: "#000000"
     },
     buttonDisabled: {
-      opacity: 0.5,
+      opacity: 0.5
     },
     buttonText: {
       fontSize: toRN(tokens.typography.fontSize.base),
       marginLeft: toRN(tokens.spacing[3]),
-      fontFamily: fontFamily.groteskMedium,
+      fontFamily: fontFamily.groteskMedium
     },
     googleButtonText: {
-      color: "#374151",
+      color: "#374151"
     },
     appleButtonText: {
-      color: "#ffffff",
+      color: "#ffffff"
     },
     iconContainer: {
       width: 20,
       height: 20,
       justifyContent: "center" as const,
-      alignItems: "center" as const,
-    },
+      alignItems: "center" as const
+    }
   };
 };
 
@@ -67,7 +63,7 @@ export const SocialSignInButton: React.FC<SocialSignInButtonProps> = ({
   onPress,
   disabled = false,
   loading = false,
-  style,
+  style
 }) => {
   const styles = useStyles(makeSocialSignInButtonStyles);
 
@@ -109,9 +105,7 @@ export const SocialSignInButton: React.FC<SocialSignInButtonProps> = ({
 
   const getButtonText = () => {
     if (loading) {
-      return provider === "google"
-        ? "Signing in with Google..."
-        : "Signing in with Apple...";
+      return provider === "google" ? "Signing in with Google..." : "Signing in with Apple...";
     }
     return provider === "google" ? "Sign in with Google" : "Sign in with Apple";
   };

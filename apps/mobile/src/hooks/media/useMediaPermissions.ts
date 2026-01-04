@@ -4,24 +4,21 @@ import * as ImagePicker from "expo-image-picker";
 export type MediaPermissionStatus = "undetermined" | "granted" | "denied";
 
 export const useMediaPermissions = () => {
-  const [cameraStatus, setCameraStatus] =
-    useState<MediaPermissionStatus>("undetermined");
-  const [libraryStatus, setLibraryStatus] =
-    useState<MediaPermissionStatus>("undetermined");
+  const [cameraStatus, setCameraStatus] = useState<MediaPermissionStatus>("undetermined");
+  const [libraryStatus, setLibraryStatus] = useState<MediaPermissionStatus>("undetermined");
   const [isLoading, setIsLoading] = useState(false);
 
   const checkPermissions = useCallback(async () => {
     try {
       const cameraPermission = await ImagePicker.getCameraPermissionsAsync();
-      const libraryPermission =
-        await ImagePicker.getMediaLibraryPermissionsAsync();
+      const libraryPermission = await ImagePicker.getMediaLibraryPermissionsAsync();
 
       setCameraStatus(
         cameraPermission.granted
           ? "granted"
           : cameraPermission.canAskAgain
             ? "undetermined"
-            : "denied",
+            : "denied"
       );
 
       setLibraryStatus(
@@ -29,7 +26,7 @@ export const useMediaPermissions = () => {
           ? "granted"
           : libraryPermission.canAskAgain
             ? "undetermined"
-            : "denied",
+            : "denied"
       );
     } catch (error) {
       console.error("Error checking media permissions:", error);
@@ -60,8 +57,7 @@ export const useMediaPermissions = () => {
   const requestLibraryPermission = useCallback(async (): Promise<boolean> => {
     setIsLoading(true);
     try {
-      const { status } =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       const granted = status === "granted";
       setLibraryStatus(granted ? "granted" : "denied");
       return granted;
@@ -79,7 +75,7 @@ export const useMediaPermissions = () => {
     try {
       const [cameraGranted, libraryGranted] = await Promise.all([
         requestCameraPermission(),
-        requestLibraryPermission(),
+        requestLibraryPermission()
       ]);
       return cameraGranted || libraryGranted; // At least one needs to be granted
     } catch (error) {
@@ -108,6 +104,6 @@ export const useMediaPermissions = () => {
     requestCameraPermission,
     requestLibraryPermission,
     requestAllPermissions,
-    checkPermissions,
+    checkPermissions
   };
 };

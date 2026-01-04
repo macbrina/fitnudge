@@ -22,7 +22,7 @@ export function WeeklyProgressBar({
   total = 7,
   percentage = 0,
   daysCompleted = [],
-  isLoading = false,
+  isLoading = false
 }: WeeklyProgressBarProps) {
   const styles = useStyles(makeWeeklyProgressBarStyles);
   const { colors, brandColors } = useTheme();
@@ -33,11 +33,7 @@ export function WeeklyProgressBar({
   if (isLoading) {
     return (
       <View style={styles.container}>
-        <SkeletonBox
-          width="40%"
-          height={16}
-          borderRadius={toRN(tokens.borderRadius.sm)}
-        />
+        <SkeletonBox width="40%" height={16} borderRadius={toRN(tokens.borderRadius.sm)} />
         <View style={styles.daysRow}>
           {dayLabels.map((_, index) => (
             <SkeletonBox
@@ -77,7 +73,7 @@ export function WeeklyProgressBar({
                 styles.dayCircle,
                 isCompleted && styles.dayCircleCompleted,
                 isFuture && styles.dayCircleFuture,
-                isToday && styles.dayCircleToday,
+                isToday && styles.dayCircleToday
               ]}
             >
               {isCompleted ? (
@@ -87,7 +83,7 @@ export function WeeklyProgressBar({
                   style={[
                     styles.dayLabel,
                     isFuture && styles.dayLabelFuture,
-                    isToday && styles.dayLabelToday,
+                    isToday && styles.dayLabelToday
                   ]}
                 >
                   {label}
@@ -104,7 +100,7 @@ export function WeeklyProgressBar({
           <View
             style={[
               styles.progressBarFill,
-              { width: `${percentage}%`, backgroundColor: brandColors.primary },
+              { width: `${percentage}%`, backgroundColor: brandColors.primary }
             ]}
           />
         </View>
@@ -116,28 +112,28 @@ export function WeeklyProgressBar({
 
 const makeWeeklyProgressBarStyles = (tokens: any, colors: any, brand: any) => ({
   container: {
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   header: {
     flexDirection: "row" as const,
     justifyContent: "space-between" as const,
     alignItems: "center" as const,
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   title: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.groteskSemiBold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   stats: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.groteskMedium,
-    color: colors.text.secondary,
+    color: colors.text.secondary
   },
   daysRow: {
     flexDirection: "row" as const,
     justifyContent: "space-between" as const,
-    marginBottom: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   dayCircle: {
     width: toRN(tokens.spacing[10]),
@@ -147,51 +143,51 @@ const makeWeeklyProgressBarStyles = (tokens: any, colors: any, brand: any) => ({
     alignItems: "center" as const,
     justifyContent: "center" as const,
     borderWidth: 2,
-    borderColor: "transparent",
+    borderColor: "transparent"
   },
   dayCircleCompleted: {
     backgroundColor: brand.primary,
-    borderColor: brand.primary,
+    borderColor: brand.primary
   },
   dayCircleToday: {
     borderColor: brand.primary,
-    borderWidth: 2,
+    borderWidth: 2
   },
   dayCircleFuture: {
-    opacity: 0.5,
+    opacity: 0.5
   },
   dayLabel: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.groteskSemiBold,
-    color: colors.text.secondary,
+    color: colors.text.secondary
   },
   dayLabelToday: {
-    color: brand.primary,
+    color: brand.primary
   },
   dayLabelFuture: {
-    color: colors.text.disabled,
+    color: colors.text.disabled
   },
   progressBarContainer: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    gap: toRN(tokens.spacing[3]),
+    gap: toRN(tokens.spacing[3])
   },
   progressBarBg: {
     flex: 1,
     height: toRN(tokens.spacing[2]),
     backgroundColor: colors.bg.muted,
     borderRadius: toRN(tokens.borderRadius.full),
-    overflow: "hidden" as const,
+    overflow: "hidden" as const
   },
   progressBarFill: {
     height: "100%",
-    borderRadius: toRN(tokens.borderRadius.full),
+    borderRadius: toRN(tokens.borderRadius.full)
   },
   percentageText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.groteskBold,
     color: colors.text.secondary,
     minWidth: toRN(tokens.spacing[10]),
-    textAlign: "right" as const,
-  },
+    textAlign: "right" as const
+  }
 });

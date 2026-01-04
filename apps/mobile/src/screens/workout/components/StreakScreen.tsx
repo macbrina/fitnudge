@@ -31,11 +31,7 @@ const getOrdinal = (n: number): string => {
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
 };
 
-export function StreakScreen({
-  streak,
-  workoutNumberToday,
-  onContinue,
-}: StreakScreenProps) {
+export function StreakScreen({ streak, workoutNumberToday, onContinue }: StreakScreenProps) {
   const styles = useStyles(makeStyles);
   const { colors, brandColors } = useTheme();
   const insets = useSafeAreaInsets();
@@ -57,22 +53,22 @@ export function StreakScreen({
       Animated.timing(fadeAnim, {
         toValue: 1,
         duration: 300,
-        useNativeDriver: true,
+        useNativeDriver: true
       }),
       // Flame pop in
       Animated.spring(scaleAnim, {
         toValue: 1,
         friction: 5,
         tension: 100,
-        useNativeDriver: true,
+        useNativeDriver: true
       }),
       // Card slide up
       Animated.spring(cardAnim, {
         toValue: 0,
         friction: 8,
         tension: 80,
-        useNativeDriver: true,
-      }),
+        useNativeDriver: true
+      })
     ]).start();
 
     // Flame flicker animation
@@ -81,14 +77,14 @@ export function StreakScreen({
         Animated.timing(flameAnim, {
           toValue: 1,
           duration: 200,
-          useNativeDriver: true,
+          useNativeDriver: true
         }),
         Animated.timing(flameAnim, {
           toValue: 0,
           duration: 200,
-          useNativeDriver: true,
-        }),
-      ]),
+          useNativeDriver: true
+        })
+      ])
     ).start();
   }, []);
 
@@ -102,7 +98,7 @@ export function StreakScreen({
 
   const flameScale = flameAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [1, 1.05],
+    outputRange: [1, 1.05]
   });
 
   return (
@@ -119,8 +115,8 @@ export function StreakScreen({
                 left: i < 4 ? `${-5 + Math.random() * 20}%` : undefined,
                 right: i >= 4 ? `${-5 + Math.random() * 20}%` : undefined,
                 opacity: 0.1,
-                transform: [{ rotate: `${Math.random() * 30 - 15}deg` }],
-              },
+                transform: [{ rotate: `${Math.random() * 30 - 15}deg` }]
+              }
             ]}
           >
             {["✧", "✦", "★", "⚡", "♦", "◆", "✸", "✹"][i]}
@@ -134,13 +130,11 @@ export function StreakScreen({
           style={[
             styles.flameContainer,
             {
-              transform: [{ scale: scaleAnim }, { scaleY: flameScale }],
-            },
+              transform: [{ scale: scaleAnim }, { scaleY: flameScale }]
+            }
           ]}
         >
-          <View
-            style={[styles.flameGlow, { backgroundColor: getFlameColor() }]}
-          />
+          <View style={[styles.flameGlow, { backgroundColor: getFlameColor() }]} />
           <Ionicons name="flame" size={140} color={getFlameColor()} />
           <View style={styles.streakNumberContainer}>
             <Text style={styles.streakNumber}>{streak.current_streak}</Text>
@@ -150,47 +144,35 @@ export function StreakScreen({
         {/* Message */}
         {workoutNumberToday > 1 ? (
           <View style={styles.messageContainer}>
-            <Text style={styles.messageTitle}>
-              {t("completion.streak.bravo")}
-            </Text>
+            <Text style={styles.messageTitle}>{t("completion.streak.bravo")}</Text>
             <Text style={styles.messageSubtitle}>
               {t("completion.streak.your")}{" "}
               <Text style={[styles.highlight, { color: getFlameColor() }]}>
                 {getOrdinal(workoutNumberToday).toUpperCase()}
               </Text>
             </Text>
-            <Text style={styles.messageSubtitle}>
-              {t("completion.streak.workout")}
-            </Text>
-            <Text style={styles.messageSubtitle}>
-              {t("completion.streak.today")}
-            </Text>
+            <Text style={styles.messageSubtitle}>{t("completion.streak.workout")}</Text>
+            <Text style={styles.messageSubtitle}>{t("completion.streak.today")}</Text>
           </View>
         ) : (
           <View style={styles.messageContainer}>
-            <Text style={styles.messageTitle}>
-              {t("completion.streak.you_are_on_a")}
-            </Text>
+            <Text style={styles.messageTitle}>{t("completion.streak.you_are_on_a")}</Text>
             <Text style={[styles.highlight, { color: getFlameColor() }]}>
               {t("completion.streak.day_count", {
-                count: streak.current_streak,
+                count: streak.current_streak
               })}
             </Text>
-            <Text style={styles.messageTitle}>
-              {t("completion.streak.streak")}
-            </Text>
+            <Text style={styles.messageTitle}>{t("completion.streak.streak")}</Text>
           </View>
         )}
 
         {/* Week progress card */}
-        <Animated.View
-          style={[styles.weekCard, { transform: [{ translateY: cardAnim }] }]}
-        >
+        <Animated.View style={[styles.weekCard, { transform: [{ translateY: cardAnim }] }]}>
           <Text style={styles.milestoneText}>
             {t("completion.streak.first_milestone")}{" "}
             <Text style={styles.milestoneBold}>
               {t("completion.streak.days_count", {
-                count: streak.milestone_target,
+                count: streak.milestone_target
               })}
             </Text>
           </Text>
@@ -208,7 +190,7 @@ export function StreakScreen({
                     style={[
                       styles.dayLabel,
                       isToday && styles.dayLabelToday,
-                      isCompleted && styles.dayLabelCompleted,
+                      isCompleted && styles.dayLabelCompleted
                     ]}
                   >
                     {day}
@@ -218,7 +200,7 @@ export function StreakScreen({
                       styles.dayCircle,
                       isCompleted && styles.dayCircleCompleted,
                       !isCompleted && isPast && styles.dayCircleMissed,
-                      !isCompleted && !isPast && styles.dayCircleFuture,
+                      !isCompleted && !isPast && styles.dayCircleFuture
                     ]}
                   >
                     {isCompleted && (
@@ -243,7 +225,7 @@ export function StreakScreen({
             <Text style={styles.encouragementText}>
               {streak.days_until_milestone > 0
                 ? t("completion.streak.great_job", {
-                    days: streak.days_until_milestone,
+                    days: streak.days_until_milestone
                   })
                 : t("completion.streak.milestone_hit")}
             </Text>
@@ -252,12 +234,7 @@ export function StreakScreen({
       </View>
 
       {/* Done button */}
-      <View
-        style={[
-          styles.buttonContainer,
-          { paddingBottom: insets.bottom + toRN(16) },
-        ]}
-      >
+      <View style={[styles.buttonContainer, { paddingBottom: insets.bottom + toRN(16) }]}>
         <Pressable style={styles.doneButton} onPress={onContinue}>
           <Text style={styles.doneButtonText}>{t("common.done")}</Text>
         </Pressable>
@@ -269,38 +246,38 @@ export function StreakScreen({
 const makeStyles = (tokens: any, colors: any, brand: any) => ({
   container: {
     flex: 1,
-    backgroundColor: colors.bg.canvas,
+    backgroundColor: colors.bg.canvas
   },
   decorativeContainer: {
     ...StyleSheet.absoluteFillObject,
-    overflow: "hidden" as const,
+    overflow: "hidden" as const
   },
   decorativeChar: {
     position: "absolute" as const,
     fontSize: toRN(40),
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   content: {
     flex: 1,
     alignItems: "center" as const,
-    paddingHorizontal: toRN(tokens.spacing[4]),
+    paddingHorizontal: toRN(tokens.spacing[4])
   },
   flameContainer: {
     alignItems: "center" as const,
     justifyContent: "center" as const,
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   flameGlow: {
     position: "absolute" as const,
     width: toRN(120),
     height: toRN(120),
     borderRadius: toRN(60),
-    opacity: 0.3,
+    opacity: 0.3
   },
   streakNumberContainer: {
     position: "absolute" as const,
     alignItems: "center" as const,
-    justifyContent: "center" as const,
+    justifyContent: "center" as const
   },
   streakNumber: {
     fontSize: toRN(48),
@@ -308,66 +285,66 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     color: "#FFFFFF",
     textShadowColor: "rgba(0,0,0,0.3)",
     textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
+    textShadowRadius: 4
   },
   messageContainer: {
     alignItems: "center" as const,
-    marginBottom: toRN(tokens.spacing[8]),
+    marginBottom: toRN(tokens.spacing[8])
   },
   messageTitle: {
     fontSize: toRN(tokens.typography.fontSize["3xl"]),
     fontFamily: fontFamily.groteskBold,
     color: colors.text.primary,
-    textAlign: "center" as const,
+    textAlign: "center" as const
   },
   messageSubtitle: {
     fontSize: toRN(tokens.typography.fontSize["3xl"]),
     fontFamily: fontFamily.groteskBold,
     color: colors.text.primary,
-    textAlign: "center" as const,
+    textAlign: "center" as const
   },
   highlight: {
     fontSize: toRN(tokens.typography.fontSize["4xl"]),
-    fontFamily: fontFamily.groteskBold,
+    fontFamily: fontFamily.groteskBold
   },
   weekCard: {
     width: "100%",
     backgroundColor: colors.bg.secondary,
     borderRadius: toRN(tokens.borderRadius["2xl"]),
-    padding: toRN(tokens.spacing[5]),
+    padding: toRN(tokens.spacing[5])
   },
   milestoneText: {
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.medium,
     color: colors.text.secondary,
     textAlign: "center" as const,
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   milestoneBold: {
     fontFamily: fontFamily.bold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   daysRow: {
     flexDirection: "row" as const,
     justifyContent: "space-between" as const,
-    marginBottom: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
   },
   dayColumn: {
     alignItems: "center" as const,
-    gap: toRN(tokens.spacing[2]),
+    gap: toRN(tokens.spacing[2])
   },
   dayLabel: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.medium,
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   dayLabelToday: {
     color: brand.primary,
-    fontFamily: fontFamily.bold,
+    fontFamily: fontFamily.bold
   },
   dayLabelCompleted: {
     color: "#FF9500",
-    fontFamily: fontFamily.bold,
+    fontFamily: fontFamily.bold
   },
   dayCircle: {
     width: toRN(36),
@@ -375,51 +352,51 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     borderRadius: toRN(18),
     backgroundColor: colors.bg.muted,
     alignItems: "center" as const,
-    justifyContent: "center" as const,
+    justifyContent: "center" as const
   },
   dayCircleCompleted: {
-    backgroundColor: "#FF9500",
+    backgroundColor: "#FF9500"
   },
   dayCircleMissed: {
     backgroundColor: colors.bg.muted,
-    opacity: 0.5,
+    opacity: 0.5
   },
   dayCircleFuture: {
     backgroundColor: colors.bg.muted,
     borderWidth: 1,
     borderColor: colors.border.subtle,
-    borderStyle: "dashed" as const,
+    borderStyle: "dashed" as const
   },
   dayFlame: {
     position: "absolute" as const,
-    top: -8,
+    top: -8
   },
   encouragementContainer: {
     borderTopWidth: 1,
     borderTopColor: colors.border.subtle,
     borderStyle: "dashed" as const,
-    paddingTop: toRN(tokens.spacing[4]),
+    paddingTop: toRN(tokens.spacing[4])
   },
   encouragementText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
     color: colors.text.tertiary,
-    textAlign: "center" as const,
+    textAlign: "center" as const
   },
   buttonContainer: {
     paddingHorizontal: toRN(tokens.spacing[4]),
-    paddingTop: toRN(tokens.spacing[4]),
+    paddingTop: toRN(tokens.spacing[4])
   },
   doneButton: {
     width: "100%",
     paddingVertical: toRN(tokens.spacing[4]),
     borderRadius: toRN(tokens.borderRadius.xl),
     backgroundColor: brand.primary,
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   doneButtonText: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.semiBold,
-    color: "#FFFFFF",
-  },
+    color: "#FFFFFF"
+  }
 });

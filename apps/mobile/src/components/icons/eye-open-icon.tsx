@@ -2,19 +2,13 @@ import { Svg, Path, G } from "react-native-svg";
 
 export const EyeOpenIcon = ({
   size = 24,
-  color = "currentColor",
+  color = "currentColor"
 }: {
   size?: number;
   color?: string;
 }) => {
   return (
-    <Svg
-      height={size}
-      viewBox="0 0 24 24"
-      width={size}
-      fill={color}
-      id="fi_9458496"
-    >
+    <Svg height={size} viewBox="0 0 24 24" width={size} fill={color} id="fi_9458496">
       <G id="Layer_2" data-name="Layer 2">
         <Path d="m12 18.53a11.71 11.71 0 0 1 -7.44-2.65l-3.09-2.53a1.74 1.74 0 0 1 0-2.7l3.09-2.53a11.78 11.78 0 0 1 14.88 0l3.09 2.53a1.74 1.74 0 0 1 0 2.7l-3.09 2.53a11.69 11.69 0 0 1 -7.44 2.65zm0-11.53a10.22 10.22 0 0 0 -6.49 2.28l-3.09 2.53a.25.25 0 0 0 0 .38l3.09 2.53a10.27 10.27 0 0 0 13 0l3.09-2.53a.25.25 0 0 0 0-.38l-3.11-2.53a10.24 10.24 0 0 0 -6.49-2.28z" />
         <Path d="m12 18.25a6.25 6.25 0 1 1 6.25-6.25 6.25 6.25 0 0 1 -6.25 6.25zm0-11a4.75 4.75 0 1 0 4.75 4.75 4.75 4.75 0 0 0 -4.75-4.75z" />

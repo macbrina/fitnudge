@@ -107,7 +107,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
           biggest_challenge: profile.biggest_challenge || "",
           available_equipment: profile.available_equipment || [],
           isCompleted: true, // Profile exists, so it's been completed
-          hasFitnessProfile: true,
+          hasFitnessProfile: true
         });
 
         return true; // Profile exists
@@ -118,16 +118,12 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
     } catch (error) {
       // Profile doesn't exist or error fetching - not an error state
       // Just means user needs to complete onboarding
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to load profile";
+      const errorMessage = error instanceof Error ? error.message : "Failed to load profile";
 
       // Only log if it's not a 404 (not found)
-      if (
-        !errorMessage.includes("404") &&
-        !errorMessage.includes("not found")
-      ) {
+      if (!errorMessage.includes("404") && !errorMessage.includes("not found")) {
         logger.error("Failed to load fitness profile", {
-          error: errorMessage,
+          error: errorMessage
         });
       }
 
@@ -159,12 +155,10 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
       "preferred_location",
       "available_time",
       "motivation_style",
-      "biggest_challenge",
+      "biggest_challenge"
     ];
 
-    const missingFields = requiredFields.filter(
-      (field) => !state[field as keyof typeof state],
-    );
+    const missingFields = requiredFields.filter((field) => !state[field as keyof typeof state]);
 
     if (missingFields.length > 0) {
       const error = `Missing required fields: ${missingFields.join(", ")}`;
@@ -185,7 +179,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
         available_time: state.available_time,
         motivation_style: state.motivation_style,
         biggest_challenge: state.biggest_challenge,
-        available_equipment: state.available_equipment,
+        available_equipment: state.available_equipment
       };
 
       // Submitting profile - tracked via PostHog in component
@@ -195,13 +189,12 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
       set({
         isCompleted: true,
         isSubmitting: false,
-        error: null,
+        error: null
       });
 
       // Profile submitted successfully - tracked via PostHog in component
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to submit profile";
+      const errorMessage = error instanceof Error ? error.message : "Failed to submit profile";
 
       logger.error("Failed to submit fitness profile", {
         error: errorMessage,
@@ -212,13 +205,13 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
           preferred_location: state.preferred_location,
           available_time: state.available_time,
           motivation_style: state.motivation_style,
-          biggest_challenge: state.biggest_challenge,
-        },
+          biggest_challenge: state.biggest_challenge
+        }
       });
 
       set({
         error: errorMessage,
-        isSubmitting: false,
+        isSubmitting: false
       });
 
       throw error;
@@ -239,7 +232,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
       isSubmitting: false,
       isCompleted: false,
       hasFitnessProfile: null,
-      error: null,
+      error: null
     });
-  },
+  }
 }));

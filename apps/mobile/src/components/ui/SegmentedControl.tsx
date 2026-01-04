@@ -1,11 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import {
-  Animated,
-  View,
-  Text,
-  TouchableOpacity,
-  LayoutChangeEvent,
-} from "react-native";
+import { Animated, View, Text, TouchableOpacity, LayoutChangeEvent } from "react-native";
 import { fontFamily } from "@/lib/fonts";
 import { toRN } from "@/lib/units";
 import { useStyles } from "@/themes";
@@ -22,13 +16,11 @@ export function SegmentedControl({
   options,
   selectedIndex,
   onChange,
-  style,
+  style
 }: SegmentedControlProps) {
   const styles = useStyles(makeSegmentedControlStyles);
   const slideAnim = useRef(new Animated.Value(0)).current;
-  const [segmentLayouts, setSegmentLayouts] = useState<
-    Array<{ x: number; width: number }>
-  >([]);
+  const [segmentLayouts, setSegmentLayouts] = useState<Array<{ x: number; width: number }>>([]);
 
   const handleSegmentLayout = (event: LayoutChangeEvent, index: number) => {
     const { x, width } = event.nativeEvent.layout;
@@ -41,11 +33,7 @@ export function SegmentedControl({
 
   useEffect(() => {
     const selected = segmentLayouts[selectedIndex];
-    if (
-      selected &&
-      selected.width > 0 &&
-      segmentLayouts.length === options.length
-    ) {
+    if (selected && selected.width > 0 && segmentLayouts.length === options.length) {
       const padding = toRN(tokens.spacing[1]);
       const position = selected.x - padding;
 
@@ -54,15 +42,14 @@ export function SegmentedControl({
         useNativeDriver: true,
         tension: 100,
         friction: 8,
-        overshootClamping: true,
+        overshootClamping: true
       }).start();
     }
   }, [selectedIndex, segmentLayouts, options.length]);
 
   const selectedLayout = segmentLayouts[selectedIndex];
   const indicatorWidth = selectedLayout?.width || 0;
-  const allReady =
-    segmentLayouts.length === options.length && indicatorWidth > 0;
+  const allReady = segmentLayouts.length === options.length && indicatorWidth > 0;
 
   return (
     <View style={[styles.wrapper, style]}>
@@ -75,8 +62,8 @@ export function SegmentedControl({
               styles.indicator,
               {
                 transform: [{ translateX: slideAnim }],
-                width: indicatorWidth,
-              },
+                width: indicatorWidth
+              }
             ]}
           />
         )}
@@ -108,7 +95,7 @@ export function SegmentedControl({
 
 const makeSegmentedControlStyles = (tokens: any, colors: any, brand: any) => ({
   wrapper: {
-    width: "100%",
+    width: "100%"
   },
   container: {
     flexDirection: "row" as const,
@@ -117,7 +104,7 @@ const makeSegmentedControlStyles = (tokens: any, colors: any, brand: any) => ({
     borderRadius: toRN(tokens.borderRadius["2xl"]),
     padding: toRN(tokens.spacing[1]),
     position: "relative" as const,
-    overflow: "hidden" as const,
+    overflow: "hidden" as const
   },
   indicator: {
     position: "absolute" as const,
@@ -130,22 +117,22 @@ const makeSegmentedControlStyles = (tokens: any, colors: any, brand: any) => ({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: toRN(2),
-    elevation: 2,
+    elevation: 2
   },
   tab: {
     flex: 1,
     alignItems: "center" as const,
     justifyContent: "center" as const,
     paddingHorizontal: toRN(tokens.spacing[3]),
-    zIndex: 1,
+    zIndex: 1
   },
   tabText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.groteskMedium,
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   tabTextSelected: {
     fontFamily: fontFamily.groteskSemiBold,
-    color: colors.text.primary,
-  },
+    color: colors.text.primary
+  }
 });

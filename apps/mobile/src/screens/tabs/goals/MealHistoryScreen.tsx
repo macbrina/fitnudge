@@ -19,7 +19,7 @@ import {
   Modal as RNModal,
   Image,
   Dimensions,
-  StatusBar,
+  StatusBar
 } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -54,15 +54,8 @@ export default function MealHistoryScreen() {
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
 
   // Fetch meal history with infinite scroll
-  const {
-    data,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-    isLoading,
-    isError,
-    refetch,
-  } = useMealHistory(goalId, challengeId, !!(goalId || challengeId));
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, isError, refetch } =
+    useMealHistory(goalId, challengeId, !!(goalId || challengeId));
 
   // Flatten pages into single array
   const allMeals = useMemo(() => {
@@ -74,9 +67,7 @@ export default function MealHistoryScreen() {
   const groupedMeals = useMemo(() => {
     const groups: { title: string; data: MealLog[] }[] = [];
     const today = new Date().toISOString().split("T")[0];
-    const yesterday = new Date(Date.now() - 86400000)
-      .toISOString()
-      .split("T")[0];
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
 
     let currentDate = "";
     let currentGroup: MealLog[] = [];
@@ -87,7 +78,7 @@ export default function MealHistoryScreen() {
         if (currentGroup.length > 0) {
           groups.push({
             title: formatDateHeader(currentDate, today, yesterday, t),
-            data: currentGroup,
+            data: currentGroup
           });
         }
         // Start new group
@@ -102,7 +93,7 @@ export default function MealHistoryScreen() {
     if (currentGroup.length > 0) {
       groups.push({
         title: formatDateHeader(currentDate, today, yesterday, t),
-        data: currentGroup,
+        data: currentGroup
       });
     }
 
@@ -111,8 +102,7 @@ export default function MealHistoryScreen() {
 
   // Flatten for FlatList (with section headers)
   const flatData = useMemo(() => {
-    const items: { type: "header" | "meal"; title?: string; meal?: MealLog }[] =
-      [];
+    const items: { type: "header" | "meal"; title?: string; meal?: MealLog }[] = [];
     groupedMeals.forEach((group) => {
       items.push({ type: "header", title: group.title });
       group.data.forEach((meal) => {
@@ -136,36 +126,27 @@ export default function MealHistoryScreen() {
 
   // Render item
   const renderItem = useCallback(
-    ({
-      item,
-    }: {
-      item: { type: "header" | "meal"; title?: string; meal?: MealLog };
-    }) => {
+    ({ item }: { item: { type: "header" | "meal"; title?: string; meal?: MealLog } }) => {
       if (item.type === "header") {
         return <Text style={styles.sectionHeader}>{item.title}</Text>;
       }
       if (item.type === "meal" && item.meal) {
-        return (
-          <MealHistoryCard meal={item.meal} onPhotoPress={handlePhotoPress} />
-        );
+        return <MealHistoryCard meal={item.meal} onPhotoPress={handlePhotoPress} />;
       }
       return null;
     },
-    [styles, handlePhotoPress],
+    [styles, handlePhotoPress]
   );
 
   // Key extractor
   const keyExtractor = useCallback(
-    (
-      item: { type: "header" | "meal"; title?: string; meal?: MealLog },
-      index: number,
-    ) => {
+    (item: { type: "header" | "meal"; title?: string; meal?: MealLog }, index: number) => {
       if (item.type === "header") {
         return `header-${item.title}-${index}`;
       }
       return item.meal?.id || `meal-${index}`;
     },
-    [],
+    []
   );
 
   // Footer component (loading indicator)
@@ -174,9 +155,7 @@ export default function MealHistoryScreen() {
     return (
       <View style={styles.loadingFooter}>
         <ActivityIndicator size="small" color={brandColors.primary} />
-        <Text style={styles.loadingText}>
-          {t("common.loading") || "Loading..."}
-        </Text>
+        <Text style={styles.loadingText}>{t("common.loading") || "Loading..."}</Text>
       </View>
     );
   }, [isFetchingNextPage, brandColors.primary, styles, t]);
@@ -186,17 +165,10 @@ export default function MealHistoryScreen() {
     if (isLoading) return null;
     return (
       <View style={styles.emptyContainer}>
-        <Ionicons
-          name="restaurant-outline"
-          size={64}
-          color={colors.text.tertiary}
-        />
-        <Text style={styles.emptyTitle}>
-          {t("meals.no_meals_yet") || "No meals logged yet"}
-        </Text>
+        <Ionicons name="restaurant-outline" size={64} color={colors.text.tertiary} />
+        <Text style={styles.emptyTitle}>{t("meals.no_meals_yet") || "No meals logged yet"}</Text>
         <Text style={styles.emptyMessage}>
-          {t("meals.no_meals_message") ||
-            "Start logging your meals to see them here"}
+          {t("meals.no_meals_message") || "Start logging your meals to see them here"}
         </Text>
       </View>
     );
@@ -227,19 +199,12 @@ export default function MealHistoryScreen() {
     return (
       <View style={styles.container}>
         <View style={styles.errorContainer}>
-          <Ionicons
-            name="alert-circle-outline"
-            size={64}
-            color={colors.feedback.error}
-          />
+          <Ionicons name="alert-circle-outline" size={64} color={colors.feedback.error} />
           <Text style={styles.errorTitle}>{t("common.error") || "Error"}</Text>
           <Text style={styles.errorMessage}>
             {t("meals.failed_to_load") || "Failed to load meal history"}
           </Text>
-          <TouchableOpacity
-            style={styles.retryButton}
-            onPress={() => refetch()}
-          >
+          <TouchableOpacity style={styles.retryButton} onPress={() => refetch()}>
             <Text style={styles.retryText}>{t("common.retry") || "Retry"}</Text>
           </TouchableOpacity>
         </View>
@@ -260,7 +225,7 @@ export default function MealHistoryScreen() {
         keyExtractor={keyExtractor}
         contentContainerStyle={[
           styles.listContent,
-          flatData.length === 0 && styles.emptyListContent,
+          flatData.length === 0 && styles.emptyListContent
         ]}
         onEndReached={handleEndReached}
         onEndReachedThreshold={0.3}
@@ -304,7 +269,7 @@ function formatDateHeader(
   dateStr: string,
   today: string,
   yesterday: string,
-  t: (key: string) => string,
+  t: (key: string) => string
 ): string {
   if (dateStr === today) {
     return t("common.today") || "Today";
@@ -317,59 +282,59 @@ function formatDateHeader(
   return date.toLocaleDateString("en-US", {
     weekday: "short",
     month: "short",
-    day: "numeric",
+    day: "numeric"
   });
 }
 
 const makeStyles = (tokens: any, colors: any, brand: any) => ({
   container: {
     flex: 1,
-    backgroundColor: colors.bg.canvas,
+    backgroundColor: colors.bg.canvas
   },
   listContent: {
-    padding: toRN(tokens.spacing[4]),
+    padding: toRN(tokens.spacing[4])
   },
   emptyListContent: {
     flex: 1,
     justifyContent: "center" as const,
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   sectionHeader: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.semiBold,
     color: colors.text.secondary,
     marginTop: toRN(tokens.spacing[4]),
-    marginBottom: toRN(tokens.spacing[2]),
+    marginBottom: toRN(tokens.spacing[2])
   },
   loadingFooter: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
     justifyContent: "center" as const,
     paddingVertical: toRN(tokens.spacing[4]),
-    gap: toRN(tokens.spacing[2]),
+    gap: toRN(tokens.spacing[2])
   },
   loadingText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
-    color: colors.text.tertiary,
+    color: colors.text.tertiary
   },
   // Empty state
   emptyContainer: {
     alignItems: "center" as const,
     paddingVertical: toRN(tokens.spacing[8]),
-    gap: toRN(tokens.spacing[3]),
+    gap: toRN(tokens.spacing[3])
   },
   emptyTitle: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.semiBold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   emptyMessage: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
     color: colors.text.tertiary,
     textAlign: "center" as const,
-    maxWidth: "80%" as const,
+    maxWidth: "80%" as const
   },
   // Error state
   errorContainer: {
@@ -377,51 +342,51 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     alignItems: "center" as const,
     justifyContent: "center" as const,
     paddingHorizontal: toRN(tokens.spacing[6]),
-    gap: toRN(tokens.spacing[3]),
+    gap: toRN(tokens.spacing[3])
   },
   errorTitle: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.semiBold,
-    color: colors.text.primary,
+    color: colors.text.primary
   },
   errorMessage: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
     color: colors.text.tertiary,
-    textAlign: "center" as const,
+    textAlign: "center" as const
   },
   retryButton: {
     marginTop: toRN(tokens.spacing[2]),
     paddingHorizontal: toRN(tokens.spacing[6]),
     paddingVertical: toRN(tokens.spacing[3]),
     backgroundColor: brand.primary,
-    borderRadius: toRN(tokens.borderRadius.lg),
+    borderRadius: toRN(tokens.borderRadius.lg)
   },
   retryText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.semiBold,
-    color: "#FFFFFF",
+    color: "#FFFFFF"
   },
   // Skeleton
   skeletonContainer: {
     padding: toRN(tokens.spacing[4]),
-    gap: toRN(tokens.spacing[3]),
+    gap: toRN(tokens.spacing[3])
   },
   // Lightbox
   lightboxContainer: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.95)",
     justifyContent: "center" as const,
-    alignItems: "center" as const,
+    alignItems: "center" as const
   },
   lightboxClose: {
     position: "absolute" as const,
     right: toRN(tokens.spacing[4]),
     zIndex: 10,
-    padding: toRN(tokens.spacing[2]),
+    padding: toRN(tokens.spacing[2])
   },
   lightboxImage: {
     width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT * 0.7,
-  },
+    height: SCREEN_HEIGHT * 0.7
+  }
 });

@@ -8,7 +8,7 @@ interface UserPlusIconProps {
 
 export const UserPlusIcon: React.FC<UserPlusIconProps> = ({
   size = 24,
-  color = "currentColor",
+  color = "currentColor"
 }) => {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
