@@ -3,7 +3,7 @@ import { Nunito } from "next/font/google";
 import Script from "next/script";
 import "@/styles/globals.css";
 import "@/lib/i18n"; // Initialize i18n
-import GoogleAnalyticsWrapper from "@/components/GoogleAnalyticsWrapper";
+// import GoogleAnalyticsWrapper from "@/components/GoogleAnalyticsWrapper";
 import { Providers } from "@/components/providers/Providers";
 import NextTopLoader from "nextjs-toploader";
 
@@ -243,7 +243,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
             style={{ display: "none", visibility: "hidden" }}
           />
         </noscript>
-        <GoogleAnalyticsWrapper />
+        {/* <GoogleAnalyticsWrapper /> */}
         <NextTopLoader showSpinner={false} color="#0066ff" />
         <Providers>{children}</Providers>
       </body>
