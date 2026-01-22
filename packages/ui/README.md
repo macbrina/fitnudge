@@ -65,6 +65,9 @@ pnpm build
 
 # Start development
 pnpm dev
+
+# Shadcn
+add "postinstall": "npm run fix-imports" to scripts in package.json
 ```
 
 ## 📁 Project Structure
