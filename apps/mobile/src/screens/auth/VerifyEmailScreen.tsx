@@ -21,6 +21,7 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const makeVerifyEmailScreenStyles = (tokens: any, colors: any, brand: any) => ({
   container: {
@@ -134,6 +135,7 @@ export default function VerifyEmailScreen() {
   const verifyEmailMutation = useVerifyEmail();
   const resendVerificationMutation = useResendVerification();
   const { showAlert, showToast } = useAlertModal();
+  const insets = useSafeAreaInsets();
 
   const handleCodeChange = (index: number, value: string) => {
     // Only allow digits
@@ -286,19 +288,19 @@ export default function VerifyEmailScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={{ flexGrow: 1 }}
+          contentContainerStyle={{
+            flexGrow: 1,
+            paddingBottom: insets.bottom
+          }}
           showsVerticalScrollIndicator={false}
         >
-          {/* Header with back button */}
-          <BackButton onPress={() => router.back()} />
-
           {/* Title and Subtitle */}
           <View style={styles.titleContainer}>
             <Text style={styles.title}>{t("auth.verify_email.title")}</Text>

@@ -19,7 +19,8 @@ export type ButtonVariant =
   | "ghost"
   | "danger"
   | "success"
-  | "text";
+  | "text"
+  | "dangerOutline";
 
 export type ButtonSize = "xs" | "sm" | "md" | "lg" | "xl";
 
@@ -111,7 +112,11 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: colors.feedback.success,
     borderWidth: 0
   },
-
+  dangerOutline: {
+    backgroundColor: "transparent",
+    borderWidth: 1,
+    borderColor: colors.feedback.error
+  },
   // Size styles
   xs: {
     paddingHorizontal: toRN(tokens.spacing[3]),
@@ -154,6 +159,9 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
   },
   outlineText: {
     color: brand.primary
+  },
+  dangerOutlineText: {
+    color: colors.feedback.error
   },
   ghostText: {
     color: brand.primary,
@@ -200,6 +208,9 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
   // Disabled text styles for specific variants
   outlineDisabledText: {
     color: brand.primary
+  },
+  dangerOutlineDisabledText: {
+    color: colors.feedback.error
   },
   ghostDisabledText: {
     color: brand.primary
@@ -323,7 +334,7 @@ export default function Button({
   const hasShadow = ["primary", "secondary", "danger", "success"].includes(variant);
 
   // Determine if variant should explicitly have no shadow (transparent variants)
-  const hasNoShadow = ["outline", "ghost", "text"].includes(variant);
+  const hasNoShadow = ["outline", "ghost", "text", "dangerOutline"].includes(variant);
 
   // Determine if variant should have minimal padding
   const hasMinimalPadding = ["ghost", "text"].includes(variant);
@@ -355,7 +366,9 @@ export default function Button({
           ? styles.ghostDisabledText
           : variant === "text"
             ? styles.textDisabledText
-            : styles.disabledText),
+            : variant === "dangerOutline"
+              ? styles.dangerOutlineDisabledText
+              : styles.disabledText),
     textStyle
   ];
 
@@ -445,7 +458,13 @@ function getIconColor(
   colors: any,
   brandColors: any
 ): string {
-  if (isDisabled && variant !== "outline" && variant !== "ghost" && variant !== "text")
+  if (
+    isDisabled &&
+    variant !== "outline" &&
+    variant !== "ghost" &&
+    variant !== "text" &&
+    variant !== "dangerOutline"
+  )
     return brandColors.onPrimary;
 
   switch (variant) {
@@ -460,6 +479,8 @@ function getIconColor(
     case "ghost":
     case "text":
       return brandColors.primary;
+    case "dangerOutline":
+      return colors.feedback.error;
     default:
       return brandColors.onPrimary;
   }

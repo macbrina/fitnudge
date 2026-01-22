@@ -3,15 +3,28 @@ Accountability Partners API endpoints
 
 Dedicated endpoints for managing accountability partners.
 Matches the frontend routes at /partners/*
+
+Per FITNUDGE_V2_SPEC.md, partners can see:
+- First name and last initial
+- Active goals (titles only, not "why" statements)
+- Daily check-in status
+- Current streak
+- NO personal info, photos, or contact details
 """
 
 import asyncio
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, status, Depends, Query
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from app.core.flexible_auth import get_current_user
 from app.services.logger import logger
+from app.services.partner_matching_service import (
+    calculate_partner_match_score,
+    extract_goal_categories,
+    find_matched_goal_titles,
+)
+
 
 router = APIRouter(redirect_slashes=False)
 
@@ -24,9 +37,9 @@ async def _send_notification_safe(
     sender_name: str,
     partnership_id: str = None,
     goal_id: str = None,
-    challenge_id: str = None,
     entity_type: str = None,
     entity_id: str = None,
+    deep_link: str = None,
     context: dict = None,
 ):
     """
@@ -40,9 +53,9 @@ async def _send_notification_safe(
         sender_name: Display name of sender
         partnership_id: ID of the partnership record
         goal_id: ID of related goal (if any)
-        challenge_id: ID of related challenge (if any)
         entity_type: Entity type for notification_history cleanup (e.g., 'partner_request')
         entity_id: Entity ID for notification_history cleanup
+        deep_link: Deep link URL for navigation (Expo Router path)
         context: Additional logging context
     """
     from app.core.database import get_supabase_client
@@ -57,9 +70,9 @@ async def _send_notification_safe(
             sender_name=sender_name,
             partnership_id=partnership_id,
             goal_id=goal_id,
-            challenge_id=challenge_id,
             entity_type=entity_type,
             entity_id=entity_id,
+            deep_link=deep_link,
             supabase=supabase,
         )
 
@@ -84,8 +97,19 @@ class PartnerUserInfo(BaseModel):
     name: Optional[str] = None
     username: Optional[str] = None
     profile_picture_url: Optional[str] = None
-    has_social_accountability: bool = False  # Whether partner has the feature
+    has_partner_feature: bool = (
+        False  # Whether partner has accountability_partner_limit feature
+    )
     is_active: bool = True  # Whether partner's account is active
+
+
+class PartnerTodayGoal(BaseModel):
+    """A partner's goal with today's check-in status for home screen display"""
+
+    id: str
+    title: str
+    logged_today: bool = False
+    is_scheduled_today: bool = True
 
 
 class PartnerResponse(BaseModel):
@@ -97,7 +121,11 @@ class PartnerResponse(BaseModel):
     initiated_by_user_id: str  # user_id who sent the request
     created_at: str
     accepted_at: Optional[str] = None
-    has_active_items: bool = False  # Whether partner has active goals or challenges
+    has_active_items: bool = False  # Whether partner has active goals
+    # Extended fields (only when include_today_goals=true)
+    overall_streak: Optional[int] = None
+    today_goals: Optional[List[PartnerTodayGoal]] = None
+    logged_today: Optional[bool] = None
 
 
 class PartnerSearchResult(BaseModel):
@@ -105,10 +133,15 @@ class PartnerSearchResult(BaseModel):
     name: Optional[str] = None
     username: Optional[str] = None
     profile_picture_url: Optional[str] = None
+    last_active_at: Optional[str] = None  # ISO timestamp for activity indicator
     is_partner: bool = False
     has_pending_request: bool = False  # Deprecated: use request_status instead
     request_status: str = "none"  # none, sent, received, accepted
     partnership_id: Optional[str] = None  # For cancel/accept actions
+    # Smart matching fields (V2)
+    match_score: Optional[float] = None  # 0-100 match percentage
+    match_reasons: Optional[List[str]] = None  # ["Similar goals", "Same timezone"]
+    matched_goals: Optional[List[str]] = None  # Goal titles they share
 
 
 class PartnerRequest(BaseModel):
@@ -135,21 +168,19 @@ async def get_partner_limits(
     Used by frontend to determine if user can send more requests.
     """
     from app.core.database import get_supabase_client
-    from app.services.subscription_service import (
-        has_user_feature,
-        get_user_feature_value,
-    )
+    from app.services.subscription_service import get_user_feature_value
 
     supabase = get_supabase_client()
     user_id = current_user["id"]
 
     try:
-        # Check if user has the social_accountability feature
-        has_social_feature = await has_user_feature(
-            supabase, user_id, "social_accountability"
+        # Get partner limit (None = unlimited, 0 = no access, >0 = limit)
+        partner_limit = await get_user_feature_value(
+            supabase, user_id, "accountability_partner_limit"
         )
 
-        if not has_social_feature:
+        # If limit is 0 or not set, user doesn't have the feature
+        if partner_limit is not None and partner_limit == 0:
             return PartnerLimitsResponse(
                 has_feature=False,
                 limit=0,
@@ -159,10 +190,7 @@ async def get_partner_limits(
                 can_send_request=False,
             )
 
-        # Get partner limit
-        partner_limit = await get_user_feature_value(
-            supabase, user_id, "accountability_partner_limit"
-        )
+        # User has the feature (limit is None for unlimited, or > 0)
 
         # Count accepted partners + pending sent requests
         # Include partner's user status to only count active users toward limit
@@ -232,13 +260,25 @@ async def get_partner_limits(
 # Endpoints
 @router.get("", response_model=List[PartnerResponse])
 async def get_partners(
+    include_today_goals: bool = Query(
+        False, description="Include today's goals with check-in status for home screen"
+    ),
     current_user: dict = Depends(get_current_user),
 ):
-    """Get list of accepted accountability partners"""
+    """
+    Get list of accepted accountability partners.
+
+    If include_today_goals=true, also returns:
+    - overall_streak: Partner's highest current streak
+    - today_goals: List of partner's active goals with today's check-in status
+    - logged_today: Whether partner has completed any goal today
+    """
     from app.core.database import get_supabase_client
+    from datetime import date
 
     supabase = get_supabase_client()
     user_id = current_user["id"]
+    today = date.today().isoformat()
 
     try:
         # Get partnerships where current user is either user_id or partner_user_id
@@ -287,45 +327,66 @@ async def get_partners(
                 "actual_partner_user_id": actual_partner_user_id,
             }
 
-        # Batch query: Get active goals count per partner
-        active_goals_map = {}  # user_id -> count
-        if partner_user_ids:
-            goals_result = (
-                supabase.table("goals")
-                .select("user_id")
-                .in_("user_id", partner_user_ids)
-                .eq("status", "active")
-                .execute()
-            )
-            for g in goals_result.data or []:
-                uid = g.get("user_id")
-                if uid:
-                    active_goals_map[uid] = active_goals_map.get(uid, 0) + 1
+        # Batch query: Get active goals for all partners
+        # If include_today_goals, we need full goal info; otherwise just count
+        goals_by_partner: Dict[str, List[Dict]] = {pid: [] for pid in partner_user_ids}
+        active_goals_map: Dict[str, int] = {}
 
-        # Batch query: Get active challenges count per partner (via challenge_participants)
-        active_challenges_map = {}  # user_id -> count
         if partner_user_ids:
-            challenges_result = (
-                supabase.table("challenge_participants")
-                .select(
-                    """
-                    user_id,
-                    challenges!inner(status)
-                """
+            if include_today_goals:
+                # Fetch full goal data for today's goals display
+                goals_result = (
+                    supabase.table("goals")
+                    .select(
+                        "id, user_id, title, status, frequency_type, target_days, current_streak"
+                    )
+                    .in_("user_id", partner_user_ids)
+                    .eq("status", "active")
+                    .execute()
                 )
-                .in_("user_id", partner_user_ids)
-                .execute()
-            )
-            for cp in challenges_result.data or []:
-                challenge = cp.get("challenges", {})
-                if challenge and challenge.get("status") in ["active", "upcoming"]:
-                    uid = cp.get("user_id")
+                for g in goals_result.data or []:
+                    uid = g.get("user_id")
                     if uid:
-                        active_challenges_map[uid] = (
-                            active_challenges_map.get(uid, 0) + 1
-                        )
+                        goals_by_partner[uid].append(g)
+                        active_goals_map[uid] = active_goals_map.get(uid, 0) + 1
+            else:
+                # Just count active goals
+                goals_result = (
+                    supabase.table("goals")
+                    .select("user_id")
+                    .in_("user_id", partner_user_ids)
+                    .eq("status", "active")
+                    .execute()
+                )
+                for g in goals_result.data or []:
+                    uid = g.get("user_id")
+                    if uid:
+                        active_goals_map[uid] = active_goals_map.get(uid, 0) + 1
 
-        # Build response with has_active_items
+        # Batch query: Get today's check-ins for all partners (only if include_today_goals)
+        checkins_by_goal: Dict[str, bool] = {}
+        if include_today_goals and partner_user_ids:
+            # Get all goal IDs first
+            all_goal_ids = []
+            for goals in goals_by_partner.values():
+                for g in goals:
+                    all_goal_ids.append(g["id"])
+
+            if all_goal_ids:
+                checkins_result = (
+                    supabase.table("check_ins")
+                    .select("goal_id, status")
+                    .in_("goal_id", all_goal_ids)
+                    .eq("check_in_date", today)
+                    .execute()
+                )
+                for ci in checkins_result.data or []:
+                    goal_id = ci.get("goal_id")
+                    if goal_id:
+                        # V2: Use status field - completed if status is 'completed'
+                        checkins_by_goal[goal_id] = ci.get("status") == "completed"
+
+        # Build response with has_active_items and optional today_goals
         partners = []
         for partner_user_id in partner_user_ids:
             data = partner_info_map[partner_user_id]
@@ -334,34 +395,71 @@ async def get_partners(
             actual_partner_user_id = data["actual_partner_user_id"]
 
             goals_count = active_goals_map.get(actual_partner_user_id, 0)
-            challenges_count = active_challenges_map.get(actual_partner_user_id, 0)
-            has_active_items = goals_count > 0 or challenges_count > 0
+            has_active_items = goals_count > 0
 
-            partners.append(
-                {
-                    "id": row["id"],
-                    "user_id": row["user_id"],
-                    "partner_user_id": actual_partner_user_id,
-                    "partner": {
-                        "id": partner_info.get("id"),
-                        "name": partner_info.get("name"),
-                        "username": partner_info.get("username"),
-                        "profile_picture_url": partner_info.get("profile_picture_url"),
-                        "is_active": data["partner_status"] == "active",
-                    },
-                    "status": row["status"],
-                    "initiated_by_user_id": row["initiated_by_user_id"],
-                    "created_at": row["created_at"],
-                    "accepted_at": row.get("accepted_at"),
-                    "has_active_items": has_active_items,
-                }
-            )
+            partner_data = {
+                "id": row["id"],
+                "user_id": row["user_id"],
+                "partner_user_id": actual_partner_user_id,
+                "partner": {
+                    "id": partner_info.get("id"),
+                    "name": partner_info.get("name"),
+                    "username": partner_info.get("username"),
+                    "profile_picture_url": partner_info.get("profile_picture_url"),
+                    "is_active": data["partner_status"] == "active",
+                },
+                "status": row["status"],
+                "initiated_by_user_id": row["initiated_by_user_id"],
+                "created_at": row["created_at"],
+                "accepted_at": row.get("accepted_at"),
+                "has_active_items": has_active_items,
+            }
+
+            # Add extended fields if requested
+            if include_today_goals:
+                partner_goals = goals_by_partner.get(actual_partner_user_id, [])
+
+                # Calculate overall streak (highest current streak)
+                overall_streak = 0
+                for g in partner_goals:
+                    streak = g.get("current_streak", 0) or 0
+                    if streak > overall_streak:
+                        overall_streak = streak
+
+                # Build today_goals with check-in status
+                today_goals = []
+                partner_logged_today = False
+                for g in partner_goals:
+                    goal_id = g["id"]
+                    logged = checkins_by_goal.get(goal_id, False)
+                    if logged:
+                        partner_logged_today = True
+
+                    # Check if scheduled today
+                    freq = g.get("frequency_type", "daily")
+                    days = g.get("target_days", [])
+                    scheduled = is_scheduled_today(freq, days)
+
+                    today_goals.append(
+                        {
+                            "id": goal_id,
+                            "title": g["title"],
+                            "logged_today": logged,
+                            "is_scheduled_today": scheduled,
+                        }
+                    )
+
+                partner_data["overall_streak"] = overall_streak
+                partner_data["today_goals"] = today_goals
+                partner_data["logged_today"] = partner_logged_today
+
+            partners.append(partner_data)
 
         return partners
 
     except Exception as e:
         logger.error(
-            f"Failed to get partners for user {user_id}",
+            f"Failed to get partners for user {user_id} {str(e)}",
             {"error": str(e), "user_id": user_id},
         )
         raise HTTPException(
@@ -436,7 +534,7 @@ async def get_pending_requests(
 
     except Exception as e:
         logger.error(
-            f"Failed to get pending requests for user {user_id}",
+            f"Failed to get pending requests for user {user_id} {str(e)}",
             {"error": str(e), "user_id": user_id},
         )
         raise HTTPException(
@@ -518,6 +616,82 @@ async def get_sent_requests(
         )
 
 
+@router.get("/blocked", response_model=List[PartnerResponse])
+async def get_blocked_partners(
+    current_user: dict = Depends(get_current_user),
+):
+    """Get partners that the current user has blocked"""
+    from app.core.database import get_supabase_client
+
+    supabase = get_supabase_client()
+    user_id = current_user["id"]
+
+    try:
+        # Get blocked partnerships where current user is the blocker
+        result = (
+            supabase.table("accountability_partners")
+            .select(
+                """
+                id,
+                user_id,
+                partner_user_id,
+                status,
+                initiated_by_user_id,
+                blocked_by,
+                created_at,
+                updated_at,
+                partner:users!accountability_partners_partner_user_id_fkey(id, name, username, profile_picture_url, status),
+                user:users!accountability_partners_user_id_fkey(id, name, username, profile_picture_url, status)
+            """
+            )
+            .eq("status", "blocked")
+            .eq("blocked_by", user_id)  # Only show blocked by current user
+            .order("updated_at", desc=True)
+            .execute()
+        )
+
+        blocked = []
+        for row in result.data or []:
+            # Determine which user is the "other" person (the blocked one)
+            if row["user_id"] == user_id:
+                other_info = row.get("partner", {})
+                other_user_id = row["partner_user_id"]
+            else:
+                other_info = row.get("user", {})
+                other_user_id = row["user_id"]
+
+            blocked.append(
+                {
+                    "id": row["id"],
+                    "user_id": row["user_id"],
+                    "partner_user_id": row["partner_user_id"],
+                    "partner": {
+                        "id": other_info.get("id") or other_user_id,
+                        "name": other_info.get("name"),
+                        "username": other_info.get("username"),
+                        "profile_picture_url": other_info.get("profile_picture_url"),
+                        "is_active": other_info.get("status") == "active",
+                    },
+                    "status": row["status"],
+                    "initiated_by_user_id": row["initiated_by_user_id"],
+                    "created_at": row["created_at"],
+                    "accepted_at": None,
+                }
+            )
+
+        return blocked
+
+    except Exception as e:
+        logger.error(
+            f"Failed to get blocked partners for user {user_id}",
+            {"error": str(e), "user_id": user_id},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get blocked partners",
+        )
+
+
 class PaginatedSearchResponse(BaseModel):
     users: List[PartnerSearchResult]
     total: int
@@ -544,10 +718,15 @@ async def search_users_for_partners(
         # Search users by name or username with pagination
         result = (
             supabase.table("users")
-            .select("id, name, username, profile_picture_url", count="exact")
+            .select(
+                "id, name, username, profile_picture_url, last_active_at", count="exact"
+            )
             .or_(f"name.ilike.%{query}%,username.ilike.%{query}%")
             .neq("id", user_id)  # Exclude current user
             .eq("status", "active")
+            .not_.is_(
+                "onboarding_completed_at", "null"
+            )  # Only users who completed onboarding
             .range(offset, offset + limit - 1)
             .execute()
         )
@@ -563,12 +742,12 @@ async def search_users_for_partners(
                 "has_more": False,
             }
 
-        # Get existing partnerships (accepted or pending)
+        # Get existing partnerships (accepted, pending, or blocked)
         partnerships = (
             supabase.table("accountability_partners")
             .select("id, user_id, partner_user_id, status, initiated_by_user_id")
             .or_(f"user_id.eq.{user_id},partner_user_id.eq.{user_id}")
-            .in_("status", ["accepted", "pending"])
+            .in_("status", ["accepted", "pending", "blocked"])
             .execute()
         )
 
@@ -589,6 +768,10 @@ async def search_users_for_partners(
         search_results = []
         for user in result.data:
             info = partnership_info.get(user["id"])
+
+            # Skip blocked users - don't show them at all
+            if info and info["status"] == "blocked":
+                continue
 
             if info:
                 if info["status"] == "accepted":
@@ -612,6 +795,7 @@ async def search_users_for_partners(
                     "name": user.get("name"),
                     "username": user.get("username"),
                     "profile_picture_url": user.get("profile_picture_url"),
+                    "last_active_at": user.get("last_active_at"),
                     "is_partner": is_partner,
                     "has_pending_request": has_pending,
                     "request_status": request_status,
@@ -644,24 +828,67 @@ async def get_suggested_partners(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=50),
 ):
-    """Get suggested users to add as accountability partners
+    """Get suggested users to add as accountability partners using smart matching.
 
-    Suggests recently active users.
-    Excludes existing partners and pending requests.
+    V2 Matching Criteria (per FITNUDGE_V2_SPEC.md):
+    - Similar goal types (fitness, reading, meditation, etc.) - 40% weight
+    - Similar frequency (daily vs 3x/week) - 25% weight
+    - Similar timezone (within 3 hours) - 25% weight
+    - Similar streak level (beginner with beginner) - 10% weight
+
+    Returns users sorted by match score with match reasons.
     """
     from app.core.database import get_supabase_client
 
     supabase = get_supabase_client()
     user_id = current_user["id"]
-    offset = (page - 1) * limit
 
     try:
-        # Get existing partnerships and pending requests to exclude
+        # 1. Get current user's profile and goals for matching
+        user_profile = (
+            supabase.table("users")
+            .select("id, timezone")
+            .eq("id", user_id)
+            .maybe_single()
+            .execute()
+        )
+
+        user_timezone = (
+            user_profile.data.get("timezone", "UTC") if user_profile.data else "UTC"
+        )
+
+        # Get current user's active goals
+        user_goals_result = (
+            supabase.table("goals")
+            .select("id, title, frequency_type, current_streak")
+            .eq("user_id", user_id)
+            .eq("status", "active")
+            .execute()
+        )
+
+        user_goal_titles = [g["title"] for g in user_goals_result.data or []]
+        user_frequencies = list(
+            set(g.get("frequency_type", "daily") for g in user_goals_result.data or [])
+        )
+        user_max_streak = max(
+            (g.get("current_streak", 0) or 0 for g in user_goals_result.data or []),
+            default=0,
+        )
+
+        user_data = {
+            "goal_titles": user_goal_titles,
+            "frequencies": user_frequencies,
+            "timezone": user_timezone,
+            "max_streak": user_max_streak,
+        }
+
+        # 2. Get existing partnerships and pending requests to exclude
+        # Also exclude blocked users - they should never appear in suggestions
         partnerships = (
             supabase.table("accountability_partners")
             .select("user_id, partner_user_id")
             .or_(f"user_id.eq.{user_id},partner_user_id.eq.{user_id}")
-            .in_("status", ["accepted", "pending"])
+            .in_("status", ["accepted", "pending", "blocked"])
             .execute()
         )
 
@@ -670,41 +897,128 @@ async def get_suggested_partners(
             exclude_ids.add(p["user_id"])
             exclude_ids.add(p["partner_user_id"])
 
-        # Get recently active users, excluding existing partners and pending requests
         exclude_list = list(exclude_ids)
 
-        query = (
+        # 3. Get candidate users with their goals (batch query)
+        # We fetch more than needed to allow for scoring and filtering
+        fetch_limit = min(limit * 5, 100)  # Fetch up to 5x or 100 candidates
+
+        users_query = (
             supabase.table("users")
-            .select("id, name, username, profile_picture_url", count="exact")
+            .select("id, name, username, profile_picture_url, timezone, last_active_at")
             .eq("status", "active")
+            .not_.is_(
+                "onboarding_completed_at", "null"
+            )  # Only users who completed onboarding
         )
 
-        # Only add NOT IN filter if we have IDs to exclude
         if exclude_list:
             exclude_str = f"({','.join(exclude_list)})"
-            query = query.filter("id", "not.in", exclude_str)
+            users_query = users_query.filter("id", "not.in", exclude_str)
 
-        result = (
-            query.order("created_at", desc=True)
-            .range(offset, offset + limit - 1)
+        users_result = users_query.limit(fetch_limit).execute()
+
+        if not users_result.data:
+            return {
+                "users": [],
+                "total": 0,
+                "page": page,
+                "limit": limit,
+                "has_more": False,
+            }
+
+        # 4. Batch fetch goals for all candidates
+        candidate_ids = [u["id"] for u in users_result.data]
+
+        goals_result = (
+            supabase.table("goals")
+            .select("user_id, title, frequency_type, current_streak")
+            .in_("user_id", candidate_ids)
+            .eq("status", "active")
             .execute()
         )
 
-        total = result.count if hasattr(result, "count") and result.count else 0
+        # Group goals by user_id
+        goals_by_user: Dict[str, List[Dict]] = {}
+        for goal in goals_result.data or []:
+            uid = goal["user_id"]
+            if uid not in goals_by_user:
+                goals_by_user[uid] = []
+            goals_by_user[uid].append(goal)
 
-        users = [
-            {
-                "id": u["id"],
-                "name": u.get("name"),
-                "username": u.get("username"),
-                "profile_picture_url": u.get("profile_picture_url"),
-                "is_partner": False,
-                "has_pending_request": False,
-                "request_status": "none",
-                "partnership_id": None,
+        # 5. Score each candidate
+        scored_candidates = []
+
+        for candidate in users_result.data:
+            cand_id = candidate["id"]
+            cand_goals = goals_by_user.get(cand_id, [])
+
+            # Skip users with no active goals (nothing to match on)
+            if not cand_goals:
+                continue
+
+            cand_goal_titles = [g["title"] for g in cand_goals]
+            cand_frequencies = list(
+                set(g.get("frequency_type", "daily") for g in cand_goals)
+            )
+            cand_max_streak = max(
+                (g.get("current_streak", 0) or 0 for g in cand_goals), default=0
+            )
+
+            candidate_data = {
+                "goal_titles": cand_goal_titles,
+                "frequencies": cand_frequencies,
+                "timezone": candidate.get("timezone", "UTC"),
+                "max_streak": cand_max_streak,
             }
-            for u in result.data or []
-        ]
+
+            # Calculate match score
+            match_score, match_reasons = calculate_partner_match_score(
+                user_data, candidate_data
+            )
+
+            # Find matched goal titles (for display)
+            matched_goals = find_matched_goal_titles(
+                user_goal_titles, cand_goal_titles, threshold=70, max_results=3
+            )
+
+            scored_candidates.append(
+                {
+                    "user": candidate,
+                    "match_score": match_score,
+                    "match_reasons": match_reasons,
+                    "matched_goals": matched_goals,
+                }
+            )
+
+        # 6. Sort by match score (descending)
+        scored_candidates.sort(key=lambda x: x["match_score"], reverse=True)
+
+        # 7. Paginate
+        total = len(scored_candidates)
+        offset = (page - 1) * limit
+        paginated = scored_candidates[offset : offset + limit]
+
+        # 8. Build response
+        users = []
+        for item in paginated:
+            user = item["user"]
+            users.append(
+                {
+                    "id": user["id"],
+                    "name": user.get("name"),
+                    "username": user.get("username"),
+                    "profile_picture_url": user.get("profile_picture_url"),
+                    "last_active_at": user.get("last_active_at"),
+                    "is_partner": False,
+                    "has_pending_request": False,
+                    "request_status": "none",
+                    "partnership_id": None,
+                    "match_score": item["match_score"],
+                    "match_reasons": item["match_reasons"],
+                    "matched_goals": item["matched_goals"],
+                }
+            )
 
         return {
             "users": users,
@@ -746,83 +1060,77 @@ async def send_partner_request(
         )
 
     try:
-        # Check if sender has the social_accountability feature
-        # and get their accountability_partner_limit
-        from app.services.subscription_service import (
-            has_user_feature,
-            get_user_feature_value,
-        )
-
-        has_social_feature = await has_user_feature(
-            supabase, user_id, "social_accountability"
-        )
-        if not has_social_feature:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Accountability partner feature requires a subscription",
-            )
+        # Get sender's accountability_partner_limit
+        from app.services.subscription_service import get_user_feature_value
+        from concurrent.futures import ThreadPoolExecutor
 
         partner_limit = await get_user_feature_value(
             supabase, user_id, "accountability_partner_limit"
         )
 
-        # Count accepted partners + pending sent requests toward the limit
-        full_result = (
-            supabase.table("accountability_partners")
-            .select("id, status, initiated_by_user_id")
-            .or_(f"user_id.eq.{user_id},partner_user_id.eq.{user_id}")
-            .in_("status", ["accepted", "pending"])
-            .execute()
-        )
-
-        accepted_count = 0
-        pending_sent_count = 0
-        for p in full_result.data or []:
-            if p.get("status") == "accepted":
-                accepted_count += 1
-            elif (
-                p.get("status") == "pending"
-                and p.get("initiated_by_user_id") == user_id
-            ):
-                pending_sent_count += 1
-
-        total_toward_limit = accepted_count + pending_sent_count
-
-        # Check limit (None = unlimited)
-        if partner_limit is not None and total_toward_limit >= partner_limit:
+        # If limit is 0, user doesn't have the feature
+        if partner_limit is not None and partner_limit == 0:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"You have reached your partner limit ({partner_limit}). "
-                f"You have {accepted_count} partners and {pending_sent_count} pending requests.",
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Accountability partner feature requires a subscription",
             )
 
-        # Check if partner user exists
-        partner = (
-            supabase.table("users")
-            .select("id, name, username, profile_picture_url")
-            .eq("id", partner_user_id)
-            .maybe_single()
-            .execute()
-        )
+        # Run partner user check and partnerships check in parallel
+        def get_partner_user():
+            return (
+                supabase.table("users")
+                .select("id, name, username, profile_picture_url")
+                .eq("id", partner_user_id)
+                .maybe_single()
+                .execute()
+            )
 
+        def get_all_partnerships():
+            # Single query: get all partnerships for limit counting AND existing check
+            return (
+                supabase.table("accountability_partners")
+                .select("id, status, initiated_by_user_id, user_id, partner_user_id")
+                .or_(f"user_id.eq.{user_id},partner_user_id.eq.{user_id}")
+                .execute()
+            )
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            partner_future = executor.submit(get_partner_user)
+            partnerships_future = executor.submit(get_all_partnerships)
+            partner = partner_future.result()
+            partnerships_result = partnerships_future.result()
+
+        # Check if partner user exists
         if not partner.data:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
             )
 
-        # Check if partnership already exists
-        existing = (
-            supabase.table("accountability_partners")
-            .select("id, status")
-            .or_(
-                f"and(user_id.eq.{user_id},partner_user_id.eq.{partner_user_id}),"
-                f"and(user_id.eq.{partner_user_id},partner_user_id.eq.{user_id})"
-            )
-            .execute()
-        )
+        # Process partnerships: count for limit AND check existing with target
+        accepted_count = 0
+        pending_sent_count = 0
+        existing_with_target = None
 
-        if existing.data:
-            status_val = existing.data[0].get("status")
+        for p in partnerships_result.data or []:
+            p_user_id = p.get("user_id")
+            p_partner_id = p.get("partner_user_id")
+            p_status = p.get("status")
+
+            # Check if this is a partnership with the target user
+            if (p_user_id == user_id and p_partner_id == partner_user_id) or (
+                p_user_id == partner_user_id and p_partner_id == user_id
+            ):
+                existing_with_target = p
+
+            # Count for limit (only accepted and pending)
+            if p_status == "accepted":
+                accepted_count += 1
+            elif p_status == "pending" and p.get("initiated_by_user_id") == user_id:
+                pending_sent_count += 1
+
+        # Check existing partnership with target
+        if existing_with_target:
+            status_val = existing_with_target.get("status")
             if status_val == "accepted":
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -833,6 +1141,20 @@ async def send_partner_request(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="A request is already pending with this user",
                 )
+            elif status_val == "blocked":
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Cannot send partner request to this user",
+                )
+
+        # Check limit (None = unlimited)
+        total_toward_limit = accepted_count + pending_sent_count
+        if partner_limit is not None and total_toward_limit >= partner_limit:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"You have reached your partner limit ({partner_limit}). "
+                f"You have {accepted_count} partners and {pending_sent_count} pending requests.",
+            )
 
         # Create partnership request
         result = (
@@ -872,6 +1194,7 @@ async def send_partner_request(
                 partnership_id=row["id"],
                 entity_type="partner_request",
                 entity_id=row["id"],
+                deep_link="/(user)/profile/partners?tab=received",  # Go to partners screen to see request
                 context={"user_id": user_id, "partner_user_id": partner_user_id},
             )
         )
@@ -1004,8 +1327,9 @@ async def accept_partner_request(
                     sender_id=user_id,
                     sender_name=accepter_name,
                     partnership_id=partnership_id,
-                    entity_type="partner_request",
+                    entity_type="partner_accepted",
                     entity_id=partnership_id,
+                    deep_link=f"/(user)/profile/partner/{user_id}?partnershipId={partnership_id}",
                     context={
                         "original_sender_id": original_sender_id,
                     },
@@ -1197,15 +1521,26 @@ async def remove_partner(
                 detail="Partnership not found",
             )
 
-        # Delete the partnership
+        # Fetch nudge IDs BEFORE deleting (cascade will remove them)
+        nudges_query = (
+            supabase.table("social_nudges")
+            .select("id")
+            .eq("partnership_id", partnership_id)
+            .execute()
+        )
+        nudge_ids = [n["id"] for n in (nudges_query.data or [])]
+
+        # Delete the partnership (cascade deletes social_nudges)
         supabase.table("accountability_partners").delete().eq(
             "id", partnership_id
         ).execute()
 
-        # Fire-and-forget: cleanup partner_request and partner_accepted notifications
+        # Fire-and-forget: cleanup notifications (pass nudge_ids since they're now deleted)
         from app.services.cleanup_service import fire_and_forget_partner_cleanup
 
-        fire_and_forget_partner_cleanup(partnership_id, reason="removed")
+        fire_and_forget_partner_cleanup(
+            partnership_id, reason="removed", nudge_ids=nudge_ids
+        )
 
         logger.info(
             f"Partnership {partnership_id} removed by {user_id}",
@@ -1227,35 +1562,18 @@ async def remove_partner(
         )
 
 
-# ===== PARTNER DASHBOARD - View partner's goals, challenges, and progress =====
+# ===== PARTNER DASHBOARD - View partner's goals and progress =====
 
 
 class PartnerGoalSummary(BaseModel):
-    """Summary of a partner's goal for accountability view"""
+    """Summary of a partner's goal for accountability view (V2)"""
 
     id: str
     title: str
-    category: str
-    tracking_type: Optional[str] = None
     status: str
-    progress_percentage: float = 0.0
     current_streak: int = 0
     logged_today: bool = False
-    frequency: Optional[str] = None
-
-
-class PartnerChallengeSummary(BaseModel):
-    """Summary of a partner's challenge for accountability view"""
-
-    id: str
-    title: str
-    category: Optional[str] = None
-    tracking_type: Optional[str] = None
-    status: str
-    progress: int = 0
-    target_value: Optional[int] = None
-    participants_count: int = 0
-    logged_today: bool = False
+    frequency_type: str = "daily"  # "daily" or "weekly"
 
 
 class PartnerDashboard(BaseModel):
@@ -1265,19 +1583,17 @@ class PartnerDashboard(BaseModel):
     partnership_id: str
     partnership_created_at: str
     goals: List[PartnerGoalSummary]
-    challenges: List[PartnerChallengeSummary]
     total_active_goals: int = 0
-    total_active_challenges: int = 0
     overall_streak: int = 0
     logged_today: bool = False
     has_scheduled_today: bool = (
-        True  # Whether partner has any goals/challenges scheduled for today
+        True  # Whether partner has any goals scheduled for today
     )
 
 
 def is_scheduled_today(frequency: Optional[str], days_of_week: Optional[list]) -> bool:
     """
-    Check if a goal/challenge is scheduled for today based on frequency settings.
+    Check if a goal is scheduled for today based on frequency settings.
 
     Args:
         frequency: "daily", "weekly", or "custom"
@@ -1326,7 +1642,7 @@ async def get_partner_dashboard(
     """
     Get a partner's accountability dashboard.
 
-    Shows the partner's active goals, challenges, progress, and "logged today" status.
+    Shows the partner's active goals, progress, and "logged today" status.
     Only accessible if there's an accepted partnership between the users.
     """
     from app.core.database import get_supabase_client
@@ -1351,7 +1667,7 @@ async def get_partner_dashboard(
             .execute()
         )
 
-        if not partnership.data:
+        if not partnership or not partnership.data:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Partnership not found or not accepted",
@@ -1369,7 +1685,7 @@ async def get_partner_dashboard(
             .execute()
         )
 
-        if not partner_info.data:
+        if not partner_info or not partner_info.data:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Partner user not found"
             )
@@ -1384,31 +1700,34 @@ async def get_partner_dashboard(
                 detail="Partner's account is no longer active",
             )
 
-        # Check if partner has social_accountability feature
-        from app.services.subscription_service import has_user_feature
+        # Check if partner has accountability feature (limit > 0)
+        from app.services.subscription_service import get_user_feature_value
 
-        partner_has_feature = await has_user_feature(
-            supabase, partner_user_id, "social_accountability"
+        partner_limit = await get_user_feature_value(
+            supabase, partner_user_id, "accountability_partner_limit"
         )
+        partner_has_feature = partner_limit is None or partner_limit > 0
 
-        # Get overall stats from user_stats_cache (always fetch, has both goals and challenges data)
-
-        stats_result = (
-            supabase.table("user_stats_cache")
-            .select("current_streak, active_goals_count, active_challenges_count")
+        # V2: Get overall stats from goals table (denormalized)
+        goals_stats_result = (
+            supabase.table("goals")
+            .select("current_streak")
             .eq("user_id", partner_user_id)
-            .maybe_single()
+            .eq("status", "active")
             .execute()
         )
-        overall_streak = (
-            stats_result.data.get("current_streak", 0) if stats_result.data else 0
-        )
+        overall_streak = 0
+        for g in goals_stats_result.data or []:
+            streak = g.get("current_streak", 0) or 0
+            if streak > overall_streak:
+                overall_streak = streak
 
-        # Get partner's active goals
+        # V2: Get partner's active goals (simplified schema)
         goals_result = (
             supabase.table("goals")
             .select(
-                "id, title, category, tracking_type, status, frequency, days_of_week"
+                "id, title, status, frequency_type, frequency_count, target_days, "
+                "current_streak, longest_streak, total_completions"
             )
             .eq("user_id", partner_user_id)
             .eq("status", "active")
@@ -1416,35 +1735,16 @@ async def get_partner_dashboard(
             .execute()
         )
 
-        all_goals_data = goals_result.data or []
-        all_goal_ids = [g["id"] for g in all_goals_data]
-
-        # Filter goals to only those with completed actionable plans
-        goals_data = []
-        goal_ids = []
-        if all_goal_ids:
-            completed_plans_result = (
-                supabase.table("actionable_plans")
-                .select("goal_id")
-                .in_("goal_id", all_goal_ids)
-                .eq("status", "completed")
-                .execute()
-            )
-            goals_with_plans = {
-                p["goal_id"]
-                for p in (completed_plans_result.data or [])
-                if p.get("goal_id")
-            }
-            goals_data = [g for g in all_goals_data if g["id"] in goals_with_plans]
-            goal_ids = [g["id"] for g in goals_data]
-        today_checkins = {}
-        goal_stats_map = {}
+        # V2: All active goals are shown (no actionable_plans in V2)
+        goals_data = goals_result.data or []
+        goal_ids = [g["id"] for g in goals_data]
+        today_checkins: Dict[str, bool] = {}
 
         if goal_ids:
-            # Batch fetch: today's check-ins + goal_statistics (2 queries instead of N+1)
+            # Batch fetch: today's check-ins
             checkins_result = (
                 supabase.table("check_ins")
-                .select("goal_id, is_checked_in")
+                .select("goal_id, status")
                 .eq("user_id", partner_user_id)
                 .eq("check_in_date", today)
                 .in_("goal_id", goal_ids)
@@ -1453,201 +1753,40 @@ async def get_partner_dashboard(
 
             for ci in checkins_result.data or []:
                 if ci.get("goal_id"):
-                    today_checkins[ci["goal_id"]] = ci.get("is_checked_in", False)
+                    # V2: Use status field - completed if status is 'completed'
+                    today_checkins[ci["goal_id"]] = ci.get("status") == "completed"
 
-            # Get individual goal stats from goal_statistics table
-            goal_stats_result = (
-                supabase.table("goal_statistics")
-                .select("goal_id, current_streak, completion_rate")
-                .in_("goal_id", goal_ids)
-                .execute()
-            )
-
-            for stat in goal_stats_result.data or []:
-                if stat.get("goal_id"):
-                    goal_stats_map[stat["goal_id"]] = {
-                        "current_streak": stat.get("current_streak", 0),
-                        "completion_rate": float(stat.get("completion_rate", 0)),
-                    }
-
-        # Build goal summaries
+        # Build goal summaries (V2: goals only)
         goal_summaries = []
         for goal in goals_data:
             goal_id = goal["id"]
             logged_today = today_checkins.get(goal_id, False)
-            goal_stats = goal_stats_map.get(goal_id, {})
 
             goal_summaries.append(
                 PartnerGoalSummary(
                     id=goal_id,
                     title=goal["title"],
-                    category=goal["category"],
-                    tracking_type=goal.get("tracking_type"),
                     status=goal["status"],
-                    progress_percentage=goal_stats.get("completion_rate", 0.0),
-                    current_streak=goal_stats.get("current_streak", 0),
+                    current_streak=goal.get("current_streak", 0) or 0,
                     logged_today=logged_today,
-                    frequency=goal.get("frequency"),
+                    frequency_type=goal.get("frequency_type", "daily"),
                 )
             )
 
-        # Get partner's active challenges via challenge_participants (just to get challenge IDs they're in)
-        participations_result = (
-            supabase.table("challenge_participants")
-            .select(
-                """
-                challenge_id,
-                challenges!inner(
-                    id, title, category, tracking_type, status,
-                    challenge_type, target_days, target_checkins,
-                    frequency, days_of_week
-                )
-            """
-            )
-            .eq("user_id", partner_user_id)
-            .execute()
-        )
-
-        # Filter to only active/upcoming challenges and collect IDs
-        all_challenge_ids = []
-        all_challenges_info = {}  # challenge_id -> challenge data
-
-        for cp in participations_result.data or []:
-            challenge = cp.get("challenges", {})
-            if challenge and challenge.get("status") in ["active", "upcoming"]:
-                cid = challenge["id"]
-                all_challenge_ids.append(cid)
-                # Determine target_value based on challenge_type
-                challenge_type = challenge.get("challenge_type")
-                if challenge_type == "streak":
-                    target_value = challenge.get("target_days")
-                else:  # checkin_count
-                    target_value = challenge.get("target_checkins")
-
-                all_challenges_info[cid] = {
-                    "id": cid,
-                    "title": challenge["title"],
-                    "category": challenge.get("category"),
-                    "tracking_type": challenge.get("tracking_type"),
-                    "status": challenge["status"],
-                    "target_value": target_value,
-                    "frequency": challenge.get("frequency"),
-                    "days_of_week": challenge.get("days_of_week"),
-                }
-
-        # Filter challenges to only those with completed actionable plans
-        challenge_ids = []
-        challenges_info = {}
-        if all_challenge_ids:
-            completed_challenge_plans_result = (
-                supabase.table("actionable_plans")
-                .select("challenge_id")
-                .in_("challenge_id", all_challenge_ids)
-                .eq("status", "completed")
-                .execute()
-            )
-            challenges_with_plans = {
-                p["challenge_id"]
-                for p in (completed_challenge_plans_result.data or [])
-                if p.get("challenge_id")
-            }
-            challenge_ids = [
-                cid for cid in all_challenge_ids if cid in challenges_with_plans
-            ]
-            challenges_info = {
-                cid: info
-                for cid, info in all_challenges_info.items()
-                if cid in challenges_with_plans
-            }
-
-        challenge_summaries = []
-
-        if challenge_ids:
-            # Batch fetch challenge_statistics (has progress, current_streak, last_checkin_date)
-            challenge_stats_result = (
-                supabase.table("challenge_statistics")
-                .select("challenge_id, current_streak, last_checkin_date, progress")
-                .eq("user_id", partner_user_id)
-                .in_("challenge_id", challenge_ids)
-                .execute()
-            )
-
-            challenge_stats_map = {}
-            for stat in challenge_stats_result.data or []:
-                cid = stat.get("challenge_id")
-                if cid:
-                    challenge_stats_map[cid] = {
-                        "current_streak": stat.get("current_streak", 0),
-                        "logged_today": stat.get("last_checkin_date") == today,
-                        "progress": stat.get("progress", 0),
-                    }
-
-            # Batch count participants per challenge
-            participants_result = (
-                supabase.table("challenge_participants")
-                .select("challenge_id")
-                .in_("challenge_id", challenge_ids)
-                .execute()
-            )
-
-            participants_count_map = {}
-            for p in participants_result.data or []:
-                cid = p.get("challenge_id")
-                if cid:
-                    participants_count_map[cid] = participants_count_map.get(cid, 0) + 1
-
-            # Build challenge summaries with all data
-            for cid in challenge_ids:
-                info = challenges_info.get(cid, {})
-                stats = challenge_stats_map.get(cid, {})
-                challenge_summaries.append(
-                    {
-                        "id": cid,
-                        "title": info.get("title", ""),
-                        "category": info.get("category"),
-                        "tracking_type": info.get("tracking_type"),
-                        "status": info.get("status", "active"),
-                        "progress": stats.get("progress", 0),
-                        "target_value": info.get("target_value"),
-                        "participants_count": participants_count_map.get(cid, 0),
-                        "logged_today": stats.get("logged_today", False),
-                    }
-                )
-
-        # Convert to Pydantic models
-        challenge_models = [PartnerChallengeSummary(**cs) for cs in challenge_summaries]
-
-        # Calculate if partner logged today (any goal or challenge)
-        partner_logged_today = any(g.logged_today for g in goal_summaries) or any(
-            c.logged_today for c in challenge_models
-        )
+        # Calculate if partner logged today (goals only in V2)
+        partner_logged_today = any(g.logged_today for g in goal_summaries)
 
         # Calculate if partner has anything scheduled for today
-        # Check goals: if any goal is scheduled for today based on frequency/days_of_week
-
         goals_scheduled_today = False
         for goal in goals_data:
-            freq = goal.get("frequency")
-            days = goal.get("days_of_week")
+            freq = goal.get("frequency_type", "daily")
+            days = goal.get("target_days", [])
             scheduled = is_scheduled_today(freq, days)
-
             if scheduled:
                 goals_scheduled_today = True
+                break
 
-        # Check challenges: if any challenge is scheduled for today based on frequency/days_of_week
-
-        challenges_scheduled_today = False
-        for cid in challenge_ids:
-            freq = challenges_info.get(cid, {}).get("frequency")
-            days = challenges_info.get(cid, {}).get("days_of_week")
-            scheduled = is_scheduled_today(freq, days)
-
-            if scheduled:
-                challenges_scheduled_today = True
-
-        partner_has_scheduled_today = (
-            goals_scheduled_today or challenges_scheduled_today
-        )
+        partner_has_scheduled_today = goals_scheduled_today
 
         return PartnerDashboard(
             partner=PartnerUserInfo(
@@ -1655,15 +1794,13 @@ async def get_partner_dashboard(
                 name=partner_info.data.get("name"),
                 username=partner_info.data.get("username"),
                 profile_picture_url=partner_info.data.get("profile_picture_url"),
-                has_social_accountability=partner_has_feature,
+                has_partner_feature=partner_has_feature,
                 is_active=partner_is_active,
             ),
             partnership_id=partnership_id,
             partnership_created_at=partnership_created_at,
             goals=goal_summaries,
-            challenges=challenge_models,
             total_active_goals=len(goal_summaries),
-            total_active_challenges=len(challenge_models),
             overall_streak=overall_streak,
             logged_today=partner_logged_today,
             has_scheduled_today=partner_has_scheduled_today,
@@ -1679,4 +1816,302 @@ async def get_partner_dashboard(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get partner dashboard: {str(e)}",
+        )
+
+
+# ===== BLOCK PARTNER =====
+
+
+@router.post("/{partnership_id}/block")
+async def block_partner(
+    partnership_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Block a partner. This will:
+    1. Update partnership status to 'blocked'
+    2. Prevent future matching with this user
+    3. Hide them from suggested partners
+
+    Unlike remove_partner (DELETE), blocking persists the record with 'blocked' status.
+    """
+    from app.core.database import get_supabase_client
+
+    supabase = get_supabase_client()
+    user_id = current_user["id"]
+
+    try:
+        # Get the partnership (must be a participant)
+        partnership = (
+            supabase.table("accountability_partners")
+            .select("*")
+            .eq("id", partnership_id)
+            .or_(f"user_id.eq.{user_id},partner_user_id.eq.{user_id}")
+            .maybe_single()
+            .execute()
+        )
+
+        if not partnership.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Partnership not found",
+            )
+
+        # Check if already blocked
+        if partnership.data.get("status") == "blocked":
+            return {"message": "Partner already blocked"}
+
+        # Update status to blocked
+        supabase.table("accountability_partners").update(
+            {
+                "status": "blocked",
+                "blocked_by": user_id,
+                "updated_at": datetime.utcnow().isoformat(),
+            }
+        ).eq("id", partnership_id).execute()
+
+        # Fire-and-forget: cleanup notifications and social_nudges between users
+        from app.services.cleanup_service import fire_and_forget_partner_cleanup
+
+        fire_and_forget_partner_cleanup(partnership_id, reason="blocked")
+
+        logger.info(
+            f"Partner blocked: {partnership_id} by {user_id}",
+            {"partnership_id": partnership_id, "user_id": user_id},
+        )
+
+        return {"message": "Partner blocked successfully"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to block partner {partnership_id}",
+            {"error": str(e), "partnership_id": partnership_id, "user_id": user_id},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to block partner",
+        )
+
+
+@router.post("/{partnership_id}/unblock")
+async def unblock_partner(
+    partnership_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Unblock a previously blocked partner.
+    This deletes the partnership record entirely - a clean slate.
+    If they want to be partners again, they can search and send a new request.
+    """
+    from app.core.database import get_supabase_client
+
+    supabase = get_supabase_client()
+    user_id = current_user["id"]
+
+    try:
+        # Get the partnership
+        partnership = (
+            supabase.table("accountability_partners")
+            .select("*")
+            .eq("id", partnership_id)
+            .or_(f"user_id.eq.{user_id},partner_user_id.eq.{user_id}")
+            .eq("status", "blocked")
+            .maybe_single()
+            .execute()
+        )
+
+        if not partnership.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Blocked partnership not found",
+            )
+
+        # Delete the partnership record entirely (clean slate)
+        supabase.table("accountability_partners").delete().eq(
+            "id", partnership_id
+        ).execute()
+
+        logger.info(
+            f"Partner unblocked (deleted): {partnership_id} by {user_id}",
+            {"partnership_id": partnership_id, "user_id": user_id},
+        )
+
+        return {"message": "Partner unblocked"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to unblock partner {partnership_id}",
+            {"error": str(e), "partnership_id": partnership_id, "user_id": user_id},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to unblock partner",
+        )
+
+
+# ===== REPORT USER =====
+
+
+def _block_partner_if_exists(supabase, blocker_id: str, user_id: str) -> bool:
+    """
+    Block a partner if an active partnership exists between blocker and user.
+    Returns True if blocked, False if no partnership found.
+    """
+    from datetime import datetime
+    from app.services.cleanup_service import fire_and_forget_partner_cleanup
+
+    partnership = (
+        supabase.table("accountability_partners")
+        .select("id")
+        .or_(
+            f"and(user_id.eq.{blocker_id},partner_user_id.eq.{user_id}),"
+            f"and(user_id.eq.{user_id},partner_user_id.eq.{blocker_id})"
+        )
+        .eq("status", "accepted")
+        .maybe_single()
+        .execute()
+    )
+
+    if partnership and partnership.data:
+        partnership_id = partnership.data["id"]
+
+        supabase.table("accountability_partners").update(
+            {
+                "status": "blocked",
+                "blocked_by": blocker_id,
+                "updated_at": datetime.utcnow().isoformat(),
+            }
+        ).eq("id", partnership_id).execute()
+
+        # Fire-and-forget: cleanup notifications and social_nudges
+        fire_and_forget_partner_cleanup(partnership_id, reason="blocked")
+
+        logger.info(f"Blocked partner after report: {partnership_id}")
+        return True
+
+    return False
+
+
+class ReportUserRequest(BaseModel):
+    """Request to report a user for inappropriate content"""
+
+    reason: str  # "inappropriate_username", "harassment", "spam", "other"
+    details: Optional[str] = None  # Additional context
+    block_partner: bool = False  # Whether to also block the partner
+
+
+@router.post("/report/{user_id}")
+async def report_user(
+    user_id: str,
+    report_data: ReportUserRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Report a user for inappropriate username or behavior.
+
+    This creates a report record for admin review and optionally
+    auto-blocks the user if they're a partner.
+    """
+    from app.core.database import get_supabase_client
+    from uuid import uuid4
+
+    supabase = get_supabase_client()
+    reporter_id = current_user["id"]
+
+    # Don't allow reporting yourself
+    if user_id == reporter_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot report yourself",
+        )
+
+    try:
+        # Check if reported user exists
+        reported_user = (
+            supabase.table("users")
+            .select("id, username, name")
+            .eq("id", user_id)
+            .maybe_single()
+            .execute()
+        )
+
+        if not reported_user.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found",
+            )
+
+        # Check for duplicate report (same reporter, same user, within 24 hours)
+        from datetime import datetime, timedelta
+
+        yesterday = (datetime.utcnow() - timedelta(hours=24)).isoformat()
+
+        existing_report = (
+            supabase.table("user_reports")
+            .select("id")
+            .eq("reporter_id", reporter_id)
+            .eq("reported_user_id", user_id)
+            .gte("created_at", yesterday)
+            .limit(1)
+            .execute()
+        )
+
+        if existing_report.data:
+            # Still block if requested, even if already reported
+            blocked = False
+            if report_data.block_partner:
+                blocked = _block_partner_if_exists(supabase, reporter_id, user_id)
+            return {
+                "message": "You've already reported this user recently. Our team is reviewing.",
+                "blocked": blocked,
+            }
+
+        # Create the report
+        report_record = {
+            "id": str(uuid4()),
+            "reporter_id": reporter_id,
+            "reported_user_id": user_id,
+            "reported_username": reported_user.data.get("username"),
+            "reason": report_data.reason,
+            "details": report_data.details,
+            "status": "pending",  # pending, reviewed, actioned, dismissed
+            "created_at": datetime.utcnow().isoformat(),
+        }
+
+        supabase.table("user_reports").insert(report_record).execute()
+
+        logger.info(
+            f"User reported: {user_id} by {reporter_id}",
+            {
+                "reported_user_id": user_id,
+                "reporter_id": reporter_id,
+                "reason": report_data.reason,
+            },
+        )
+
+        # If they're partners and block_partner is True, block them
+        blocked = False
+        if report_data.block_partner:
+            blocked = _block_partner_if_exists(supabase, reporter_id, user_id)
+
+        return {
+            "message": "Thank you for your report. Our team will review it.",
+            "report_id": report_record["id"],
+            "blocked": blocked,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to report user {user_id}",
+            {"error": str(e), "user_id": user_id, "reporter_id": reporter_id},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to submit report",
         )

@@ -244,7 +244,7 @@ def generate_referral_code(username: str) -> str:
 
 
 def generate_invite_code() -> str:
-    """Generate a unique invite code for challenges/goals/partners
+    """Generate a unique invite code for goals/partners
 
     Returns:
         A 12-character invite code

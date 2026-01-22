@@ -17,9 +17,7 @@ class AchievementService:
     async def check_and_unlock_achievements(
         self,
         user_id: str,
-        source_type: Optional[
-            str
-        ] = None,  # "goal", "challenge", "partner", "nudge", etc.
+        source_type: Optional[str] = None,  # "goal", "partner", "nudge", etc.
         source_id: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
@@ -69,16 +67,20 @@ class AchievementService:
                     continue  # Already unlocked
 
                 # Check if condition is met using the condition checker
-                condition_met = await condition_checker.check_condition(
-                    user_id, achievement["unlock_condition"]
+                # Returns both the result AND metadata to avoid duplicate queries
+                condition_met, condition_metadata = (
+                    await condition_checker.check_condition(
+                        user_id, achievement["unlock_condition"]
+                    )
                 )
 
                 if condition_met:
-                    # Unlock the achievement
+                    # Unlock the achievement with metadata from condition check
                     unlocked = await self._unlock_achievement(
                         user_id,
                         achievement["id"],
                         achievement,
+                        condition_metadata,
                         source_type,
                         source_id,
                     )
@@ -110,6 +112,7 @@ class AchievementService:
         user_id: str,
         achievement_type_id: str,
         achievement_data: Dict[str, Any],
+        condition_metadata: Dict[str, Any],
         source_type: Optional[str] = None,
         source_id: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
@@ -120,6 +123,7 @@ class AchievementService:
             user_id: User ID
             achievement_type_id: Achievement type ID
             achievement_data: Achievement type data
+            condition_metadata: Metadata from condition check (avoids duplicate queries)
             source_type: Optional source type for metadata
             source_id: Optional source ID for metadata
 
@@ -129,8 +133,10 @@ class AchievementService:
         supabase = get_supabase_client()
 
         try:
-            # Build metadata with source info if provided
-            metadata: Dict[str, Any] = {}
+            # Build metadata - start with condition metadata (stats from the check)
+            metadata: Dict[str, Any] = {**condition_metadata}
+
+            # Add source info if provided
             if source_type and source_id:
                 metadata["source_type"] = source_type
                 metadata["source_id"] = source_id
@@ -141,28 +147,6 @@ class AchievementService:
                 "achievement_type_id": achievement_type_id,
                 "metadata": metadata,
             }
-
-            # Add additional metadata based on achievement type
-            badge_key = achievement_data.get("badge_key", "")
-            if "streak" in badge_key and "workout" not in badge_key:
-                streak = await condition_checker.get_current_streak(user_id)
-                achievement_record["metadata"]["streak"] = streak
-            elif "workout_streak" in badge_key:
-                streak = await condition_checker.get_workout_streak(user_id)
-                achievement_record["metadata"]["workout_streak"] = streak
-            elif "checkin" in badge_key:
-                # Get total check-in count across all goals
-                result = (
-                    supabase.table("check_ins")
-                    .select("id", count="exact")
-                    .eq("user_id", user_id)
-                    .eq("completed", True)
-                    .execute()
-                )
-                count = (
-                    result.count if hasattr(result, "count") else len(result.data or [])
-                )
-                achievement_record["metadata"]["checkin_count"] = count
 
             result = (
                 supabase.table("user_achievements").insert(achievement_record).execute()

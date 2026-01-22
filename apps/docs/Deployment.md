@@ -68,6 +68,52 @@ Other keys (OAuth client IDs, LaunchDarkly, Supabase anon keys, etc.) live in th
 - **TLS:** Celery requires explicit SSL options. Either append `?ssl_cert_reqs=none` to the URL or set the broker/result SSL options in `celery_app.py` (already handled in the repo).
 - **REST tokens:** Only needed if you plan to interact with Upstash REST API; Celery uses the Redis URL.
 
+### Celery Production Commands
+
+In production, run **separate processes** instead of combining `--beat` with the worker:
+
+#### Development (combined - fine for local dev):
+```bash
+poetry run celery -A celery_worker worker --beat --loglevel=info
+```
+
+#### Production (recommended - separate services):
+```bash
+# Service 1: Worker (can have multiple instances for scaling)
+poetry run celery -A celery_worker worker --loglevel=info
+
+# Service 2: Beat scheduler (ONLY ONE instance - never scale this)
+poetry run celery -A celery_worker beat --loglevel=info
+
+# Service 3: Flower monitoring (optional)
+poetry add flower  # if not already installed
+poetry run celery -A celery_worker flower --port=5555
+```
+
+#### Why Separate in Production?
+
+| Component | Instances | Purpose |
+|-----------|-----------|---------|
+| **Worker** | 1-4+ | Executes tasks. Scale based on load. |
+| **Beat** | Exactly 1 | Schedules periodic tasks. Multiple instances = duplicate tasks! |
+| **Flower** | 0-1 | Web UI for monitoring. Optional but recommended. |
+
+#### Railway Service Configuration
+
+For Railway, create separate services:
+
+1. **celery-worker** service:
+   - Start command: `poetry run celery -A celery_worker worker --loglevel=info`
+   - Can scale replicas if needed
+
+2. **celery-beat** service:
+   - Start command: `poetry run celery -A celery_worker beat --loglevel=info`
+   - Keep at 1 replica only
+
+3. **celery-flower** service (optional):
+   - Start command: `poetry run celery -A celery_worker flower --port=${PORT:-5555}`
+   - Expose via Railway domain for admin access
+
 ---
 
 ## 5. Storage & Media
@@ -89,8 +135,41 @@ Other keys (OAuth client IDs, LaunchDarkly, Supabase anon keys, etc.) live in th
 ## 7. Monitoring & Health Checks
 
 - Railway Health Check: point to `/health` (JSON response). It merges multiple component checks (Supabase, Redis, Celery, SMTP, Cloudflare, AI keys).
-- Celery Worker: consider enabling Flower or using Railway logs to monitor.
 - Optionally integrate New Relic by setting the env vars and adding the agent start-up script.
+
+### Celery Task Monitoring
+
+#### Option 1: Flower (Recommended for Quick Setup)
+Real-time web-based monitor:
+```bash
+poetry run celery -A celery_worker flower --port=5555
+```
+Features:
+- Task success/failure rates and history
+- Real-time task progress
+- Worker status and resource usage
+- Can be password-protected for production
+
+#### Option 2: Custom Admin Dashboard (Future)
+For a fully integrated admin, use Celery signals to log task results to the database:
+
+```python
+from celery.signals import task_success, task_failure, task_prerun
+
+@task_prerun.connect
+def task_started(task_id, task, *args, **kwargs):
+    # Log task start to DB
+
+@task_success.connect
+def task_succeeded(sender, result, **kwargs):
+    # Log success to DB
+
+@task_failure.connect
+def task_failed(sender, task_id, exception, **kwargs):
+    # Log failure with error details to DB
+```
+
+This allows querying task history, building dashboards, and alerting on failures.
 
 ---
 
@@ -106,7 +185,69 @@ For web (Next.js / `apps/web`), deploy separately (Vercel, Netlify, Railway). Se
 
 ---
 
-## 9. Deployment Workflow
+## 9. Admin API & Dashboard
+
+The admin system consists of two components:
+
+### Admin API (`apps/admin-api`)
+
+Separate FastAPI application providing administrative endpoints:
+
+```bash
+# Development
+cd apps/admin-api
+poetry install
+poetry run uvicorn main:app --reload --port 8001
+
+# Production
+poetry run uvicorn main:app --host 0.0.0.0 --port ${PORT:-8001}
+```
+
+#### Railway Configuration
+
+Create a separate Railway service for admin-api:
+
+| Setting | Value |
+|---------|-------|
+| **Root Directory** | `apps/admin-api` |
+| **Build Command** | `poetry install --no-root` |
+| **Start Command** | `poetry run uvicorn main:app --host 0.0.0.0 --port ${PORT:-8001}` |
+
+#### Security Recommendations
+
+- **Restrict access**: Use Railway's private networking or IP allowlist
+- **Separate domain**: e.g., `admin-api.fitnudge.app` (not public)
+- **Admin users only**: API checks `role = 'admin'` on every request
+
+#### Admin API Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `POST /api/auth/login` | Admin login |
+| `GET /api/users` | List/search users |
+| `GET /api/users/{id}` | User details |
+| `PATCH /api/users/{id}` | Update user |
+| `GET /api/subscriptions` | List subscriptions |
+| `GET /api/subscriptions/stats` | MRR and subscription metrics |
+| `POST /api/subscriptions/grant` | Grant subscription to user |
+| `GET /api/tasks/overview` | Celery task queue status |
+| `GET /api/tasks/workers` | Worker details |
+| `GET /api/tasks/{id}` | Task status |
+| `POST /api/tasks/{id}/revoke` | Cancel a task |
+| `GET /api/analytics/dashboard` | Admin dashboard stats |
+
+### Admin Dashboard (`apps/admin`)
+
+Next.js frontend for the admin interface. Connects to the Admin API.
+
+```bash
+# Environment
+NEXT_PUBLIC_ADMIN_API_URL=https://admin-api.fitnudge.app
+```
+
+---
+
+## 10. Deployment Workflow
 
 1. Commit to `main` or a release branch.
 2. Railway detects the change, rebuilds the container image, and restarts the API service.
@@ -117,7 +258,7 @@ For web (Next.js / `apps/web`), deploy separately (Vercel, Netlify, Railway). Se
 
 ---
 
-## 10. Post-Deployment Checklist
+## 11. Post-Deployment Checklist
 
 - [ ] `/health` returns `status: "ok"` and component checks pass.
 - [ ] Celery worker logs show “Ready” without TLS errors.
@@ -126,4 +267,11 @@ For web (Next.js / `apps/web`), deploy separately (Vercel, Netlify, Railway). Se
 - [ ] Feature flags, analytics, AI endpoints confirm connectivity.
 - [ ] Observability: verify logs, alerts, and metrics on Railway.
 
-Keep this file updated as infrastructure evolves (e.g. if you move to managed Postgres or add additional services).\*\*\*
+### Admin API
+- [ ] Admin API `/health` returns OK with database and Celery connected.
+- [ ] Admin login works with an admin user (`role = 'admin'`).
+- [ ] Task monitoring shows active Celery workers.
+- [ ] User management endpoints return data.
+- [ ] Access is restricted (not publicly accessible).
+
+Keep this file updated as infrastructure evolves (e.g. if you move to managed Postgres or add additional services).

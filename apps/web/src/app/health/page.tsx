@@ -34,7 +34,11 @@ type ComponentHistory = Record<string, HistoryEntry[]>;
 
 const HISTORY_KEY = "fitnudge.health.history";
 const COMPONENT_HISTORY_KEY = "fitnudge.health.component-history";
+const HISTORY_VERSION_KEY = "fitnudge.health.version";
 const MAX_HISTORY_POINTS = 56;
+
+// Bump this version when the component list changes to clear old history
+const CURRENT_HISTORY_VERSION = 2;
 
 const TIMELINE_COLOR_CLASS: Record<HealthStatus, string> = {
   ok: "bg-success",
@@ -64,34 +68,11 @@ const COMPONENT_DISPLAY: Record<
     descriptionKeys?: Partial<Record<HealthStatus, string>>;
   }
 > = {
-  environment: {
-    nameKey: "health.components.environment.name",
-    descriptionKeys: {
-      ok: "health.components.environment.descriptions.ok",
-      degraded: "health.components.environment.descriptions.degraded",
-      critical: "health.components.environment.descriptions.critical",
-    },
-  },
   supabase: {
     nameKey: "health.components.supabase.name",
     descriptionKeys: {
       ok: "health.components.supabase.descriptions.ok",
       critical: "health.components.supabase.descriptions.critical",
-    },
-  },
-  redis: {
-    nameKey: "health.components.redis.name",
-    descriptionKeys: {
-      ok: "health.components.redis.descriptions.ok",
-      critical: "health.components.redis.descriptions.critical",
-    },
-  },
-  celery: {
-    nameKey: "health.components.celery.name",
-    descriptionKeys: {
-      ok: "health.components.celery.descriptions.ok",
-      degraded: "health.components.celery.descriptions.degraded",
-      critical: "health.components.celery.descriptions.critical",
     },
   },
   smtp: {
@@ -106,22 +87,6 @@ const COMPONENT_DISPLAY: Record<
     descriptionKeys: {
       ok: "health.components.openai.descriptions.ok",
       not_configured: "health.components.openai.descriptions.not_configured",
-    },
-  },
-  elevenlabs: {
-    nameKey: "health.components.elevenlabs.name",
-    descriptionKeys: {
-      ok: "health.components.elevenlabs.descriptions.ok",
-      not_configured:
-        "health.components.elevenlabs.descriptions.not_configured",
-    },
-  },
-  cloudflare_r2: {
-    nameKey: "health.components.cloudflare_r2.name",
-    descriptionKeys: {
-      ok: "health.components.cloudflare_r2.descriptions.ok",
-      not_configured:
-        "health.components.cloudflare_r2.descriptions.not_configured",
     },
   },
 };
@@ -302,6 +267,19 @@ export default function HealthPage() {
     if (typeof window === "undefined") {
       return;
     }
+
+    // Check if history version matches - clear old data if components changed
+    const storedVersion = loadHistory<number>(HISTORY_VERSION_KEY, 0);
+    if (storedVersion !== CURRENT_HISTORY_VERSION) {
+      // Clear old history data from previous component configurations
+      saveHistory(HISTORY_KEY, []);
+      saveHistory(COMPONENT_HISTORY_KEY, {});
+      saveHistory(HISTORY_VERSION_KEY, CURRENT_HISTORY_VERSION);
+      setHistory([]);
+      setComponentHistory({});
+      return;
+    }
+
     setHistory(loadHistory<HistoryEntry[]>(HISTORY_KEY, []));
     setComponentHistory(
       loadHistory<ComponentHistory>(COMPONENT_HISTORY_KEY, {})
@@ -396,7 +374,6 @@ export default function HealthPage() {
         recordHistory(data, data.status);
       } catch (err) {
         if (!cancelled) {
-          console.error("Failed to load health status", err);
           const message =
             err instanceof Error && err.message
               ? err.message
@@ -435,14 +412,6 @@ export default function HealthPage() {
   const incidentComponents = health?.checks.filter(
     (check) => check.status !== "ok" && check.status !== "not_configured"
   );
-  const loadingPlaceholder = t("health.metrics.loading_placeholder");
-  const environmentValue = loading
-    ? loadingPlaceholder
-    : health?.environment || t("health.labels.unknown");
-  const apiVersionValue = loading
-    ? loadingPlaceholder
-    : health?.version || t("health.labels.unknown");
-  const backendUrl = root ?? t("health.error.default_url");
 
   // History list and details are handled on dedicated routes.
 
@@ -553,25 +522,11 @@ export default function HealthPage() {
                         {t("health.metrics.healthy_checks", { value: uptime })}
                       </p>
                     </div>
-                    <div className="flex flex-wrap gap-6 text-sm text-slate-600 dark:text-slate-300">
-                      <div>
-                        <p className="uppercase tracking-wide text-xs text-slate-400 dark:text-slate-500">
-                          {t("health.metrics.last_updated")}
-                        </p>
-                        <p>{formatTimestamp(health?.timestamp, loading, t)}</p>
-                      </div>
-                      <div>
-                        <p className="uppercase tracking-wide text-xs text-slate-400 dark:text-slate-500">
-                          {t("health.metrics.environment")}
-                        </p>
-                        <p className="capitalize">{environmentValue}</p>
-                      </div>
-                      <div>
-                        <p className="uppercase tracking-wide text-xs text-slate-400 dark:text-slate-500">
-                          {t("health.metrics.api_version")}
-                        </p>
-                        <p>{apiVersionValue}</p>
-                      </div>
+                    <div className="text-sm text-slate-600 dark:text-slate-300">
+                      <p className="uppercase tracking-wide text-xs text-slate-400 dark:text-slate-500">
+                        {t("health.metrics.last_updated")}
+                      </p>
+                      <p>{formatTimestamp(health?.timestamp, loading, t)}</p>
                     </div>
                   </div>
 
@@ -668,7 +623,7 @@ export default function HealthPage() {
                     <p className="mt-1 text-sm text-destructive/90">{error}</p>
                   </div>
                   <div className="rounded-2xl border border-destructive-soft/60 bg-white/80 px-4 py-2 text-xs text-destructive dark:bg-destructive/10">
-                    {t("health.error.developer_hint", { url: backendUrl })}
+                    {t("health.error.developer_hint", { url: "backend URL" })}
                   </div>
                 </div>
               </div>

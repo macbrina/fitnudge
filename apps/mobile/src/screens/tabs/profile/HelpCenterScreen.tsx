@@ -8,13 +8,14 @@ import { toRN } from "@/lib/units";
 import { fontFamily } from "@/lib/fonts";
 import { BackButton } from "@/components/ui/BackButton";
 import Button from "@/components/ui/Button";
-import { EXTERNAL_URLS } from "@/constants/general";
+import { useExternalUrls } from "@/hooks/api/useAppConfig";
 
 export default function HelpCenterScreen() {
   const router = useRouter();
   const styles = useStyles(makeStyles);
   const { brandColors, colors } = useTheme();
   const { t } = useTranslation();
+  const externalUrls = useExternalUrls();
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const webViewRef = useRef<WebView>(null);
@@ -37,14 +38,14 @@ export default function HelpCenterScreen() {
     const { url } = event;
 
     // Allow internal WebView URLs (about:, blob:, data:, js protocol)
-    // eslint-disable-next-line no-script-url
+
     const internalSchemes = ["about:", "blob:", "data:", "javascript:"];
     if (internalSchemes.some((scheme) => url.startsWith(scheme))) {
       return true;
     }
 
     // Allow the help center URL and its subpages
-    const helpCenterDomain = new URL(EXTERNAL_URLS.HELP_CENTER).hostname;
+    const helpCenterDomain = new URL(externalUrls.helpCenter).hostname;
     if (url.includes(helpCenterDomain)) {
       return true;
     }
@@ -88,7 +89,7 @@ export default function HelpCenterScreen() {
         ) : (
           <WebView
             ref={webViewRef}
-            source={{ uri: EXTERNAL_URLS.HELP_CENTER }}
+            source={{ uri: externalUrls.helpCenter }}
             style={styles.webView}
             onLoadStart={() => setIsLoading(true)}
             onLoadEnd={() => setIsLoading(false)}

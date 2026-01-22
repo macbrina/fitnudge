@@ -1,325 +1,613 @@
 """
-Goal Tasks
+Goal Tasks - V2.1
 
-Celery tasks for goal-related operations like check-in creation and completion checks.
+Celery tasks for goal-related operations.
+
+V2.1 Architecture Notes:
+- Check-ins are PRE-CREATED daily with status='pending' by precreate_daily_checkins_task
+- Users UPDATE pending check-ins when responding (status -> completed/skipped/rest_day)
+- mark_missed_checkins_task marks remaining 'pending' as 'missed' at end of day
+- Streaks are stored on goals table and updated O(1) after each check-in
+- Daily task resets streaks for missed days (batch operation)
+- Weekly task processes weekly goal streaks
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, List
+from datetime import datetime, timedelta
 from app.services.tasks.base import celery_app, get_supabase_client, logger
 
 
+# =====================================================
+# DAILY CHECK-IN PRE-CREATION TASK (Runs Hourly)
+# =====================================================
+
+
 @celery_app.task(
-    name="auto_create_daily_checkins",
+    name="precreate_daily_checkins",
     bind=True,
     max_retries=2,
-    default_retry_delay=30,
+    default_retry_delay=60,
 )
-def auto_create_daily_checkins_task(self) -> Dict[str, Any]:
+def precreate_daily_checkins_task(self) -> Dict[str, Any]:
     """
-    Celery task to automatically create check-ins for active goals AND challenges.
-    TIMEZONE-AWARE: Runs hourly to ensure today's check-in exists.
-    - Daily goals/challenges: creates check-in for today if missing
-    - Weekly goals/challenges: creates check-in for today if today is in days_of_week
-    - Prevents duplicates: checks for existing check-in before creating
+    Pre-creates check-ins for all active goals for today.
+
+    Runs HOURLY to catch all timezones as their day starts.
+    Uses PostgreSQL function for O(1) batch operation.
+
+    Flow:
+    1. Call precreate_checkins_for_date(CURRENT_DATE) PostgreSQL function
+    2. Function creates check-ins with status='pending' for all active goals
+       where today is a scheduled day (daily goals or weekly goals on target days)
+    3. Trigger on goal INSERT also creates check-ins, so this catches existing goals
+    4. Invalidate analytics cache for users who got new check-ins
+
+    Scalability: Single batch INSERT, no loops, handles 100K+ goals efficiently.
+    Uses ON CONFLICT DO NOTHING to avoid duplicates.
     """
-    from datetime import datetime, date
-    import pytz
+    from app.services.tasks.analytics_refresh_tasks import (
+        invalidate_user_analytics_cache,
+    )
 
     try:
         supabase = get_supabase_client()
-        goal_created_count = 0
-        goal_skipped_count = 0
-        challenge_created_count = 0
-        challenge_skipped_count = 0
-        processed_users = set()
 
-        # =========================================
-        # PART 1: Create Goal Check-ins
-        # =========================================
-        # Get all active goals with user timezone
-        # Join with users table to get timezone
-        active_goals_result = (
-            supabase.table("goals")
-            .select(
-                "id, user_id, title, frequency, days_of_week, users!inner(timezone)"
-            )
-            .eq("status", "active")
-            .execute()
-        )
+        # Call PostgreSQL function for batch pre-creation
+        # Returns list of {user_id, goal_id} for each newly inserted check-in
+        result = supabase.rpc(
+            "precreate_checkins_for_date",
+            {
+                "p_target_date": datetime.utcnow().date().isoformat(),
+            },
+        ).execute()
 
-        goals = active_goals_result.data or []
-        if goals:
-            # SCALABILITY: Batch fetch all existing check-ins for today
-            goal_ids = [g["id"] for g in goals]
-            today_str = datetime.now().strftime("%Y-%m-%d")
+        # result.data is now a list of {user_id, goal_id} dicts
+        inserted_rows = result.data if result.data else []
+        inserted_count = len(inserted_rows)
 
-            existing_checkins_result = (
-                supabase.table("check_ins")
-                .select("goal_id, check_in_date")
-                .in_("goal_id", goal_ids)
-                .gte("check_in_date", today_str)
-                .execute()
-            )
-
-            # Build set of (goal_id, date) pairs that already exist
-            existing_checkin_keys = set()
-            for ci in existing_checkins_result.data or []:
-                existing_checkin_keys.add((ci["goal_id"], ci["check_in_date"]))
-
-        for goal in goals:
-            goal_id = goal["id"]
-            user_id = goal["user_id"]
-            goal_title = goal.get("title", "Unknown")
-            frequency = goal["frequency"]
-            days_of_week = goal.get("days_of_week") or []
-
-            # Get user's timezone (default to UTC if not set)
-            user_timezone_str = goal.get("users", {}).get("timezone") or "UTC"
-
+        # Invalidate analytics cache for each user/goal that got a new check-in
+        # This ensures fresh data when they view analytics
+        invalidated_count = 0
+        for row in inserted_rows:
             try:
-                # Get current time in user's timezone
-                user_tz = pytz.timezone(user_timezone_str)
-                user_now = datetime.now(user_tz)
-                user_today = user_now.date()
+                invalidate_user_analytics_cache(row["user_id"], row["goal_id"])
+                invalidated_count += 1
+            except Exception:
+                # Don't fail the whole task if cache invalidation fails
+                pass
 
-                # Mark this user as processed (for logging)
-                processed_users.add(user_id)
-
-                # Check if today is a valid day for this goal
-                should_create = _is_scheduled_day(frequency, days_of_week, user_today)
-
-                if not should_create:
-                    continue
-
-                # Check if check-in already exists (from batch data)
-                if (goal_id, user_today.isoformat()) in existing_checkin_keys:
-                    goal_skipped_count += 1
-                    continue
-
-                # Create new check-in for user's today
-                checkin_data = {
-                    "goal_id": goal_id,
-                    "user_id": user_id,
-                    "check_in_date": user_today.isoformat(),
-                    "completed": False,
-                }
-
-                result = supabase.table("check_ins").insert(checkin_data).execute()
-
-                if result.data:
-                    goal_created_count += 1
-                    print(
-                        f"✅ [GOAL CHECK-IN] Created for '{goal_title}': "
-                        f"date={user_today.isoformat()}, timezone={user_timezone_str}"
-                    )
-
-            except pytz.exceptions.UnknownTimeZoneError:
-                logger.error(
-                    f"Invalid timezone for user {user_id}: {user_timezone_str}",
-                    {"user_id": user_id, "timezone": user_timezone_str},
-                )
-                continue
-            except Exception as e:
-                logger.error(
-                    f"Failed to create check-in for goal {goal_id}",
-                    {"goal_id": goal_id, "user_id": user_id, "error": str(e)},
-                )
-                continue
-
-        # =========================================
-        # PART 2: Create Challenge Check-ins
-        # =========================================
-        # Get all active challenge participants with challenge and user data
-        try:
-            participants_result = (
-                supabase.table("challenge_participants")
-                .select(
-                    "user_id, challenge_id, "
-                    "challenges!inner(id, title, status, start_date, end_date, frequency, days_of_week), "
-                    "users!inner(timezone)"
-                )
-                .execute()
-            )
-
-            participants = participants_result.data or []
-            if participants:
-                # SCALABILITY: Batch fetch all existing challenge check-ins
-                challenge_ids = list(
-                    set(
-                        p.get("challenges", {}).get("id")
-                        for p in participants
-                        if p.get("challenges")
-                    )
-                )
-
-                existing_challenge_checkins = (
-                    supabase.table("challenge_check_ins")
-                    .select("challenge_id, user_id, check_in_date")
-                    .in_("challenge_id", challenge_ids)
-                    .gte("check_in_date", today_str)
-                    .execute()
-                )
-
-                # Build set of (challenge_id, user_id, date) keys
-                existing_challenge_keys = set()
-                for ci in existing_challenge_checkins.data or []:
-                    existing_challenge_keys.add(
-                        (ci["challenge_id"], ci["user_id"], ci["check_in_date"])
-                    )
-
-            for participant in participants:
-                user_id = participant["user_id"]
-                challenge = participant.get("challenges", {})
-                challenge_id = challenge.get("id")
-                challenge_title = challenge.get("title", "Unknown")
-
-                # Skip if challenge is not active
-                if challenge.get("status") not in ("upcoming", "active"):
-                    continue
-
-                # Get user's timezone
-                user_timezone_str = (
-                    participant.get("users", {}).get("timezone") or "UTC"
-                )
-
-                try:
-                    user_tz = pytz.timezone(user_timezone_str)
-                    user_now = datetime.now(user_tz)
-                    user_today = user_now.date()
-
-                    processed_users.add(user_id)
-
-                    # Check if challenge is within date range
-                    start_date_str = challenge.get("start_date")
-                    end_date_str = challenge.get("end_date")
-
-                    if start_date_str:
-                        start_date = date.fromisoformat(start_date_str)
-                        if user_today < start_date:
-                            continue  # Challenge hasn't started yet
-
-                    if end_date_str:
-                        end_date = date.fromisoformat(end_date_str)
-                        if user_today > end_date:
-                            continue  # Challenge has ended
-
-                    # Check if today is a scheduled day (direct fields on challenge)
-                    frequency = challenge.get("frequency", "daily")
-                    days_of_week = challenge.get("days_of_week") or []
-
-                    should_create = _is_scheduled_day(
-                        frequency, days_of_week, user_today
-                    )
-
-                    if not should_create:
-                        continue
-
-                    # Check if check-in exists (from batch data)
-                    if (
-                        challenge_id,
-                        user_id,
-                        user_today.isoformat(),
-                    ) in existing_challenge_keys:
-                        challenge_skipped_count += 1
-                        continue
-
-                    # Create new challenge check-in
-                    checkin_data = {
-                        "challenge_id": challenge_id,
-                        "user_id": user_id,
-                        "check_in_date": user_today.isoformat(),
-                        "completed": False,
-                        "is_checked_in": False,
-                    }
-
-                    result = (
-                        supabase.table("challenge_check_ins")
-                        .insert(checkin_data)
-                        .execute()
-                    )
-
-                    if result.data:
-                        challenge_created_count += 1
-                        print(
-                            f"✅ [CHALLENGE CHECK-IN] Created for '{challenge_title}': "
-                            f"user={user_id}, date={user_today.isoformat()}"
-                        )
-
-                except pytz.exceptions.UnknownTimeZoneError:
-                    logger.error(
-                        f"Invalid timezone for user {user_id}: {user_timezone_str}",
-                        {"user_id": user_id, "timezone": user_timezone_str},
-                    )
-                    continue
-                except Exception as e:
-                    logger.error(
-                        f"Failed to create challenge check-in for user {user_id}",
-                        {
-                            "challenge_id": challenge_id,
-                            "user_id": user_id,
-                            "error": str(e),
-                        },
-                    )
-                    continue
-
-        except Exception as e:
-            logger.error(
-                f"Failed to fetch challenge participants: {e}",
-                {"error": str(e)},
-            )
-
-        # =========================================
-        # Summary
-        # =========================================
-        total_created = goal_created_count + challenge_created_count
-        total_skipped = goal_skipped_count + challenge_skipped_count
-
-        print(
-            f"Auto-created {total_created} check-ins "
-            f"(goals: {goal_created_count}, challenges: {challenge_created_count}), "
-            f"skipped {total_skipped} existing for {len(processed_users)} users"
+        logger.info(
+            f"Pre-created daily check-ins",
+            {"inserted_count": inserted_count, "caches_invalidated": invalidated_count},
         )
 
         return {
             "success": True,
-            "processed": len(processed_users),
-            "goal_created": goal_created_count,
-            "goal_skipped": goal_skipped_count,
-            "challenge_created": challenge_created_count,
-            "challenge_skipped": challenge_skipped_count,
-            "total_created": total_created,
-            "total_skipped": total_skipped,
+            "inserted_count": inserted_count,
+            "caches_invalidated": invalidated_count,
         }
 
     except Exception as e:
-        logger.error(
-            "Failed to auto-create daily check-ins",
-            {"error": str(e)},
-        )
+        logger.error(f"Failed to pre-create daily check-ins: {e}")
         if self.request.retries < self.max_retries:
             raise self.retry(exc=e)
         return {"success": False, "error": str(e)}
 
 
-def _is_scheduled_day(frequency: str, days_of_week: list, check_date) -> bool:
-    """
-    Check if a given date is a scheduled check-in day based on frequency and days_of_week.
+# =====================================================
+# MARK MISSED CHECK-INS TASK (Runs Hourly)
+# =====================================================
 
-    Args:
-        frequency: 'daily' or 'weekly'
-        days_of_week: List of day indices (0=Sunday, 1=Monday, ..., 6=Saturday)
-        check_date: The date to check
 
-    Returns:
-        True if check_date is a scheduled day
+@celery_app.task(
+    name="mark_missed_checkins",
+    bind=True,
+    max_retries=2,
+    default_retry_delay=60,
+)
+def mark_missed_checkins_task(self) -> Dict[str, Any]:
     """
-    if frequency == "daily":
-        return True
-    elif frequency == "weekly":
-        if not days_of_week:
-            return True  # If no days specified, treat as daily
-        # Convert Python weekday (0=Mon, 6=Sun) to our format (0=Sun, 1=Mon, ..., 6=Sat)
-        python_weekday = check_date.weekday()
-        our_weekday = (python_weekday + 1) % 7
-        return our_weekday in days_of_week
-    return True  # Default to daily if unknown frequency
+    Marks pending check-ins as 'missed' when their day has passed.
+
+    Runs HOURLY to catch all timezones as their day ends.
+    Uses PostgreSQL function for O(1) batch operation.
+
+    Flow:
+    1. Call mark_missed_checkins_batch() PostgreSQL function
+    2. Function finds check-ins where:
+       - status = 'pending'
+       - check_in_date < user's current date (day has passed in their timezone)
+    3. Updates status to 'missed'
+
+    Scalability: Single batch UPDATE, no loops, handles 100K+ goals efficiently.
+    """
+    try:
+        supabase = get_supabase_client()
+
+        # Call PostgreSQL function for batch marking
+        result = supabase.rpc("mark_missed_checkins_batch").execute()
+
+        affected_count = result.data if result.data else 0
+
+        logger.info(
+            f"Marked missed check-ins",
+            {"affected_count": affected_count},
+        )
+
+        return {
+            "success": True,
+            "affected_count": affected_count,
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to mark missed check-ins: {e}")
+        if self.request.retries < self.max_retries:
+            raise self.retry(exc=e)
+        return {"success": False, "error": str(e)}
+
+
+# =====================================================
+# DAILY STREAK RESET TASK (Runs Hourly)
+# =====================================================
+
+
+@celery_app.task(
+    name="reset_missed_streaks",
+    bind=True,
+    max_retries=2,
+    default_retry_delay=60,
+)
+def reset_missed_streaks_task(self) -> Dict[str, Any]:
+    """
+    Resets streaks for goals where yesterday was a target day but no check-in.
+
+    Runs HOURLY to catch all timezones.
+    Uses PostgreSQL function for O(1) batch operation.
+
+    Scalability: Single batch UPDATE, no loops, handles 100K+ goals efficiently.
+    """
+    try:
+        supabase = get_supabase_client()
+
+        # Call PostgreSQL function for batch reset
+        result = supabase.rpc("reset_missed_streaks_batch").execute()
+
+        affected_count = result.data if result.data else 0
+
+        logger.info(
+            f"Reset missed streaks batch completed",
+            {"affected_count": affected_count},
+        )
+
+        return {
+            "success": True,
+            "affected_count": affected_count,
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to reset missed streaks: {e}")
+        if self.request.retries < self.max_retries:
+            raise self.retry(exc=e)
+        return {"success": False, "error": str(e)}
+
+
+# =====================================================
+# WEEKLY COMPLETIONS RESET TASK (Runs Mondays)
+# =====================================================
+
+
+@celery_app.task(
+    name="reset_weekly_completions",
+    bind=True,
+    max_retries=2,
+    default_retry_delay=60,
+)
+def reset_weekly_completions_task(self) -> Dict[str, Any]:
+    """
+    Resets week_completions counter for weekly goals at start of new week.
+
+    Note: Streaks are managed per check-in (same as daily goals).
+    This task only resets the "X/Y this week" counter for UI display.
+
+    Runs every MONDAY at midnight UTC.
+    Uses PostgreSQL function for O(1) batch operation.
+    """
+    try:
+        supabase = get_supabase_client()
+
+        # Call PostgreSQL function for batch reset
+        result = supabase.rpc("reset_weekly_completions_batch").execute()
+
+        affected_count = result.data if result.data else 0
+
+        logger.info(
+            f"Weekly completions reset",
+            {"affected_count": affected_count},
+        )
+
+        return {
+            "success": True,
+            "affected_count": affected_count,
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to reset weekly completions: {e}")
+        if self.request.retries < self.max_retries:
+            raise self.retry(exc=e)
+        return {"success": False, "error": str(e)}
+
+
+# =====================================================
+# AI PATTERN INSIGHTS TASK (Premium - Runs Weekly)
+# =====================================================
+
+
+@celery_app.task(
+    name="detect_patterns",
+    bind=True,
+    max_retries=1,
+    default_retry_delay=300,
+)
+def detect_patterns_task(self) -> Dict[str, Any]:
+    """
+    Refreshes AI-generated pattern insights for all premium users.
+    Uses the AI insights service for intelligent pattern detection.
+
+    Runs WEEKLY (Sunday evening).
+    Processes users sequentially to manage API rate limits.
+    """
+    import asyncio
+    from app.services.ai_insights_service import get_ai_insights_service
+
+    async def refresh_all_users():
+        supabase = get_supabase_client()
+        insights_service = get_ai_insights_service()
+
+        # Get all premium users
+        users_result = (
+            supabase.table("users")
+            .select("id")
+            .eq("plan", "premium")
+            .eq("status", "active")
+            .execute()
+        )
+
+        users = users_result.data or []
+        total_refreshed = 0
+        total_skipped = 0
+        total_failed = 0
+        processed_users = 0
+
+        # Process users sequentially (to manage OpenAI rate limits)
+        for user in users:
+            try:
+                result = await insights_service.refresh_all_for_user(user["id"])
+                total_refreshed += result.get("refreshed", 0)
+                total_skipped += result.get("skipped", 0)
+                total_failed += result.get("failed", 0)
+                processed_users += 1
+
+            except Exception as user_error:
+                logger.warning(
+                    f"Failed to refresh insights for user {user['id']}: {user_error}"
+                )
+                total_failed += 1
+                continue
+
+        return {
+            "processed_users": processed_users,
+            "total_refreshed": total_refreshed,
+            "total_skipped": total_skipped,
+            "total_failed": total_failed,
+        }
+
+    try:
+        result = asyncio.run(refresh_all_users())
+
+        logger.info(
+            f"AI pattern insights refresh completed",
+            {
+                "processed_users": result["processed_users"],
+                "total_refreshed": result["total_refreshed"],
+                "total_skipped": result["total_skipped"],
+                "total_failed": result["total_failed"],
+            },
+        )
+
+        return {
+            "success": True,
+            **result,
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to run AI pattern insights refresh: {e}")
+        if self.request.retries < self.max_retries:
+            raise self.retry(exc=e)
+        return {"success": False, "error": str(e)}
+
+
+@celery_app.task(
+    name="detect_user_patterns_single",
+    bind=True,
+    max_retries=1,
+)
+def detect_user_patterns_single_task(self, user_id: str) -> Dict[str, Any]:
+    """
+    Refresh AI pattern insights for a single user.
+    Called on-demand when user opens AI coach chat.
+    """
+    import asyncio
+    from app.services.ai_insights_service import get_ai_insights_service
+
+    async def refresh_user():
+        insights_service = get_ai_insights_service()
+        return await insights_service.refresh_all_for_user(user_id)
+
+    try:
+        result = asyncio.run(refresh_user())
+
+        return {
+            "success": True,
+            "user_id": user_id,
+            "refreshed": result.get("refreshed", 0),
+            "skipped": result.get("skipped", 0),
+            "failed": result.get("failed", 0),
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to refresh insights for user {user_id}: {e}")
+        return {"success": False, "error": str(e)}
+
+
+# =====================================================
+# SINGLE GOAL INSIGHTS TASK (Background - On-Demand)
+# =====================================================
+
+
+@celery_app.task(
+    name="generate_goal_insights",
+    bind=True,
+    max_retries=2,
+    default_retry_delay=30,
+)
+def generate_goal_insights_task(self, goal_id: str, user_id: str) -> Dict[str, Any]:
+    """
+    Generate AI pattern insights for a single goal.
+
+    Called when user views a goal and insights need to be generated.
+    Runs in background so API returns immediately with 'generating' status.
+    Realtime subscription updates the UI when complete.
+    """
+    import asyncio
+    from app.services.ai_insights_service import get_ai_insights_service
+
+    async def generate():
+        insights_service = get_ai_insights_service()
+        return await insights_service.generate_insights_background(goal_id, user_id)
+
+    try:
+        result = asyncio.run(generate())
+
+        logger.info(
+            f"Generated insights for goal {goal_id}",
+            {
+                "goal_id": goal_id,
+                "user_id": user_id,
+                "status": result.get("status"),
+            },
+        )
+
+        return {
+            "success": True,
+            "goal_id": goal_id,
+            "status": result.get("status"),
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to generate insights for goal {goal_id}: {e}")
+
+        # Mark as failed in database
+        try:
+            supabase = get_supabase_client()
+            supabase.table("pattern_insights").upsert(
+                {
+                    "goal_id": goal_id,
+                    "user_id": user_id,
+                    "status": "failed",
+                    "error_message": str(e),
+                },
+                on_conflict="goal_id",
+            ).execute()
+        except Exception:
+            pass
+
+        if self.request.retries < self.max_retries:
+            raise self.retry(exc=e)
+        return {"success": False, "error": str(e)}
+
+
+# =====================================================
+# BUILD AI CONTEXT TASK
+# =====================================================
+
+
+@celery_app.task(name="build_ai_context")
+def build_ai_context_task(user_id: str) -> Dict[str, Any]:
+    """
+    Build comprehensive AI context for a user.
+    Called before AI coach chat or check-in response generation.
+
+    Uses PostgreSQL function for efficient aggregation.
+    """
+    try:
+        supabase = get_supabase_client()
+
+        result = supabase.rpc("build_ai_context", {"p_user_id": user_id}).execute()
+
+        context = result.data if result.data else {}
+
+        return {
+            "success": True,
+            "context": context,
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to build AI context for user {user_id}: {e}")
+        return {"success": False, "error": str(e)}
+
+
+# =====================================================
+# STREAK UPDATE TASK
+# =====================================================
+
+
+@celery_app.task(
+    name="update_goal_streak",
+    bind=True,
+    max_retries=2,
+    default_retry_delay=30,
+)
+def update_goal_streak_task(
+    self,
+    goal_id: str,
+    user_id: str,
+) -> Dict[str, Any]:
+    """
+    Celery task to update streak counts for a goal after a check-in.
+
+    Updates:
+    - current_streak: Consecutive completed check-ins
+    - longest_streak: Best streak ever
+    - total_completions: Total completed check-ins
+
+    Called after each check-in to keep streaks up-to-date.
+    This is EVENT-DRIVEN, not scheduled.
+    """
+    try:
+        supabase = get_supabase_client()
+
+        # V2.1: Get all check-ins using status field (excludes pending)
+        checkins_result = (
+            supabase.table("check_ins")
+            .select("check_in_date, status")
+            .eq("goal_id", goal_id)
+            .eq("user_id", user_id)
+            .neq("status", "pending")  # Exclude pending check-ins
+            .order("check_in_date", desc=True)
+            .execute()
+        )
+
+        checkins = checkins_result.data or []
+
+        if not checkins:
+            return {
+                "success": True,
+                "goal_id": goal_id,
+                "current_streak": 0,
+                "longest_streak": 0,
+                "total_completions": 0,
+            }
+
+        # Calculate total completions using status field
+        total_completions = sum(1 for c in checkins if c.get("status") == "completed")
+
+        # Calculate current streak (consecutive completed/rest_day from most recent)
+        current_streak = 0
+        today = datetime.utcnow().date()
+
+        for i, checkin in enumerate(checkins):
+            checkin_date = datetime.fromisoformat(checkin["check_in_date"]).date()
+            status = checkin.get("status", "missed")
+            is_completed = status == "completed"
+            is_rest_day = status == "rest_day"
+
+            # For current streak, we check from most recent
+            if i == 0:
+                # Most recent check-in
+                if is_completed or is_rest_day:
+                    current_streak = 1
+                else:
+                    break  # Streak broken (missed/skipped)
+            else:
+                # Previous check-ins
+                prev_date = datetime.fromisoformat(
+                    checkins[i - 1]["check_in_date"]
+                ).date()
+                expected_date = prev_date - timedelta(days=1)
+
+                if checkin_date == expected_date:
+                    if is_completed or is_rest_day:
+                        current_streak += 1
+                    else:
+                        break  # Streak broken
+                else:
+                    # Gap in dates - streak broken
+                    break
+
+        # Calculate longest streak (need to scan all checkins)
+        longest_streak = 0
+        temp_streak = 0
+        sorted_checkins = sorted(checkins, key=lambda x: x["check_in_date"])
+
+        for i, checkin in enumerate(sorted_checkins):
+            status = checkin.get("status", "missed")
+            is_completed = status == "completed"
+            is_rest_day = status == "rest_day"
+
+            if is_completed or is_rest_day:
+                if i == 0:
+                    temp_streak = 1
+                else:
+                    prev_date = datetime.fromisoformat(
+                        sorted_checkins[i - 1]["check_in_date"]
+                    ).date()
+                    curr_date = datetime.fromisoformat(checkin["check_in_date"]).date()
+
+                    if (curr_date - prev_date).days == 1:
+                        temp_streak += 1
+                    else:
+                        # Gap - start new streak
+                        longest_streak = max(longest_streak, temp_streak)
+                        temp_streak = 1
+            else:
+                # Not completed (missed/skipped) - end streak
+                longest_streak = max(longest_streak, temp_streak)
+                temp_streak = 0
+
+        longest_streak = max(longest_streak, temp_streak, current_streak)
+
+        # Update goal with new streak values
+        supabase.table("goals").update(
+            {
+                "current_streak": current_streak,
+                "longest_streak": longest_streak,
+                "total_completions": total_completions,
+            }
+        ).eq("id", goal_id).execute()
+
+        logger.info(
+            f"Updated streak for goal {goal_id}",
+            {
+                "goal_id": goal_id,
+                "current_streak": current_streak,
+                "longest_streak": longest_streak,
+                "total_completions": total_completions,
+            },
+        )
+
+        return {
+            "success": True,
+            "goal_id": goal_id,
+            "current_streak": current_streak,
+            "longest_streak": longest_streak,
+            "total_completions": total_completions,
+        }
+
+    except Exception as e:
+        logger.error(
+            f"Failed to update goal streak: {e}",
+            {"goal_id": goal_id, "user_id": user_id, "error": str(e)},
+        )
+        if self.request.retries < self.max_retries:
+            raise self.retry(exc=e)
+        return {"success": False, "error": str(e)}

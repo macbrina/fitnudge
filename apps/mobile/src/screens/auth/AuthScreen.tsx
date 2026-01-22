@@ -22,7 +22,7 @@ const makeAuthScreenStyles = (tokens: any, colors: any, brandColors: any) => {
   return {
     container: {
       flex: 1,
-      backgroundColor: brandColors.primary
+      backgroundColor: "#0066ff"
     },
     header: {
       flexDirection: "row" as const,
@@ -104,7 +104,7 @@ const makeAuthScreenStyles = (tokens: any, colors: any, brandColors: any) => {
       marginLeft: toRN(tokens.spacing[3])
     },
     emailButtonText: {
-      color: brandColors.primary
+      color: "#0066ff"
     },
     signupButtonText: {
       color: "#ffffff"

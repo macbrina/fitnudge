@@ -1,5 +1,6 @@
 import React from "react";
 import { View, Text, TouchableOpacity } from "react-native";
+import { useRouter } from "expo-router";
 import { Card } from "@/components/ui/Card";
 import { useStyles } from "@/themes";
 import { useTheme } from "@/themes";
@@ -7,21 +8,23 @@ import { tokens } from "@/themes/tokens";
 import { toRN } from "@/lib/units";
 import { fontFamily } from "@/lib/fonts";
 import { useTranslation } from "@/lib/i18n";
+import { MOBILE_ROUTES } from "@/lib/routes";
 import { EmptyState } from "./EmptyState";
 import { SkeletonBox } from "@/components/ui/SkeletonBox";
 import { useMyAchievements, getRarityColor, getBadgeIcon } from "@/hooks/api/useAchievements";
 import { UserAchievement } from "@/services/api";
 
-interface AchievementsSectionProps {
-  onViewAll?: () => void;
-}
-
-export function AchievementsSection({ onViewAll }: AchievementsSectionProps) {
+export function AchievementsSection() {
   const styles = useStyles(makeAchievementsSectionStyles);
   const { colors, brandColors } = useTheme();
   const { t } = useTranslation();
+  const router = useRouter();
 
   const { data: achievements, isLoading } = useMyAchievements();
+
+  const handlePress = () => {
+    router.push(MOBILE_ROUTES.PROFILE.ACHIEVEMENTS);
+  };
 
   if (isLoading) {
     return (
@@ -54,46 +57,48 @@ export function AchievementsSection({ onViewAll }: AchievementsSectionProps) {
 
   if (displayAchievements.length === 0) {
     return (
-      <Card shadow="md" style={styles.card}>
-        <Text style={styles.title}>{t("home.achievements")}</Text>
-        <EmptyState
-          icon="ribbon-outline"
-          title={t("home.no_achievements")}
-          message={t("home.no_achievements_message")}
-        />
-      </Card>
+      <TouchableOpacity onPress={handlePress} activeOpacity={0.7}>
+        <Card shadow="md" style={styles.card}>
+          <Text style={styles.title}>{t("home.achievements")}</Text>
+          <EmptyState
+            icon="ribbon-outline"
+            title={t("home.no_achievements")}
+            message={t("home.no_achievements_message")}
+          />
+        </Card>
+      </TouchableOpacity>
     );
   }
 
   return (
-    <Card shadow="md" style={styles.card}>
-      <View style={styles.header}>
-        <Text style={styles.title}>{t("home.achievements")}</Text>
-        {achievements && achievements.length > 3 && onViewAll && (
-          <TouchableOpacity onPress={onViewAll}>
+    <TouchableOpacity onPress={handlePress} activeOpacity={0.7}>
+      <Card shadow="md" style={styles.card}>
+        <View style={styles.header}>
+          <Text style={styles.title}>{t("home.achievements")}</Text>
+          {achievements && achievements.length > 3 && (
             <Text style={[styles.viewAll, { color: brandColors.primary }]}>
               {t("common.view_all")}
             </Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      <View style={styles.badgeGrid}>
-        {displayAchievements.map((achievement) => (
-          <AchievementBadge key={achievement.id} achievement={achievement} />
-        ))}
-      </View>
-
-      {/* Total points earned */}
-      {achievements && achievements.length > 0 && (
-        <View style={styles.pointsContainer}>
-          <Text style={styles.pointsLabel}>{t("home.total_points")}</Text>
-          <Text style={[styles.pointsValue, { color: brandColors.primary }]}>
-            {achievements.reduce((sum, a) => sum + (a.points || 0), 0)}
-          </Text>
+          )}
         </View>
-      )}
-    </Card>
+
+        <View style={styles.badgeGrid}>
+          {displayAchievements.map((achievement) => (
+            <AchievementBadge key={achievement.id} achievement={achievement} />
+          ))}
+        </View>
+
+        {/* Total points earned */}
+        {achievements && achievements.length > 0 && (
+          <View style={styles.pointsContainer}>
+            <Text style={styles.pointsLabel}>{t("home.total_points")}</Text>
+            <Text style={[styles.pointsValue, { color: brandColors.primary }]}>
+              {achievements.reduce((sum, a) => sum + (a.points || 0), 0)}
+            </Text>
+          </View>
+        )}
+      </Card>
+    </TouchableOpacity>
   );
 }
 

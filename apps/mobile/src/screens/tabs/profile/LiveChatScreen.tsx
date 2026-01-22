@@ -8,7 +8,7 @@ import { toRN } from "@/lib/units";
 import { fontFamily } from "@/lib/fonts";
 import { BackButton } from "@/components/ui/BackButton";
 import Button from "@/components/ui/Button";
-import { EXTERNAL_URLS } from "@/constants/general";
+import { useExternalUrls } from "@/hooks/api/useAppConfig";
 import { useMediaPermissions } from "@/hooks/media/useMediaPermissions";
 
 export default function LiveChatScreen() {
@@ -16,6 +16,7 @@ export default function LiveChatScreen() {
   const styles = useStyles(makeStyles);
   const { brandColors, colors } = useTheme();
   const { t } = useTranslation();
+  const externalUrls = useExternalUrls();
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const webViewRef = useRef<WebView>(null);
@@ -63,14 +64,14 @@ export default function LiveChatScreen() {
     const { url } = event;
 
     // Allow internal WebView URLs (about:, blob:, data:, js protocol)
-    // eslint-disable-next-line no-script-url
+
     const internalSchemes = ["about:", "blob:", "data:", "javascript:"];
     if (internalSchemes.some((scheme) => url.startsWith(scheme))) {
       return true;
     }
 
     // Allow the main chat URL and its subpages
-    if (url.includes("tawk.to") || url.includes(EXTERNAL_URLS.TAWK_TO_CHAT)) {
+    if (url.includes("tawk.to") || url.includes(externalUrls.tawkChat)) {
       return true;
     }
 
@@ -113,7 +114,7 @@ export default function LiveChatScreen() {
         ) : (
           <WebView
             ref={webViewRef}
-            source={{ uri: EXTERNAL_URLS.TAWK_TO_CHAT }}
+            source={{ uri: externalUrls.tawkChat }}
             style={styles.webView}
             onLoadStart={() => setIsLoading(true)}
             onLoadEnd={handleLoadEnd}

@@ -1,44 +1,41 @@
 """
-Achievement Condition Checker
+FitNudge V2 - Achievement Condition Checker
 
 Handles checking if achievement unlock conditions are met.
 Separated for cleaner code organization and easier testing.
 
-Supported condition types (must match achievement_types.unlock_condition):
-- streak: Check-in streak across all goals
+Returns both condition result AND metadata to avoid duplicate queries.
+
+V2 Supported condition types (must match achievement_types.unlock_condition in 005_seed_data.sql):
 - checkin_count: Total completed check-ins
 - goal_count: Total goals created
-- perfect_week: 7 consecutive days with check-ins
-- workout_count: Completed workout sessions
-- perfect_workout: At least one workout with no skipped exercises
-- perfect_workout_count: Count of perfect workouts
-- workout_time: Workout at specific time (before, after, between)
-- workout_duration: Workout lasting X minutes
-- workout_streak: Consecutive days with workouts
-- weekly_workouts: Workouts in current week
 - partner_count: Active accountability partners
+- streak: Check-in streak across all goals
+- perfect_week: 7 consecutive days with check-ins
+- perfect_month: 30 consecutive days with check-ins
+- perfect_period: X consecutive days with check-ins
 - nudges_sent: Total nudges sent
-- meal_count: Total meals logged
-- hydration_count: Total hydration logs
-- challenge_count: Challenges participated in
-- challenge_won: Challenges won (rank 1)
-- post_count: Posts created (future)
-- comment_count: Comments created (future)
-- likes_received: Likes received on posts (future)
+- cheers_sent: Total cheers sent
+- ai_conversations: Total AI coach conversations
+- recaps_viewed: Total weekly recaps viewed
+- account_age: Days since account creation
 """
 
 import json
 from datetime import date, datetime, timedelta
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Tuple
 
 from app.core.database import get_supabase_client
 from app.services.logger import logger
+
+# Type alias for condition check result: (is_met, metadata)
+ConditionResult = Tuple[bool, Dict[str, Any]]
 
 
 class AchievementConditionChecker:
     """Handles checking achievement unlock conditions"""
 
-    async def check_condition(self, user_id: str, condition: str) -> bool:
+    async def check_condition(self, user_id: str, condition: str) -> ConditionResult:
         """
         Check if an achievement condition is met.
 
@@ -47,7 +44,9 @@ class AchievementConditionChecker:
             condition: JSON string describing the condition
 
         Returns:
-            True if condition is met, False otherwise
+            Tuple of (is_condition_met, metadata_dict)
+            - is_condition_met: True if condition is met
+            - metadata_dict: Relevant stats for the achievement (e.g., {"checkin_count": 150})
         """
         try:
             condition_data = (
@@ -59,7 +58,7 @@ class AchievementConditionChecker:
             supabase = get_supabase_client()
 
             # ==========================================
-            # GENERAL CONDITION TYPES
+            # CHECK-IN & GOAL CONDITIONS
             # ==========================================
 
             if condition_type == "checkin_count":
@@ -72,41 +71,16 @@ class AchievementConditionChecker:
                 return await self._check_goal_count(supabase, user_id, target_value)
 
             elif condition_type == "perfect_week":
-                return await self._check_perfect_week(supabase, user_id)
+                return await self._check_perfect_period(supabase, user_id, 7)
+
+            elif condition_type == "perfect_month":
+                return await self._check_perfect_period(supabase, user_id, 30)
+
+            elif condition_type == "perfect_period":
+                return await self._check_perfect_period(supabase, user_id, target_value)
 
             # ==========================================
-            # WORKOUT CONDITION TYPES
-            # ==========================================
-
-            elif condition_type == "workout_count":
-                return await self._check_workout_count(supabase, user_id, target_value)
-
-            elif condition_type == "perfect_workout":
-                return await self._check_perfect_workout(supabase, user_id)
-
-            elif condition_type == "perfect_workout_count":
-                return await self._check_perfect_workout_count(
-                    supabase, user_id, target_value
-                )
-
-            elif condition_type == "workout_time":
-                return await self._check_workout_time(supabase, user_id, condition_data)
-
-            elif condition_type == "workout_duration":
-                return await self._check_workout_duration(
-                    supabase, user_id, condition_data
-                )
-
-            elif condition_type == "workout_streak":
-                return await self._check_workout_streak(user_id, target_value)
-
-            elif condition_type == "weekly_workouts":
-                return await self._check_weekly_workouts(
-                    supabase, user_id, target_value
-                )
-
-            # ==========================================
-            # SOCIAL & PARTNER CONDITION TYPES
+            # SOCIAL & PARTNER CONDITIONS
             # ==========================================
 
             elif condition_type == "partner_count":
@@ -115,84 +89,65 @@ class AchievementConditionChecker:
             elif condition_type == "nudges_sent":
                 return await self._check_nudges_sent(supabase, user_id, target_value)
 
+            elif condition_type == "cheers_sent":
+                return await self._check_cheers_sent(supabase, user_id, target_value)
+
             # ==========================================
-            # MEAL & HYDRATION CONDITION TYPES
+            # ENGAGEMENT CONDITIONS
             # ==========================================
 
-            elif condition_type == "meal_count":
-                return await self._check_meal_count(supabase, user_id, target_value)
-
-            elif condition_type == "hydration_count":
-                return await self._check_hydration_count(
+            elif condition_type == "ai_conversations":
+                return await self._check_ai_conversations(
                     supabase, user_id, target_value
                 )
 
-            # ==========================================
-            # CHALLENGE CONDITION TYPES
-            # ==========================================
+            elif condition_type == "recaps_viewed":
+                return await self._check_recaps_viewed(supabase, user_id, target_value)
 
-            elif condition_type == "challenge_count":
-                return await self._check_challenge_count(
-                    supabase, user_id, target_value
-                )
-
-            elif condition_type == "challenge_won":
-                return await self._check_challenge_won(supabase, user_id, target_value)
-
-            # ==========================================
-            # SOCIAL POSTS/COMMENTS/LIKES CONDITION TYPES
-            # (For future social features)
-            # ==========================================
-
-            elif condition_type == "post_count":
-                return await self._check_post_count(supabase, user_id, target_value)
-
-            elif condition_type == "comment_count":
-                return await self._check_comment_count(supabase, user_id, target_value)
-
-            elif condition_type == "likes_received":
-                return await self._check_likes_received(supabase, user_id, target_value)
+            elif condition_type == "account_age":
+                return await self._check_account_age(supabase, user_id, target_value)
 
             # Unknown condition type
             logger.warning(
                 f"Unknown achievement condition type: {condition_type}",
                 {"condition": condition, "user_id": user_id},
             )
-            return False
+            return False, {}
 
         except Exception as e:
             logger.error(
                 f"Failed to check achievement condition: {e}",
                 {"condition": condition, "error": str(e)},
             )
-            return False
+            return False, {}
 
     # ==========================================
-    # GENERAL CONDITION IMPLEMENTATIONS
+    # CHECK-IN & GOAL CONDITION IMPLEMENTATIONS
     # ==========================================
 
     async def _check_checkin_count(
         self, supabase: Any, user_id: str, target_value: int
-    ) -> bool:
-        """Count total check-ins across all goals (completed = true)"""
+    ) -> ConditionResult:
+        """Count total check-ins across all goals (status = 'completed')"""
+        # V2.1: Use status instead of completed boolean
         result = (
             supabase.table("check_ins")
             .select("id", count="exact")
             .eq("user_id", user_id)
-            .eq("completed", True)
+            .eq("status", "completed")
             .execute()
         )
         count = result.count if hasattr(result, "count") else len(result.data or [])
-        return count >= target_value
+        return count >= target_value, {"checkin_count": count}
 
-    async def _check_streak(self, user_id: str, target_value: int) -> bool:
+    async def _check_streak(self, user_id: str, target_value: int) -> ConditionResult:
         """Check if current streak meets target"""
         streak = await self.get_current_streak(user_id)
-        return streak >= target_value
+        return streak >= target_value, {"streak": streak}
 
     async def _check_goal_count(
         self, supabase: Any, user_id: str, target_value: int
-    ) -> bool:
+    ) -> ConditionResult:
         """Count total goals created"""
         result = (
             supabase.table("goals")
@@ -201,151 +156,28 @@ class AchievementConditionChecker:
             .execute()
         )
         count = result.count if hasattr(result, "count") else len(result.data or [])
-        return count >= target_value
+        return count >= target_value, {"goal_count": count}
 
-    async def _check_perfect_week(self, supabase: Any, user_id: str) -> bool:
-        """Check if user completed all check-ins in a week"""
+    async def _check_perfect_period(
+        self, supabase: Any, user_id: str, days: int
+    ) -> ConditionResult:
+        """Check if user completed all check-ins for X consecutive days"""
+        # V2.1: Use status instead of completed boolean
         today = date.today()
-        week_start = today - timedelta(days=today.weekday())
+        start_date = today - timedelta(days=days - 1)
 
         result = (
             supabase.table("check_ins")
             .select("check_in_date")
             .eq("user_id", user_id)
-            .eq("completed", True)
-            .gte("check_in_date", week_start.isoformat())
+            .eq("status", "completed")
+            .gte("check_in_date", start_date.isoformat())
             .lte("check_in_date", today.isoformat())
             .execute()
         )
         completed_dates = {row["check_in_date"] for row in (result.data or [])}
-        return len(completed_dates) >= 7
-
-    # ==========================================
-    # WORKOUT CONDITION IMPLEMENTATIONS
-    # ==========================================
-
-    async def _check_workout_count(
-        self, supabase: Any, user_id: str, target_value: int
-    ) -> bool:
-        """Count completed workout sessions"""
-        result = (
-            supabase.table("workout_sessions")
-            .select("id", count="exact")
-            .eq("user_id", user_id)
-            .eq("status", "completed")
-            .execute()
-        )
-        count = result.count if hasattr(result, "count") else len(result.data or [])
-        return count >= target_value
-
-    async def _check_perfect_workout(self, supabase: Any, user_id: str) -> bool:
-        """Check if user completed at least one workout without skipping"""
-        result = (
-            supabase.table("workout_sessions")
-            .select("id")
-            .eq("user_id", user_id)
-            .eq("status", "completed")
-            .eq("exercises_skipped", 0)
-            .limit(1)
-            .execute()
-        )
-        return len(result.data or []) > 0
-
-    async def _check_perfect_workout_count(
-        self, supabase: Any, user_id: str, target_value: int
-    ) -> bool:
-        """Count perfect workouts (no skipped exercises)"""
-        result = (
-            supabase.table("workout_sessions")
-            .select("id", count="exact")
-            .eq("user_id", user_id)
-            .eq("status", "completed")
-            .eq("exercises_skipped", 0)
-            .execute()
-        )
-        count = result.count if hasattr(result, "count") else len(result.data or [])
-        return count >= target_value
-
-    async def _check_workout_time(
-        self, supabase: Any, user_id: str, condition_data: Dict[str, Any]
-    ) -> bool:
-        """Check if user completed a workout at a specific time"""
-        time_condition = condition_data.get("condition")  # "before", "after", "between"
-        hour = condition_data.get("hour")
-        start_hour = condition_data.get("start_hour")
-        end_hour = condition_data.get("end_hour")
-
-        result = (
-            supabase.table("workout_sessions")
-            .select("started_at")
-            .eq("user_id", user_id)
-            .eq("status", "completed")
-            .execute()
-        )
-
-        for session in result.data or []:
-            started_at = session.get("started_at")
-            if not started_at:
-                continue
-
-            # Parse the datetime
-            if isinstance(started_at, str):
-                session_time = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
-            else:
-                session_time = started_at
-
-            session_hour = session_time.hour
-
-            if time_condition == "before" and session_hour < hour:
-                return True
-            elif time_condition == "after" and session_hour >= hour:
-                return True
-            elif time_condition == "between":
-                if start_hour <= session_hour < end_hour:
-                    return True
-
-        return False
-
-    async def _check_workout_duration(
-        self, supabase: Any, user_id: str, condition_data: Dict[str, Any]
-    ) -> bool:
-        """Check if user completed a workout of a certain duration"""
-        minutes = condition_data.get("minutes", 0)
-        seconds = minutes * 60
-
-        result = (
-            supabase.table("workout_sessions")
-            .select("total_duration_seconds")
-            .eq("user_id", user_id)
-            .eq("status", "completed")
-            .gte("total_duration_seconds", seconds)
-            .limit(1)
-            .execute()
-        )
-        return len(result.data or []) > 0
-
-    async def _check_workout_streak(self, user_id: str, target_value: int) -> bool:
-        """Check if current workout streak meets target"""
-        streak = await self.get_workout_streak(user_id)
-        return streak >= target_value
-
-    async def _check_weekly_workouts(
-        self, supabase: Any, user_id: str, target_value: int
-    ) -> bool:
-        """Check if user completed X workouts in current week"""
-        today = date.today()
-        week_start = today - timedelta(days=today.weekday())
-
-        result = (
-            supabase.table("workout_sessions")
-            .select("id", count="exact")
-            .eq("user_id", user_id)
-            .eq("status", "completed")
-            .gte("started_at", week_start.isoformat())
-            .execute()
-        )
-        count = result.count if hasattr(result, "count") else len(result.data or [])
-        return count >= target_value
+        perfect_days = len(completed_dates)
+        return perfect_days >= days, {"perfect_days": perfect_days}
 
     # ==========================================
     # SOCIAL & PARTNER CONDITION IMPLEMENTATIONS
@@ -353,7 +185,7 @@ class AchievementConditionChecker:
 
     async def _check_partner_count(
         self, supabase: Any, user_id: str, target_value: int
-    ) -> bool:
+    ) -> ConditionResult:
         """Count active accountability partners"""
         result = (
             supabase.table("accountability_partners")
@@ -363,138 +195,97 @@ class AchievementConditionChecker:
             .execute()
         )
         count = result.count if hasattr(result, "count") else len(result.data or [])
-        return count >= target_value
+        return count >= target_value, {"partner_count": count}
 
     async def _check_nudges_sent(
         self, supabase: Any, user_id: str, target_value: int
-    ) -> bool:
+    ) -> ConditionResult:
         """Count nudges sent by user"""
         result = (
             supabase.table("social_nudges")
             .select("id", count="exact")
             .eq("sender_id", user_id)
+            .eq("nudge_type", "nudge")
             .execute()
         )
         count = result.count if hasattr(result, "count") else len(result.data or [])
-        return count >= target_value
+        return count >= target_value, {"nudges_sent": count}
 
-    # ==========================================
-    # MEAL & HYDRATION CONDITION IMPLEMENTATIONS
-    # ==========================================
-
-    async def _check_meal_count(
+    async def _check_cheers_sent(
         self, supabase: Any, user_id: str, target_value: int
-    ) -> bool:
-        """Count meals logged by user"""
+    ) -> ConditionResult:
+        """Count cheers sent by user"""
         result = (
-            supabase.table("meal_logs")
+            supabase.table("social_nudges")
             .select("id", count="exact")
+            .eq("sender_id", user_id)
+            .eq("nudge_type", "cheer")
+            .execute()
+        )
+        count = result.count if hasattr(result, "count") else len(result.data or [])
+        return count >= target_value, {"cheers_sent": count}
+
+    # ==========================================
+    # ENGAGEMENT CONDITION IMPLEMENTATIONS
+    # ==========================================
+
+    async def _check_ai_conversations(
+        self, supabase: Any, user_id: str, target_value: int
+    ) -> ConditionResult:
+        """Count AI coach user messages from daily usage tracking"""
+        result = (
+            supabase.table("ai_coach_daily_usage")
+            .select("message_count")
             .eq("user_id", user_id)
             .execute()
         )
-        count = result.count if hasattr(result, "count") else len(result.data or [])
-        return count >= target_value
+        # Sum all message counts across days
+        total_messages = sum(row.get("message_count", 0) for row in (result.data or []))
+        return total_messages >= target_value, {"ai_conversations": total_messages}
 
-    async def _check_hydration_count(
+    async def _check_recaps_viewed(
         self, supabase: Any, user_id: str, target_value: int
-    ) -> bool:
-        """Count hydration logs by user"""
+    ) -> ConditionResult:
+        """Count weekly recaps viewed by user (viewed_at is not null)"""
         result = (
-            supabase.table("hydration_logs")
+            supabase.table("weekly_recaps")
             .select("id", count="exact")
             .eq("user_id", user_id)
+            .not_.is_("viewed_at", "null")
             .execute()
         )
         count = result.count if hasattr(result, "count") else len(result.data or [])
-        return count >= target_value
+        return count >= target_value, {"recaps_viewed": count}
 
-    # ==========================================
-    # CHALLENGE CONDITION IMPLEMENTATIONS
-    # ==========================================
-
-    async def _check_challenge_count(
+    async def _check_account_age(
         self, supabase: Any, user_id: str, target_value: int
-    ) -> bool:
-        """Count challenges user has participated in"""
+    ) -> ConditionResult:
+        """Check if account is at least X days old"""
         result = (
-            supabase.table("challenge_participants")
-            .select("id", count="exact")
-            .eq("user_id", user_id)
+            supabase.table("users")
+            .select("created_at")
+            .eq("id", user_id)
+            .single()
             .execute()
         )
-        count = result.count if hasattr(result, "count") else len(result.data or [])
-        return count >= target_value
 
-    async def _check_challenge_won(
-        self, supabase: Any, user_id: str, target_value: int
-    ) -> bool:
-        """Count challenges won by user (rank 1)"""
-        result = (
-            supabase.table("challenge_statistics")
-            .select("id", count="exact")
-            .eq("user_id", user_id)
-            .eq("final_rank", 1)
-            .execute()
-        )
-        count = result.count if hasattr(result, "count") else len(result.data or [])
-        return count >= target_value
+        if not result.data:
+            return False, {"account_age_days": 0}
 
-    # ==========================================
-    # SOCIAL POSTS/COMMENTS/LIKES IMPLEMENTATIONS
-    # (For future social features)
-    # ==========================================
+        created_at_str = result.data.get("created_at")
+        if not created_at_str:
+            return False, {"account_age_days": 0}
 
-    async def _check_post_count(
-        self, supabase: Any, user_id: str, target_value: int
-    ) -> bool:
-        """Count posts created by user"""
-        result = (
-            supabase.table("posts")
-            .select("id", count="exact")
-            .eq("user_id", user_id)
-            .execute()
-        )
-        count = result.count if hasattr(result, "count") else len(result.data or [])
-        return count >= target_value
+        # Parse the datetime
+        if isinstance(created_at_str, str):
+            created_at = datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
+        else:
+            created_at = created_at_str
 
-    async def _check_comment_count(
-        self, supabase: Any, user_id: str, target_value: int
-    ) -> bool:
-        """Count comments created by user"""
-        result = (
-            supabase.table("comments")
-            .select("id", count="exact")
-            .eq("user_id", user_id)
-            .execute()
-        )
-        count = result.count if hasattr(result, "count") else len(result.data or [])
-        return count >= target_value
-
-    async def _check_likes_received(
-        self, supabase: Any, user_id: str, target_value: int
-    ) -> bool:
-        """Count likes received on user's posts"""
-        # First get all user's post IDs, then count likes on those posts
-        posts_result = (
-            supabase.table("posts").select("id").eq("user_id", user_id).execute()
-        )
-        post_ids = [p["id"] for p in (posts_result.data or [])]
-
-        if not post_ids:
-            return False
-
-        likes_result = (
-            supabase.table("likes")
-            .select("id", count="exact")
-            .in_("post_id", post_ids)
-            .execute()
-        )
-        count = (
-            likes_result.count
-            if hasattr(likes_result, "count")
-            else len(likes_result.data or [])
-        )
-        return count >= target_value
+        days_since_creation = (datetime.now(created_at.tzinfo) - created_at).days
+        return days_since_creation >= target_value, {
+            "account_age_days": days_since_creation
+        }
 
     # ==========================================
     # STREAK CALCULATION HELPERS
@@ -502,7 +293,7 @@ class AchievementConditionChecker:
 
     async def get_current_streak(self, user_id: str) -> int:
         """
-        Get current streak for user across all goals/challenges.
+        Get current streak for user across all goals.
 
         Args:
             user_id: User ID
@@ -513,11 +304,12 @@ class AchievementConditionChecker:
         supabase = get_supabase_client()
 
         # Get all completed check-ins across all goals, ordered by date descending
+        # V2.1: Use status instead of completed boolean
         result = (
             supabase.table("check_ins")
             .select("check_in_date")
             .eq("user_id", user_id)
-            .eq("completed", True)
+            .eq("status", "completed")
             .order("check_in_date", desc=True)
             .execute()
         )
@@ -548,64 +340,6 @@ class AchievementConditionChecker:
 
         return streak
 
-    async def get_workout_streak(self, user_id: str) -> int:
-        """
-        Get current workout streak for user (consecutive days with workouts).
-
-        Args:
-            user_id: User ID
-
-        Returns:
-            Current workout streak count (days)
-        """
-        supabase = get_supabase_client()
-
-        # Get all completed workout sessions, ordered by date descending
-        result = (
-            supabase.table("workout_sessions")
-            .select("started_at")
-            .eq("user_id", user_id)
-            .eq("status", "completed")
-            .order("started_at", desc=True)
-            .execute()
-        )
-
-        sessions = result.data or []
-
-        if not sessions:
-            return 0
-
-        # Get unique workout dates
-        workout_dates = set()
-        for session in sessions:
-            started_at = session.get("started_at")
-            if started_at:
-                if isinstance(started_at, str):
-                    dt = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
-                else:
-                    dt = started_at
-                workout_dates.add(dt.date())
-
-        # Calculate streak by checking consecutive days
-        streak = 0
-        today = date.today()
-        current_date = today
-
-        # Check if we have a workout today or yesterday
-        if today in workout_dates:
-            current_date = today
-        elif (today - timedelta(days=1)) in workout_dates:
-            current_date = today - timedelta(days=1)
-        else:
-            return 0
-
-        while current_date in workout_dates:
-            streak += 1
-            current_date -= timedelta(days=1)
-
-        return streak
-
 
 # Global instance
 condition_checker = AchievementConditionChecker()
-

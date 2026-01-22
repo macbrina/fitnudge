@@ -1,21 +1,116 @@
 """
-Weekly Recap Service
+FitNudge - Weekly Recap Service
 
 Generates AI-powered weekly progress summaries for users.
+
+Schema Notes:
+- goals: has current_streak, longest_streak, total_completions
+- check_ins: has mood (tough, good, amazing), skip_reason, note
+- daily_checkin_summaries: Pre-aggregated daily stats (total_check_ins, completed_count, rest_day_count,
+  skipped_count, streak_at_date). Populated automatically by trigger on check_ins table.
+  Used for faster analytics calculation. Falls back to raw check_ins if summaries unavailable.
+- weekly_recaps: has goals_hit, goals_total, consistency_percent, summary, win, insight, focus_next_week, motivational_close
 """
 
 from typing import Dict, Any, Optional, List
 from datetime import date, timedelta, datetime
+from collections import defaultdict, Counter
+from openai import AsyncOpenAI
 from app.core.database import get_supabase_client
+from app.core.config import settings
 from app.services.logger import logger
-from app.services.openai_service import OpenAIService
+
+
+# Initialize OpenAI client
+client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
 
 
 class WeeklyRecapService:
-    """Service for generating weekly recaps"""
+    """Service for generating weekly recaps with rich insights"""
 
-    def __init__(self):
-        self.openai_service = OpenAIService()
+    async def get_weekly_recap(
+        self, user_id: str, force_regenerate: bool = False
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get cached weekly recap or generate on-demand.
+        Cache-first pattern per SCALABILITY.md.
+        """
+        supabase = get_supabase_client()
+        today = date.today()
+        # Week starts on Monday
+        week_start = today - timedelta(days=today.weekday())
+
+        if not force_regenerate:
+            # Try to get cached recap first
+            try:
+                cached = (
+                    supabase.table("weekly_recaps")
+                    .select("*")
+                    .eq("user_id", user_id)
+                    .eq("week_start", week_start.isoformat())
+                    .maybe_single()
+                    .execute()
+                )
+
+                if cached.data:
+                    logger.info(f"Returning cached weekly recap for user {user_id}")
+                    return cached.data
+            except Exception as e:
+                logger.warning(f"Failed to fetch cached recap: {e}")
+
+        # Generate fresh recap
+        recap = await self.generate_weekly_recap(user_id, goal_id=None)
+
+        # Store in cache for future requests
+        if recap:
+            try:
+                # Calculate goals_hit (goals that met their weekly target)
+                goal_breakdown = recap.get("goal_breakdown", [])
+                goals_hit = len(
+                    [
+                        g
+                        for g in goal_breakdown
+                        if g.get("status") in ["excellent", "good"]
+                    ]
+                )
+                goals_total = len(goal_breakdown)
+
+                # weekly_recaps schema with JSONB columns for full data caching
+                cache_data = {
+                    "user_id": user_id,
+                    "week_start": recap["week_start"],
+                    "week_end": recap["week_end"],
+                    # Basic stats (DB columns)
+                    "goals_hit": goals_hit,
+                    "goals_total": goals_total,
+                    "consistency_percent": recap.get("stats", {}).get(
+                        "completion_rate", 0
+                    ),
+                    # AI-generated text fields
+                    "summary": recap.get("recap_text"),  # AI summary paragraph
+                    "win": recap.get("win"),
+                    "insight": recap.get("insight"),
+                    "focus_next_week": recap.get("focus_next_week"),
+                    "motivational_close": recap.get("motivational_close"),
+                    "recap_text": recap.get("recap_text"),  # Same as summary for now
+                    # JSONB cached data
+                    "stats": recap.get("stats", {}),
+                    "goal_breakdown": recap.get("goal_breakdown", []),
+                    "completion_rate_trend": recap.get("completion_rate_trend", []),
+                    "achievements_unlocked": recap.get("achievements_unlocked", []),
+                    "partner_context": recap.get("partner_context"),
+                    # Metadata
+                    "generated_at": recap["generated_at"],
+                }
+                supabase.table("weekly_recaps").upsert(
+                    cache_data,
+                    on_conflict="user_id,week_start",
+                ).execute()
+                logger.info(f"Cached weekly recap for user {user_id}")
+            except Exception as e:
+                logger.warning(f"Failed to cache recap: {e}")
+
+        return recap
 
     async def generate_weekly_recap(
         self, user_id: str, goal_id: Optional[str] = None
@@ -23,12 +118,9 @@ class WeeklyRecapService:
         """
         Generate a weekly recap for a user.
 
-        Args:
-            user_id: User ID
-            goal_id: Optional goal ID to focus recap on specific goal
-
-        Returns:
-            Recap data with insights, stats, and motivation
+        - Only uses goals
+        - Uses goals.current_streak and goals.longest_streak directly
+        - Uses daily_checkin_summaries
         """
         supabase = get_supabase_client()
 
@@ -39,43 +131,47 @@ class WeeklyRecapService:
             week_end = today
 
             # =========================================
-            # 1. Get goal check-ins for the week
+            # 1. Get check-ins for the week
             # =========================================
-            query = (
+            checkins_query = (
                 supabase.table("check_ins")
                 .select("*")
                 .eq("user_id", user_id)
-                .eq("completed", True)
                 .gte("check_in_date", week_start.isoformat())
                 .lte("check_in_date", week_end.isoformat())
             )
 
             if goal_id:
-                query = query.eq("goal_id", goal_id)
+                checkins_query = checkins_query.eq("goal_id", goal_id)
 
-            check_ins_result = query.execute()
-            goal_check_ins = check_ins_result.data or []
+            checkins_result = checkins_query.execute()
+            check_ins = checkins_result.data or []
 
             # =========================================
-            # 2. Get challenge check-ins for the week (completed only)
+            # 2. Get daily summaries for the week (for trend analysis)
             # =========================================
-            challenge_check_ins = []
+            summaries = []
             try:
-                challenge_checkins_result = (
-                    supabase.table("challenge_check_ins")
-                    .select("*")
+                summary_query = (
+                    supabase.table("daily_checkin_summaries")
+                    .select(
+                        "summary_date, total_check_ins, completed_count, rest_day_count, skipped_count, streak_at_date"
+                    )
                     .eq("user_id", user_id)
-                    .eq("completed", True)
-                    .gte("check_in_date", week_start.isoformat())
-                    .lte("check_in_date", week_end.isoformat())
-                    .execute()
+                    .gte("summary_date", week_start.isoformat())
+                    .lte("summary_date", week_end.isoformat())
                 )
-                challenge_check_ins = challenge_checkins_result.data or []
-            except Exception:
-                pass
+
+                if goal_id:
+                    summary_query = summary_query.eq("goal_id", goal_id)
+
+                summary_result = summary_query.execute()
+                summaries = summary_result.data or []
+            except Exception as e:
+                logger.warning(f"Failed to fetch summaries: {e}")
 
             # =========================================
-            # 3. Get active personal goals
+            # 3. Get user's active goals with streak info
             # =========================================
             if goal_id:
                 goal_result = (
@@ -86,8 +182,7 @@ class WeeklyRecapService:
                     .maybe_single()
                     .execute()
                 )
-                goal = goal_result.data if goal_result.data else None
-                personal_goals = [goal] if goal else []
+                personal_goals = [goal_result.data] if goal_result.data else []
             else:
                 goal_result = (
                     supabase.table("goals")
@@ -97,606 +192,625 @@ class WeeklyRecapService:
                     .execute()
                 )
                 personal_goals = goal_result.data or []
-                goal = personal_goals[0] if personal_goals else None
 
-            # =========================================
-            # 4. Get active challenges
-            # =========================================
-            active_challenges = []
-            try:
-                participant_result = (
-                    supabase.table("challenge_participants")
-                    .select(
-                        "challenges(id, title, description, start_date, end_date, status)"
-                    )
-                    .eq("user_id", user_id)
-                    .execute()
-                )
-                for p in participant_result.data or []:
-                    challenge = p.get("challenges")
-                    if not challenge or challenge.get("status") not in (
-                        "upcoming",
-                        "active",
-                    ):
-                        continue
-                    start_date_c = (
-                        date.fromisoformat(challenge["start_date"])
-                        if challenge.get("start_date")
-                        else None
-                    )
-                    end_date_c = (
-                        date.fromisoformat(challenge["end_date"])
-                        if challenge.get("end_date")
-                        else None
-                    )
-                    if start_date_c and today < start_date_c:
-                        continue
-                    if end_date_c and today > end_date_c:
-                        continue
-                    active_challenges.append(challenge)
-            except Exception:
-                pass
+            if not personal_goals:
+                logger.warning(f"No active goals found for user {user_id}")
+                return None
 
-            if not goal and not active_challenges:
-                logger.warning(
-                    f"No active goals or challenges found for user {user_id}"
-                )
+            # Check if we have any check-in data for the week
+            if not check_ins:
+                logger.info(f"No check-ins found for user {user_id} this week")
                 return None
 
             # =========================================
-            # 5. Calculate combined statistics
+            # 4. Get user profile for motivation style
             # =========================================
-            # Combine check-in dates for streak calculation
-            all_checkin_dates: set[str] = set()
-            for c in goal_check_ins:
-                all_checkin_dates.add(c["check_in_date"])
-            for c in challenge_check_ins:
-                all_checkin_dates.add(c["check_in_date"])
-
-            # Get goal_id for cache optimization
-            current_goal_id = goal.get("id") if goal else None
-            stats = self._calculate_stats(
-                goal_check_ins, week_start, week_end, current_goal_id, None, user_id
-            )
-            # Add challenge stats
-            stats["challenge_check_ins"] = len(challenge_check_ins)
-            stats["total_check_ins"] = stats["completed_check_ins"] + len(
-                challenge_check_ins
-            )
-
-            # Get aggregated challenge stats from cache
-            challenge_stats = self._get_aggregated_challenge_stats(
-                user_id, [c["id"] for c in active_challenges]
-            )
-            stats["challenge_current_streak"] = challenge_stats.get("current_streak", 0)
-            stats["challenge_longest_streak"] = challenge_stats.get("longest_streak", 0)
-            stats["challenge_total_points"] = challenge_stats.get("total_points", 0)
-
-            # Recalculate streak from combined dates
-            stats["current_streak"] = self._calculate_combined_streak(
-                all_checkin_dates, week_end
-            )
-
-            # =========================================
-            # 6. Get user profile for personalization
-            # =========================================
-            profile_result = (
-                supabase.table("user_fitness_profiles")
-                .select("*")
-                .eq("user_id", user_id)
+            user_result = (
+                supabase.table("users")
+                .select("name, motivation_style")
+                .eq("id", user_id)
                 .maybe_single()
                 .execute()
             )
-            user_profile = profile_result.data if profile_result.data else None
+            user_data = user_result.data or {}
+            motivation_style = user_data.get("motivation_style", "supportive")
+            user_name = user_data.get("name", "there")
 
             # =========================================
-            # 7. Generate AI recap with full context
+            # 5. Calculate statistics
             # =========================================
-            recap_text = await self._generate_ai_recap(
-                goal=goal,
+            stats = self._calculate_stats(
+                check_ins, personal_goals, week_start, week_end, summaries
+            )
+
+            # =========================================
+            # 6. Get previous week for comparison
+            # =========================================
+            previous_week_start = week_start - timedelta(days=7)
+            previous_week_end = week_start - timedelta(days=1)
+            prev_checkins = (
+                supabase.table("check_ins")
+                .select("id")
+                .eq("user_id", user_id)
+                .eq("status", "completed")
+                .gte("check_in_date", previous_week_start.isoformat())
+                .lte("check_in_date", previous_week_end.isoformat())
+                .execute()
+            )
+            previous_week_count = len(prev_checkins.data or [])
+            stats["previous_week_checkins"] = previous_week_count
+            stats["week_over_week_change"] = (
+                stats["completed_check_ins"] - previous_week_count
+            )
+
+            # =========================================
+            # 7. Get partner context
+            # =========================================
+            partner_context = await self._get_partner_context(supabase, user_id)
+
+            # =========================================
+            # 8. Get achievements unlocked this week
+            # =========================================
+            achievements_unlocked = self._get_weekly_achievements(
+                supabase, user_id, week_start, week_end
+            )
+
+            # =========================================
+            # 9. Calculate goal breakdown
+            # =========================================
+            goal_breakdown = self._calculate_goal_breakdown(check_ins, personal_goals)
+
+            # =========================================
+            # 10. Get historical trend (4 weeks)
+            # =========================================
+            completion_rate_trend = self._get_historical_trend(
+                supabase, user_id, week_start, goal_id
+            )
+
+            # =========================================
+            # 11. Generate AI recap
+            # =========================================
+            ai_recap = await self._generate_ai_recap(
+                user_name=user_name,
                 personal_goals=personal_goals,
-                active_challenges=active_challenges,
-                goal_check_ins=goal_check_ins,
-                challenge_check_ins=challenge_check_ins,
                 stats=stats,
-                user_profile=user_profile,
+                motivation_style=motivation_style,
                 week_start=week_start,
                 week_end=week_end,
+                goal_breakdown=goal_breakdown,
+                partner_context=partner_context,
+                achievements_unlocked=achievements_unlocked,
+                completion_rate_trend=completion_rate_trend,
             )
+
+            # Calculate goals_hit (goals that met their weekly target)
+            goals_hit = len(
+                [g for g in goal_breakdown if g.get("status") in ["excellent", "good"]]
+            )
+            goals_total = len(goal_breakdown)
 
             recap = {
                 "week_start": week_start.isoformat(),
                 "week_end": week_end.isoformat(),
-                "goal_id": goal["id"] if goal else None,
-                "goal_title": goal["title"] if goal else "Multiple Activities",
+                "goal_id": goal_id,
+                "goal_title": (
+                    personal_goals[0].get("title")
+                    if personal_goals
+                    else "Multiple Goals"
+                ),
+                # DB columns
+                "goals_hit": goals_hit,
+                "goals_total": goals_total,
+                "consistency_percent": stats.get("completion_rate", 0),
+                # Full stats object
                 "stats": stats,
-                "recap_text": recap_text,
+                "goal_breakdown": goal_breakdown,
+                "partner_context": partner_context,
+                "achievements_unlocked": achievements_unlocked,
+                "completion_rate_trend": completion_rate_trend,
+                # AI-generated content
+                "recap_text": ai_recap.get("summary"),
+                "summary": ai_recap.get("summary"),  # Alias for recap_text
+                "win": ai_recap.get("win"),
+                "insight": ai_recap.get("insight"),
+                "focus_next_week": ai_recap.get("focus_next_week"),
+                "motivational_close": ai_recap.get("motivational_close"),
                 "generated_at": datetime.now().isoformat(),
             }
 
-            print(
-                f"Generated weekly recap for user {user_id}",
-                {
-                    "user_id": user_id,
-                    "goal_id": goal_id,
-                    "goal_check_ins": stats["completed_check_ins"],
-                    "challenge_check_ins": stats["challenge_check_ins"],
-                    "challenges": len(active_challenges),
-                },
-            )
-
+            logger.info(f"Generated weekly recap for user {user_id}")
             return recap
 
         except Exception as e:
-            logger.error(
-                f"Failed to generate weekly recap for user {user_id}",
-                {"error": str(e), "user_id": user_id, "goal_id": goal_id},
-            )
+            logger.error(f"Failed to generate weekly recap for user {user_id}: {e}")
             return None
-
-    def _calculate_combined_streak(
-        self, checkin_dates: set[str], end_date: date
-    ) -> int:
-        """Calculate streak from combined goal and challenge check-in dates"""
-        if not checkin_dates:
-            return 0
-
-        streak = 0
-        check_date = end_date
-
-        while check_date.isoformat() in checkin_dates:
-            streak += 1
-            check_date = check_date - timedelta(days=1)
-
-        # If today not checked, check if streak continues from yesterday
-        if streak == 0:
-            check_date = end_date - timedelta(days=1)
-            while check_date.isoformat() in checkin_dates:
-                streak += 1
-                check_date = check_date - timedelta(days=1)
-
-        return streak
-
-    def _get_aggregated_challenge_stats(
-        self, user_id: str, challenge_ids: List[str]
-    ) -> Dict[str, Any]:
-        """Get aggregated challenge statistics from challenge_statistics cache
-
-        Args:
-            user_id: User ID
-            challenge_ids: List of challenge IDs to aggregate stats for
-
-        Returns:
-            Aggregated stats including best streak, total points
-        """
-        from app.core.database import get_supabase_client
-
-        result = {
-            "current_streak": 0,
-            "longest_streak": 0,
-            "total_points": 0,
-            "total_checkins": 0,
-        }
-
-        if not challenge_ids:
-            return result
-
-        try:
-            supabase = get_supabase_client()
-            stats_result = (
-                supabase.table("challenge_statistics")
-                .select("current_streak, longest_streak, points, total_checkins")
-                .eq("user_id", user_id)
-                .in_("challenge_id", challenge_ids)
-                .execute()
-            )
-
-            if stats_result.data:
-                # Aggregate: best current streak, best longest streak, sum of points/checkins
-                for stat in stats_result.data:
-                    result["current_streak"] = max(
-                        result["current_streak"], stat.get("current_streak", 0)
-                    )
-                    result["longest_streak"] = max(
-                        result["longest_streak"], stat.get("longest_streak", 0)
-                    )
-                    result["total_points"] += stat.get("points", 0)
-                    result["total_checkins"] += stat.get("total_checkins", 0)
-
-        except Exception as e:
-            logger.warning(f"Failed to get aggregated challenge stats: {e}")
-
-        return result
 
     def _calculate_stats(
         self,
         check_ins: List[Dict[str, Any]],
+        personal_goals: List[Dict[str, Any]],
         week_start: date,
         week_end: date,
-        goal_id: str = None,
-        challenge_id: str = None,
-        user_id: str = None,
+        summaries: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
-        """Calculate weekly statistics
+        """Calculate weekly statistics from check-ins, goals, and summaries.
 
-        Args:
-            check_ins: List of check-in records
-            week_start: Start date of the week
-            week_end: End date of the week
-            goal_id: Optional goal ID for using cached goal_statistics
-            challenge_id: Optional challenge ID for using cached challenge_statistics
-            user_id: Optional user ID for challenge_statistics lookup
+        Uses pre-aggregated summaries when available for faster calculation,
+        falls back to counting raw check-ins when summaries are empty.
         """
-        # Count completed check-ins
-        completed_count = len(check_ins)
-
-        # Calculate current streak (uses cache if goal_id or challenge_id provided and end_date is today)
-        current_streak = self._calculate_streak(
-            check_ins, week_end, goal_id, challenge_id, user_id
-        )
-
-        # Calculate average mood
-        moods = [c.get("mood") for c in check_ins if c.get("mood") is not None]
-        average_mood = sum(moods) / len(moods) if moods else None
-
-        # Count days with check-ins
-        days_with_checkins = len(
-            set(
-                (
-                    c["check_in_date"]
-                    if isinstance(c["check_in_date"], date)
-                    else date.fromisoformat(str(c["check_in_date"]))
-                )
-                for c in check_ins
+        # Use summaries for aggregate counts if available (faster)
+        if summaries:
+            completed_count = sum(s.get("completed_count", 0) for s in summaries)
+            rest_day_count = sum(s.get("rest_day_count", 0) for s in summaries)
+            total_check_ins = sum(s.get("total_check_ins", 0) for s in summaries)
+            # Peak streak during the week (highest streak_at_date)
+            peak_streak_this_week = max(
+                (s.get("streak_at_date", 0) for s in summaries), default=0
             )
+            # Days with any check-ins
+            days_with_checkins = len(
+                set(
+                    s.get("summary_date")
+                    for s in summaries
+                    if s.get("completed_count", 0) > 0
+                )
+            )
+        else:
+            # Fall back to counting raw check-ins
+            # V2.1: Use status instead of completed boolean
+            completed_count = len(
+                [c for c in check_ins if c.get("status") == "completed"]
+            )
+            rest_day_count = len(
+                [c for c in check_ins if c.get("status") == "rest_day"]
+            )
+            total_check_ins = len(
+                [c for c in check_ins if c.get("status") != "pending"]
+            )
+            peak_streak_this_week = 0
+            days_with_checkins = len(
+                set(
+                    c.get("check_in_date")
+                    for c in check_ins
+                    if c.get("status") == "completed"
+                )
+            )
+
+        # Get current/longest streak from goals (V2 stores streaks on goals table)
+        current_streak = max(
+            (g.get("current_streak", 0) for g in personal_goals), default=0
+        )
+        longest_streak = max(
+            (g.get("longest_streak", 0) for g in personal_goals), default=0
         )
 
-        # Get longest streak in the week (uses cache if goal_id or challenge_id provided)
-        longest_streak = self._calculate_longest_streak(
-            check_ins, goal_id, challenge_id, user_id
+        # Analyze mood (still needs raw check-ins)
+        moods = [c.get("mood") for c in check_ins if c.get("mood")]
+        mood_distribution = Counter(moods)
+
+        # Calculate completion rate
+        total_scheduled = 7  # Default to 7 days
+        completion_rate = (
+            round((completed_count / total_scheduled) * 100, 1)
+            if total_scheduled > 0
+            else 0
         )
+
+        # Analyze day patterns (still needs raw check-ins)
+        strongest_day, weakest_day = self._analyze_day_patterns(check_ins)
 
         return {
             "completed_check_ins": completed_count,
+            "rest_day_count": rest_day_count,
+            "total_check_ins": total_check_ins,
+            "total_scheduled": total_scheduled,
             "days_with_checkins": days_with_checkins,
             "current_streak": current_streak,
             "longest_streak": longest_streak,
-            "average_mood": round(average_mood, 2) if average_mood else None,
-            "completion_rate": round(
-                (completed_count / 7) * 100, 1
-            ),  # Assuming 7-day week
+            "peak_streak_this_week": peak_streak_this_week,
+            "completion_rate": completion_rate,
+            "mood_distribution": dict(mood_distribution),
+            "strongest_day": strongest_day,
+            "weakest_day": weakest_day,
         }
 
-    def _calculate_streak(
+    def _analyze_day_patterns(
+        self, check_ins: List[Dict[str, Any]]
+    ) -> tuple[Optional[str], Optional[str]]:
+        """Analyze check-ins by day of week to find strongest/weakest days."""
+        day_counts: Counter = Counter()
+
+        for checkin in check_ins:
+            # V2.1: Use status field instead of completed boolean
+            if checkin.get("status") == "completed":
+                try:
+                    d = date.fromisoformat(checkin["check_in_date"])
+                    day_name = d.strftime("%A")
+                    day_counts[day_name] += 1
+                except (ValueError, KeyError):
+                    pass
+
+        if not day_counts:
+            return None, None
+
+        sorted_days = day_counts.most_common()
+        strongest = sorted_days[0][0] if sorted_days else None
+        weakest = sorted_days[-1][0] if len(sorted_days) > 1 else None
+
+        return strongest, weakest
+
+    def _calculate_goal_breakdown(
         self,
         check_ins: List[Dict[str, Any]],
-        end_date: date,
-        goal_id: str = None,
-        challenge_id: str = None,
-        user_id: str = None,
-    ) -> int:
-        """Calculate current streak ending on end_date
+        personal_goals: List[Dict[str, Any]],
+    ) -> List[Dict[str, Any]]:
+        """Calculate per-goal breakdown from check-ins."""
+        goal_lookup = {g["id"]: g for g in personal_goals}
 
-        If goal_id is provided and end_date is today, use cached goal_statistics
-        If challenge_id and user_id are provided and end_date is today, use cached challenge_statistics
-        """
-        from app.core.database import get_supabase_client
-
-        # Optimization: Use cached goal_statistics if available and end_date is today
-        if goal_id and end_date == date.today():
-            try:
-                supabase = get_supabase_client()
-                stats_result = (
-                    supabase.table("goal_statistics")
-                    .select("current_streak")
-                    .eq("goal_id", goal_id)
-                    .maybe_single()
-                    .execute()
-                )
-                if stats_result.data:
-                    return stats_result.data.get("current_streak", 0)
-            except Exception:
-                pass  # Fall back to calculation
-
-        # Optimization: Use cached challenge_statistics if available and end_date is today
-        if challenge_id and user_id and end_date == date.today():
-            try:
-                supabase = get_supabase_client()
-                stats_result = (
-                    supabase.table("challenge_statistics")
-                    .select("current_streak")
-                    .eq("challenge_id", challenge_id)
-                    .eq("user_id", user_id)
-                    .maybe_single()
-                    .execute()
-                )
-                if stats_result.data:
-                    return stats_result.data.get("current_streak", 0)
-            except Exception:
-                pass  # Fall back to calculation
-
-        if not check_ins:
-            return 0
-
-        sorted_check_ins = sorted(
-            check_ins,
-            key=lambda x: (
-                x["check_in_date"]
-                if isinstance(x["check_in_date"], date)
-                else date.fromisoformat(str(x["check_in_date"]))
-            ),
-            reverse=True,
+        # Aggregate by goal_id
+        goal_stats: Dict[str, Dict[str, Any]] = defaultdict(
+            lambda: {"completed": 0, "total": 0, "days": set(), "moods": []}
         )
 
-        streak = 0
-        current_date = end_date
+        for checkin in check_ins:
+            goal_id = checkin.get("goal_id")
+            if not goal_id:
+                continue
+            # V2.1: Use status instead of completed boolean
+            checkin_status = checkin.get("status", "pending")
+            if checkin_status != "pending":
+                goal_stats[goal_id]["total"] += 1
+            if checkin_status == "completed":
+                goal_stats[goal_id]["completed"] += 1
+                goal_stats[goal_id]["days"].add(checkin.get("check_in_date"))
+            if checkin.get("mood"):
+                goal_stats[goal_id]["moods"].append(checkin["mood"])
 
-        for check_in in sorted_check_ins:
-            check_in_date = (
-                check_in["check_in_date"]
-                if isinstance(check_in["check_in_date"], date)
-                else date.fromisoformat(str(check_in["check_in_date"]))
+        breakdown = []
+        for gid, stats in goal_stats.items():
+            goal_info = goal_lookup.get(gid, {})
+            scheduled = stats["total"] or 7
+            completion_rate = (
+                round((stats["completed"] / scheduled) * 100, 1) if scheduled > 0 else 0
             )
 
-            if check_in_date == current_date:
-                streak += 1
-                current_date -= timedelta(days=1)
-            elif check_in_date < current_date:
-                break
+            status = (
+                "excellent"
+                if completion_rate >= 80
+                else "good" if completion_rate >= 50 else "needs_attention"
+            )
 
-        return streak
+            breakdown.append(
+                {
+                    "goal_id": gid,
+                    "title": goal_info.get("title", "Unknown Goal"),
+                    "completed": stats["completed"],
+                    "total": stats["total"],
+                    "days_active": len(stats["days"]),
+                    "completion_rate": completion_rate,
+                    "status": status,
+                    "current_streak": goal_info.get("current_streak", 0),
+                    "longest_streak": goal_info.get("longest_streak", 0),
+                }
+            )
 
-    def _calculate_longest_streak(
-        self,
-        check_ins: List[Dict[str, Any]],
-        goal_id: str = None,
-        challenge_id: str = None,
-        user_id: str = None,
-    ) -> int:
-        """Calculate longest consecutive streak in check-ins
+        breakdown.sort(key=lambda x: x["completion_rate"], reverse=True)
+        return breakdown
 
-        If goal_id is provided, try to use cached goal_statistics first
-        If challenge_id and user_id are provided, try to use cached challenge_statistics first
-        """
-        from app.core.database import get_supabase_client
+    async def _get_partner_context(
+        self, supabase, user_id: str
+    ) -> Optional[List[Dict[str, Any]]]:
+        """Get accountability partners context for the recap."""
+        partners = []
+        partner_ids_seen = set()
 
-        # Optimization: Use cached goal_statistics if available
-        if goal_id:
-            try:
-                supabase = get_supabase_client()
-                stats_result = (
-                    supabase.table("goal_statistics")
-                    .select("longest_streak")
-                    .eq("goal_id", goal_id)
-                    .maybe_single()
-                    .execute()
+        try:
+            # Get partners where user is the requester
+            partner_result = (
+                supabase.table("accountability_partners")
+                .select(
+                    "*, partner:users!accountability_partners_partner_user_id_fkey(id, name)"
                 )
-                if stats_result.data:
-                    return stats_result.data.get("longest_streak", 0)
-            except Exception:
-                pass  # Fall back to calculation
+                .eq("user_id", user_id)
+                .eq("status", "accepted")
+                .execute()
+            )
 
-        # Optimization: Use cached challenge_statistics if available
-        if challenge_id and user_id:
-            try:
-                supabase = get_supabase_client()
-                stats_result = (
-                    supabase.table("challenge_statistics")
-                    .select("longest_streak")
-                    .eq("challenge_id", challenge_id)
+            for partner_data in partner_result.data or []:
+                partner_info = partner_data.get("partner", {})
+                partner_user_id = partner_info.get("id")
+                if partner_user_id and partner_user_id not in partner_ids_seen:
+                    partner_ids_seen.add(partner_user_id)
+                    # Get partner's best streak from their goals
+                    partner_goals = (
+                        supabase.table("goals")
+                        .select("current_streak")
+                        .eq("user_id", partner_user_id)
+                        .eq("status", "active")
+                        .execute()
+                    )
+                    best_streak = max(
+                        (
+                            g.get("current_streak", 0)
+                            for g in (partner_goals.data or [])
+                        ),
+                        default=0,
+                    )
+                    partners.append(
+                        {
+                            "partner_id": partner_user_id,
+                            "partner_name": partner_info.get("name", "Partner"),
+                            "partner_streak": best_streak,
+                        }
+                    )
+
+            # Get partners where user is the partner (reverse relationship)
+            reverse_result = (
+                supabase.table("accountability_partners")
+                .select(
+                    "*, partner:users!accountability_partners_user_id_fkey(id, name)"
+                )
+                .eq("partner_user_id", user_id)
+                .eq("status", "accepted")
+                .execute()
+            )
+
+            for partner_data in reverse_result.data or []:
+                partner_info = partner_data.get("partner", {})
+                partner_user_id = partner_info.get("id")
+                if partner_user_id and partner_user_id not in partner_ids_seen:
+                    partner_ids_seen.add(partner_user_id)
+                    # Get partner's best streak
+                    partner_goals = (
+                        supabase.table("goals")
+                        .select("current_streak")
+                        .eq("user_id", partner_user_id)
+                        .eq("status", "active")
+                        .execute()
+                    )
+                    best_streak = max(
+                        (
+                            g.get("current_streak", 0)
+                            for g in (partner_goals.data or [])
+                        ),
+                        default=0,
+                    )
+                    partners.append(
+                        {
+                            "partner_id": partner_user_id,
+                            "partner_name": partner_info.get("name", "Partner"),
+                            "partner_streak": best_streak,
+                        }
+                    )
+
+            return partners if partners else None
+
+        except Exception as e:
+            logger.warning(f"Failed to get partner context: {e}")
+            return None
+
+    def _get_historical_trend(
+        self, supabase, user_id: str, current_week_start: date, goal_id: Optional[str]
+    ) -> List[Dict[str, Any]]:
+        """Get completion rate trend for the last 4 weeks using check_ins table."""
+        trend = []
+
+        try:
+            for weeks_ago in range(3, -1, -1):
+                week_start = current_week_start - timedelta(weeks=weeks_ago)
+                week_end = week_start + timedelta(days=6)
+
+                # V2.1: Select status instead of completed
+                query = (
+                    supabase.table("check_ins")
+                    .select("id, status")
                     .eq("user_id", user_id)
-                    .maybe_single()
-                    .execute()
+                    .gte("check_in_date", week_start.isoformat())
+                    .lte("check_in_date", week_end.isoformat())
                 )
-                if stats_result.data:
-                    return stats_result.data.get("longest_streak", 0)
-            except Exception:
-                pass  # Fall back to calculation
 
-        if not check_ins:
-            return 0
+                if goal_id:
+                    query = query.eq("goal_id", goal_id)
 
-        sorted_dates = sorted(
-            [
-                (
-                    c["check_in_date"]
-                    if isinstance(c["check_in_date"], date)
-                    else date.fromisoformat(str(c["check_in_date"]))
+                result = query.execute()
+                check_ins = result.data or []
+
+                # V2.1: Count by status instead of completed boolean
+                completed = len(
+                    [c for c in check_ins if c.get("status") == "completed"]
                 )
-                for c in check_ins
-            ]
-        )
+                total = len([c for c in check_ins if c.get("status") != "pending"]) or 7
+                completion_rate = round((completed / 7) * 100, 1) if total > 0 else 0
 
-        if not sorted_dates:
-            return 0
+                trend.append(
+                    {
+                        "week_start": week_start.isoformat(),
+                        "week_label": f"Week {4 - weeks_ago}",
+                        "completed": completed,
+                        "total": total,
+                        "completion_rate": completion_rate,
+                        "is_current": weeks_ago == 0,
+                    }
+                )
 
-        longest = 1
-        current = 1
+        except Exception as e:
+            logger.warning(f"Failed to get historical trend: {e}")
 
-        for i in range(1, len(sorted_dates)):
-            if sorted_dates[i] - sorted_dates[i - 1] == timedelta(days=1):
-                current += 1
-                longest = max(longest, current)
-            else:
-                current = 1
+        return trend
 
-        return longest
+    def _get_weekly_achievements(
+        self, supabase, user_id: str, week_start: date, week_end: date
+    ) -> List[Dict[str, Any]]:
+        """Get achievements unlocked during this week."""
+        achievements = []
+
+        try:
+            result = (
+                supabase.table("user_achievements")
+                .select(
+                    "*, achievement_type:achievement_types(badge_key, badge_name, badge_description, category, rarity)"
+                )
+                .eq("user_id", user_id)
+                .gte("unlocked_at", f"{week_start.isoformat()}T00:00:00")
+                .lte("unlocked_at", f"{week_end.isoformat()}T23:59:59")
+                .execute()
+            )
+
+            for achievement in result.data or []:
+                type_info = achievement.get("achievement_type", {})
+                achievements.append(
+                    {
+                        "badge_key": type_info.get("badge_key"),
+                        "badge_name": type_info.get("badge_name", "Achievement"),
+                        "description": type_info.get("badge_description", ""),
+                        "category": type_info.get("category", "general"),
+                        "rarity": type_info.get("rarity", "common"),
+                        "unlocked_at": achievement.get("unlocked_at"),
+                    }
+                )
+
+        except Exception as e:
+            logger.warning(f"Failed to get weekly achievements: {e}")
+
+        return achievements
 
     async def _generate_ai_recap(
         self,
-        goal: Optional[Dict[str, Any]],
+        user_name: str,
         personal_goals: List[Dict[str, Any]],
-        active_challenges: List[Dict[str, Any]],
-        goal_check_ins: List[Dict[str, Any]],
-        challenge_check_ins: List[Dict[str, Any]],
         stats: Dict[str, Any],
-        user_profile: Optional[Dict[str, Any]],
+        motivation_style: str,
         week_start: date,
         week_end: date,
-    ) -> str:
-        """
-        Generate AI-powered recap text with full context.
-
-        Args:
-            goal: Primary goal data (for backward compat)
-            personal_goals: List of personal goals
-            active_challenges: List of active challenges
-            goal_check_ins: List of goal check-ins for the week
-            challenge_check_ins: List of challenge check-ins for the week
-            stats: Calculated statistics
-            user_profile: Optional user profile
-            week_start: Week start date
-            week_end: Week end date
-
-        Returns:
-            Generated recap text
-        """
-        # Get motivation style
-        motivation_style = (
-            user_profile.get("motivation_style", "friendly")
-            if user_profile
-            else "friendly"
-        )
-
-        # Map motivation style to tone description
-        tone_map = {
-            "tough_love": "direct, challenging, and no-nonsense",
-            "gentle_encouragement": "warm, supportive, and compassionate",
-            "data_driven": "analytical, metric-focused, and logical",
-            "accountability_buddy": "friendly but firm, like a supportive friend",
+        goal_breakdown: List[Dict[str, Any]],
+        partner_context: Optional[List[Dict[str, Any]]],
+        achievements_unlocked: List[Dict[str, Any]],
+        completion_rate_trend: List[Dict[str, Any]],
+    ) -> Dict[str, str]:
+        """Generate AI-powered recap using gpt-4o-mini."""
+        # Style mapping
+        style_prompts = {
+            "supportive": "Warm, encouraging, celebrates every small win.",
+            "tough_love": "Direct, challenging, pushes them to be better.",
+            "calm": "Patient, balanced, philosophical.",
         }
-        tone_description = tone_map.get(motivation_style, "friendly and encouraging")
+        tone = style_prompts.get(motivation_style, style_prompts["supportive"])
 
-        # Build personal goals section
-        personal_goals_str = ""
-        if personal_goals:
-            goals_list = [
-                f"- {g.get('title', 'Unknown')} ({g.get('category', 'general')})"
-                for g in personal_goals
-            ]
-            personal_goals_str = "\n".join(goals_list)
-        else:
-            personal_goals_str = "None"
+        # Build goal breakdown
+        goal_breakdown_str = ""
+        for g in goal_breakdown[:5]:  # Limit to 5 goals
+            status_emoji = (
+                "🏆"
+                if g["status"] == "excellent"
+                else "✅" if g["status"] == "good" else "⚠️"
+            )
+            goal_breakdown_str += f"- {g['title']}: {g['completed']}/{g['total']} ({g['completion_rate']}%) {status_emoji}, streak: {g['current_streak']}d\n"
 
-        # Build challenges section
-        challenges_str = ""
-        if active_challenges:
-            challenges_list = [
-                f"- {c.get('title', 'Unknown')}" for c in active_challenges
-            ]
-            challenges_str = "\n".join(challenges_list)
-        else:
-            challenges_str = "None"
+        # Build trend
+        trend_str = ""
+        if completion_rate_trend:
+            rates = [f"{t['completion_rate']}%" for t in completion_rate_trend]
+            trend_str = " → ".join(rates)
 
-        # Build prompt for AI
-        prompt = f"""Generate a personalized weekly recap for a fitness accountability app user.
+        # Build achievements
+        achievements_str = ""
+        for a in achievements_unlocked[:3]:
+            achievements_str += f"- {a['badge_name']}\n"
 
-PERSONAL GOALS ({len(personal_goals)} active):
-{personal_goals_str}
+        # Build partner context
+        partner_str = ""
+        if partner_context:
+            for p in partner_context[:3]:
+                partner_str += f"- {p['partner_name']}: {p['partner_streak']}d streak\n"
 
-ACTIVE CHALLENGES ({len(active_challenges)} active):
-{challenges_str}
+        # Week over week
+        wow_change = stats.get("week_over_week_change", 0)
+        wow_str = f"+{wow_change}" if wow_change > 0 else str(wow_change)
 
-WEEKLY STATS (Week of {week_start.strftime('%B %d')} - {week_end.strftime('%B %d, %Y')}):
-- Goal Check-ins: {stats['completed_check_ins']}
-- Challenge Check-ins: {stats.get('challenge_check_ins', 0)}
-- Total Check-ins: {stats.get('total_check_ins', stats['completed_check_ins'])}
-- Active Days: {stats['days_with_checkins']} out of 7 days
-- Current Streak: {stats['current_streak']} days (combined goals + challenges)
-- Longest Streak This Week: {stats['longest_streak']} days
-- Completion Rate: {stats['completion_rate']}%
-- Challenge Points Earned: {stats.get('challenge_total_points', 0)} points
-- Best Challenge Streak: {stats.get('challenge_current_streak', 0)} days
-"""
+        prompt = f"""Generate a personalized weekly recap for {user_name} in a fitness accountability app.
 
-        if stats.get("average_mood"):
-            prompt += f"- Average Mood: {stats['average_mood']}/5\n"
+TONE: {tone}
 
-        if user_profile:
-            prompt += f"""
-USER PREFERENCES:
-- Motivation Style: {motivation_style} ({tone_description})
-- Biggest Challenge: {user_profile.get("biggest_challenge", "Not specified")}
-- Fitness Level: {user_profile.get("fitness_level", "Not specified")}
-"""
+GOALS:
+{goal_breakdown_str if goal_breakdown_str else "No goals tracked"}
 
-        prompt += f"""
-INSTRUCTIONS:
-1. Write in a {tone_description} tone - MATCH their preferred motivation style
-2. Celebrate their wins across goals AND challenges
-3. If they have group goals or challenges, mention the power of community/accountability
-4. Address their completion rate ({stats['completion_rate']}%) constructively
-5. Highlight their {stats['current_streak']}-day streak momentum
-6. Provide 1-2 actionable insights or tips
-7. Keep it encouraging and motivating
-8. Be concise (2-3 paragraphs max)
+STATS (Week of {week_start.strftime('%b %d')} - {week_end.strftime('%b %d')}):
+- Completed: {stats['completed_check_ins']} check-ins ({wow_str} vs last week)
+- Streak: {stats['current_streak']} days
+- Completion: {stats['completion_rate']}%
+- Best Day: {stats.get('strongest_day', 'N/A')}
 
-Generate the recap now:"""
+4-WEEK TREND: {trend_str if trend_str else 'N/A'}
+
+ACHIEVEMENTS THIS WEEK:
+{achievements_str if achievements_str else 'None'}
+
+PARTNERS:
+{partner_str if partner_str else 'None'}
+
+Generate a recap with these EXACT 4 sections (keep each section to 1-2 sentences max):
+
+1. SUMMARY: Brief overview of the week
+2. WIN: Their biggest accomplishment 
+3. INSIGHT: One pattern or observation
+4. FOCUS_NEXT_WEEK: One specific action for next week
+
+Respond in JSON format:
+{{"summary": "...", "win": "...", "insight": "...", "focus_next_week": "..."}}"""
 
         try:
-            # Use OpenAI to generate recap
-            import asyncio
-
-            response = await asyncio.wait_for(
-                self.openai_service.client.responses.create(
-                    model="gpt-5-mini",
-                    input=prompt,
-                    reasoning={"effort": "low"},
-                ),
-                timeout=20.0,
+            response = await client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are an accountability coach. Respond only in valid JSON.",
+                    },
+                    {"role": "user", "content": prompt},
+                ],
+                max_tokens=300,
+                temperature=0.8,
             )
 
-            # Extract text from response
-            recap_text = ""
-            for item in response.output:
-                if hasattr(item, "content"):
-                    if hasattr(item, "type") and item.type == "reasoning":
-                        continue
-                    for content_part in item.content:
-                        if hasattr(content_part, "text"):
-                            recap_text += content_part.text
-                        elif hasattr(content_part, "content") and content_part.content:
-                            for nested in content_part.content:
-                                if hasattr(nested, "text"):
-                                    recap_text += nested.text
+            import json
 
-            return recap_text.strip()
+            content = response.choices[0].message.content.strip()
+            # Remove markdown code blocks if present
+            if content.startswith("```"):
+                content = content.split("```")[1]
+                if content.startswith("json"):
+                    content = content[4:]
+            result = json.loads(content)
+            return {
+                "summary": result.get("summary", "Great week!"),
+                "win": result.get("win", "You showed up."),
+                "insight": result.get("insight", "Consistency matters."),
+                "focus_next_week": result.get("focus_next_week", "Keep it up!"),
+                "motivational_close": f"Keep going, {user_name}! 💪",
+            }
 
         except Exception as e:
-            logger.error(
-                f"Failed to generate AI recap: {e}",
-                {"error": str(e)},
-            )
-            # Fallback to basic recap
-            return self._generate_fallback_recap(goal, stats)
+            logger.error(f"Failed to generate AI recap: {e}")
+            return self._generate_fallback_recap(user_name, stats)
 
     def _generate_fallback_recap(
-        self, goal: Dict[str, Any], stats: Dict[str, Any]
-    ) -> str:
-        """Generate a basic fallback recap if AI fails"""
-        goal_title = goal.get("title", "your goal")
+        self, user_name: str, stats: Dict[str, Any]
+    ) -> Dict[str, str]:
+        """Generate a basic fallback recap if AI fails."""
         completed = stats.get("completed_check_ins", 0)
         streak = stats.get("current_streak", 0)
 
-        recap = f"Great work this week on {goal_title}! "
-
-        if completed >= 5:
-            recap += (
-                f"You completed {completed} check-ins - that's amazing consistency! "
-            )
-        elif completed >= 3:
-            recap += f"You completed {completed} check-ins - keep it up! "
-        else:
-            recap += f"You completed {completed} check-ins. Every step counts! "
-
-        if streak >= 3:
-            recap += f"You're on a {streak}-day streak - incredible momentum! "
-        elif streak > 0:
-            recap += f"You have a {streak}-day streak going - keep building on it! "
-
-        recap += "Keep showing up and remember why you started. You've got this!"
-
-        return recap
+        return {
+            "summary": f"Great work this week, {user_name}! You completed {completed} check-ins.",
+            "win": (
+                f"You maintained a {streak}-day streak!"
+                if streak > 0
+                else "You showed up and that matters!"
+            ),
+            "insight": "Consistency is key to building lasting habits.",
+            "focus_next_week": "Try to check in at the same time each day to build routine.",
+            "motivational_close": f"Keep it up, {user_name}! You've got this! 💪",
+        }
 
 
 # Global instance

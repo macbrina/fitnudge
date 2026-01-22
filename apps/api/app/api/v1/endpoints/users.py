@@ -15,8 +15,8 @@ class UserProfileResponse(BaseModel):
     email: str
     name: str
     username: str
-    profile_picture_url: Optional[str]
-    bio: Optional[str]
+    profile_picture_url: Optional[str] = None
+    bio: Optional[str] = None
     plan: str
     timezone: str  # User's timezone (IANA format)
     language: Optional[str] = None  # Language code (e.g., 'en', 'es')
@@ -24,9 +24,21 @@ class UserProfileResponse(BaseModel):
     email_verified: bool
     auth_provider: str
     created_at: str
-    last_login_at: Optional[str]
+    updated_at: Optional[str] = None
+    last_login_at: Optional[str] = None
     linked_providers: Optional[List[str]] = None  # List of linked OAuth providers
     has_password: Optional[bool] = None  # Whether the user has a password set
+    # Status & Role
+    status: Optional[str] = "active"
+    role: Optional[str] = None
+    # V2 Preferences
+    motivation_style: Optional[str] = None  # 'supportive', 'tough_love', 'calm'
+    morning_motivation_enabled: Optional[bool] = None
+    morning_motivation_time: Optional[str] = None  # HH:MM format
+    # Referral
+    referral_code: Optional[str] = None
+    # Onboarding
+    onboarding_completed_at: Optional[str] = None
 
 
 class UserStatsResponse(BaseModel):
@@ -49,6 +61,10 @@ class ProfileUpdate(BaseModel):
     timezone: Optional[str] = None  # IANA timezone string (e.g., 'America/New_York')
     language: Optional[str] = None  # Language code (e.g., 'en', 'es')
     country: Optional[str] = None  # ISO 3166-1 alpha-2 country code (e.g., 'US', 'NG')
+    # V2 Preferences
+    motivation_style: Optional[str] = None  # 'supportive', 'tough_love', 'calm'
+    morning_motivation_enabled: Optional[bool] = None
+    morning_motivation_time: Optional[str] = None  # HH:MM format
 
 
 class PasswordChange(BaseModel):
@@ -176,11 +192,12 @@ async def get_user_stats(user_id: str, current_user: dict = Depends(get_current_
     active_goals = len([g for g in goals_result.data if g.get("status") == "active"])
     completed_goals = total_goals - active_goals
 
-    # Get check-ins stats
+    # Get check-ins stats (V2: use status field)
     checkins_result = (
         supabase.table("check_ins")
-        .select("check_in_date, completed")
+        .select("check_in_date, status")
         .eq("user_id", user_id)
+        .neq("status", "pending")  # Exclude pending check-ins
         .execute()
     )
 
@@ -197,7 +214,8 @@ async def get_user_stats(user_id: str, current_user: dict = Depends(get_current_
     )
 
     for checkin in sorted_checkins:
-        if checkin["completed"]:
+        # V2: Use status field
+        if checkin.get("status") == "completed" or checkin.get("status") == "rest_day":
             temp_streak += 1
             current_streak = max(current_streak, temp_streak)
         else:

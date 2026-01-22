@@ -52,6 +52,5 @@ export function useStyles(stylesFn: MakeStylesFunction) {
   return useMemo(() => {
     const styles = stylesFn(themeTokens, colors, brandColors);
     return StyleSheet.create(styles);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [colors, brandColors]);
 }

@@ -51,49 +51,49 @@ export const semanticLight = {
 
 export const semanticDark = {
   bg: {
-    canvas: tokens.colors.dark.background, // #0f172a
-    card: tokens.colors.dark.secondary, // #1e293b
-    primary: tokens.colors.dark.primary, // #3b82f6
-    secondary: tokens.colors.dark.secondary, // #1e293b
-    muted: tokens.colors.dark.muted, // #1e293b
-    surface: tokens.colors.dark.muted, // #1e293b
-    accent: tokens.colors.dark.accent, // #1e293b
-    destructive: tokens.colors.dark.destructive, // #dc2626
-    success: tokens.colors.dark.success, // #34d399
-    warning: tokens.colors.dark.warning, // #fbbf24
-    overlay: "rgba(0, 0, 0, 0.7)", // Modal overlay
-    overlayLight: "rgba(0, 0, 0, 0.1)", // Modal overlay
-    overlayTransparent: "rgba(0, 0, 0, 0.0)" // Modal overlay
+    canvas: tokens.colors.dark.background, // #000000 - pure black
+    card: tokens.colors.dark.secondary, // #121212 - near-black cards
+    primary: tokens.colors.dark.primary, // #00a3ff - electric blue
+    secondary: tokens.colors.dark.secondary, // #121212
+    muted: tokens.colors.dark.muted, // #0a0a0a
+    surface: tokens.colors.dark.muted, // #0a0a0a
+    accent: tokens.colors.dark.accent, // #1a1a1a
+    destructive: tokens.colors.dark.destructive, // #ff4757 - vibrant red
+    success: tokens.colors.dark.success, // #00d68f - vibrant green
+    warning: tokens.colors.dark.warning, // #ffaa00 - warm amber
+    overlay: "rgba(0, 0, 0, 0.85)", // Darker overlay for pure black theme
+    overlayLight: "rgba(255, 255, 255, 0.05)", // Subtle light overlay
+    overlayTransparent: "rgba(0, 0, 0, 0.0)" // Transparent overlay
   },
   text: {
-    primary: tokens.colors.dark.foreground, // #f8fafc
-    tertiary: tokens.colors.dark.mutedForeground, // #64748b
-    secondary: tokens.colors.dark.secondaryForeground, // #f8fafc
-    muted: tokens.colors.dark.mutedForeground, // #94a3b8
+    primary: tokens.colors.dark.foreground, // #ffffff - pure white
+    tertiary: tokens.colors.dark.mutedForeground, // #8e8e8e - neutral gray
+    secondary: tokens.colors.dark.secondaryForeground, // #ffffff
+    muted: tokens.colors.dark.mutedForeground, // #8e8e8e
     onPrimary: tokens.colors.dark.primaryForeground, // #ffffff
-    onSecondary: tokens.colors.dark.secondaryForeground, // #f8fafc
-    onAccent: tokens.colors.dark.accentForeground, // #f8fafc
+    onSecondary: tokens.colors.dark.secondaryForeground, // #ffffff
+    onAccent: tokens.colors.dark.accentForeground, // #ffffff
     onDestructive: tokens.colors.dark.destructiveForeground, // #ffffff
-    onSuccess: tokens.colors.dark.successForeground, // #064e3b
-    onWarning: tokens.colors.dark.warningForeground // #78350f
+    onSuccess: tokens.colors.dark.successForeground, // #000000
+    onWarning: tokens.colors.dark.warningForeground // #000000
   },
   border: {
-    default: tokens.colors.dark.border, // #334155
-    subtle: tokens.colors.dark.borderSubtle, // #334155
-    input: tokens.colors.dark.input, // #334155
-    ring: tokens.colors.dark.ring // #3b82f6
+    default: tokens.colors.dark.border, // #2f2f2f - subtle dark border
+    subtle: tokens.colors.dark.borderSubtle, // #1f1f1f - very subtle
+    input: tokens.colors.dark.input, // #2f2f2f
+    ring: tokens.colors.dark.ring // #00a3ff - electric blue
   },
   feedback: {
-    success: tokens.colors.dark.success, // #34d399
-    error: tokens.colors.dark.destructive, // #dc2626
-    warning: tokens.colors.dark.warning // #fbbf24
+    success: tokens.colors.dark.success, // #00d68f - vibrant green
+    error: tokens.colors.dark.destructive, // #ff4757 - vibrant red
+    warning: tokens.colors.dark.warning // #ffaa00 - warm amber
   },
   shadow: {
-    default: "rgba(0, 0, 0, 0.3)", // Dark shadow
-    sm: "rgba(0, 0, 0, 0.2)", // Small shadow
-    md: "rgba(0, 0, 0, 0.3)", // Medium shadow
-    lg: "rgba(0, 0, 0, 0.4)", // Large shadow
-    xl: "rgba(0, 0, 0, 0.5)" // Extra large shadow
+    default: "rgba(0, 0, 0, 0.5)", // Deeper shadows for pure black
+    sm: "rgba(0, 0, 0, 0.3)",
+    md: "rgba(0, 0, 0, 0.5)",
+    lg: "rgba(0, 0, 0, 0.6)",
+    xl: "rgba(0, 0, 0, 0.7)"
   }
 } as const;
 

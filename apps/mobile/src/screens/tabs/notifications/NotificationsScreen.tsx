@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 import {
   View,
   Text,
@@ -29,7 +29,7 @@ import {
   getNotificationIcon
 } from "@/hooks/api/useNotificationHistory";
 
-type NotificationTab = "all" | "requests" | "system";
+type NotificationTab = "all" | "activity" | "requests" | "system";
 
 export default function NotificationsScreen() {
   const styles = useStyles(makeStyles);
@@ -39,6 +39,16 @@ export default function NotificationsScreen() {
 
   const [activeTab, setActiveTab] = useState<NotificationTab>("all");
   const [refreshing, setRefreshing] = useState(false);
+  const [, setTimeTick] = useState(0);
+
+  // Update relative times every minute
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTimeTick((tick) => tick + 1);
+    }, 60000); // 60 seconds
+
+    return () => clearInterval(interval);
+  }, []);
 
   // Fetch notification history with infinite scroll
   const { data, isLoading, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } =
@@ -67,6 +77,9 @@ export default function NotificationsScreen() {
 
     return allNotifications.filter((n) => {
       const category = categorizeNotificationType(n.notification_type);
+      if (activeTab === "activity") {
+        return category === "activity";
+      }
       if (activeTab === "requests") {
         return category === "requests";
       }
@@ -78,6 +91,12 @@ export default function NotificationsScreen() {
   }, [allNotifications, activeTab]);
 
   // Count notifications by category
+  const activityCount = useMemo(() => {
+    return allNotifications.filter(
+      (n) => categorizeNotificationType(n.notification_type) === "activity"
+    ).length;
+  }, [allNotifications]);
+
   const requestsCount = useMemo(() => {
     return allNotifications.filter(
       (n) => categorizeNotificationType(n.notification_type) === "requests"
@@ -100,14 +119,14 @@ export default function NotificationsScreen() {
     }
   }, [refetch]);
 
-  // Mark all as read - uses optimistic update, processes API calls in background
+  // Mark all as read - single batch API call following SCALABILITY.md best practices
+  // Marks ALL unread notifications in DB, not just visible ones
   const handleMarkAllAsRead = useCallback(() => {
-    if (unreadNotifications.length === 0 || markAllOpenedMutation.isPending) return;
+    if (unreadCount === 0 || markAllOpenedMutation.isPending) return;
 
-    // Extract IDs and fire the mutation - optimistic update happens immediately
-    const unreadIds = unreadNotifications.map((n) => n.id);
-    markAllOpenedMutation.mutate(unreadIds);
-  }, [unreadNotifications, markAllOpenedMutation]);
+    // Single batch API call - optimistic update happens immediately
+    markAllOpenedMutation.mutate();
+  }, [unreadCount, markAllOpenedMutation]);
 
   // Load more when reaching end of list
   const handleLoadMore = useCallback(() => {
@@ -140,40 +159,46 @@ export default function NotificationsScreen() {
       // Type-based navigation
       switch (notification.notification_type) {
         case "reminder":
-        case "ai_motivation":
           if (data?.goalId || notification.entity_id) {
             const goalId = data?.goalId || notification.entity_id;
             router.push(MOBILE_ROUTES.GOALS.DETAILS + `?id=${goalId}`);
-          } else if (data?.challengeId) {
-            router.push(MOBILE_ROUTES.CHALLENGES.DETAILS(data.challengeId));
           }
           break;
 
-        case "challenge":
-        case "challenge_invite":
-        case "challenge_joined":
-        case "challenge_overtaken":
-        case "challenge_lead":
-        case "challenge_nudge":
-        case "challenge_starting":
-        case "challenge_ending":
-        case "challenge_ended":
-          if (data?.challengeId || notification.entity_id) {
-            const challengeId = data?.challengeId || notification.entity_id;
-            router.push(MOBILE_ROUTES.CHALLENGES.DETAILS(challengeId));
+        case "ai_motivation":
+          if (data?.goalId || notification.entity_id) {
+            // Goal-specific motivation - go to goal details
+            const goalId = data?.goalId || notification.entity_id;
+            router.push(MOBILE_ROUTES.GOALS.DETAILS + `?id=${goalId}`);
+          } else {
+            // General daily motivation - go to home where MotivationCard is visible
+            router.push(MOBILE_ROUTES.MAIN.HOME);
+          }
+          break;
+
+        // Adaptive nudges - navigate to goal if available
+        case "adaptive_nudge":
+          if (data?.goalId || notification.entity_id) {
+            const goalId = data?.goalId || notification.entity_id;
+            router.push(MOBILE_ROUTES.GOALS.DETAILS + `?id=${goalId}`);
           }
           break;
 
         case "partner_request":
+          // Open partners screen with "received" tab active
+          router.push(`${MOBILE_ROUTES.PROFILE.PARTNERS}?tab=received`);
+          break;
+
         case "partner_accepted":
+          // Open partners screen with default "partners" tab
           router.push(MOBILE_ROUTES.PROFILE.PARTNERS);
           break;
 
-        // Partner nudges, cheers, milestones - always go to ActivityScreen first
-        // User can see the nudge details, then tap to navigate to goal/challenge
+        // Partner nudges, cheers, milestones - go to ActivityScreen
         case "partner_nudge":
         case "partner_cheer":
         case "partner_milestone":
+        case "partner_inactive":
           router.push(MOBILE_ROUTES.PROFILE.ACTIVITY);
           break;
 
@@ -230,7 +255,7 @@ export default function NotificationsScreen() {
                 {isUnread && <View style={styles.unreadDot} />}
               </View>
 
-              <Text style={styles.cardBody} numberOfLines={2}>
+              <Text style={styles.cardBody} numberOfLines={3}>
                 {item.body}
               </Text>
 
@@ -248,6 +273,11 @@ export default function NotificationsScreen() {
       id: "all",
       label: t("notifications.all") || "All",
       count: allNotifications.length
+    },
+    {
+      id: "activity",
+      label: t("notifications.activity") || "Activity",
+      count: activityCount
     },
     {
       id: "requests",
@@ -301,7 +331,12 @@ export default function NotificationsScreen() {
     let emptyMessage =
       t("notifications.empty_message") || "When you receive notifications, they'll appear here.";
 
-    if (activeTab === "requests") {
+    if (activeTab === "activity") {
+      emptyTitle = t("notifications.empty.activity_title") || "No Activity Yet";
+      emptyMessage =
+        t("notifications.empty.activity_description") ||
+        "Partner cheers, nudges, and milestones will appear here.";
+    } else if (activeTab === "requests") {
       emptyTitle = t("notifications.empty.requests_title") || "No Pending Requests";
       emptyMessage =
         t("notifications.empty.requests_description") ||

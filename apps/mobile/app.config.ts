@@ -7,14 +7,10 @@ const reverseClientId = (clientId: string): string => {
 
 export default ({ config }: ConfigContext): ExpoConfig => {
   const iosClientId =
-    process.env.GOOGLE_IOS_CLIENT_ID ||
-    process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS ||
-    "";
+    process.env.GOOGLE_IOS_CLIENT_ID || process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS || "";
 
   const androidClientId =
-    process.env.GOOGLE_ANDROID_CLIENT_ID ||
-    process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID ||
-    "";
+    process.env.GOOGLE_ANDROID_CLIENT_ID || process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID || "";
 
   const webClientId =
     process.env.GOOGLE_WEB_CLIENT_ID ||
@@ -41,8 +37,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         iosUrlScheme: iosUrlScheme || undefined,
         iosClientId: iosClientId || undefined,
         androidClientId: androidClientId || undefined,
-        webClientId: webClientId || undefined,
-      },
+        webClientId: webClientId || undefined
+      }
     ],
     "expo-sqlite", // Required for Supabase localStorage polyfill
     "expo-audio", // For workout music and sound effects
@@ -56,10 +52,10 @@ export default ({ config }: ConfigContext): ExpoConfig => {
           useExoplayerRtsp: false,
           useExoplayerSmoothStreaming: false,
           useExoplayerHls: false,
-          useExoplayerDash: false,
-        },
-      },
-    ],
+          useExoplayerDash: false
+        }
+      }
+    ]
   ];
 
   return {
@@ -73,8 +69,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         iosClientId,
         androidClientId,
         webClientId,
-        iosUrlScheme,
-      },
-    },
+        iosUrlScheme
+      }
+    }
   };
 };

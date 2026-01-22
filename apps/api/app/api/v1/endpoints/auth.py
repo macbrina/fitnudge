@@ -241,12 +241,28 @@ def serialize_user(user: Dict[str, Any]) -> Dict[str, Any]:
         "plan": user.get("plan", "free"),
         "timezone": user.get("timezone", "UTC"),
         "country": user.get("country"),  # ISO 3166-1 alpha-2 code
+        "language": user.get("language", "en"),
         "email_verified": user.get("email_verified", False),
         "auth_provider": user.get("auth_provider", "email"),
         "created_at": user.get("created_at"),
+        "updated_at": user.get("updated_at"),
         "last_login_at": user.get("last_login_at"),
         "linked_providers": linked_providers,
         "has_password": has_password,
+        # Profile fields
+        "profile_picture_url": user.get("profile_picture_url"),
+        "bio": user.get("bio"),
+        # Status & Role
+        "status": user.get("status", "active"),
+        "role": user.get("role"),
+        # V2 Preferences
+        "motivation_style": user.get("motivation_style"),
+        "morning_motivation_enabled": user.get("morning_motivation_enabled"),
+        "morning_motivation_time": user.get("morning_motivation_time"),
+        # Referral
+        "referral_code": user.get("referral_code"),
+        # Onboarding
+        "onboarding_completed_at": user.get("onboarding_completed_at"),
     }
 
 
@@ -493,12 +509,13 @@ async def signup(user_data: UserSignup, request: Request):
             }
         ).eq("id", user["id"]).execute()
 
-        # Create default audio preferences for workout music
-        from app.api.v1.endpoints.audio_preferences import (
-            create_default_audio_preferences,
-        )
+        # # Refresh user from database to ensure we have latest values (e.g., email_verified)
+        # # This is important because create_user() may have auto-verified email if SMTP failed
+        # from app.core.auth import get_user_by_id
 
-        create_default_audio_preferences(user["id"])
+        # refreshed_user = await get_user_by_id(user["id"])
+        # if refreshed_user:
+        #     user = refreshed_user
 
         # Build device info from request and body
         device_info = build_device_info(request, user_data.device_info)
@@ -711,31 +728,34 @@ async def google_oauth(oauth_data: GoogleOAuth, request: Request):
         )
         is_new_user = True
 
-        # Handle referral for new OAuth users
-        if oauth_data.referral_code:
-            from app.services.referral_service import (
-                generate_referral_code,
-                get_referrer_by_code,
-            )
-
-            new_referral_code = generate_referral_code(username)
-            referrer = await get_referrer_by_code(oauth_data.referral_code)
-            referrer_id = referrer["id"] if referrer else None
-
-            # Store referral info (bonus granted later when they subscribe)
-            supabase.table("users").update(
-                {
-                    "referral_code": new_referral_code,
-                    "referred_by_user_id": referrer_id,
-                }
-            ).eq("id", user["id"]).execute()
-
-        # Create default audio preferences for new OAuth user
-        from app.api.v1.endpoints.audio_preferences import (
-            create_default_audio_preferences,
+        # Handle referral for new OAuth users - always generate referral code
+        from app.services.referral_service import (
+            generate_referral_code,
+            get_referrer_by_code,
         )
 
-        create_default_audio_preferences(user["id"])
+        new_referral_code = generate_referral_code(username)
+        referrer_id = None
+
+        # Check if they were referred by someone
+        if oauth_data.referral_code:
+            referrer = await get_referrer_by_code(oauth_data.referral_code)
+            referrer_id = referrer["id"] if referrer else None
+            if referrer_id:
+                logger.info(
+                    f"Google OAuth user {user['id']} was referred by {referrer_id}",
+                    {"referral_code": oauth_data.referral_code},
+                )
+
+        # Store referral code (and referrer if any)
+        supabase.table("users").update(
+            {
+                "referral_code": new_referral_code,
+                "referred_by_user_id": referrer_id,
+            }
+        ).eq("id", user["id"]).execute()
+
+        # V2: Audio preferences removed (V1 feature)
     else:
         # Ensure existing user is in auth.users (for Realtime to work)
         await ensure_auth_user_exists(user)
@@ -872,31 +892,34 @@ async def apple_oauth(oauth_data: AppleOAuth, request: Request):
             }
         )
 
-        # Handle referral for new OAuth users
-        if oauth_data.referral_code:
-            from app.services.referral_service import (
-                generate_referral_code,
-                get_referrer_by_code,
-            )
-
-            new_referral_code = generate_referral_code(username)
-            referrer = await get_referrer_by_code(oauth_data.referral_code)
-            referrer_id = referrer["id"] if referrer else None
-
-            # Store referral info (bonus granted later when they subscribe)
-            supabase.table("users").update(
-                {
-                    "referral_code": new_referral_code,
-                    "referred_by_user_id": referrer_id,
-                }
-            ).eq("id", user["id"]).execute()
-
-        # Create default audio preferences for new Apple OAuth user
-        from app.api.v1.endpoints.audio_preferences import (
-            create_default_audio_preferences,
+        # Handle referral for new OAuth users - always generate referral code
+        from app.services.referral_service import (
+            generate_referral_code,
+            get_referrer_by_code,
         )
 
-        create_default_audio_preferences(user["id"])
+        new_referral_code = generate_referral_code(username)
+        referrer_id = None
+
+        # Check if they were referred by someone
+        if oauth_data.referral_code:
+            referrer = await get_referrer_by_code(oauth_data.referral_code)
+            referrer_id = referrer["id"] if referrer else None
+            if referrer_id:
+                logger.info(
+                    f"Apple OAuth user {user['id']} was referred by {referrer_id}",
+                    {"referral_code": oauth_data.referral_code},
+                )
+
+        # Store referral code (and referrer if any)
+        supabase.table("users").update(
+            {
+                "referral_code": new_referral_code,
+                "referred_by_user_id": referrer_id,
+            }
+        ).eq("id", user["id"]).execute()
+
+        # V2: Audio preferences removed (V1 feature)
     else:
         # Ensure existing user is in auth.users (for Realtime to work)
         await ensure_auth_user_exists(user)

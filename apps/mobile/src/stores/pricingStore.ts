@@ -1,17 +1,17 @@
 import { create } from "zustand";
-import { subscriptionPlansApi, SubscriptionPlan } from "@/services/api/subscriptionPlans";
+import { subscriptionPlansApi, PricingPlan } from "@/services/api/subscriptionPlans";
 import { logger } from "@/services/logger";
 
 interface PricingState {
   // State
-  plans: SubscriptionPlan[];
+  plans: PricingPlan[];
   isLoading: boolean;
   error: string | null;
   lastFetched: number | null;
 
   // Actions
   fetchPlans: () => Promise<void>;
-  getPlanById: (id: string) => SubscriptionPlan | undefined;
+  getPlanById: (id: string) => PricingPlan | undefined;
   getGoalLimit: (planId: string) => number | null; // null means unlimited
   canCreateGoal: (planId: string, currentGoalCount: number) => boolean;
   clearError: () => void;
@@ -35,8 +35,10 @@ export const usePricingStore = create<PricingState>((set, get) => ({
   fetchPlans: async () => {
     const { lastFetched, plans } = get();
 
-    // Check if we have recent data - return immediately without touching isLoading
-    if (lastFetched && Date.now() - lastFetched < CACHE_DURATION && plans.length > 0) {
+    // Check if we have recent data AND plans array is not empty
+    // If plans is empty, we should refetch even if cache timestamp exists
+    const hasValidData = plans && plans.length > 0;
+    if (hasValidData && lastFetched && Date.now() - lastFetched < CACHE_DURATION) {
       return;
     }
 
@@ -83,7 +85,7 @@ export const usePricingStore = create<PricingState>((set, get) => ({
 
   getGoalLimit: (planId: string) => {
     const plan = get().getPlanById(planId);
-    return plan?.goal_limit ?? null;
+    return plan?.active_goal_limit ?? null;
   },
 
   canCreateGoal: (planId: string, currentGoalCount: number) => {

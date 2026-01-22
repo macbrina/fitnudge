@@ -1,7 +1,7 @@
 """
-Achievement Tasks
+FitNudge V2 - Achievement Tasks
 
-Celery tasks for achievement unlocking and challenge progress tracking.
+Celery tasks for achievement unlocking.
 """
 
 from typing import Dict, Any, Optional
@@ -28,7 +28,7 @@ def check_achievements_task(
     Args:
         self: Celery task instance
         user_id: User ID
-        source_type: Optional source type ("goal" or "challenge") for metadata
+        source_type: Optional source type for metadata
         source_id: Optional source ID for metadata
 
     Returns:
@@ -61,7 +61,7 @@ def check_achievements_task(
             supabase = get_supabase_client()
 
             try:
-                from app.services.expo_push_service import send_push_to_user
+                from app.services.expo_push_service import send_push_to_user_sync
 
                 for achievement in newly_unlocked:
                     # Use correct field names from _unlock_achievement
@@ -73,26 +73,21 @@ def check_achievements_task(
 
                     try:
                         achievement_id = achievement.get("id")
-                        notification_result = loop.run_until_complete(
-                            send_push_to_user(
-                                user_id=user_id,
-                                title="🏆 Achievement Unlocked!",
-                                body=f"{badge_name}"
-                                + (
-                                    f": {badge_description}"
-                                    if badge_description
-                                    else ""
-                                ),
-                                data={
-                                    "type": "achievement",
-                                    "achievementId": achievement_id,
-                                    "badgeKey": badge_key,
-                                    "deepLink": "/(user)/profile/achievements",
-                                },
-                                notification_type="achievement",
-                                entity_type="achievement",
-                                entity_id=achievement_id,
-                            )
+                        # Use sync version for Celery consistency
+                        notification_result = send_push_to_user_sync(
+                            user_id=user_id,
+                            title="🏆 Achievement Unlocked!",
+                            body=f"{badge_name}"
+                            + (f": {badge_description}" if badge_description else ""),
+                            data={
+                                "type": "achievement",
+                                "achievementId": achievement_id,
+                                "badgeKey": badge_key,
+                                "deepLink": "/(user)/profile/achievements",
+                            },
+                            notification_type="achievement",
+                            entity_type="achievement",
+                            entity_id=achievement_id,
                         )
 
                         if notification_result.get("notification_id"):
@@ -217,89 +212,87 @@ def check_achievements_task(
 
 
 @celery_app.task(
-    name="update_challenge_progress",
+    name="check_account_age_achievements",
     bind=True,
     max_retries=2,
-    default_retry_delay=30,
+    default_retry_delay=60,
     autoretry_for=(Exception,),
     retry_backoff=True,
 )
-def update_challenge_progress_task(
-    self, user_id: str, goal_id: Optional[str] = None
-) -> Dict[str, Any]:
+def check_account_age_achievements_task(self) -> Dict[str, Any]:
     """
-    Celery task to update challenge progress for a user.
+    Scheduled task to check account_age achievements for all users.
+    Should run daily to unlock membership milestone achievements.
 
-    Note: goal_id is kept for backward compatibility but not used.
-    Challenge progress is updated for all challenges the user participates in.
-
-    Args:
-        self: Celery task instance
-        user_id: User ID
-        goal_id: Optional goal ID (not used, kept for compatibility)
-
-    Returns:
-        Dict with updated challenge data
+    This checks users who might have reached account age milestones
+    (30, 90, 180, 365, 730, 1095, 1825 days).
     """
-    from app.services.challenge_service import challenge_service
-    import asyncio
+    from datetime import datetime, timedelta
 
     try:
         supabase = get_supabase_client()
 
-        # Find all active challenges the user is participating in
-        participants = (
-            supabase.table("challenge_participants")
-            .select("challenge_id")
-            .eq("user_id", user_id)
-            .execute()
-        )
+        # Account age milestones (in days)
+        milestones = [30, 90, 180, 365, 730, 1095, 1825]
 
-        if not participants.data:
-            return {"success": True, "updated_challenges": 0}
+        users_checked = 0
+        achievements_unlocked = 0
 
-        # Update progress for each challenge
-        updated_count = 0
-        loop = None
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_closed():
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+        # For each milestone, find users who just reached it (within last 2 days buffer)
+        for days in milestones:
+            # Calculate the date range for users who reached this milestone
+            target_date = datetime.utcnow() - timedelta(days=days)
+            buffer_start = target_date - timedelta(days=1)
+            buffer_end = target_date + timedelta(days=1)
 
-        for participant in participants.data:
-            challenge_id = participant["challenge_id"]
+            # Find users created within this window
+            result = (
+                supabase.table("users")
+                .select("id")
+                .gte("created_at", buffer_start.isoformat())
+                .lte("created_at", buffer_end.isoformat())
+                .execute()
+            )
 
-            try:
-                loop.run_until_complete(
-                    challenge_service.update_participant_progress(
-                        challenge_id=challenge_id,
+            users = result.data or []
+
+            for user in users:
+                user_id = user["id"]
+                users_checked += 1
+
+                # Trigger achievement check for this user
+                try:
+                    check_result = check_achievements_task.delay(
                         user_id=user_id,
+                        source_type="account_age",
+                        source_id=f"milestone_{days}",
                     )
-                )
-                updated_count += 1
-            except Exception as e:
-                logger.warning(
-                    f"Failed to update progress for challenge {challenge_id}",
-                    {"error": str(e), "challenge_id": challenge_id, "user_id": user_id},
-                )
+                    if check_result:
+                        achievements_unlocked += 1
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to check achievements for user {user_id}",
+                        {"error": str(e)},
+                    )
+
+        logger.info(
+            "Account age achievement check completed",
+            {
+                "users_checked": users_checked,
+                "achievements_triggered": achievements_unlocked,
+            },
+        )
 
         return {
             "success": True,
-            "updated_challenges": updated_count,
+            "users_checked": users_checked,
+            "achievements_triggered": achievements_unlocked,
         }
 
     except Exception as e:
         logger.error(
-            f"Failed to update challenge progress for user {user_id}",
-            {
-                "error": str(e),
-                "user_id": user_id,
-                "retry_count": self.request.retries,
-            },
+            "Failed to run account age achievement check",
+            {"error": str(e), "retry_count": self.request.retries},
         )
 
         if self.request.retries >= self.max_retries:

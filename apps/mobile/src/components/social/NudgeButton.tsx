@@ -7,13 +7,13 @@ import { fontFamily } from "@/lib/fonts";
 import { useTranslation } from "@/lib/i18n";
 import { useAlertModal } from "@/contexts/AlertModalContext";
 import { useSendQuickNudge } from "@/hooks/api/useNudges";
+import { ApiError } from "@/services/api/base";
 import { Ionicons } from "@expo/vector-icons";
 
 interface NudgeButtonProps {
   recipientId: string;
   recipientName: string;
   goalId?: string;
-  challengeId?: string;
   partnershipId?: string;
   onSuccess?: () => void;
   size?: "sm" | "md" | "lg";
@@ -25,7 +25,6 @@ export function NudgeButton({
   recipientId,
   recipientName,
   goalId,
-  challengeId,
   partnershipId,
   onSuccess,
   size = "md",
@@ -58,7 +57,6 @@ export function NudgeButton({
         recipientId,
         type: "nudge",
         goalId,
-        challengeId,
         partnershipId
       });
 
@@ -70,8 +68,11 @@ export function NudgeButton({
       });
 
       onSuccess?.();
-    } catch (error: any) {
-      const errorMessage = error?.response?.data?.detail || t("social.nudge_error");
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof ApiError
+          ? error.message
+          : t("social.nudge_error") || "Failed to send nudge";
       showAlert({
         title: t("common.error"),
         message: errorMessage,

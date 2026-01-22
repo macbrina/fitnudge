@@ -8,35 +8,46 @@ import { BaseApiService, ApiResponse } from "./base";
 import { ROUTES } from "@/lib/routes";
 import { DeviceTokenInfo, NotificationPreferences } from "../notifications/notificationTypes";
 
+/**
+ * V2 Notification Types
+ *
+ * Core Types:
+ * - reminder: Check-in prompts and follow-ups
+ * - ai_motivation: AI-generated motivation messages
+ * - subscription: Subscription-related notifications (always sent)
+ * - reengagement: User reengagement notifications
+ * - achievement: Achievement unlock notifications
+ * - streak_milestone: Streak milestone celebrations (7, 14, 21, 30, 50, 100 days)
+ * - weekly_recap: Weekly recap summaries
+ * - adaptive_nudge: V2 adaptive nudging (crushing it, pattern suggestions, etc.)
+ * - general: Fallback for generic notifications
+ *
+ * Social/Partner Types:
+ * - partner_request: Partner request received
+ * - partner_accepted: Partner request accepted
+ * - partner_nudge: Nudge from partner
+ * - partner_cheer: Cheer from partner
+ * - partner_milestone: Partner achieved a milestone
+ * - partner_inactive: Check on inactive partner
+ */
 export type NotificationType =
+  // Core notification types
   | "reminder"
   | "ai_motivation"
   | "subscription"
   | "reengagement"
   | "achievement"
-  | "social"
-  | "nudge"
+  | "streak_milestone"
+  | "weekly_recap"
+  | "adaptive_nudge"
   | "general"
+  // Partner/Social notification types
   | "partner_request"
   | "partner_accepted"
   | "partner_nudge"
   | "partner_cheer"
   | "partner_milestone"
-  | "partner_inactive"
-  | "challenge"
-  | "challenge_invite"
-  | "challenge_joined"
-  | "challenge_overtaken"
-  | "challenge_lead"
-  | "challenge_nudge"
-  | "challenge_starting"
-  | "challenge_ending"
-  | "challenge_ended"
-  | "plan_ready"
-  | "motivation_message"
-  | "weekly_recap"
-  | "streak_milestone"
-  | "goal_complete";
+  | "partner_inactive";
 
 export interface RegisterDeviceResponse {
   success: boolean;
@@ -93,6 +104,16 @@ class NotificationsService extends BaseApiService {
   async markOpened(notificationId: string): Promise<ApiResponse<{ success: boolean }>> {
     return this.post<{ success: boolean }>(
       `${ROUTES.NOTIFICATIONS.HISTORY}/${notificationId}/opened`
+    );
+  }
+
+  /**
+   * Mark ALL unread notifications as opened (batch operation)
+   * Single API call following SCALABILITY.md best practices
+   */
+  async markAllOpened(): Promise<ApiResponse<{ success: boolean; updated_count: number }>> {
+    return this.post<{ success: boolean; updated_count: number }>(
+      `${ROUTES.NOTIFICATIONS.HISTORY}/mark-all-opened`
     );
   }
 

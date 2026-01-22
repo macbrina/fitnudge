@@ -1,0 +1,898 @@
+{
+  "common": {
+    "error": "Errore",
+    "user": "Utente",
+    "logout": "Disconnettersi",
+    "close": "Chiudi",
+    "loading": "Caricamento...",
+    "feedback": "Feedback",
+    "send_feedback": "Invia feedback"
+  },
+  "auth": {
+    "login": {
+      "title": "Benvenuto a FitNudge",
+      "subtitle": "Accedi per continuare",
+      "email_placeholder": "Email",
+      "password_placeholder": "Password",
+      "sign_in": "Accedi",
+      "signing_in": "Accesso in corso...",
+      "no_account": "Non hai un account?",
+      "sign_up": "Iscriviti"
+    },
+    "signup": {
+      "title": "Crea account",
+      "subtitle": "Iscriviti a FitNudge oggi",
+      "name_placeholder": "Nome completo",
+      "username_placeholder": "Nome utente",
+      "email_placeholder": "Email",
+      "password_placeholder": "Password",
+      "create_account": "Crea account",
+      "creating_account": "Creazione account...",
+      "already_have_account": "Hai già un account?",
+      "sign_in": "Accedi"
+    }
+  },
+  "home": {
+    "welcome_back": "Bentornato, {{name}}!",
+    "subtitle": "Pronto a raggiungere i tuoi obiettivi oggi?",
+    "todays_motivation": "La motivazione di oggi",
+    "motivation_quote": "Ogni passo che fai è un passo più vicino ai tuoi obiettivi. Continua a andare avanti! 💪",
+    "quick_actions": "Azioni rapide",
+    "log_workout": "Registra allenamento",
+    "set_goal": "Imposta obiettivo",
+    "recent_activity": "Attività recente",
+    "activity_message": "Sei stato costante con i tuoi allenamenti questa settimana! 🎉"
+  },
+  "goals": {
+    "title": "I miei obiettivi",
+    "subtitle": "Monitora i tuoi progressi e rimani motivato",
+    "active_goals": "Obiettivi Attivi",
+    "no_goals_message": "Non hai ancora obiettivi attivi. Crea il tuo primo obiettivo per iniziare!",
+    "create_goal": "Crea obiettivo",
+    "categories": "Categorie di obiettivi",
+    "category_fitness": "Fitness",
+    "category_nutrition": "Nutrizione",
+    "category_wellness": "Benessere",
+    "category_sleep": "Sonno"
+  },
+  "feed": {
+    "title": "Feed di Motivazione",
+    "subtitle": "Post motivazionali e comunitari basati sull'IA",
+    "ai_motivation": "Motivazione dell'IA",
+    "ai_quote_1": "Stai andando alla grande! Ogni allenamento conta e stai costruendo un slancio inarrestabile! 🚀",
+    "time_ago": "{{hours}} ore fa"
+  },
+  "profile": {
+    "account_settings": "Impostazioni account",
+    "edit_profile": "Modifica profilo",
+    "notifications": "Notifiche",
+    "privacy": "Privacy",
+    "subscription": "Abbonamento",
+    "manage_subscription": "Gestisci abbonamento",
+    "billing_history": "Storico fatturazione",
+    "support": "Supporto",
+    "help_center": "Centro assistenza",
+    "contact_us": "Contattaci",
+    "free_plan": "Piano gratuito",
+    "pro_plan": "Pro Plan"
+  },
+  "web": {
+    "hero": {
+      "title": "Il tuo partner di responsabilità potenziato dall'IA",
+      "subtitle": "Ricevi motivazione personalizzata, monitora i tuoi obiettivi e connettiti con una comunità che ti mantiene responsabile. Alimentato da tecnologia avanzata AI.",
+      "download_free": "Scarica Gratis",
+      "learn_more": "Scopri di più"
+    },
+    "blog": {
+      "title": "Blog FitNudge",
+      "subtitle": "Approfondimenti, consigli e storie per aiutarti a costruire abitudini durature. Dalla motivazione supportata dall'IA alle storie di successo della comunità.",
+      "article": "Articolo",
+      "read_article": "Leggi articolo",
+      "read_full_article": "Leggi l'articolo completo",
+      "featured": "In evidenza",
+      "featured_article": "Articolo in evidenza",
+      "all_posts": "Tutti i post",
+      "latest_articles": "Ultimi Articoli",
+      "articles": "Articoli",
+      "articles_description": "Esplora la nostra raccolta di articoli sulla costruzione di abitudini, la produttività e la crescita personale.",
+      "min_read": "Lettura di {{minutes}} minuti",
+      "min": "{{minutes}} min",
+      "back_to_blog": "Torna al blog",
+      "loading": "Caricamento...",
+      "related_articles": "Articoli correlati",
+      "no_articles_found": "Nessun articolo trovato",
+      "no_articles_category": "Non ci sono ancora articoli in questa categoria. Prova a selezionare un'altra categoria o torna a controllare presto!",
+      "no_articles_empty": "Stiamo lavorando per creare contenuti di qualità per te. Torna presto per articoli utili su come costruire abitudini sane!",
+      "view_all_posts": "Visualizza tutti i post",
+      "pagination": { "previous": "Precedente", "next": "Avanti" },
+      "newsletter": {
+        "title": "Rimani aggiornato",
+        "description": "Ricevi nella tua casella di posta gli ultimi articoli su come creare abitudini, consigli sulla produttività e storie di successo.",
+        "placeholder": "Inserisci la tua email",
+        "subscribe": "Iscriviti"
+      },
+      "cta": {
+        "title": "Pronto a costruire abitudini migliori?",
+        "description": "Unisciti a migliaia di persone che già utilizzano FitNudge per rimanere responsabili e raggiungere i loro obiettivi.",
+        "button": "Iscriviti alla lista d’attesa"
+      },
+      "share": {
+        "title": "Condividi",
+        "twitter": "Condividi su Twitter",
+        "facebook": "Condividi su Facebook",
+        "linkedin": "Condividi su LinkedIn",
+        "copy_link": "Copia link",
+        "link_copied": "Link copiato!"
+      },
+      "error": {
+        "not_found_title": "Articolo non trovato",
+        "not_found_description": "L'articolo che stai cercando non esiste o è stato rimosso.",
+        "failed_to_load": "Impossibile caricare il post",
+        "post_not_found": "Post non trovato"
+      }
+    }
+  },
+  "nav": {
+    "why_fitnudge": "Perché FitNudge",
+    "features": "Caratteristiche",
+    "how_it_works": "Come funziona",
+    "testimonials": "Testimonianze",
+    "blog": "Blog",
+    "contact": "Contatto",
+    "download": "Scarica l'app",
+    "theme": "Tema",
+    "language": "Lingua",
+    "join_waitlist": "Iscriviti alla lista d'attesa",
+    "join": "Iscriviti",
+    "toggle_menu": "Apri/chiudi menu",
+    "close_menu": "Chiudi menu",
+    "select_language": "Seleziona lingua"
+  },
+  "hero": {
+    "badge": "In arrivo",
+    "title": "Il tuo partner di responsabilità AI per qualsiasi obiettivo",
+    "subtitle": "Rimani costante con qualsiasi abitudine o obiettivo - fitness, lettura, meditazione, apprendimento o qualsiasi altra cosa. FitNudge ti offre il promemoria quotidiano di cui hai bisogno.",
+    "download_free": "Scarica Gratis",
+    "join_waitlist": "Iscriviti alla lista d’attesa",
+    "watch_demo": "Guarda la demo",
+    "stats": {
+      "users": "Utenti Attivi",
+      "rating": "Valutazione dell'App Store",
+      "support": "Supporto AI"
+    }
+  },
+  "features": {
+    "title": "Tutto ciò di cui hai bisogno per rimanere costante",
+    "subtitle": "FitNudge è pieno di funzionalità progettate per mantenerti responsabile e motivato nel tuo percorso.",
+    "view_all": "Visualizza tutte le funzionalità",
+    "ai": {
+      "title": "Motivazione dell'IA",
+      "description": "Messaggi AI personalizzati che si adattano al tuo percorso e ti mantengono motivato ogni giorno."
+    },
+    "goals": {
+      "title": "Monitoraggio degli obiettivi",
+      "description": "Imposta obiettivi giornalieri o settimanali con una pianificazione flessibile. Monitora qualsiasi abitudine tu voglia sviluppare."
+    },
+    "reminders": {
+      "title": "Promemoria intelligenti",
+      "description": "Notifiche intelligenti che funzionano come un coach AI che ti controlla nei momenti giusti."
+    },
+    "streaks": {
+      "title": "Monitoraggio della serie",
+      "description": "Costruisci slancio con il monitoraggio delle serie. Vedi le tue serie attuali e più lunghe per rimanere costante."
+    },
+    "partners": {
+      "title": "Partner di responsabilità",
+      "description": "Connettiti con partner che condividono i tuoi obiettivi. Inviate incoraggiamenti, stimoli e motivatevi a vicenda."
+    },
+    "coach": {
+      "title": "Chat dell'allenatore AI",
+      "description": "Conversazioni su richiesta con il tuo coach AI che conosce i tuoi obiettivi, le tue abitudini e i tuoi progressi."
+    },
+    "analytics": {
+      "title": "Analisi dei Progressi",
+      "description": "Monitora i tuoi progressi con analisi dettagliate e informazioni sul tuo percorso di fitness."
+    },
+    "community": {
+      "title": "Supporto alla Comunità",
+      "description": "Connettiti con appassionati di fitness che la pensano come te e condividete insieme il vostro percorso."
+    },
+    "privacy": {
+      "title": "Privacy e Sicurezza",
+      "description": "I tuoi dati sono protetti da controlli di sicurezza e privacy di livello aziendale."
+    },
+    "cta": {
+      "title": "Pronto per iniziare?",
+      "subtitle": "Unisciti a migliaia di utenti che stanno già costruendo abitudini durature con FitNudge."
+    }
+  },
+  "testimonials": {
+    "title": "Amato da chi raggiunge gli obiettivi",
+    "subtitle": "Unisciti a migliaia di persone che hanno trasformato le loro abitudini con FitNudge",
+    "rating": "Valutazione dell'App Store",
+    "users": "Utenti soddisfatti",
+    "satisfaction": "Tasso di soddisfazione",
+    "stats": {
+      "active_users": "Utenti Attivi",
+      "app_rating": "Valutazione dell'App Store",
+      "consistency_rate": "Tasso di coerenza",
+      "check_ins": "Check-in completati"
+    },
+    "items": {
+      "sarah": {
+        "name": "Sarah M.",
+        "role": "Raggiuntore di obiettivi",
+        "content": "FitNudge ha completamente cambiato il modo in cui affronto i miei obiettivi. I controlli dell'IA sembrano personali e mi motivano davvero a rimanere costante."
+      },
+      "david": {
+        "name": "David R.",
+        "role": "Corridore di maratona",
+        "content": "I riassunti settimanali sono fantastici! Adoro vedere i miei schemi: mi mostrano cosa funziona e dove devo migliorare. Un cambiamento totale per il mio allenamento."
+      },
+      "emily": {
+        "name": "Emily T.",
+        "role": "Mamma impegnata",
+        "content": "Come mamma impegnata, non avrei mai pensato di poter rimanere coerente con i miei obiettivi. I promemoria intelligenti e la celebrazione dei piccoli traguardi mi danno la carica."
+      },
+      "alex": {
+        "name": "Alex P.",
+        "role": "Sviluppatore di software",
+        "content": "Ho provato molti tracker di abitudini, ma FitNudge è diverso. L'intelligenza artificiale ricordava davvero perché ho iniziato e usa questo per motivarmi."
+      },
+      "jessica": {
+        "name": "Jessica L.",
+        "role": "Istruttore di yoga",
+        "content": "La funzione del partner di responsabilità è fantastica! Avere qualcuno con cui condividere il mio percorso fa tutta la differenza."
+      },
+      "michael": {
+        "name": "Michael K.",
+        "role": "Viaggio per la perdita di peso",
+        "content": "Persi 30 libbre in 6 mesi! Tenere traccia della mia serie mi ha aiutato a restare responsabile anche nei giorni in cui non avevo voglia di allenarmi."
+      }
+    }
+  },
+  "pricing": {
+    "title": "Prezzi Semplici e Trasparenti",
+    "subtitle": "Scegli il piano che fa per te. Tutti i piani includono le nostre funzionalità principali di intelligenza artificiale.",
+    "popular": "Più Popolari",
+    "note": "Tutti i piani includono una prova gratuita di 14 giorni. Non è richiesta la carta di credito.",
+    "free": {
+      "name": "Piano gratuito",
+      "price": "$ 0",
+      "period": "/mese",
+      "description": "Perfetto per iniziare",
+      "features": {
+        "basic_ai": "Motivazione di base dell'IA",
+        "one_goal": "1 obiettivo attivo",
+        "community": "Accesso alla comunità",
+        "basic_analytics": "Monitoraggio dei progressi di base"
+      },
+      "cta": "Inizia Gratis"
+    },
+    "pro": {
+      "name": "Pro Plan",
+      "price": "$ 9,99",
+      "period": "/mese",
+      "description": "Per chi punta a obiettivi seri",
+      "features": {
+        "unlimited_goals": "Obiettivi illimitati",
+        "voice_coaching": "Post vocali e coaching con IA",
+        "advanced_analytics": "Analisi avanzata",
+        "priority_support": "Supporto prioritario",
+        "personalized_plans": "Piani di allenamento personalizzati",
+        "export_data": "Esportazione dei dati"
+      },
+      "cta": "Avvia la prova Pro"
+    },
+    "enterprise": {
+      "name": "Impresa",
+      "price": "Personalizzato",
+      "period": "",
+      "description": "Per team e organizzazioni",
+      "features": {
+        "everything_pro": "Tutto in Pro",
+        "team_management": "Gestione del team",
+        "custom_integrations": "Integrazioni personalizzate",
+        "dedicated_support": "Supporto dedicato",
+        "advanced_security": "Sicurezza avanzata",
+        "sla_guarantee": "Garanzia SLA"
+      },
+      "cta": "Contatta le vendite"
+    }
+  },
+  "footer": {
+    "description": "Il tuo partner di responsabilità alimentato dall'IA per qualsiasi obiettivo. Crea abitudini durature con motivazione personalizzata e monitoraggio intelligente.",
+    "product": "Prodotto",
+    "company": "Azienda",
+    "support": "Supporto",
+    "features": "Caratteristiche",
+    "pricing": "Prezzi",
+    "download": "Scarica",
+    "blog": "Blog",
+    "contact": "Contatto",
+    "about": "Informazioni",
+    "help_center": "Centro assistenza",
+    "privacy": "Informativa sulla privacy",
+    "terms": "Termini di Servizio",
+    "cookies": "Politica sui cookie",
+    "rights": "Tutti i diritti riservati.",
+    "why_fitnudge": "Perché FitNudge",
+    "faqs": "Domande frequenti",
+    "system_status": "Stato del sistema",
+    "legal": "Legale",
+    "made_with": "Fatto con",
+    "for_goal_achievers": "per chi raggiunge obiettivi",
+    "download_cta": {
+      "title": "Pronto a trasformare il tuo percorso di fitness?",
+      "subtitle": "Scarica FitNudge oggi e inizia la tua trasformazione delle abitudini supportata dall'IA",
+      "ios": "Scarica per iOS",
+      "android": "Scarica per Android"
+    }
+  },
+  "cookies": {
+    "title": "Usiamo i cookie",
+    "description": "Utilizziamo i cookie per migliorare la tua esperienza, analizzare il traffico del sito e personalizzare i contenuti. Puoi personalizzare le tue preferenze qui sotto.",
+    "accept_all": "Accetta tutto",
+    "customize": "Personalizza",
+    "reject_all": "Rifiuta tutto",
+    "preferences": {
+      "title": "Preferenze dei cookie",
+      "save": "Salva preferenze",
+      "cancel": "Annulla",
+      "required": "Necessario",
+      "necessary": {
+        "title": "Cookie necessari",
+        "description": "Essenziale per il corretto funzionamento del sito web. Questi non possono essere disattivati."
+      },
+      "analytics": {
+        "title": "Cookie di analisi",
+        "description": "Aiutaci a capire come i visitatori interagiscono con il nostro sito web raccogliendo informazioni anonime."
+      },
+      "marketing": {
+        "title": "Cookie di marketing",
+        "description": "Utilizzato per monitorare i visitatori attraverso i siti web per mostrare pubblicità pertinenti e coinvolgenti."
+      },
+      "functional": {
+        "title": "Cookie funzionali",
+        "description": "Abilita funzionalità avanzate e personalizzazione, come ricordare le tue preferenze."
+      }
+    }
+  },
+  "health": {
+    "badge": "Stato del Sistema FitNudge",
+    "title": "Disponibilità della piattaforma",
+    "tagline": "Visualizzazione in tempo reale della nostra infrastruttura principale. Ogni barra qui sotto rappresenta l'ultimo controllo di salute registrato. Il verde significa che è tutto funzionante, l'ambra indica un degrado parziale e il rosso segnala un'interruzione del servizio.",
+    "status": {
+      "operational": "Operativo",
+      "degraded": "Degradato",
+      "critical": "Interruzione",
+      "not_configured": "Non configurato",
+      "checking": "Controllo…"
+    },
+    "metrics": {
+      "overall_uptime": "Tempo di attività complessivo (mobile)",
+      "healthy_checks": "{{value}}% controlli sanitari",
+      "last_updated": "Ultimo aggiornamento",
+      "environment": "Ambiente",
+      "api_version": "Versione API",
+      "loading_placeholder": "—"
+    },
+    "labels": { "unknown": "sconosciuto" },
+    "how_we_track": {
+      "button": "Come monitoriamo lo stato",
+      "title": "Come monitoriamo lo stato",
+      "description": "Ogni minuto eseguiamo controlli automatizzati sulle infrastrutture critiche. Ecco cosa monitoriamo:",
+      "items": {
+        "api": "Heartbeat dell'API, raggiungibilità del database, connessioni alla cache.",
+        "queues": "Salute della coda in background, trasporto email, fornitori di analisi.",
+        "third_party": "Servizi di intelligenza artificiale di terze parti e integrazioni di analisi."
+      }
+    },
+    "cards": {
+      "uptime": "{{value}}% tempo di attività",
+      "last_check": "Ultimo controllo {{value}}",
+      "affected_one": "{{count}} componente interessato",
+      "affected_other": "{{count}} componenti interessati"
+    },
+    "incidents": {
+      "loading": "Caricamento…",
+      "none": "Nessun incidente attivo",
+      "show_details": "Mostra dettagli",
+      "hide_details": "Nascondi dettagli",
+      "title": "Incidenti attivi",
+      "investigating": "Indagando."
+    },
+    "loading_banner": "Controllo dello stato del sistema…",
+    "error": {
+      "title": "Impossibile raggiungere il servizio di stato.",
+      "developer_hint": "Sviluppatori: assicuratevi che il backend sia attivo su {{url}} prima di ricaricare.",
+      "default_url": "l'URL base della tua API",
+      "missing_api": "L'URL di base dell'API non è configurato."
+    },
+    "components_section": {
+      "title": "Salute del componente",
+      "description": "Ogni scheda rappresenta una dipendenza critica. Manteniamo una finestra mobile di controlli in modo che tu possa individuare le tendenze a colpo d'occhio."
+    },
+    "history": {
+      "view_button": "Visualizza cronologia",
+      "title": "Storico degli incidenti",
+      "description": "Record recenti catturati dai nostri controlli automatizzati.",
+      "loading": "Caricamento della cronologia…",
+      "error": "Impossibile caricare la cronologia in questo momento.",
+      "missing_api": "L'URL di base dell'API non è configurato.",
+      "empty": "Nessun incidente registrato finora.",
+      "list_heading": "Eventi storici",
+      "list_description": "Esplora gli incidenti precedentemente registrati dai nostri controlli automatici e segui gli aggiornamenti sulla loro risoluzione.",
+      "back_to_status": "Torna allo stato del sistema",
+      "back_to_history": "Torna alla cronologia degli incidenti",
+      "detail_not_found": "Non siamo riusciti a trovare quell'incidente.",
+      "detail_impacted": "Componenti interessati",
+      "detail_no_impacted": "Nessun componente è stato segnalato come interessato.",
+      "detail_updates": "Aggiorna cronologia",
+      "detail_update_count": "Aggiornamenti {{count}}",
+      "detail_reported": "Segnalato {{value}}",
+      "latest_update": "Ultimo aggiornamento",
+      "view_details": "Visualizza dettagli",
+      "no_updates": "Nessun aggiornamento pubblicato ancora.",
+      "timestamp": "Accesso {{value}}",
+      "impacted": "Componenti interessati",
+      "no_details": "Nessun dettaglio aggiuntivo fornito.",
+      "summary": {
+        "operational": "Tutti i sistemi operativi",
+        "single": "{{component}} ha riportato una condizione {{status}}",
+        "multiple": "{{count}} componenti interessati"
+      },
+      "update_status": {
+        "identified": "Identificato",
+        "monitoring": "Monitoraggio",
+        "resolved": "Risolto"
+      }
+    },
+    "components": {
+      "supabase": {
+        "name": "Servizi Core",
+        "descriptions": {
+          "ok": "Tutti i servizi principali funzionano senza problemi.",
+          "critical": "I servizi principali non sono attualmente disponibili."
+        }
+      },
+      "smtp": {
+        "name": "Notifiche",
+        "descriptions": {
+          "ok": "Le notifiche email funzionano.",
+          "degraded": "Le notifiche e-mail possono subire dei ritardi."
+        }
+      },
+      "openai": {
+        "name": "Funzionalità AI",
+        "descriptions": {
+          "ok": "Le funzionalità basate sull'IA sono disponibili.",
+          "not_configured": "Le funzionalità di IA non sono disponibili temporaneamente."
+        }
+      }
+    }
+  },
+  "wellness": {
+    "title": "Il tuo coach AI che non dorme mai",
+    "description1": "Ricevi messaggi motivazionali personalizzati dall'IA, promemoria intelligenti e check-in giornalieri che ti aiutano a rimanere responsabile per qualsiasi obiettivo — che si tratti di fare esercizio, leggere, meditare, imparare una nuova abilità o sviluppare qualsiasi abitudine positiva.",
+    "description2": "Monitora i tuoi progressi con analisi intelligenti, celebra le tue serie di successi e connettiti con partner di responsabilità che condividono il tuo percorso. Resta costante con il potere dell'IA.",
+    "cta": "Scopri di più",
+    "highlights": {
+      "ai_messages": "Messaggi motivazionali personalizzati con intelligenza artificiale",
+      "smart_reminders": "Promemoria intelligenti che si adattano a te",
+      "daily_checkins": "Controlli quotidiani per mantenerti responsabile",
+      "streak_tracking": "Monitora le serie e celebra la costanza"
+    }
+  },
+  "tracker": {
+    "title": "Monitora i tuoi progressi con le streak",
+    "description": "Monitora il tuo percorso con un tracciamento dei progressi intelligente. Visualizza le tue serie giornaliere, i check-in quotidiani e i risultati grazie a analisi dettagliate che ti aiutano a rimanere costante e motivato.",
+    "cta": "Scopri di più",
+    "join_waitlist": "Iscriviti alla lista d’attesa",
+    "stats": {
+      "track_progress": "Monitora i progressi",
+      "daily_checkins": "Controlli giornalieri",
+      "achievements": "Risultati"
+    }
+  },
+  "download": {
+    "title": "Scarica ora e inizia a creare abitudini durature.",
+    "description": "Unisciti a migliaia di utenti che stanno costruendo abitudini migliori con FitNudge. Presto disponibile su iOS e Android.",
+    "coming_soon": "In arrivo",
+    "app_store": "App Store",
+    "google_play": "Google Play",
+    "downloads": "Download",
+    "phone_mockup": {
+      "greeting": "Buongiorno!",
+      "ready": "Pronto per il check-in?",
+      "current_streak": "Serie attuale",
+      "streak_days": "🔥 14 giorni",
+      "todays_goal": "Obiettivo di oggi",
+      "morning_workout": "Allenamento mattutino"
+    }
+  },
+  "contact": {
+    "title": "Mettiamoci in contatto",
+    "subtitle": "Hai domande? Ci piacerebbe sentirti. Inviaci un messaggio e ti risponderemo il prima possibile.",
+    "form": {
+      "name": "Il tuo nome",
+      "email": "Indirizzo email",
+      "subject": "Oggetto",
+      "message": "Il tuo messaggio",
+      "submit": "Invia messaggio",
+      "sending": "Invio...",
+      "success": "Messaggio inviato con successo! Ti risponderemo presto.",
+      "error": "Qualcosa è andato storto. Per favore riprova.",
+      "name_placeholder": "John Doe",
+      "email_placeholder": "john@example.com",
+      "subject_placeholder": "Come possiamo aiutare?",
+      "message_placeholder": "Dicci di più sulla tua domanda o sul tuo feedback..."
+    },
+    "info": {
+      "title_email": "Inviaci un'email",
+      "title_response": "Tempo di risposta",
+      "email": "hello@fitnudge.app",
+      "response_time": "Di solito rispondiamo entro 24-48 ore"
+    }
+  },
+  "features_page": {
+    "title": "Tutte le funzionalità",
+    "subtitle": "Tutto ciò di cui hai bisogno per rimanere costante e costruire abitudini durature",
+    "free_tier": "Funzionalità gratuite",
+    "premium_tier": "Funzionalità Premium",
+    "view_all": "Visualizza tutte le funzionalità",
+    "free_price": "$0 per sempre",
+    "premium_price": "9,99$/mese",
+    "cta": {
+      "title": "Pronto a costruire abitudini durature?",
+      "description": "Iscriviti alla lista d'attesa e sii il primo a sapere quando FitNudge sarà lanciato.",
+      "button": "Iscriviti alla lista d’attesa"
+    },
+    "free_features": {
+      "goals": {
+        "title": "Fino a 2 obiettivi attivi",
+        "description": "Monitora fino a 2 obiettivi alla volta — fitness, lettura, meditazione, studio o qualsiasi abitudine tu voglia sviluppare."
+      },
+      "checkins": {
+        "title": "Controlli quotidiani con l'IA",
+        "description": "Ricevi promemoria di check-in Sì/No all'orario previsto. Semplice ed efficace per responsabilizzarti."
+      },
+      "streaks": {
+        "title": "Monitoraggio della serie",
+        "description": "Monitora le tue serie attuali e più lunghe. Celebra i traguardi a 7, 14, 21, 30, 50 e 100 giorni."
+      },
+      "motivation": {
+        "title": "Motivazione quotidiana",
+        "description": "Ricevi messaggi motivazionali generati dall'IA all'orario del promemoria programmato."
+      },
+      "stats": {
+        "title": "Statistiche di base",
+        "description": "Visualizza la tua percentuale di costanza e le statistiche di base dei progressi."
+      },
+      "partner": {
+        "title": "1 Partner di Responsabilità",
+        "description": "Connettiti con un partner di responsabilità per motivarvi a vicenda."
+      }
+    },
+    "premium_features": {
+      "goals": {
+        "title": "Fino a 10 Obiettivi Attivi",
+        "description": "Monitora fino a 10 obiettivi contemporaneamente. Perfetto per sviluppare più abitudini."
+      },
+      "coach": {
+        "title": "Chat con allenatore AI",
+        "description": "Conversazioni on-demand con il tuo coach AI che conosce i tuoi obiettivi, i tuoi schemi e i tuoi progressi."
+      },
+      "recaps": {
+        "title": "Riepiloghi Settimanali sull'IA",
+        "description": "Ricevi riepiloghi settimanali personalizzati con successi, approfondimenti e aree di concentrazione per la settimana successiva."
+      },
+      "analytics": {
+        "title": "Analisi Avanzata",
+        "description": "Grafici dettagliati, mappe di calore e analisi delle tendenze per comprendere meglio i tuoi modelli."
+      },
+      "patterns": {
+        "title": "Rilevamento Intelligente dei Modelli",
+        "description": "L'IA rileva schemi come i tuoi giorni migliori/peggiori e i punti di abbandono per aiutarti a migliorare."
+      },
+      "nudging": {
+        "title": "Sollecitazione Adattiva",
+        "description": "Sollecitazioni intelligenti quando stai per interrompere una serie o quando i modelli suggeriscono che hai bisogno di supporto extra."
+      },
+      "voice": {
+        "title": "Note vocali",
+        "description": "Registra le riflessioni vocali dopo i check-in per una consapevolezza di sé più profonda."
+      },
+      "partners": {
+        "title": "Fino a 3 partner di responsabilità",
+        "description": "Connettiti con fino a 3 partner. Inviate incoraggiamenti, solleciti e motivatevi a vicenda."
+      },
+      "reminders": {
+        "title": "Più orari di promemoria",
+        "description": "Imposta fino a 5 orari di promemoria per obiettivo per la massima flessibilità."
+      },
+      "ad_free": {
+        "title": "Esperienza senza pubblicità",
+        "description": "Goditi FitNudge senza interruzioni pubblicitarie."
+      },
+      "support": {
+        "title": "Supporto prioritario",
+        "description": "Ricevi tempi di risposta più rapidi dal nostro team di supporto quando hai bisogno di aiuto."
+      }
+    }
+  },
+  "why_fitnudge": {
+    "badge": "Il modo più intelligente per costruire abitudini",
+    "title": "Perché Scegliere FitNudge?",
+    "subtitle": "A differenza dei comuni tracker di abitudini, FitNudge utilizza l'intelligenza artificiale per comprenderti, motivarti personalmente e aiutarti a mantenere l'impegno per qualsiasi obiettivo tu fissi.",
+    "cta_button": "Iscriviti alla lista d’attesa",
+    "pain_points": {
+      "title": "Ti suona familiare?",
+      "subtitle": "La maggior parte delle persone affronta le stesse difficoltà quando cerca di creare nuove abitudini.",
+      "motivation": {
+        "problem": "Inizi con forza ma perdi motivazione dopo pochi giorni",
+        "solution": "FitNudge invia messaggi motivazionali personalizzati con intelligenza artificiale che risuonano davvero con te"
+      },
+      "tracking": {
+        "problem": "Tenere traccia sembra un compito noioso e ti dimentichi di farlo",
+        "solution": "Check-in semplici con un solo tocco e promemoria intelligenti nei momenti giusti"
+      },
+      "accountability": {
+        "problem": "Non hai nessuno che ti renda responsabile",
+        "solution": "Connettiti con partner di responsabilità che ti incoraggiano e ti danno una spinta quando necessario"
+      },
+      "generic": {
+        "problem": "Le app generiche non comprendono il tuo percorso personale",
+        "solution": "Approfondimenti basati sull'IA che si adattano ai tuoi schemi e obiettivi"
+      }
+    },
+    "differentiators": {
+      "title": "Cosa rende FitNudge diverso",
+      "subtitle": "Abbiamo creato FitNudge per risolvere i veri problemi legati alla formazione delle abitudini.",
+      "ai": {
+        "title": "IA Che Ti Capisce",
+        "description": "La nostra intelligenza artificiale apprende i tuoi schemi, le tue preferenze e ciò che ti motiva per offrire un supporto veramente personalizzato."
+      },
+      "any_goal": {
+        "title": "Qualsiasi obiettivo, un'unica app",
+        "description": "Che si tratti di fitness, lettura, meditazione, apprendimento di una nuova abilità o qualsiasi abitudine positiva, FitNudge se ne occupa tutto."
+      },
+      "partners": {
+        "title": "Vera responsabilità",
+        "description": "Connettiti con amici o familiari come partner di responsabilità. Inviate incoraggiamenti, stimoli e motivatevi a vicenda."
+      },
+      "nudges": {
+        "title": "Sollecitazioni Intelligenti",
+        "description": "Ricevi promemoria al momento giusto basati sulle tue abitudini e sul tuo programma, non su notifiche arbitrarie."
+      },
+      "insights": {
+        "title": "Informazioni Utili",
+        "description": "Osserva i tuoi schemi, comprendi cosa funziona e ricevi suggerimenti basati sull'IA per migliorare."
+      },
+      "holistic": {
+        "title": "Approccio Olistico",
+        "description": "Monitora più obiettivi insieme e scopri come si intrecciano per costruire una versione migliore di te."
+      }
+    },
+    "benefits": {
+      "title": "Cosa otterrai",
+      "consistency": {
+        "title": "Rimani costante",
+        "description": "Costruisci abitudini e mantieni il ritmo con check-in quotidiani e stimoli motivazionali."
+      },
+      "motivation": {
+        "title": "Non perdere mai motivazione",
+        "description": "Messaggi generati dall'IA che ti mantengono ispirato e concentrato sui tuoi obiettivi."
+      },
+      "privacy": {
+        "title": "I tuoi dati, il tuo controllo",
+        "description": "Prendiamo la privacy sul serio. I tuoi dati sono criptati e non vengono mai venduti a terzi."
+      }
+    },
+    "cta": {
+      "title": "Pronto a costruire abitudini durature?",
+      "description": "Unisciti a migliaia di persone che raggiungono i loro obiettivi e che sono già nella lista d'attesa. Sii il primo a provare FitNudge.",
+      "button": "Accedi in anteprima"
+    }
+  },
+  "waitlist": {
+    "badge": "In arrivo",
+    "title": "Iscriviti alla lista d'attesa e ottieni l'accesso anticipato",
+    "description": "Sii tra i primi a provare FitNudge - il tuo partner di responsabilità alimentato dall'intelligenza artificiale per qualsiasi obiettivo. Iscriviti ora per assicurarti il tuo posto e i vantaggi esclusivi per i primi iscritti.",
+    "reserve_spot": "Prenota il tuo posto",
+    "social_proof": "Unisciti a oltre 1.000 persone che hanno già raggiunto i loro obiettivi e sono in lista d'attesa",
+    "fallback_link": "Iscriviti alla lista d’attesa",
+    "privacy_note": "Rispettiamo la tua privacy. Puoi annullare l'iscrizione in qualsiasi momento.",
+    "benefits": {
+      "early_access": {
+        "title": "Accesso anticipato",
+        "description": "Sii il primo a provare FitNudge quando lo lanceremo"
+      },
+      "founder_pricing": {
+        "title": "Prezzi per i Fondatori",
+        "description": "Blocca prezzi speciali per i sostenitori early"
+      },
+      "launch_updates": {
+        "title": "Aggiornamenti sul lancio",
+        "description": "Ricevi notifiche sulle nuove funzionalità e sulla data di rilascio"
+      },
+      "shape_product": {
+        "title": "Dare forma al prodotto",
+        "description": "Il tuo feedback ci aiuterà a creare la migliore app"
+      }
+    }
+  },
+  "how_it_works": {
+    "title": "Come funziona",
+    "subtitle": "Costruisci abitudini durature in 3 semplici passi con motivazione supportata dall'IA e monitoraggio intelligente.",
+    "steps": {
+      "set_goal": {
+        "title": "Imposta il tuo obiettivo",
+        "description": "Scegli tra i modelli o crea obiettivi personalizzati. Definisci cosa vuoi raggiungere - fitness, lettura, meditazione, apprendimento o qualsiasi altra cosa."
+      },
+      "get_motivation": {
+        "title": "Ottieni motivazione dall'IA",
+        "description": "Ricevi messaggi personalizzati e promemoria intelligenti dal tuo coach AI. Ottieni la motivazione di cui hai bisogno proprio quando ne hai più bisogno."
+      },
+      "track_progress": {
+        "title": "Monitora i progressi",
+        "description": "Monitora la tua costanza e festeggia i tuoi successi. Vedi le tue serie, i progressi e rimani responsabile verso i tuoi obiettivi."
+      }
+    },
+    "cta": "Pronto per iniziare?"
+  },
+  "about": {
+    "hero": {
+      "title": "Informazioni su FitNudge",
+      "subtitle": "Stiamo costruendo il futuro della formazione delle abitudini attraverso responsabilità supportata dall'IA e motivazione personalizzata."
+    },
+    "story": {
+      "title": "La nostra storia",
+      "subtitle": "Nato da un'idea semplice: e se avessi un partner di responsabilità che non dorme mai e sa sempre esattamente cosa dire?",
+      "description": "È facile perdere concentrazione e motivazione quando si cercano di costruire nuove abitudini. Ci siamo passati tutti: iniziare l'anno con obiettivi ambiziosi, per poi ritrovarci ad arrenderci già a febbraio. Che si tratti di allenarsi, leggere di più, imparare una nuova abilità o qualsiasi altra abitudine positiva, mantenere la costanza è difficile. Ed è da qui che è nata FitNudge. Abbiamo capito che ciò di cui le persone hanno davvero bisogno non è un'altra app per tracciare le attività o una lista di cose da fare, ma un partner di responsabilità che le capisca, creda in loro e sia sempre disponibile 24/7 per mantenerle sulla giusta strada. Così abbiamo deciso di creare un coach alimentato dall'intelligenza artificiale che non dorme mai, non giudica mai e sa sempre esattamente cosa dire per mantenerti motivato nel tuo percorso per diventare la migliore versione di te stesso."
+    },
+    "mission": {
+      "title": "La nostra missione",
+      "subtitle": "Crediamo che tutti meritino un partner di responsabilità personale che comprenda il loro percorso e li mantenga motivati.",
+      "points": {
+        "consistency": {
+          "title": "Prima la coerenza",
+          "description": "Ci concentriamo sull'aiutare gli utenti a costruire abitudini durature attraverso check-in quotidiani, serie consecutive e motivazione personalizzata."
+        },
+        "ai": {
+          "title": "Coaching basato sull'intelligenza artificiale",
+          "description": "Il nostro coach AI impara dai tuoi progressi e adatta il suo stile di motivazione per mantenerti coinvolto e responsabile."
+        },
+        "community": {
+          "title": "Partner di responsabilità",
+          "description": "Connettiti con partner che condividono i tuoi obiettivi. Motivatevi a vicenda con incoraggiamenti e stimoli."
+        }
+      }
+    },
+    "values": {
+      "title": "I nostri valori",
+      "subtitle": "Questi valori fondamentali guidano tutto ciò che facciamo a FitNudge.",
+      "privacy": {
+        "title": "Privacy e Sicurezza",
+        "description": "I tuoi dati sono protetti con sicurezza di livello aziendale. Non condividiamo mai le tue informazioni personali senza il tuo consenso."
+      },
+      "community": {
+        "title": "Comunità Prima",
+        "description": "Crediamo nel potere dei partner di responsabilità e della motivazione tra pari per raggiungere qualsiasi obiettivo."
+      },
+      "innovation": {
+        "title": "Innovazione",
+        "description": "Innoviamo continuamente per offrire l'esperienza di responsabilità basata sull'IA più efficace."
+      },
+      "empathy": {
+        "title": "Empatia",
+        "description": "Comprendiamo che costruire abitudini ha alti e bassi, e siamo qui per supportarti in entrambi."
+      }
+    },
+    "team": {
+      "title": "Incontra il nostro team",
+      "subtitle": "Le persone appassionate dietro FitNudge, che lavorano per rendere la responsabilità accessibile a tutti.",
+      "founder": {
+        "name": "Alex Johnson",
+        "role": "Fondatore e CEO",
+        "bio": "Appassionato di abitudini e ricercatore di intelligenza artificiale con oltre 10 anni nel settore tecnologico. Appassionato di rendere la crescita personale accessibile a tutti."
+      },
+      "cto": {
+        "name": "Sarah Chen",
+        "role": "CTO",
+        "bio": "Ingegnere full-stack e specialista di intelligenza artificiale. Guida il nostro team tecnico nella creazione di soluzioni scalabili e intelligenti."
+      },
+      "designer": {
+        "name": "Mike Rodriguez",
+        "role": "Responsabile del Design",
+        "bio": "Designer UX/UI concentrato sulla creazione di esperienze intuitive e coinvolgenti che motivano gli utenti a raggiungere i loro obiettivi."
+      }
+    }
+  },
+  "reset_password": {
+    "invalid_link": "Link di reimpostazione non valido",
+    "invalid_link_description": "Questo link per reimpostare la password non è valido o manca un token. Per favore richiedi un nuovo reset della password.",
+    "opening_app": "Aprendo l'app FitNudge...",
+    "validating": "Convalida del tuo link di reimpostazione...",
+    "expired_title": "Link per il reset scaduto",
+    "expired_description": "Questo link per reimpostare la password non è più valido. Per favore, richiedi una nuova email di reimpostazione.",
+    "request_new": "Richiedi una nuova email di reimpostazione",
+    "need_help": "Hai bisogno di aiuto? Contatta l'assistenza e ti rimetteremo in funzione rapidamente.",
+    "title": "Reimposta la tua password",
+    "opening_mobile": "Apertura dell'app FitNudge...",
+    "download_prompt": "Scarica l'app per reimpostare la tua password",
+    "no_app_installed": "Non hai l'app installata?",
+    "app_store_alt": "Scarica su App Store",
+    "play_store_alt": "Disponibile su Google Play",
+    "manual_instructions": "Se l'app non si è aperta automaticamente, apri l'app FitNudge e usa \"Password dimenticata\" per richiedere un nuovo link. Il tuo codice di reimpostazione da questo link è già stato applicato all'interno dell'app se si è aperta correttamente.",
+    "security_note": "I link per reimpostare la password scadono dopo 1 ora per la tua sicurezza. Se non hai richiesto un reset, puoi ignorare tranquillamente questa email.",
+    "loading": "Caricamento della pagina di reimpostazione...",
+    "validation_error_missing": "Questo link per reimpostare la password non è valido o manca un token. Per favore richiedi una nuova email di reimpostazione.",
+    "validation_error_expired": "Questo link per reimpostare la password non è più valido. Per favore, richiedi una nuova email di reimpostazione.",
+    "validation_error_network": "Non siamo riusciti a verificare il link per il reset in questo momento. Si prega di richiedere una nuova email per reimpostare la password."
+  },
+  "errors": {
+    "validation_error": "Per favore compila tutti i campi",
+    "authentication_error": "Accesso non riuscito. Per favore riprova.",
+    "registration_error": "Registrazione fallita. Per favore riprova.",
+    "not_found_title": "Pagina Non Trovata",
+    "not_found_description": "Ops! La pagina che stai cercando non esiste o è stata spostata.",
+    "go_home": "Vai alla Home",
+    "go_back": "Torna Indietro",
+    "looking_for": "Stai cercando qualcosa?",
+    "error_title": "Qualcosa È Andato Storto",
+    "error_description": "Abbiamo riscontrato un errore imprevisto. Non preoccuparti, il nostro team è stato avvisato.",
+    "try_again": "Riprova",
+    "persist_message": "Se il problema persiste,",
+    "contact_support": "contatta il nostro team di supporto"
+  },
+  "legal": {
+    "legal_document": "Documento Legale",
+    "terms_of_service": "Termini di Servizio",
+    "privacy_policy": "Informativa sulla Privacy",
+    "cookie_policy": "Politica sui Cookie",
+    "last_updated": "Ultimo aggiornamento",
+    "version": "Versione",
+    "not_available": "Questo documento non è attualmente disponibile. Riprova più tardi.",
+    "load_error": "Impossibile caricare il documento. Riprova più tardi.",
+    "unavailable_title": "Documento non disponibile",
+    "contact_for_help": "Contattaci per assistenza",
+    "also_see": "Vedi anche"
+  },
+  "recaps": {
+    "title": "Riepiloghi settimanali",
+    "detail_title": "Riepilogo settimanale",
+    "check_ins": "Check-in",
+    "completion": "Completamento",
+    "goals_completed": "Obiettivi",
+    "streak": "Striscia",
+    "total_check_ins": "Check-in",
+    "current_streak": "Striscia",
+    "ai_summary": "Sintesi AI",
+    "highlights": "In evidenza",
+    "recommendations": "Raccomandazioni",
+    "goal_breakdown": "Suddivisione degli obiettivi",
+    "trend": "Tendenza di 4 settimane",
+    "achievements": "Obiettivi Sbloccati",
+    "partner": "Partner di responsabilità",
+    "partners": "Partner di responsabilità",
+    "week_over_week": "rispetto alla scorsa settimana",
+    "active_days": "giorni attivi",
+    "active_days_count": "{{count}}/7 giorni attivi",
+    "best_day": "Miglior giorno: {{day}}",
+    "day_streak": "Serie di {{count}} giorni",
+    "completed_count": "{{completed}}/{{total}} completati",
+    "archived_label": "(Archiviato)",
+    "goals_hit_count": "{{hit}}/{{total}} Obiettivi Raggiunti",
+    "premium_title": "Riepiloghi settimanali",
+    "premium_description": "Ricevi riepiloghi settimanali basati sull'intelligenza artificiale dei tuoi progressi, risultati e approfondimenti personalizzati per aiutarti a rimanere sulla buona strada.",
+    "empty_title": "Nessun riepilogo ancora",
+    "empty_description": "I tuoi riassunti settimanali appariranno qui una volta completata la tua prima settimana di attività.",
+    "not_found_title": "Riepilogo non trovato",
+    "not_found_description": "Questo riepilogo settimanale non è stato trovato.",
+    "win": "La tua grande vittoria",
+    "insight": "Intuizione chiave",
+    "focus_next_week": "Obiettivi per la prossima settimana",
+    "motivational_close": "Vai avanti!"
+  }
+}

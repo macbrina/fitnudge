@@ -86,7 +86,9 @@ const buildSummary = (
   return t(entry.summary_key, params);
 };
 
-const getLatestUpdate = (updates: HealthHistoryUpdate[]): HealthHistoryUpdate | null => {
+const getLatestUpdate = (
+  updates: HealthHistoryUpdate[]
+): HealthHistoryUpdate | null => {
   if (!updates || updates.length === 0) {
     return null;
   }
@@ -131,8 +133,7 @@ export default function HealthHistoryListPage() {
             }))
           );
         }
-      } catch (err) {
-        console.error("Failed to load history", err);
+      } catch {
         if (!cancelled) {
           setError(t("health.history.error"));
         }
@@ -254,7 +255,9 @@ export default function HealthHistoryListPage() {
                                 {latest ? (
                                   <div className="space-y-1 text-sm text-slate-600 dark:text-slate-300">
                                     <div className="inline-flex items-center gap-2">
-                                      <UpdateStatusBadge status={latest.status} />
+                                      <UpdateStatusBadge
+                                        status={latest.status}
+                                      />
                                       <span className="font-semibold">
                                         {latest.title}
                                       </span>
@@ -285,4 +288,3 @@ export default function HealthHistoryListPage() {
     </LandingLayout>
   );
 }
-

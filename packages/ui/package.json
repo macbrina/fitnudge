@@ -1,6 +1,7 @@
 {
   "name": "@fitnudge/ui",
   "version": "0.0.0",
+  "type": "module",
   "private": true,
   "exports": {
     ".": {
@@ -24,8 +25,7 @@
     "generate:component": "turbo gen react-component",
     "check-types": "tsc --noEmit",
     "fix-imports": "node scripts/fix-imports.js",
-    "shadcn:add": "node scripts/shadcn-add.js",
-    "postinstall": "npm run fix-imports"
+    "shadcn:add": "node scripts/shadcn-add.js"
   },
   "devDependencies": {
     "@fitnudge/eslint-config": "workspace:*",

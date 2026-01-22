@@ -28,6 +28,57 @@ export function setLoggingOut(value: boolean) {
 let isRefreshing = false;
 let refreshPromise: Promise<any> | null = null;
 
+// Buffer time before token expiration to trigger proactive refresh (5 minutes)
+const TOKEN_REFRESH_BUFFER_SECONDS = 5 * 60;
+
+/**
+ * Decode JWT payload without verification (just to read expiration)
+ * JWTs are base64url encoded: header.payload.signature
+ */
+const decodeJwtPayload = (token: string): { exp?: number } | null => {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+
+    // Base64url decode the payload (second part)
+    const payload = parts[1];
+    // Replace base64url chars and add padding
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+
+    // Decode using atob (available in React Native)
+    const decoded = atob(padded);
+    return JSON.parse(decoded);
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Check if token expires within the buffer time
+ */
+const isTokenExpiringSoon = (token: string): boolean => {
+  const payload = decodeJwtPayload(token);
+  if (!payload?.exp) return false;
+
+  const now = Math.floor(Date.now() / 1000);
+  const expiresIn = payload.exp - now;
+
+  // Token expires within buffer time
+  return expiresIn <= TOKEN_REFRESH_BUFFER_SECONDS;
+};
+
+/**
+ * Check if token is already expired
+ */
+const isTokenExpired = (token: string): boolean => {
+  const payload = decodeJwtPayload(token);
+  if (!payload?.exp) return false;
+
+  const now = Math.floor(Date.now() / 1000);
+  return payload.exp <= now;
+};
+
 // Types
 export interface ApiResponse<T = any> {
   data?: T;
@@ -173,8 +224,8 @@ declare global {
 
 // Token management
 class TokenManager {
-  private static ACCESS_TOKEN_KEY = "access_token";
-  private static REFRESH_TOKEN_KEY = "refresh_token";
+  private static ACCESS_TOKEN_KEY = STORAGE_KEYS.ACCESS_TOKEN;
+  private static REFRESH_TOKEN_KEY = STORAGE_KEYS.REFRESH_TOKEN;
   private static REMEMBER_ME_EMAIL_KEY = STORAGE_KEYS.REMEMBER_ME_EMAIL;
   private static REMEMBER_ME_ENABLED_KEY = STORAGE_KEYS.REMEMBER_ME_ENABLED;
 
@@ -283,6 +334,57 @@ class TokenManager {
       storageUtil.removeItem(this.REMEMBER_ME_ENABLED_KEY)
     ]);
   }
+
+  /**
+   * Proactively refresh token if it's expiring soon
+   * This prevents 401 errors by refreshing BEFORE the token expires
+   * Returns true if refresh was needed and successful, false otherwise
+   */
+  static async ensureValidToken(): Promise<boolean> {
+    const token = global.accessToken ?? (await this.getAccessToken());
+    if (!token) return false;
+
+    // Check if token is expired or expiring soon
+    if (!isTokenExpiringSoon(token) && !isTokenExpired(token)) {
+      return true; // Token is still valid
+    }
+
+    // Token needs refresh - use the same refresh mechanism to prevent concurrent refreshes
+    if (isRefreshing && refreshPromise) {
+      // Already refreshing, wait for it
+      try {
+        await refreshPromise;
+        return !!global.accessToken;
+      } catch {
+        return false;
+      }
+    }
+
+    // Start a new refresh
+    isRefreshing = true;
+    console.log("[TokenManager] Token expiring soon, proactively refreshing...");
+
+    try {
+      // Dynamic import to avoid circular dependency
+      const { authService } = await import("./auth");
+      refreshPromise = authService.refreshToken();
+      const refreshResult = await refreshPromise;
+
+      if (refreshResult.data) {
+        console.log("[TokenManager] Proactive token refresh successful");
+        return true;
+      } else {
+        console.warn("[TokenManager] Proactive token refresh failed:", refreshResult.error);
+        return false;
+      }
+    } catch (error) {
+      console.warn("[TokenManager] Proactive token refresh error:", error);
+      return false;
+    } finally {
+      isRefreshing = false;
+      refreshPromise = null;
+    }
+  }
 }
 
 // Base API Service Class
@@ -296,7 +398,12 @@ export abstract class BaseApiService {
   }
 
   // Generic HTTP methods
-  protected async request<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
+  protected async request<T>(
+    endpoint: string,
+    options: RequestInit = {},
+    _retryCount: number = 0
+  ): Promise<ApiResponse<T>> {
+    const MAX_GATEWAY_RETRIES = 2; // Retry up to 2 times for gateway errors
     // Skip all API requests if logout is in progress
     if (isLoggingOut && !isPublicEndpoint(endpoint)) {
       throw new ApiError(401, null, "Logout in progress");
@@ -304,12 +411,16 @@ export abstract class BaseApiService {
 
     const url = `${this.baseURL}${endpoint}`;
 
-    // Use global token cache for fast, reliable access
+    // For non-public endpoints, proactively refresh token if expiring soon
+    // This prevents 401 errors by refreshing BEFORE the token expires
+    if (!isPublicEndpoint(endpoint)) {
+      await TokenManager.ensureValidToken();
+    }
+
+    // Use global token cache for fast, reliable access (may have been refreshed above)
     // If cache is not initialized, fallback to storage
     const token =
       global.accessToken !== undefined ? global.accessToken : await TokenManager.getAccessToken();
-
-    // console.log("accessToken", token);
 
     if (!token && !isPublicEndpoint(endpoint)) {
       // Silently skip unauthenticated requests (hooks should have enabled: isAuthenticated)
@@ -573,8 +684,23 @@ export abstract class BaseApiService {
           }
         }
 
-        // Handle gateway/server errors (502, 503, 504) - backend is offline
+        // Handle gateway/server errors (502, 503, 504) - retry before marking offline
         if (response.status === 502 || response.status === 503 || response.status === 504) {
+          // Retry if we haven't exceeded max retries
+          if (_retryCount < MAX_GATEWAY_RETRIES) {
+            const retryDelay = Math.min(1000 * Math.pow(2, _retryCount), 4000); // 1s, 2s, max 4s
+            console.log(
+              `[API] Gateway error ${response.status}, retrying in ${retryDelay}ms (attempt ${_retryCount + 1}/${MAX_GATEWAY_RETRIES})...`
+            );
+            await new Promise((resolve) => setTimeout(resolve, retryDelay));
+            return this.request<T>(endpoint, options, _retryCount + 1);
+          }
+
+          // All retries exhausted - mark as offline
+          console.log(
+            `[API] Gateway error ${response.status} after ${MAX_GATEWAY_RETRIES} retries, marking offline`
+          );
+
           // Check if it's a Cloudflare error page (HTML response)
           const isCloudflareError =
             contentType.includes("text/html") &&
@@ -613,9 +739,34 @@ export abstract class BaseApiService {
         console.warn(`[API] Request to ${url} failed. Is the backend running?`, error);
       }
       console.log("error", error);
-      // Detect network failures and mark as offline
+
+      // Check if this is a retryable error (network, SSL/TLS, timeout)
       if (error instanceof Error) {
         const errorMsg = error.message.toLowerCase();
+        const isRetryableError =
+          errorMsg.includes("network request failed") ||
+          errorMsg.includes("network error") ||
+          errorMsg.includes("failed to fetch") ||
+          errorMsg.includes("ssl") ||
+          errorMsg.includes("tls") ||
+          errorMsg.includes("bad record mac") ||
+          errorMsg.includes("connection refused") ||
+          errorMsg.includes("connection reset") ||
+          errorMsg.includes("econnrefused") ||
+          errorMsg.includes("econnreset") ||
+          error.name === "AbortError"; // Timeout
+
+        // Retry retryable errors if we haven't exceeded max retries
+        if (isRetryableError && _retryCount < MAX_GATEWAY_RETRIES) {
+          const retryDelay = Math.min(1000 * Math.pow(2, _retryCount), 4000); // 1s, 2s, max 4s
+          console.log(
+            `[API] Retryable error (${error.name}: ${error.message.substring(0, 50)}), retrying in ${retryDelay}ms (attempt ${_retryCount + 1}/${MAX_GATEWAY_RETRIES})...`
+          );
+          await new Promise((resolve) => setTimeout(resolve, retryDelay));
+          return this.request<T>(endpoint, options, _retryCount + 1);
+        }
+
+        // All retries exhausted - check if it's a network error to mark offline
         const isNetworkError =
           errorMsg.includes("network request failed") ||
           errorMsg.includes("network error") ||
@@ -626,10 +777,10 @@ export abstract class BaseApiService {
           errorMsg.includes("econnrefused");
 
         if (isNetworkError) {
+          console.log(`[API] Network error after ${MAX_GATEWAY_RETRIES} retries, marking offline`);
           useSystemStatusStore.getState().setBackendStatus("offline", "Network error");
         }
-      }
-      if (error instanceof Error) {
+
         if (error.name === "AbortError") {
           throw new ApiError(408, null, "Request timeout");
         }
@@ -644,6 +795,31 @@ export abstract class BaseApiService {
     }
   }
 
+  /**
+   * Safely stringify data for request body with better error logging for circular refs
+   */
+  private safeStringify(data: any, endpoint: string): string {
+    try {
+      return JSON.stringify(data);
+    } catch (e: any) {
+      // Log details to help debug circular reference issues
+      console.error("[API] Failed to stringify request body:", {
+        endpoint,
+        keys: data ? Object.keys(data) : [],
+        types: data
+          ? Object.entries(data).reduce(
+              (acc, [key, value]) => {
+                acc[key] = value === null ? "null" : typeof value;
+                return acc;
+              },
+              {} as Record<string, string>
+            )
+          : {}
+      });
+      throw e;
+    }
+  }
+
   protected async get<T>(endpoint: string): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, { method: "GET" });
   }
@@ -651,14 +827,14 @@ export abstract class BaseApiService {
   protected async post<T>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, {
       method: "POST",
-      body: data ? JSON.stringify(data) : undefined
+      body: data ? this.safeStringify(data, endpoint) : undefined
     });
   }
 
   protected async put<T>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, {
       method: "PUT",
-      body: data ? JSON.stringify(data) : undefined
+      body: data ? this.safeStringify(data, endpoint) : undefined
     });
   }
 
@@ -669,7 +845,7 @@ export abstract class BaseApiService {
   protected async patch<T>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, {
       method: "PATCH",
-      body: data ? JSON.stringify(data) : undefined
+      body: data ? this.safeStringify(data, endpoint) : undefined
     });
   }
 
@@ -685,6 +861,322 @@ export abstract class BaseApiService {
       Authorization: token ? `Bearer ${token}` : ""
     };
   }
+}
+
+/**
+ * SSE Event handlers interface for streaming requests
+ */
+export interface SSEEventHandlers<T = any> {
+  onMessage: (data: T) => void;
+  onError?: (error: { type: string; message?: string; status?: number }) => void;
+  onOpen?: () => void;
+  onComplete?: () => void;
+}
+
+/**
+ * SSE Connection interface for controlling the stream
+ */
+export interface SSEConnection {
+  close: () => void;
+}
+
+/**
+ * Streaming API request using Server-Sent Events (SSE).
+ * Handles authentication, token refresh, and error handling.
+ * Uses react-native-sse for proper SSE support in React Native.
+ *
+ * @param endpoint - API endpoint (e.g., "/ai-coach/chat")
+ * @param options - Request options (method, body, headers)
+ * @param handlers - Event handlers for SSE events
+ * @param _isRetry - Internal flag to prevent infinite retry loops
+ * @returns SSEConnection object to control the stream
+ */
+export async function apiRequestSSE<T = any>(
+  endpoint: string,
+  options: {
+    method?: string;
+    body?: string;
+    headers?: Record<string, string>;
+  },
+  handlers: SSEEventHandlers<T>,
+  _isRetry: boolean = false
+): Promise<SSEConnection> {
+  // Import EventSource dynamically to avoid issues if not installed
+  const EventSource = (await import("react-native-sse")).default;
+
+  // Skip all API requests if logout is in progress
+  if (isLoggingOut) {
+    handlers.onError?.({ type: "auth", message: "Logout in progress", status: 401 });
+    return { close: () => {} };
+  }
+
+  // Proactively refresh token if expiring soon
+  await TokenManager.ensureValidToken();
+
+  // Get token from cache or storage (may have been refreshed above)
+  const token =
+    global.accessToken !== undefined ? global.accessToken : await TokenManager.getAccessToken();
+
+  if (!token) {
+    handlers.onError?.({ type: "auth", message: "Not authenticated", status: 401 });
+    return { close: () => {} };
+  }
+
+  const baseURL = resolveBaseUrl();
+  const url = `${baseURL}${endpoint}`;
+
+  console.log(`[API SSE] 📤 Starting SSE request${_isRetry ? " (retry)" : ""}`, {
+    endpoint,
+    method: options.method || "GET"
+  });
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Accept: "text/event-stream",
+    "User-Agent": USER_AGENT,
+    Authorization: `Bearer ${token}`
+  };
+
+  // Merge any additional headers
+  if (options.headers) {
+    Object.assign(headers, options.headers);
+  }
+
+  // Create EventSource
+  const es = new EventSource<"message">(url, {
+    method: options.method || "POST",
+    headers,
+    body: options.body,
+    pollingInterval: 0 // Disable polling for true SSE
+  });
+
+  // Track if we've already handled completion/error
+  let hasEnded = false;
+  // Track the retry connection so we can return it
+  let retryConnection: SSEConnection | null = null;
+
+  // Handle incoming messages
+  es.addEventListener("message", (event) => {
+    if (!event.data || hasEnded) return;
+
+    try {
+      const data = JSON.parse(event.data) as T;
+      handlers.onMessage(data);
+    } catch (parseErr) {
+      console.warn("[API SSE] ⚠️ Parse error", {
+        data: event.data?.substring(0, 100),
+        error: parseErr
+      });
+    }
+  });
+
+  // Handle connection open
+  es.addEventListener("open", () => {
+    console.log("[API SSE] 📡 Connection opened");
+    handlers.onOpen?.();
+  });
+
+  // Handle errors
+  es.addEventListener("error", async (event: any) => {
+    if (hasEnded) return;
+
+    const errorMessage = event.message || "Connection failed";
+    const xhrStatus = event.xhrStatus;
+
+    console.error("[API SSE] 💥 Error", {
+      type: event.type,
+      message: errorMessage,
+      xhrStatus
+    });
+
+    // Handle 401 - attempt token refresh and RETRY the request
+    if (xhrStatus === 401 && !_isRetry) {
+      console.log("[API SSE] Token expired, attempting refresh...");
+      hasEnded = true;
+      es.close();
+
+      let refreshSucceeded = false;
+
+      if (isRefreshing && refreshPromise) {
+        // Wait for existing refresh
+        await refreshPromise;
+        // Check if we have a new token
+        refreshSucceeded = !!global.accessToken;
+      } else {
+        isRefreshing = true;
+        try {
+          const { authService } = await import("./auth");
+          refreshPromise = authService.refreshToken();
+          const refreshResponse = await refreshPromise;
+          isRefreshing = false;
+          refreshPromise = null;
+
+          if (refreshResponse.data?.access_token) {
+            refreshSucceeded = true;
+            console.log("[API SSE] Token refreshed successfully, retrying SSE request...");
+          } else {
+            // Refresh failed, trigger logout
+            const refreshError = refreshResponse.error || "";
+            const errorLower = refreshError.toLowerCase();
+            const isUserNotFound =
+              refreshResponse.status === 404 ||
+              (refreshResponse.status === 500 && errorLower.includes("internal server error")) ||
+              errorLower.includes("user not found");
+
+            const logoutReason = isUserNotFound ? "not_found" : "expired_session";
+            try {
+              const { handleAutoLogout } = await import("@/utils/authUtils");
+              await handleAutoLogout(logoutReason);
+            } catch {}
+          }
+        } catch {
+          isRefreshing = false;
+          refreshPromise = null;
+        }
+      }
+
+      // If refresh succeeded, retry the SSE request with new token
+      if (refreshSucceeded) {
+        try {
+          retryConnection = await apiRequestSSE(endpoint, options, handlers, true);
+          return;
+        } catch (retryError) {
+          console.error("[API SSE] Retry failed after token refresh", retryError);
+        }
+      }
+
+      // If we get here, refresh failed or retry failed - trigger logout
+      try {
+        const { handleAutoLogout } = await import("@/utils/authUtils");
+        await handleAutoLogout("expired_session");
+      } catch (error) {
+        console.error("[API SSE] Failed to handle auto-logout:", error);
+      }
+      return;
+    }
+
+    // Handle 401 on retry - don't retry again, trigger logout
+    if (xhrStatus === 401 && _isRetry) {
+      console.log("[API SSE] 401 on retry, triggering auto-logout");
+      hasEnded = true;
+      es.close();
+      try {
+        const { handleAutoLogout } = await import("@/utils/authUtils");
+        await handleAutoLogout("expired_session");
+      } catch (error) {
+        console.error("[API SSE] Failed to handle auto-logout:", error);
+      }
+      return;
+    }
+
+    // Handle 403 - check for disabled/suspended
+    if (xhrStatus === 403) {
+      console.log("[API SSE] Access forbidden");
+      try {
+        const { handleAutoLogout } = await import("@/utils/authUtils");
+        // Check if it's a user status issue
+        if (errorMessage.includes("disabled")) {
+          await handleAutoLogout("disabled");
+        } else if (errorMessage.includes("suspended")) {
+          await handleAutoLogout("suspended");
+        }
+      } catch {}
+
+      hasEnded = true;
+      handlers.onError?.({
+        type: "forbidden",
+        message: errorMessage,
+        status: 403
+      });
+      es.close();
+      return;
+    }
+
+    // Handle gateway errors (502, 503, 504) - retry once before giving up
+    if (xhrStatus === 502 || xhrStatus === 503 || xhrStatus === 504) {
+      if (!_isRetry) {
+        console.log(`[API SSE] Gateway error ${xhrStatus}, retrying in 1s...`);
+        hasEnded = true;
+        es.close();
+
+        // Wait 1 second then retry
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        try {
+          retryConnection = await apiRequestSSE(endpoint, options, handlers, true);
+          return;
+        } catch (retryError) {
+          console.error("[API SSE] Gateway error retry failed", retryError);
+        }
+      }
+
+      // Retry exhausted or already retried
+      console.log(`[API SSE] Gateway error ${xhrStatus} after retry, marking offline`);
+      useSystemStatusStore.getState().setBackendStatus("offline", "Server temporarily unavailable");
+      hasEnded = true;
+      handlers.onError?.({
+        type: "server",
+        message: "Server temporarily unavailable",
+        status: xhrStatus
+      });
+      es.close();
+      return;
+    }
+
+    // Handle network errors (including SSL/TLS) - retry once before giving up
+    const lowerError = errorMessage.toLowerCase();
+    const isNetworkError =
+      lowerError.includes("network") ||
+      lowerError.includes("failed to fetch") ||
+      lowerError.includes("connection") ||
+      lowerError.includes("ssl") ||
+      lowerError.includes("tls") ||
+      lowerError.includes("bad record mac");
+
+    if (isNetworkError && !_isRetry) {
+      console.log(`[API SSE] Network/SSL error, retrying in 1s...`);
+      hasEnded = true;
+      es.close();
+
+      // Wait 1 second then retry
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      try {
+        retryConnection = await apiRequestSSE(endpoint, options, handlers, true);
+        return;
+      } catch (retryError) {
+        console.error("[API SSE] Network error retry failed", retryError);
+      }
+    }
+
+    if (isNetworkError) {
+      console.log(`[API SSE] Network error after retry, marking offline`);
+      useSystemStatusStore
+        .getState()
+        .setBackendStatus("offline", "Unable to connect to the server");
+    }
+
+    hasEnded = true;
+    handlers.onError?.({
+      type: isNetworkError ? "network" : "unknown",
+      message: errorMessage,
+      status: xhrStatus
+    });
+    es.close();
+  });
+
+  // Return connection controller
+  return {
+    close: () => {
+      hasEnded = true;
+      // If we have a retry connection, close that instead
+      if (retryConnection) {
+        retryConnection.close();
+      } else {
+        handlers.onComplete?.();
+        es.close();
+      }
+      console.log("[API SSE] 🔌 Connection closed by client");
+    }
+  };
 }
 
 // Export token manager for use in other services

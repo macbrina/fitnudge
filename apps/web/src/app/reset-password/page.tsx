@@ -4,10 +4,15 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { Button } from "@fitnudge/ui";
+import { useTranslation } from "@/lib/i18n";
+import { useAppStoreLinks, useAppConfig } from "@/store/appConfig";
 
 function ResetPasswordContent() {
+  const { t } = useTranslation();
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
+  const { ios: iosAppUrl, android: androidAppUrl } = useAppStoreLinks();
+  const { config } = useAppConfig();
   const [isClient, setIsClient] = useState(false);
   const [validationState, setValidationState] = useState<
     "checking" | "valid" | "invalid" | "missing"
@@ -43,9 +48,7 @@ function ResetPasswordContent() {
   useEffect(() => {
     if (!token) {
       setValidationState("missing");
-      setValidationMessage(
-        "This password reset link is invalid or missing a token. Please request a new reset email."
-      );
+      setValidationMessage(t("reset_password.validation_error_missing"));
       return;
     }
 
@@ -91,16 +94,12 @@ function ResetPasswordContent() {
 
         setValidationState("invalid");
         setValidationMessage(
-          detail ||
-            "This password reset link is no longer valid. Please request a new reset email."
+          detail || t("reset_password.validation_error_expired")
         );
-      } catch (error) {
+      } catch {
         if (cancelled) return;
-        console.error("Failed to validate reset token:", error);
         setValidationState("invalid");
-        setValidationMessage(
-          "We couldn't verify this reset link right now. Please request a new password reset email."
-        );
+        setValidationMessage(t("reset_password.validation_error_network"));
       }
     };
 
@@ -109,18 +108,17 @@ function ResetPasswordContent() {
     return () => {
       cancelled = true;
     };
-  }, [apiBaseUrl, token]);
+  }, [apiBaseUrl, token, t]);
 
   if (!token) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
         <div className="max-w-md w-full bg-white rounded-lg shadow-md p-8">
           <h1 className="text-2xl font-bold text-gray-900 mb-4">
-            Invalid Reset Link
+            {t("reset_password.invalid_link")}
           </h1>
           <p className="text-gray-600">
-            This password reset link is invalid or missing a token. Please
-            request a new password reset.
+            {t("reset_password.invalid_link_description")}
           </p>
         </div>
       </div>
@@ -132,7 +130,9 @@ function ResetPasswordContent() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-gray-600">Opening FitNudge app...</p>
+          <p className="mt-4 text-gray-600">
+            {t("reset_password.opening_app")}
+          </p>
         </div>
       </div>
     );
@@ -143,7 +143,7 @@ function ResetPasswordContent() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
         <div className="max-w-md w-full bg-white rounded-lg shadow-md p-8 text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto" />
-          <p className="mt-4 text-gray-600">Validating your reset link...</p>
+          <p className="mt-4 text-gray-600">{t("reset_password.validating")}</p>
         </div>
       </div>
     );
@@ -154,23 +154,22 @@ function ResetPasswordContent() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
         <div className="max-w-md w-full bg-white rounded-lg shadow-md p-8">
           <h1 className="text-2xl font-bold text-gray-900 mb-4">
-            Reset Link Expired
+            {t("reset_password.expired_title")}
           </h1>
           <p className="text-gray-600 mb-6">
-            {validationMessage ||
-              "This password reset link is no longer valid. Please request a new reset email."}
+            {validationMessage || t("reset_password.expired_description")}
           </p>
           <div className="space-y-3">
             <Button
               className="w-full"
-              title="Request a new reset email"
+              title={t("reset_password.request_new")}
               onClick={() => {
-                window.location.href =
-                  "mailto:support@fitnudge.app?subject=Password%20Reset%20Help";
+                const email = config.contact_email.replace("mailto:", "");
+                window.location.href = `mailto:${email}?subject=Password%20Reset%20Help`;
               }}
             />
             <p className="text-xs text-gray-500 text-center">
-              Need help? Contact support and we’ll get you back in quickly.
+              {t("reset_password.need_help")}
             </p>
           </div>
         </div>
@@ -183,13 +182,13 @@ function ResetPasswordContent() {
       <div className="max-w-md w-full bg-white rounded-lg shadow-md p-8">
         <div className="text-center mb-6">
           <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            Reset Your Password
+            {t("reset_password.title")}
           </h1>
           <p className="text-gray-600">
             {typeof window !== "undefined" &&
             /iphone|ipad|ipod|android/.test(navigator.userAgent.toLowerCase())
-              ? "Opening the FitNudge app..."
-              : "Download the app to reset your password"}
+              ? t("reset_password.opening_mobile")
+              : t("reset_password.download_prompt")}
           </p>
         </div>
 
@@ -204,32 +203,32 @@ function ResetPasswordContent() {
 
         <div className="bg-gray-50 rounded-lg p-4 mb-6">
           <p className="text-sm text-gray-700 text-center md:text-left mb-4 font-semibold">
-            Do not have the app installed?
+            {t("reset_password.no_app_installed")}
           </p>
           <div className="space-y-2 md:space-y-0 flex flex-col md:flex-row md:justify-center items-center">
             <a
-              href="https://apps.apple.com/app/idXXXXXXXXXX"
+              href={iosAppUrl}
               className="block hover:opacity-90 transition-opacity mx-auto"
               target="_blank"
               rel="noopener noreferrer"
             >
               <Image
                 src="/images/appstore.webp"
-                alt="Download on App Store"
+                alt={t("reset_password.app_store_alt")}
                 width={150}
                 height={45}
                 className="h-auto rounded-lg"
               />
             </a>
             <a
-              href="https://play.google.com/store/apps/details?id=com.fitnudge.app"
+              href={androidAppUrl}
               className="block hover:opacity-90 transition-opacity mx-auto"
               target="_blank"
               rel="noopener noreferrer"
             >
               <Image
                 src="/images/playstore.webp"
-                alt="Get it on Google Play"
+                alt={t("reset_password.play_store_alt")}
                 width={150}
                 height={45}
                 className="h-auto rounded-lg"
@@ -240,14 +239,10 @@ function ResetPasswordContent() {
 
         <div className="border-t pt-6">
           <p className="text-sm text-gray-600 mb-4">
-            If the app did not open automatically, open the FitNudge app and use
-            “Forgot password” to request a fresh link. Your reset code from this
-            link has already been applied inside the app if it opened
-            successfully.
+            {t("reset_password.manual_instructions")}
           </p>
           <p className="text-xs text-gray-500">
-            Password reset links expire in 1 hour for your security. If you did
-            not request a reset, you can safely ignore this email.
+            {t("reset_password.security_note")}
           </p>
         </div>
       </div>
@@ -262,7 +257,7 @@ export default function ResetPasswordPage() {
         <div className="min-h-screen flex items-center justify-center bg-gray-50">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto" />
-            <p className="mt-4 text-gray-600">Loading reset page...</p>
+            <p className="mt-4 text-gray-600">Loading...</p>
           </div>
         </div>
       }

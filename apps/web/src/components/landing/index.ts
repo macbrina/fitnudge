@@ -5,4 +5,7 @@ export { Tracker } from "./tracker";
 export { HowItWorks } from "./HowItWorks";
 export { Wellness } from "./wellness";
 export { Features } from "./features";
+export { Footer } from "./footer";
+export { Waitlist } from "./waitlist";
+export { Testimonials } from "./testimonials";
 export { Download } from "./download";

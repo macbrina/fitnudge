@@ -24,6 +24,7 @@ from app.core.middleware import (
     AccountLockoutMiddleware,
     IPWhitelistMiddleware,
     AuditLoggingMiddleware,
+    UserActivityMiddleware,
     SQLInjectionProtectionMiddleware,
     SessionManagementMiddleware,
 )
@@ -65,6 +66,7 @@ app.add_middleware(AccountLockoutMiddleware)
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(AuditLoggingMiddleware)
 app.add_middleware(SessionManagementMiddleware)
+app.add_middleware(UserActivityMiddleware)  # Track user activity for partner suggestions
 
 # Include API router
 app.include_router(api_router, prefix="/api/v1")

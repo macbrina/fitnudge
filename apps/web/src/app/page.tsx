@@ -6,7 +6,7 @@ import { Wellness } from "@/components/landing/wellness";
 import { Features } from "@/components/landing/features";
 import { Tracker } from "@/components/landing/tracker";
 import { HowItWorks } from "@/components/landing/HowItWorks";
-import { Download } from "@/components/landing/download";
+import { Waitlist } from "@/components/landing/waitlist";
 
 export default function HomePage() {
   return (
@@ -16,7 +16,7 @@ export default function HomePage() {
       <Features />
       <Tracker />
       <HowItWorks />
-      <Download />
+      <Waitlist />
     </LandingLayout>
   );
 }

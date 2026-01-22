@@ -23,7 +23,7 @@ import { authService } from "@/services/api";
 import { useAlertModal } from "@/contexts/AlertModalContext";
 import { ApiError } from "@/services/api/base";
 import { useAuthStore } from "@/stores/authStore";
-import { getRedirection } from "@/utils/getRedirection";
+import { getRedirection, hasCompletedV2Onboarding } from "@/utils/getRedirection";
 import LoadingContainer from "@/components/common/LoadingContainer";
 
 export default function ResetPasswordScreen() {
@@ -48,7 +48,7 @@ export default function ResetPasswordScreen() {
   const insets = useSafeAreaInsets();
   const resetPasswordMutation = useResetPassword();
   const { showAlert } = useAlertModal();
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
 
   const redirectToLoginWithMessage = useCallback(
     (message: string) => {
@@ -65,7 +65,9 @@ export default function ResetPasswordScreen() {
 
     const handleAuthenticatedRedirect = async () => {
       try {
-        const destination = await getRedirection();
+        const destination = await getRedirection({
+          hasCompletedOnboarding: hasCompletedV2Onboarding(user)
+        });
         if (isMounted) {
           router.replace(destination);
         }
@@ -84,7 +86,7 @@ export default function ResetPasswordScreen() {
     return () => {
       isMounted = false;
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, user]);
 
   useEffect(() => {
     setToken(initialToken);

@@ -2,6 +2,9 @@ import type { Metadata, Viewport } from "next";
 import { Nunito } from "next/font/google";
 import "@/styles/globals.css";
 import "@/lib/i18n"; // Initialize i18n
+import GoogleAnalyticsWrapper from "@/components/GoogleAnalyticsWrapper";
+import { Providers } from "@/components/providers/Providers";
+import NextTopLoader from "nextjs-toploader";
 
 const nunito = Nunito({
   subsets: ["latin"],
@@ -11,53 +14,201 @@ const nunito = Nunito({
   display: "swap",
 });
 
-export const metadata: Metadata = {
-  title:
-    "FitNudge - AI-Powered Fitness Motivation | Transform Your Fitness Journey",
+// Site configuration
+const siteConfig = {
+  name: "FitNudge",
+  title: "FitNudge - AI Accountability Partner | Build Lasting Habits",
   description:
-    "Transform your fitness journey with AI-powered motivation, personalized coaching, and smart goal tracking. Join 50,000+ users achieving their fitness dreams with FitNudge.",
-  keywords:
-    "fitness app, AI coach, fitness motivation, workout tracker, fitness goals, health app, personal trainer, fitness community",
-  authors: [{ name: "FitNudge Team" }],
-  creator: "FitNudge",
-  publisher: "FitNudge",
-  robots: "index, follow",
-  openGraph: {
-    title: "FitNudge - AI-Powered Fitness Motivation",
-    description:
-      "Transform your fitness journey with AI-powered motivation and personalized coaching",
-    url: "https://fitnudge.app",
-    siteName: "FitNudge",
-    images: [
+    "Build lasting habits with AI-powered accountability, personalized motivation, and smart goal tracking. Your daily nudge for any goal - fitness, reading, meditation, learning, or anything else.",
+  url: process.env.NEXT_PUBLIC_BASE_URL || "https://fitnudge.app",
+  ogImage: `${process.env.NEXT_PUBLIC_BASE_URL || "https://fitnudge.app"}/og-image.jpg`,
+  twitterHandle: "@fitnudgeapp",
+  locale: "en_US",
+  // App Store URLs
+  iosAppStoreUrl:
+    process.env.NEXT_PUBLIC_IOS_APP_STORE_URL ||
+    "https://apps.apple.com/app/fitnudge/id123456789",
+  iosAppStoreId: process.env.NEXT_PUBLIC_IOS_APP_STORE_ID || "123456789",
+  androidPackage: process.env.NEXT_PUBLIC_ANDROID_PACKAGE || "com.fitnudge.app",
+  androidPlayStoreUrl:
+    process.env.NEXT_PUBLIC_ANDROID_PLAY_STORE_URL ||
+    "https://play.google.com/store/apps/details?id=com.fitnudge.app",
+};
+
+export const metadata: Metadata = {
+  // Basic metadata
+  title: {
+    default: siteConfig.title,
+    template: `%s | ${siteConfig.name}`,
+  },
+  description: siteConfig.description,
+  keywords: [
+    "habit tracker",
+    "AI coach",
+    "goal tracking",
+    "accountability app",
+    "habit building",
+    "personal development",
+    "motivation app",
+    "streak tracker",
+    "fitness tracker",
+    "daily habits",
+    "goal setting",
+    "self improvement",
+    "productivity app",
+    "wellness app",
+  ],
+
+  // Authorship
+  authors: [{ name: "FitNudge Team", url: siteConfig.url }],
+  creator: siteConfig.name,
+  publisher: siteConfig.name,
+
+  // Canonical URL
+  metadataBase: new URL(siteConfig.url),
+  alternates: {
+    canonical: "/",
+    languages: {
+      "en-US": "/",
+      "es-ES": "/es",
+      "fr-FR": "/fr",
+      "de-DE": "/de",
+      "it-IT": "/it",
+      "pt-PT": "/pt",
+      "nl-NL": "/nl",
+    },
+  },
+
+  // Robots
+  robots: {
+    index: true,
+    follow: true,
+    nocache: false,
+    googleBot: {
+      index: true,
+      follow: true,
+      noimageindex: false,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
+
+  // Icons
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+    ],
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
+    other: [
       {
-        url: "/og-image.jpg",
-        width: 1200,
-        height: 630,
-        alt: "FitNudge - AI-Powered Fitness Motivation",
+        rel: "mask-icon",
+        url: "/safari-pinned-tab.svg",
+        color: "#2563eb",
       },
     ],
-    locale: "en_US",
-    type: "website",
   },
+
+  // Manifest
+  manifest: "/site.webmanifest",
+
+  // Open Graph
+  openGraph: {
+    type: "website",
+    locale: siteConfig.locale,
+    url: siteConfig.url,
+    siteName: siteConfig.name,
+    title: siteConfig.title,
+    description: siteConfig.description,
+    images: [
+      {
+        url: siteConfig.ogImage,
+        width: 1200,
+        height: 630,
+        alt: `${siteConfig.name} - AI Accountability Partner`,
+        type: "image/jpeg",
+      },
+      {
+        url: `${siteConfig.url}/og-image-square.jpg`,
+        width: 600,
+        height: 600,
+        alt: `${siteConfig.name} Logo`,
+        type: "image/jpeg",
+      },
+    ],
+  },
+
+  // Twitter
   twitter: {
     card: "summary_large_image",
-    title: "FitNudge - AI-Powered Fitness Motivation",
-    description:
-      "Transform your fitness journey with AI-powered motivation and personalized coaching",
-    images: ["/og-image.jpg"],
+    site: siteConfig.twitterHandle,
+    creator: siteConfig.twitterHandle,
+    title: siteConfig.title,
+    description: siteConfig.description,
+    images: {
+      url: siteConfig.ogImage,
+      alt: `${siteConfig.name} - AI Accountability Partner`,
+    },
   },
+
+  // App Links
+  appLinks: {
+    ios: {
+      url: siteConfig.iosAppStoreUrl,
+      app_store_id: siteConfig.iosAppStoreId,
+      app_name: siteConfig.name,
+    },
+    android: {
+      package: siteConfig.androidPackage,
+      url: siteConfig.androidPlayStoreUrl,
+      app_name: siteConfig.name,
+    },
+    web: {
+      url: siteConfig.url,
+      should_fallback: true,
+    },
+  },
+
+  // Verification (Google uses DNS verification for domain ownership)
+  verification: {
+    // yandex: "your-yandex-verification-code",
+    other: {
+      // "msvalidate.01": "your-bing-verification-code",
+      "facebook-domain-verification": "c7rubsbzt1jc51q32lr54ajc0w5zfr",
+    },
+  },
+
+  // Category
+  category: "Health & Fitness",
+
+  // Classification
+  classification: "Productivity, Health & Fitness, Lifestyle",
+
+  // Other metadata
   other: {
-    "apple-itunes-app": "app-id=XXXXXXXXXX",
+    "apple-itunes-app": `app-id=${siteConfig.iosAppStoreId}`,
+    "google-play-app": `app-id=${siteConfig.androidPackage}`,
+    "msapplication-TileColor": "#2563eb",
+    "msapplication-config": "/browserconfig.xml",
+    "format-detection": "telephone=no",
   },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#ffffff" },
     { media: "(prefers-color-scheme: dark)", color: "#111827" },
   ],
+  colorScheme: "light dark",
 };
 
 export default function RootLayout({
@@ -68,7 +219,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={`scroll-smooth ${nunito.variable}`}>
       <body className={`antialiased w-full font-sans ${nunito.className}`}>
-        {children}
+        <GoogleAnalyticsWrapper />
+        <NextTopLoader showSpinner={false} color="#0066ff" />
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

@@ -28,14 +28,21 @@ export function WeeklyProgressBar({
   const { colors, brandColors } = useTheme();
   const { t } = useTranslation();
 
-  const dayLabels = ["M", "T", "W", "T", "F", "S", "S"];
+  // Day keys in Monday-first order (matches daysCompleted array)
+  const dayKeys = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+  const dayLabels = dayKeys.map((key) => t(`common.days_of_week.short.${key}`));
 
   if (isLoading) {
     return (
       <View style={styles.container}>
-        <SkeletonBox width="40%" height={16} borderRadius={toRN(tokens.borderRadius.sm)} />
+        <SkeletonBox
+          style={{ marginBottom: toRN(tokens.spacing[3]) }}
+          width="40%"
+          height={16}
+          borderRadius={toRN(tokens.borderRadius.sm)}
+        />
         <View style={styles.daysRow}>
-          {dayLabels.map((_, index) => (
+          {dayKeys.map((_, index) => (
             <SkeletonBox
               key={index}
               width={toRN(tokens.spacing[10])}
@@ -165,7 +172,7 @@ const makeWeeklyProgressBarStyles = (tokens: any, colors: any, brand: any) => ({
     color: brand.primary
   },
   dayLabelFuture: {
-    color: colors.text.disabled
+    color: colors.text.tertiary
   },
   progressBarContainer: {
     flexDirection: "row" as const,

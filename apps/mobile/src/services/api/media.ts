@@ -3,10 +3,11 @@ import { ROUTES } from "@/lib/routes";
 import * as FileSystem from "expo-file-system/legacy";
 import { TokenManager } from "./base";
 
-export type MediaType = "post" | "checkin" | "profile" | "other";
+export type MediaType = "post" | "checkin" | "profile" | "meal" | "other";
 
 export interface MediaUploadResponse {
   id?: string; // Only present for post media
+  meal_log_id?: string; // Only present for meal media
   url: string;
   filename: string;
   file_size: number;
@@ -18,7 +19,7 @@ export interface MediaUploadResponse {
 export interface UploadOptions {
   filename?: string;
   mediaType?: MediaType;
-  postId?: string;
+  goalId?: string;
 }
 
 // Media Service
@@ -32,7 +33,7 @@ export class MediaService extends BaseApiService {
     fileUri: string,
     options: UploadOptions = {}
   ): Promise<ApiResponse<MediaUploadResponse>> {
-    const { filename, mediaType = "other", postId } = options;
+    const { filename, mediaType = "other", goalId } = options;
 
     try {
       // Get file info
@@ -65,9 +66,7 @@ export class MediaService extends BaseApiService {
 
       // Build URL with query params
       const params = new URLSearchParams({ media_type: mediaType });
-      if (postId) {
-        params.append("post_id", postId);
-      }
+
       const url = `${this.baseURL}${ROUTES.MEDIA.UPLOAD}?${params.toString()}`;
 
       const uploadResponse = await fetch(url, {

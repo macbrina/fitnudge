@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { View, Text, TouchableOpacity, Platform, Modal } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useStyles } from "@/themes/makeStyles";
@@ -7,6 +7,26 @@ import { fontFamily } from "@/lib/fonts";
 import { toRN } from "@/lib/units";
 import { tokens } from "@/themes/tokens";
 import { Ionicons } from "@expo/vector-icons";
+import { formatReminderTime } from "@/utils/helper";
+
+// Detect device 24-hour preference
+const getDeviceIs24Hour = (): boolean => {
+  try {
+    // Check device locale by formatting a test time
+    const testDate = new Date();
+    testDate.setHours(14, 0); // 2:00 PM
+    const formatted = testDate.toLocaleTimeString([], { hour: "numeric" });
+    // If it contains "14" or "2" without AM/PM indicator
+    return (
+      formatted.includes("14") ||
+      (!formatted.toLowerCase().includes("am") &&
+        !formatted.toLowerCase().includes("pm") &&
+        formatted.includes("2"))
+    );
+  } catch {
+    return false; // Default to 12-hour
+  }
+};
 
 interface TimePickerProps {
   value: string; // HH:MM format
@@ -15,7 +35,7 @@ interface TimePickerProps {
   description?: string;
   error?: string;
   disabled?: boolean;
-  is24Hour?: boolean;
+  is24Hour?: boolean; // If not provided, will use device preference
 }
 
 const makeTimePickerStyles = (tokens: any, colors: any, brand: any) => {
@@ -119,12 +139,17 @@ export function TimePicker({
   description,
   error,
   disabled = false,
-  is24Hour = false
+  is24Hour
 }: TimePickerProps) {
   const styles = useStyles(makeTimePickerStyles);
   const { colors, brandColors, isDark } = useTheme();
   const [showPicker, setShowPicker] = useState(false);
   const [tempTime, setTempTime] = useState<Date>(() => getDateFromTime(value));
+
+  // Use device preference if is24Hour not explicitly set
+  const effectiveIs24Hour = useMemo(() => {
+    return is24Hour ?? getDeviceIs24Hour();
+  }, [is24Hour]);
 
   // Parse HH:MM to Date object for picker
   function getDateFromTime(timeStr: string): Date {
@@ -149,19 +174,9 @@ export function TimePicker({
     return `${hours}:${minutes}`;
   };
 
-  // Format time for display (12-hour or 24-hour format)
+  // Format time for display (uses device locale via formatReminderTime)
   const formatTimeForDisplay = (timeStr: string): string => {
-    if (!timeStr || !timeStr.includes(":")) return "";
-
-    const [hours, minutes] = timeStr.split(":").map(Number);
-
-    if (is24Hour) {
-      return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
-    }
-
-    const period = hours >= 12 ? "PM" : "AM";
-    const displayHours = hours % 12 || 12;
-    return `${displayHours}:${String(minutes).padStart(2, "0")} ${period}`;
+    return formatReminderTime(timeStr);
   };
 
   const handleTimeChange = (event: any, selectedDate?: Date) => {
@@ -228,7 +243,7 @@ export function TimePicker({
         <DateTimePicker
           value={getDateFromTime(value)}
           mode="time"
-          is24Hour={is24Hour}
+          is24Hour={effectiveIs24Hour}
           display="default"
           onChange={handleTimeChange}
           themeVariant={isDark ? "dark" : "light"}
@@ -259,7 +274,7 @@ export function TimePicker({
               <DateTimePicker
                 value={tempTime}
                 mode="time"
-                is24Hour={is24Hour}
+                is24Hour={effectiveIs24Hour}
                 display="spinner"
                 onChange={handleTimeChange}
                 style={{ height: 200 }}

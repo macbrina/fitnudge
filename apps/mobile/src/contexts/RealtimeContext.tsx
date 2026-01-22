@@ -11,7 +11,7 @@ import { AppState, AppStateStatus } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
 import { realtimeService } from "@/services/realtime/realtimeService";
 import { useAuthStore } from "@/stores/authStore";
-import { setLoggingOut } from "@/services/api/base";
+import { setLoggingOut, TokenManager } from "@/services/api/base";
 
 // CONFIGURATION: Disable Realtime in local development if it's not working
 // Set to false to skip Realtime subscriptions (app will still work via polling)
@@ -21,12 +21,14 @@ interface RealtimeContextType {
   isConnected: boolean;
   channelCount: number;
   reconnectAttempts: number;
+  trackUserActivity: () => void;
 }
 
 const RealtimeContext = createContext<RealtimeContextType>({
   isConnected: false,
   channelCount: 0,
-  reconnectAttempts: 0
+  reconnectAttempts: 0,
+  trackUserActivity: () => {}
 });
 
 export const useRealtime = () => useContext(RealtimeContext);
@@ -62,19 +64,28 @@ export function RealtimeProvider({ children }: RealtimeProviderProps) {
         isAuthenticated &&
         user?.id
       ) {
-        console.log("[RealtimeContext] 📱 App returned to foreground, refreshing data...");
+        console.log(
+          "[RealtimeContext] 📱 App returned to foreground, checking token and refreshing data..."
+        );
+
+        // Proactively refresh token if expiring soon
+        // This ensures all subsequent API requests have a valid token
+        await TokenManager.ensureValidToken();
 
         // Invalidate key queries to ensure fresh data
         // Realtime reconnection is handled by the service's AppState listener
-        queryClient.invalidateQueries({ queryKey: ["checkIns"] });
-        queryClient.invalidateQueries({ queryKey: ["user"] }); // All user queries including stats
-        queryClient.invalidateQueries({ queryKey: ["progress"] }); // All progress queries
-        queryClient.invalidateQueries({ queryKey: ["progress", "streak"] }); // Explicitly streak
-        queryClient.invalidateQueries({ queryKey: ["progress", "mood"] }); // Explicitly mood trends
-        queryClient.invalidateQueries({ queryKey: ["goals"] });
-        queryClient.invalidateQueries({ queryKey: ["challenges"] });
-        queryClient.invalidateQueries({ queryKey: ["homeDashboard"] });
-        queryClient.invalidateQueries({ queryKey: ["partners"] }); // Partner data
+        // These keys match the definitions in hooks/api/queryKeys.ts and other hook files
+
+        // V2 Core data - only invalidate data that changes frequently
+        // Don't invalidate dailyMotivations, weeklyRecaps, achievements - they rarely change
+        // and already have proper staleTime/gcTime caching
+        queryClient.invalidateQueries({ queryKey: ["goals"] }); // goalsQueryKeys.all
+        queryClient.invalidateQueries({ queryKey: ["checkIns"] }); // checkInsQueryKeys.all
+        queryClient.invalidateQueries({ queryKey: ["user"] }); // userQueryKeys
+        queryClient.invalidateQueries({ queryKey: ["partners"] }); // partnersQueryKeys.all
+        queryClient.invalidateQueries({ queryKey: ["nudges"] }); // nudgesQueryKeys.all
+        queryClient.invalidateQueries({ queryKey: ["home"] }); // homeDashboardQueryKeys.all
+        queryClient.invalidateQueries({ queryKey: ["notificationHistory"] }); // notificationHistoryQueryKeys.all
       }
 
       appStateRef.current = nextAppState;
@@ -103,8 +114,8 @@ export function RealtimeProvider({ children }: RealtimeProviderProps) {
 
       // Add delay to allow Supabase client and tokens to fully initialize
       // This prevents race conditions where Realtime tries to connect before auth is ready
-      const startupDelay = setTimeout(() => {
-        realtimeService.start(user.id);
+      const startupDelay = setTimeout(async () => {
+        await realtimeService.start(user.id);
       }, 2000); // 2 second delay for initialization
 
       // Update connection status every 5 seconds
@@ -118,11 +129,24 @@ export function RealtimeProvider({ children }: RealtimeProviderProps) {
         // Don't clear userId on cleanup - allows reconnection after background
         realtimeService.stop(false);
       };
-    } else {
-      // User logged out or not authenticated - full cleanup
+    } else if (!isAuthenticated) {
+      // User logged out - full cleanup including userId
+      // This is the only time we should do full cleanup
+      console.log("[RealtimeContext] 🚪 User logged out, full cleanup");
       realtimeService.cleanup();
+    } else {
+      // Still verifying or no user yet - just stop but keep state for potential reconnect
+      // This prevents clearing queryClient/userId during the verification phase
+      console.log("[RealtimeContext] ⏳ Auth in progress, stopping without cleanup");
+      realtimeService.stop(false);
     }
   }, [isAuthenticated, user?.id, isVerifyingUser]);
 
-  return <RealtimeContext.Provider value={connectionStatus}>{children}</RealtimeContext.Provider>;
+  // Memoize the context value to prevent unnecessary re-renders
+  const contextValue: RealtimeContextType = {
+    ...connectionStatus,
+    trackUserActivity: () => realtimeService.trackUserActivity()
+  };
+
+  return <RealtimeContext.Provider value={contextValue}>{children}</RealtimeContext.Provider>;
 }

@@ -15,7 +15,7 @@ import { tokens, lineHeight } from "@/themes/tokens";
 import { useTheme } from "@/themes";
 import { MOBILE_ROUTES } from "@/lib/routes";
 import { useSignup } from "@/hooks/api/useAuth";
-import { getRedirection } from "@/utils/getRedirection";
+import { getRedirection, hasCompletedV2Onboarding } from "@/utils/getRedirection";
 import { useAlertModal } from "@/contexts/AlertModalContext";
 import { authService, type LoginResponse } from "@/services/api/auth";
 import { getApiErrorDetails } from "@/services/api/errors";
@@ -31,7 +31,7 @@ import {
   isAppleCancelledError
 } from "@/lib/auth/apple";
 import { ApiError } from "@/services/api/base";
-import { EXTERNAL_URLS } from "@/constants/general";
+import { useExternalUrls } from "@/hooks/api/useAppConfig";
 
 export default function SignupScreen() {
   // Get query params from deep links
@@ -61,6 +61,7 @@ export default function SignupScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { showAlert } = useAlertModal();
+  const externalUrls = useExternalUrls();
 
   // Use the signup mutation hook
   const signupMutation = useSignup();
@@ -72,34 +73,44 @@ export default function SignupScreen() {
   const showGoogle = hasGoogleSignInConfiguration();
   const showApple = Platform.OS === "ios" && appleAvailable;
 
-  // Fetch subscription data after login (non-blocking)
-  const fetchSubscriptionData = async () => {
-    try {
-      const [{ useSubscriptionStore }, { usePricingStore }] = await Promise.all([
-        import("@/stores/subscriptionStore"),
-        import("@/stores/pricingStore")
-      ]);
+  // Combined loading state - disable all inputs when any auth is in progress
+  const isAuthLoading = signupMutation.isPending || isGoogleLoading || isAppleLoading;
 
-      // Fetch subscription, features, and pricing plans in parallel
-      await Promise.all([
-        useSubscriptionStore.getState().fetchSubscription(),
-        useSubscriptionStore.getState().fetchFeatures(),
-        usePricingStore.getState().fetchPlans()
-      ]);
-    } catch (error) {
-      console.warn("[Signup] Failed to fetch subscription data:", error);
-    }
-  };
+  // Prefetch all critical data after signup (non-blocking)
+  // This runs in background while user navigates to home/onboarding
+  const prefetchAfterAuth = () => {
+    // 1. Subscription data (critical for paywall/feature gating)
+    Promise.all([import("@/stores/subscriptionStore"), import("@/stores/pricingStore")])
+      .then(([{ useSubscriptionStore }, { usePricingStore }]) => {
+        return Promise.all([
+          useSubscriptionStore.getState().fetchSubscription(),
+          useSubscriptionStore.getState().fetchFeatures(),
+          usePricingStore.getState().fetchPlans()
+        ]);
+      })
+      .catch((error) => {
+        console.warn("[Signup] Failed to fetch subscription data:", error);
+      });
 
-  // Check if user has fitness profile (for personalization skip)
-  const checkFitnessProfile = async (): Promise<boolean> => {
-    try {
-      const { useOnboardingStore } = await import("@/stores/onboardingStore");
-      return await useOnboardingStore.getState().checkHasFitnessProfile();
-    } catch (error) {
-      console.warn("[Signup] Failed to check fitness profile:", error);
-      return false;
-    }
+    // 2. Critical data (home dashboard, goals, motivation)
+    import("@/services/prefetch")
+      .then(({ prefetchCriticalData }) => {
+        import("@/lib/queryClient").then(({ queryClient }) => {
+          prefetchCriticalData(queryClient).catch((error) => {
+            console.warn("[Signup] Failed to prefetch critical data:", error);
+          });
+        });
+      })
+      .catch(() => {});
+
+    // 3. High priority data (achievements, partners) - runs after critical
+    import("@/services/prefetch")
+      .then(({ prefetchHighPriorityData }) => {
+        import("@/lib/queryClient").then(({ queryClient }) => {
+          prefetchHighPriorityData(queryClient).catch(() => {});
+        });
+      })
+      .catch(() => {});
   };
 
   // Sync referral code from URL params
@@ -136,16 +147,23 @@ export default function SignupScreen() {
     await login(payload.user, payload.access_token, payload.refresh_token);
 
     // Fetch subscription data immediately after login (non-blocking for navigation)
-    fetchSubscriptionData();
+    prefetchAfterAuth();
 
     try {
-      // Check if user has fitness profile (skip personalization if they do - e.g., existing user via OAuth)
-      const hasFitnessProfile = await checkFitnessProfile();
-      const destination = await getRedirection({ hasFitnessProfile });
-      router.replace(destination);
+      // V2: Check if user has completed onboarding
+      const hasCompletedOnboarding = hasCompletedV2Onboarding(payload.user);
+      const destination = await getRedirection({ hasCompletedOnboarding });
+
+      // Defer navigation slightly to let auth state propagate through Stack.Protected guard
+      // This prevents double navigation when isAuthenticated changes
+      requestAnimationFrame(() => {
+        router.replace(destination);
+      });
     } catch (redirectError) {
       console.warn("[Signup] Failed to compute redirection", redirectError);
-      router.replace(MOBILE_ROUTES.MAIN.HOME);
+      requestAnimationFrame(() => {
+        router.replace(MOBILE_ROUTES.MAIN.HOME);
+      });
     }
   };
 
@@ -218,22 +236,32 @@ export default function SignupScreen() {
             );
 
             // Fetch subscription data immediately after login (non-blocking for navigation)
-            fetchSubscriptionData();
+            prefetchAfterAuth();
 
             // Check if email verification is required
             const user = response.data.user;
             if (user && !user.email_verified && user.auth_provider === "email") {
               // Redirect to email verification screen
-              router.replace(MOBILE_ROUTES.AUTH.VERIFY_EMAIL);
+              // Defer navigation slightly to let auth state propagate through Stack.Protected guard
+              requestAnimationFrame(() => {
+                router.replace(MOBILE_ROUTES.AUTH.VERIFY_EMAIL);
+              });
             } else {
               try {
-                // Check if user has fitness profile (skip personalization if they do)
-                const hasFitnessProfile = await checkFitnessProfile();
-                const destination = await getRedirection({ hasFitnessProfile });
-                router.replace(destination);
+                // V2: Check if user has completed onboarding
+                const hasCompletedOnboarding = hasCompletedV2Onboarding(response.data.user);
+                const destination = await getRedirection({ hasCompletedOnboarding });
+
+                // Defer navigation slightly to let auth state propagate through Stack.Protected guard
+                // This prevents double navigation when isAuthenticated changes
+                requestAnimationFrame(() => {
+                  router.replace(destination);
+                });
               } catch (redirectError) {
                 console.warn("[Signup] Failed to compute redirection", redirectError);
-                router.replace(MOBILE_ROUTES.MAIN.HOME);
+                requestAnimationFrame(() => {
+                  router.replace(MOBILE_ROUTES.MAIN.HOME);
+                });
               }
             }
           }
@@ -421,9 +449,9 @@ export default function SignupScreen() {
             showApple={showApple}
             onGooglePress={handleGoogleSignIn}
             onApplePress={handleAppleSignIn}
-            googleDisabled={!showGoogle || isGoogleLoading}
+            googleDisabled={!showGoogle || isAuthLoading}
             googleLoading={isGoogleLoading}
-            appleDisabled={!showApple || isAppleLoading}
+            appleDisabled={!showApple || isAuthLoading}
             appleLoading={isAppleLoading}
           />
 
@@ -442,6 +470,7 @@ export default function SignupScreen() {
               autoCapitalize="none"
               autoCorrect={false}
               error={errors.username}
+              disabled={isAuthLoading}
             />
 
             <TextInput
@@ -458,6 +487,7 @@ export default function SignupScreen() {
               autoCapitalize="none"
               autoCorrect={false}
               error={errors.email}
+              disabled={isAuthLoading}
             />
 
             <TextInput
@@ -474,6 +504,7 @@ export default function SignupScreen() {
               showPasswordToggle
               autoCapitalize="none"
               error={errors.password}
+              disabled={isAuthLoading}
             />
 
             {/* Referral Code Input - Collapsible */}
@@ -491,6 +522,7 @@ export default function SignupScreen() {
                 autoCapitalize="characters"
                 autoCorrect={false}
                 error={errors.referralCode}
+                disabled={isAuthLoading}
               />
             ) : (
               <Button
@@ -499,6 +531,7 @@ export default function SignupScreen() {
                 variant="text"
                 size="sm"
                 style={styles.referralToggle}
+                disabled={isAuthLoading}
               />
             )}
 
@@ -510,7 +543,7 @@ export default function SignupScreen() {
                   : t("auth.signup.create_account")
               }
               onPress={handleSignup}
-              disabled={signupMutation.isPending}
+              disabled={isAuthLoading}
               loading={signupMutation.isPending}
             />
 
@@ -519,7 +552,7 @@ export default function SignupScreen() {
               <Text style={styles.termsText}>
                 {t("auth.signup.terms_text")}{" "}
                 <LinkText
-                  url={EXTERNAL_URLS.TERMS_OF_SERVICE}
+                  url={externalUrls.termsOfService}
                   title={t("auth.signup.terms_of_use")}
                   style={styles.linkText}
                 >
@@ -527,7 +560,7 @@ export default function SignupScreen() {
                 </LinkText>
                 {" and "}
                 <LinkText
-                  url={EXTERNAL_URLS.PRIVACY_POLICY}
+                  url={externalUrls.privacyPolicy}
                   title={t("auth.signup.privacy_policy")}
                   style={styles.linkText}
                 >
@@ -542,6 +575,7 @@ export default function SignupScreen() {
               onPress={() => router.push(MOBILE_ROUTES.AUTH.LOGIN)}
               variant="text"
               size="sm"
+              disabled={isAuthLoading}
               style={{
                 ...styles.loginLinkContainer,
                 paddingBottom: insets.bottom + 20

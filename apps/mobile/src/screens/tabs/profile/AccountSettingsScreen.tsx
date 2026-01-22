@@ -128,6 +128,12 @@ export default function AccountSettingsScreen() {
       icon: "link",
       label: t("profile.linked_accounts"),
       route: MOBILE_ROUTES.PROFILE.LINKED_ACCOUNTS
+    },
+    {
+      id: "blocked_users",
+      icon: "ban",
+      label: t("partners.blocked_users") || "Blocked Users",
+      route: MOBILE_ROUTES.PROFILE.BLOCKED_PARTNERS
     }
   ];
 

@@ -4,13 +4,13 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  TextInput,
   KeyboardAvoidingView,
   Platform,
   Modal,
   FlatList
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { TextInput } from "@/components/ui/TextInput";
 import { useRouter } from "expo-router";
 import { useAuthStore } from "@/stores/authStore";
 import { useTranslation } from "@/lib/i18n";
@@ -199,62 +199,47 @@ export default function ProfileSettingsScreen() {
           <View style={styles.formSection}>
             <Card style={styles.formCard}>
               {/* Name Input */}
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>{t("profile_settings.name_label")}</Text>
-                <TextInput
-                  style={[styles.input, nameError && styles.inputError]}
-                  value={name}
-                  onChangeText={(text) => {
-                    setName(text);
-                    if (nameError) validateName(text);
-                  }}
-                  onBlur={() => validateName(name)}
-                  placeholder={t("profile_settings.name_placeholder")}
-                  placeholderTextColor={colors.text.tertiary}
-                  autoCapitalize="words"
-                />
-                {nameError && <Text style={styles.errorText}>{nameError}</Text>}
-              </View>
+              <TextInput
+                label={t("profile_settings.name_label")}
+                value={name}
+                onChangeText={(text) => {
+                  setName(text);
+                  if (nameError) validateName(text);
+                }}
+                onBlur={() => validateName(name)}
+                placeholder={t("profile_settings.name_placeholder")}
+                autoCapitalize="words"
+                error={nameError || undefined}
+              />
 
               {/* Username Input */}
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>{t("profile_settings.username_label")}</Text>
-                <View style={styles.usernameInputContainer}>
-                  <Text style={styles.usernamePrefix}>@</Text>
-                  <TextInput
-                    style={[styles.usernameInput, usernameError && styles.inputError]}
-                    value={username}
-                    onChangeText={(text) => {
-                      const cleaned = text.toLowerCase().replace(/[^a-z0-9_]/g, "");
-                      setUsername(cleaned);
-                      if (usernameError) validateUsername(cleaned);
-                    }}
-                    onBlur={() => validateUsername(username)}
-                    placeholder={t("profile_settings.username_placeholder")}
-                    placeholderTextColor={colors.text.tertiary}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
-                </View>
-                {usernameError && <Text style={styles.errorText}>{usernameError}</Text>}
-              </View>
+              <TextInput
+                label={t("profile_settings.username_label")}
+                value={username}
+                onChangeText={(text) => {
+                  const cleaned = text.toLowerCase().replace(/[^a-z0-9_]/g, "");
+                  setUsername(cleaned);
+                  if (usernameError) validateUsername(cleaned);
+                }}
+                onBlur={() => validateUsername(username)}
+                placeholder={t("profile_settings.username_placeholder")}
+                autoCapitalize="none"
+                autoCorrect={false}
+                error={usernameError || undefined}
+                leftIcon={<Text style={styles.usernamePrefix}>@</Text>}
+              />
 
               {/* Bio Input */}
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>
-                  {t("profile_settings.bio_label")}{" "}
-                  <Text style={styles.optional}>({t("common.optional")})</Text>
-                </Text>
                 <TextInput
-                  style={[styles.input, styles.bioInput]}
+                  label={`${t("profile_settings.bio_label")} (${t("common.optional")})`}
                   value={bio}
                   onChangeText={setBio}
                   placeholder={t("profile_settings.bio_placeholder")}
-                  placeholderTextColor={colors.text.tertiary}
                   multiline
                   numberOfLines={3}
                   maxLength={160}
-                  textAlignVertical="top"
+                  containerStyle={styles.bioInputContainer}
                 />
                 <Text style={styles.charCount}>{bio.length}/160</Text>
               </View>
@@ -409,6 +394,9 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
   bioInput: {
     minHeight: 80,
     paddingTop: toRN(tokens.spacing[3])
+  },
+  bioInputContainer: {
+    marginBottom: 0
   },
   charCount: {
     fontSize: toRN(tokens.typography.fontSize.xs),

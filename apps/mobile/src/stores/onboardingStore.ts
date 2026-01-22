@@ -1,238 +1,116 @@
 import { create } from "zustand";
-import { logger } from "@/services/logger";
-import { onboardingApi } from "@/services/api/onboarding";
-import { FitnessProfile } from "@/types/user";
+import { persist, createJSONStorage } from "zustand/middleware";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+/**
+ * V2 Onboarding Store
+ * Stores all data collected during onboarding flow.
+ * Persisted to AsyncStorage so users don't lose progress.
+ *
+ * Flow:
+ * 1. Name - What should we call you?
+ * 2. Motivation Style - How should AI motivate you?
+ * 3. First Goal - What do you want to stay accountable to?
+ * 4. Goal Details - Frequency, days, reminder time
+ * 5. Why Matters - Why is this goal important? (optional)
+ * 6. Complete!
+ */
 
 interface OnboardingState {
-  // Profile data
-  biological_sex: string; // 'male', 'female', 'prefer_not_to_say'
-  fitness_level: string;
-  primary_goal: string;
-  current_frequency: string;
-  preferred_location: string;
-  available_time: string;
-  motivation_style: string;
-  biggest_challenge: string;
-  available_equipment: string[];
+  // Screen 3: Name
+  name: string;
+
+  // Screen 4: Motivation Style
+  motivation_style: "supportive" | "tough_love" | "calm" | "";
+
+  // Screen 5: First Goal
+  selected_goal_type: "workout" | "read" | "meditate" | "hydration" | "journal" | "custom" | "";
+
+  // Screen 5b/5c: Goal Details
+  goal_title: string; // For custom goals or populated from selected type
+  goal_frequency: number; // Times per week (1-7)
+  goal_days: string[]; // Selected days ['mon', 'tue', etc.]
+  goal_reminder_time: string; // ISO time string e.g., "18:00"
+  goal_is_daily: boolean; // For custom goals
+
+  // Screen 6: Why Matters
+  goal_why: string;
+
+  // Morning Motivation Settings (sent with completeOnboarding)
+  morning_motivation_enabled: boolean;
+  morning_motivation_time: string; // HH:MM format
 
   // State
-  isSubmitting: boolean;
   isCompleted: boolean;
-  hasFitnessProfile: boolean | null; // null = not checked yet, true/false = checked
-  error: string | null;
 
   // Actions
-  setBiologicalSex: (sex: string) => void;
-  setFitnessLevel: (level: string) => void;
-  setPrimaryGoal: (goal: string) => void;
-  setCurrentFrequency: (frequency: string) => void;
-  setPreferredLocation: (location: string) => void;
-  setAvailableTime: (time: string) => void;
-  setMotivationStyle: (style: string) => void;
-  setBiggestChallenge: (challenge: string) => void;
-  setAvailableEquipment: (equipment: string[]) => void;
-  loadProfile: () => Promise<boolean>; // Returns true if profile exists, false otherwise
-  checkHasFitnessProfile: () => Promise<boolean>; // Quick check without loading full profile
-  submitProfile: () => Promise<void>;
+  setName: (name: string) => void;
+  setMotivationStyle: (style: "supportive" | "tough_love" | "calm") => void;
+  setSelectedGoalType: (
+    type: "workout" | "read" | "meditate" | "hydration" | "journal" | "custom"
+  ) => void;
+  setGoalTitle: (title: string) => void;
+  setGoalFrequency: (frequency: number) => void;
+  setGoalDays: (days: string[]) => void;
+  setGoalReminderTime: (time: string) => void;
+  setGoalIsDaily: (isDaily: boolean) => void;
+  setGoalWhy: (why: string) => void;
+  setMorningMotivationEnabled: (enabled: boolean) => void;
+  setMorningMotivationTime: (time: string) => void;
+  setCompleted: (completed: boolean) => void;
   reset: () => void;
 }
 
-export const useOnboardingStore = create<OnboardingState>((set, get) => ({
-  // Initial state
-  biological_sex: "",
-  fitness_level: "",
-  primary_goal: "",
-  current_frequency: "",
-  preferred_location: "",
-  available_time: "",
-  motivation_style: "",
-  biggest_challenge: "",
-  available_equipment: [],
-  isSubmitting: false,
-  isCompleted: false,
-  hasFitnessProfile: null, // null = not checked yet
-  error: null,
+const initialState = {
+  name: "",
+  motivation_style: "" as const,
+  selected_goal_type: "" as const,
+  goal_title: "",
+  goal_frequency: 3,
+  goal_days: [] as string[],
+  goal_reminder_time: "18:00",
+  goal_is_daily: false,
+  goal_why: "",
+  morning_motivation_enabled: true,
+  morning_motivation_time: "08:00",
+  isCompleted: false
+};
 
-  // Actions
-  setBiologicalSex: (sex: string) => {
-    set({ biological_sex: sex });
-  },
+export const useOnboardingStore = create<OnboardingState>()(
+  persist(
+    (set) => ({
+      ...initialState,
 
-  setFitnessLevel: (level: string) => {
-    set({ fitness_level: level });
-  },
+      // Actions
+      setName: (name) => set({ name }),
 
-  setPrimaryGoal: (goal: string) => {
-    set({ primary_goal: goal });
-  },
+      setMotivationStyle: (style) => set({ motivation_style: style }),
 
-  setCurrentFrequency: (frequency: string) => {
-    set({ current_frequency: frequency });
-  },
+      setSelectedGoalType: (type) => set({ selected_goal_type: type }),
 
-  setPreferredLocation: (location: string) => {
-    set({ preferred_location: location });
-  },
+      setGoalTitle: (title) => set({ goal_title: title }),
 
-  setAvailableTime: (time: string) => {
-    set({ available_time: time });
-  },
+      setGoalFrequency: (frequency) => set({ goal_frequency: frequency }),
 
-  setMotivationStyle: (style: string) => {
-    set({ motivation_style: style });
-  },
+      setGoalDays: (days) => set({ goal_days: days }),
 
-  setBiggestChallenge: (challenge: string) => {
-    set({ biggest_challenge: challenge });
-  },
+      setGoalReminderTime: (time) => set({ goal_reminder_time: time }),
 
-  setAvailableEquipment: (equipment: string[]) => {
-    set({ available_equipment: equipment });
-  },
+      setGoalIsDaily: (isDaily) => set({ goal_is_daily: isDaily }),
 
-  loadProfile: async () => {
-    try {
-      const profile = await onboardingApi.getProfile();
+      setGoalWhy: (why) => set({ goal_why: why }),
 
-      if (profile) {
-        // Populate store with existing profile data
-        set({
-          biological_sex: profile.biological_sex || "",
-          fitness_level: profile.fitness_level || "",
-          primary_goal: profile.primary_goal || "",
-          current_frequency: profile.current_frequency || "",
-          preferred_location: profile.preferred_location || "",
-          available_time: profile.available_time || "",
-          motivation_style: profile.motivation_style || "",
-          biggest_challenge: profile.biggest_challenge || "",
-          available_equipment: profile.available_equipment || [],
-          isCompleted: true, // Profile exists, so it's been completed
-          hasFitnessProfile: true
-        });
+      setMorningMotivationEnabled: (enabled) => set({ morning_motivation_enabled: enabled }),
 
-        return true; // Profile exists
-      }
+      setMorningMotivationTime: (time) => set({ morning_motivation_time: time }),
 
-      set({ hasFitnessProfile: false });
-      return false; // No profile found
-    } catch (error) {
-      // Profile doesn't exist or error fetching - not an error state
-      // Just means user needs to complete onboarding
-      const errorMessage = error instanceof Error ? error.message : "Failed to load profile";
+      setCompleted: (completed) => set({ isCompleted: completed }),
 
-      // Only log if it's not a 404 (not found)
-      if (!errorMessage.includes("404") && !errorMessage.includes("not found")) {
-        logger.error("Failed to load fitness profile", {
-          error: errorMessage
-        });
-      }
-
-      set({ hasFitnessProfile: false });
-      return false; // No profile exists
+      reset: () => set(initialState)
+    }),
+    {
+      name: "onboarding-storage",
+      storage: createJSONStorage(() => AsyncStorage)
     }
-  },
-
-  checkHasFitnessProfile: async () => {
-    // If already checked, return cached value
-    const currentState = get().hasFitnessProfile;
-    if (currentState !== null) {
-      return currentState;
-    }
-
-    // Otherwise, load profile to check
-    return get().loadProfile();
-  },
-
-  submitProfile: async () => {
-    const state = get();
-
-    // Validate required fields
-    // biological_sex is optional (user can choose 'prefer_not_to_say' or skip)
-    const requiredFields = [
-      "fitness_level",
-      "primary_goal",
-      "current_frequency",
-      "preferred_location",
-      "available_time",
-      "motivation_style",
-      "biggest_challenge"
-    ];
-
-    const missingFields = requiredFields.filter((field) => !state[field as keyof typeof state]);
-
-    if (missingFields.length > 0) {
-      const error = `Missing required fields: ${missingFields.join(", ")}`;
-      logger.error("Profile validation failed", { missingFields });
-      set({ error, isSubmitting: false });
-      throw new Error(error);
-    }
-
-    set({ isSubmitting: true, error: null });
-
-    try {
-      const profileData: FitnessProfile = {
-        biological_sex: state.biological_sex || undefined, // Optional field
-        fitness_level: state.fitness_level,
-        primary_goal: state.primary_goal,
-        current_frequency: state.current_frequency,
-        preferred_location: state.preferred_location,
-        available_time: state.available_time,
-        motivation_style: state.motivation_style,
-        biggest_challenge: state.biggest_challenge,
-        available_equipment: state.available_equipment
-      };
-
-      // Submitting profile - tracked via PostHog in component
-
-      await onboardingApi.saveProfile(profileData);
-
-      set({
-        isCompleted: true,
-        isSubmitting: false,
-        error: null
-      });
-
-      // Profile submitted successfully - tracked via PostHog in component
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to submit profile";
-
-      logger.error("Failed to submit fitness profile", {
-        error: errorMessage,
-        profileData: {
-          fitness_level: state.fitness_level,
-          primary_goal: state.primary_goal,
-          current_frequency: state.current_frequency,
-          preferred_location: state.preferred_location,
-          available_time: state.available_time,
-          motivation_style: state.motivation_style,
-          biggest_challenge: state.biggest_challenge
-        }
-      });
-
-      set({
-        error: errorMessage,
-        isSubmitting: false
-      });
-
-      throw error;
-    }
-  },
-
-  reset: () => {
-    set({
-      biological_sex: "",
-      fitness_level: "",
-      primary_goal: "",
-      current_frequency: "",
-      preferred_location: "",
-      available_time: "",
-      motivation_style: "",
-      biggest_challenge: "",
-      available_equipment: [],
-      isSubmitting: false,
-      isCompleted: false,
-      hasFitnessProfile: null,
-      error: null
-    });
-  }
-}));
+  )
+);

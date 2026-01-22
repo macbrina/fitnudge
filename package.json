@@ -8,8 +8,8 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
-    "lint": "pnpm --filter ./apps/mobile exec eslint . && pnpm --filter ./apps/web exec eslint . && pnpm --filter ./apps/admin-portal exec eslint . && pnpm --filter ./packages/ui exec eslint . && pnpm --filter ./packages/lib exec eslint . && pnpm --filter ./packages/themes exec eslint . && pnpm --filter ./packages/assets exec eslint .",
-    "lint:fix": "pnpm --filter ./apps/mobile exec eslint . --fix && pnpm --filter ./apps/web exec eslint . --fix && pnpm --filter ./apps/admin-portal exec eslint . --fix && pnpm --filter ./packages/ui exec eslint . --fix && pnpm --filter ./packages/lib exec eslint . --fix && pnpm --filter ./packages/themes exec eslint . --fix && pnpm --filter ./packages/assets exec eslint . --fix",
+    "lint": "pnpm --filter ./apps/mobile exec eslint . && pnpm --filter ./apps/web exec eslint . && pnpm --filter ./apps/admin-portal exec eslint .",
+    "lint:fix": "pnpm --filter ./apps/mobile exec eslint . --fix && pnpm --filter ./apps/web exec eslint . --fix && pnpm --filter ./apps/admin-portal exec eslint . --fix",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
     "shadcn": "cd packages/ui && pnpm dlx shadcn@latest",
@@ -34,12 +34,6 @@
     ],
     "packages/lib/**/!(*.d).{ts,tsx}": [
       "pnpm --filter ./packages/lib exec eslint --max-warnings=0"
-    ],
-    "packages/themes/**/!(*.d).{ts,tsx}": [
-      "pnpm --filter ./packages/themes exec eslint --max-warnings=0"
-    ],
-    "packages/assets/**/!(*.d).{ts,tsx}": [
-      "pnpm --filter ./packages/assets exec eslint --max-warnings=0"
     ]
   },
   "devDependencies": {

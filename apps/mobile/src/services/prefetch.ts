@@ -1,12 +1,8 @@
 /**
- * Prefetch Service
+ * Prefetch Service - V2 Simplified
  *
  * Handles prefetching critical data during the splash screen so that
  * when users navigate through the app, data is already available.
- *
- * This eliminates loading spinners on first navigation to screens.
- *
- * @see docs/PREFETCH_CACHE_STRATEGY.md for full documentation
  */
 
 import { QueryClient } from "@tanstack/react-query";
@@ -14,25 +10,128 @@ import { homeService } from "@/services/api";
 import { userService } from "@/services/api/user";
 import { achievementsService } from "@/services/api";
 import { goalsService } from "@/services/api";
-import { exercisesService } from "@/services/api/exercises";
-import { audioPreferencesService } from "@/services/api/audioPreferences";
+import { dailyMotivationService } from "@/services/api";
 import { notificationsService } from "@/services/api/notifications";
 
-// Import query keys for consistency with hooks
 import { homeDashboardQueryKeys } from "@/hooks/api/useHomeDashboard";
 import { userQueryKeys } from "@/hooks/api/useUser";
 import { achievementsQueryKeys } from "@/hooks/api/useAchievements";
-import { goalsQueryKeys } from "@/hooks/api/queryKeys";
-import { exercisesQueryKeys } from "@/hooks/api/useExercises";
+import { dailyMotivationsQueryKeys } from "@/hooks/api/useDailyMotivations";
+import { goalsQueryKeys, partnersQueryKeys } from "@/hooks/api/queryKeys";
 import { notificationHistoryQueryKeys } from "@/hooks/api/useNotificationHistory";
+import { partnersService } from "@/services/api/partners";
+import { logger } from "@/services/logger";
+
+// =====================================================
+// Coordinated Initialization (prevents duplicate fetches)
+// =====================================================
+
+// Module-level promise for deduplication - shared across imports
+let initializationPromise: Promise<void> | null = null;
 
 /**
- * Configuration for each prefetchable query
+ * Initialize authenticated user data with deduplication.
  *
- * IMPORTANT: When adding new prefetch queries, ensure:
- * 1. The queryKey matches EXACTLY what the hook uses
- * 2. The queryFn returns the same data shape as the hook
- * 3. You set appropriate staleTime for the data type
+ * This function coordinates between index.tsx and _layout.tsx to prevent
+ * duplicate fetches when both try to initialize at the same time.
+ *
+ * - First caller starts the fetch and stores the promise
+ * - Subsequent callers await the existing promise instead of starting new fetches
+ * - Safe to call from multiple places (index.tsx, _layout.tsx deep links, etc.)
+ */
+export async function initializeAuthenticatedData(queryClient: QueryClient): Promise<void> {
+  // If already initializing, wait for that instead of starting new
+  if (initializationPromise) {
+    logger.debug("[Prefetch] Initialization already in progress, waiting...");
+    return initializationPromise;
+  }
+
+  // Dynamic imports to avoid circular dependencies
+  const [{ useSubscriptionStore }, { usePricingStore }] = await Promise.all([
+    import("@/stores/subscriptionStore"),
+    import("@/stores/pricingStore")
+  ]);
+
+  // Check if already loaded (from previous init or cache)
+  const hasSubscription = useSubscriptionStore.getState().subscription !== null;
+  const hasFeatures = useSubscriptionStore.getState().features !== null;
+  const hasPricing = usePricingStore.getState().plans.length > 0;
+
+  if (hasSubscription && hasFeatures && hasPricing) {
+    logger.debug("[Prefetch] Data already loaded, skipping initialization");
+    return; // Already loaded, skip
+  }
+
+  logger.info("[Prefetch] Starting authenticated data initialization...");
+
+  initializationPromise = (async () => {
+    try {
+      // Fetch subscription data, features, history, pricing plans,
+      // AND prefetch critical React Query data in parallel
+      await Promise.all([
+        useSubscriptionStore.getState().fetchSubscription(),
+        useSubscriptionStore.getState().fetchFeatures(),
+        useSubscriptionStore.getState().fetchHistory(),
+        usePricingStore.getState().fetchPlans(),
+        prefetchCriticalData(queryClient)
+      ]);
+
+      // Prefetch high priority data (partners, motivation, achievements)
+      // Don't await - let it run in background
+      prefetchHighPriorityData(queryClient).catch(() => {
+        // Silently ignore errors - these are not critical
+      });
+
+      logger.info("[Prefetch] Authenticated data initialization complete");
+    } finally {
+      // Clear promise so future calls can run again if needed
+      initializationPromise = null;
+    }
+  })();
+
+  return initializationPromise;
+}
+
+/**
+ * Refresh authenticated user data (for foreground resume).
+ *
+ * Unlike initializeAuthenticatedData, this always refetches regardless of cache.
+ * Used when app comes to foreground to ensure fresh data.
+ */
+export async function refreshAuthenticatedData(queryClient: QueryClient): Promise<void> {
+  const [{ useSubscriptionStore }, { usePricingStore }] = await Promise.all([
+    import("@/stores/subscriptionStore"),
+    import("@/stores/pricingStore")
+  ]);
+
+  const hasPricing = usePricingStore.getState().plans.length > 0;
+
+  await Promise.all([
+    useSubscriptionStore.getState().fetchSubscription(),
+    useSubscriptionStore.getState().fetchFeatures(),
+    useSubscriptionStore.getState().fetchHistory(),
+    !hasPricing ? usePricingStore.getState().fetchPlans() : Promise.resolve(),
+    prefetchCriticalData(queryClient)
+  ]);
+
+  prefetchHighPriorityData(queryClient).catch(() => {
+    // Silently ignore errors - these are not critical
+  });
+}
+
+/**
+ * Get user's timezone for API calls
+ */
+function getUserTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    return "UTC";
+  }
+}
+
+/**
+ * Prefetch configuration
  */
 interface PrefetchConfig {
   queryKey: readonly unknown[];
@@ -44,231 +143,196 @@ interface PrefetchConfig {
 }
 
 /**
- * Get user's timezone for API calls that need it
+ * Define prefetch queries for V2
  */
-const getUserTimezone = (): string => {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone;
-  } catch {
-    return "UTC";
-  }
-};
-
-/**
- * All prefetchable queries configuration
- *
- * Add new queries here to have them prefetched during splash screen.
- * Group by priority:
- * - critical: Must complete before app loads (home screen data)
- * - high: Should complete but won't block app (profile, goals)
- * - normal: Nice to have, runs after high priority
- */
-const getPrefetchConfigs = (): PrefetchConfig[] => {
+function getPrefetchConfigs(): PrefetchConfig[] {
   const timezone = getUserTimezone();
 
   return [
-    // ==================== CRITICAL PRIORITY ====================
-    // These are for the first screen users see (Home tab)
-
+    // Critical - needed immediately on home screen
     {
       queryKey: homeDashboardQueryKeys.dashboard(),
       queryFn: async () => {
+        // Must extract .data to match useHomeDashboard
         const response = await homeService.getDashboard(timezone);
-        if (response.error) throw new Error(response.error);
+        if (response.error) {
+          throw new Error(response.error);
+        }
         return response.data;
       },
-      staleTime: 1 * 60 * 1000, // 1 minute
-      description: "Home dashboard (items, stats, pending check-ins)",
+      staleTime: 2 * 60 * 1000, // 2 minutes
+      description: "Home dashboard",
+      priority: "critical"
+    },
+    {
+      queryKey: userQueryKeys.currentUser,
+      queryFn: () => userService.getCurrentUser(),
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      description: "Current user",
+      priority: "critical"
+    },
+    {
+      queryKey: goalsQueryKeys.list(),
+      queryFn: () => goalsService.getGoals(),
+      staleTime: 30 * 1000, // 30 seconds
+      description: "Goals list",
+      priority: "critical"
+    },
+    // Motivation card is visible on home screen - must be critical
+    {
+      queryKey: dailyMotivationsQueryKeys.today(),
+      queryFn: async () => {
+        // Must extract .data to match useTodayDailyMotivation
+        const response = await dailyMotivationService.getToday();
+        if (response.status !== 200 || !response.data) {
+          throw new Error(response.error || "Failed to fetch daily motivation");
+        }
+        return response.data;
+      },
+      staleTime: 60 * 60 * 1000, // 1 hour
+      description: "Today's motivation",
+      priority: "critical"
+    },
+    // Notification count shows in tab bar - must be critical
+    {
+      queryKey: notificationHistoryQueryKeys.unreadCount(),
+      queryFn: async () => {
+        // Must extract .data to match useUnreadNotificationCount's fetchNotificationHistory
+        const response = await notificationsService.getHistory(100, 0);
+        if (response.error || !response.data) {
+          throw new Error(response.message || "Failed to fetch notifications");
+        }
+        return response.data;
+      },
+      staleTime: 30 * 1000, // 30 seconds
+      description: "Notification count",
       priority: "critical"
     },
 
-    // ==================== HIGH PRIORITY ====================
-    // These are for commonly accessed screens
-
-    {
-      queryKey: userQueryKeys.currentUser,
-      queryFn: async () => {
-        const response = await userService.getCurrentUser();
-        return response;
-      },
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      description: "Current user profile",
-      priority: "high"
-    },
-
-    {
-      queryKey: userQueryKeys.userStats(),
-      queryFn: async () => {
-        const response = await userService.getUserStats();
-        return response;
-      },
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      description: "User stats (streak, goals count, check-ins)",
-      priority: "high"
-    },
-
-    {
-      queryKey: goalsQueryKeys.active(),
-      queryFn: async () => {
-        const response = await goalsService.getActiveGoals();
-        return response;
-      },
-      staleTime: 2 * 60 * 1000, // 2 minutes
-      description: "Active goals list for Goals tab",
-      priority: "high"
-    },
-
+    // High priority - needed soon after home screen
     {
       queryKey: achievementsQueryKeys.myAchievements(),
-      queryFn: async () => {
-        const response = await achievementsService.getMyAchievements();
-        return response;
-      },
+      queryFn: () => achievementsService.getMyAchievements(),
       staleTime: 5 * 60 * 1000, // 5 minutes
-      description: "User's unlocked achievements",
+      description: "Achievements",
       priority: "high"
     },
-
+    {
+      queryKey: partnersQueryKeys.listWithGoals(),
+      queryFn: () => partnersService.getPartners(true),
+      staleTime: 60 * 1000, // 1 minute
+      description: "Partners with today's goals",
+      priority: "high"
+    },
+    // Notification list for when user navigates to notifications screen
+    // Uses infinite query - must match useNotificationHistory hook
     {
       queryKey: notificationHistoryQueryKeys.list(),
       queryFn: async () => {
+        // Must extract .data to match useNotificationHistory's fetchNotificationHistory
         const response = await notificationsService.getHistory(20, 0);
-        if (response.error) throw new Error(response.error);
+        if (response.error || !response.data) {
+          throw new Error(response.message || "Failed to fetch notifications");
+        }
         return response.data;
       },
-      staleTime: 1 * 60 * 1000, // 1 minute (notifications change frequently)
-      description: "Notification history for Notifications tab",
+      staleTime: 2 * 60 * 1000, // 2 minutes
+      description: "Notifications list",
       priority: "high",
-      isInfinite: true // Flag for infinite query
-    },
-
-    // ==================== NORMAL PRIORITY ====================
-    // These are for less frequently accessed features
-
-    {
-      queryKey: exercisesQueryKeys.popular(20),
-      queryFn: async () => {
-        const response = await exercisesService.getPopularExercises(20);
-        return response;
-      },
-      staleTime: 24 * 60 * 60 * 1000, // 24 hours (exercises rarely change)
-      description: "Popular exercises for workout picker",
-      priority: "normal"
-    },
-
-    {
-      queryKey: ["audio-preferences"],
-      queryFn: async () => {
-        const response = await audioPreferencesService.getPreferences();
-        return response;
-      },
-      staleTime: 60 * 60 * 1000, // 1 hour
-      description: "Audio preferences for workout player",
-      priority: "normal"
+      isInfinite: true
     }
   ];
-};
-
-/**
- * Prefetch all critical data during splash screen
- *
- * This function is called from index.tsx after user authentication is verified.
- * It runs all prefetch queries in parallel, grouped by priority.
- *
- * @param queryClient - The React Query client instance
- * @returns Promise that resolves when critical + high priority prefetching is done
- */
-export async function prefetchCriticalData(queryClient: QueryClient): Promise<void> {
-  const configs = getPrefetchConfigs();
-
-  // Group configs by priority
-  const critical = configs.filter((c) => c.priority === "critical");
-  const high = configs.filter((c) => c.priority === "high");
-  const normal = configs.filter((c) => c.priority === "normal");
-
-  console.log(
-    `[Prefetch] Starting prefetch: ${critical.length} critical, ${high.length} high, ${normal.length} normal`
-  );
-
-  const prefetchOne = async (config: PrefetchConfig): Promise<void> => {
-    try {
-      if (config.isInfinite) {
-        // Use prefetchInfiniteQuery for infinite queries
-        await queryClient.prefetchInfiniteQuery({
-          queryKey: config.queryKey,
-          queryFn: config.queryFn,
-          staleTime: config.staleTime,
-          initialPageParam: 0
-        });
-      } else {
-        await queryClient.prefetchQuery({
-          queryKey: config.queryKey,
-          queryFn: config.queryFn,
-          staleTime: config.staleTime
-        });
-      }
-      console.log(`[Prefetch] ✓ ${config.description}`);
-    } catch (error) {
-      // Log but don't fail - prefetch is best-effort
-      console.warn(`[Prefetch] ✗ ${config.description}:`, error);
-    }
-  };
-
-  // Run critical queries first (must complete)
-  await Promise.all(critical.map(prefetchOne));
-
-  // Run high priority in parallel (should complete but don't block)
-  await Promise.all(high.map(prefetchOne));
-
-  // Fire off normal priority but don't wait for them
-  // They'll complete in background while user starts using the app
-  Promise.all(normal.map(prefetchOne)).catch(() => {
-    // Silently ignore - normal priority failures are fine
-  });
-
-  console.log("[Prefetch] Critical and high priority prefetch complete");
 }
 
 /**
- * Prefetch a specific query manually
- *
- * Use this to prefetch data before navigation, e.g.:
- * - Prefetch goal details when user hovers over a goal card
- * - Prefetch challenge data when user opens challenges tab
- *
- * @param queryClient - The React Query client instance
- * @param queryKey - The query key to prefetch
- * @param queryFn - The function to fetch the data
- * @param staleTime - How long the data should be considered fresh
+ * Helper to prefetch a single config (handles both regular and infinite queries)
  */
-export async function prefetchQuery<T>(
-  queryClient: QueryClient,
-  queryKey: readonly unknown[],
-  queryFn: () => Promise<T>,
-  staleTime: number = 5 * 60 * 1000
-): Promise<void> {
-  try {
-    await queryClient.prefetchQuery({
-      queryKey,
-      queryFn,
-      staleTime
+async function prefetchConfig(queryClient: QueryClient, config: PrefetchConfig): Promise<void> {
+  if (config.isInfinite) {
+    // Use prefetchInfiniteQuery for infinite queries
+    await queryClient.prefetchInfiniteQuery({
+      queryKey: config.queryKey,
+      queryFn: () => config.queryFn(),
+      staleTime: config.staleTime,
+      initialPageParam: 0,
+      getNextPageParam: () => undefined // Only prefetch first page
     });
-  } catch (error) {
-    console.warn(`[Prefetch] Failed to prefetch ${queryKey.join("/")}:`, error);
+  } else {
+    await queryClient.prefetchQuery({
+      queryKey: config.queryKey,
+      queryFn: config.queryFn,
+      staleTime: config.staleTime
+    });
   }
 }
 
 /**
- * Check if a query is already cached and fresh
- *
- * Use this to avoid unnecessary prefetches
+ * Prefetch critical data for authenticated users
  */
-export function isQueryFresh(queryClient: QueryClient, queryKey: readonly unknown[]): boolean {
-  const state = queryClient.getQueryState(queryKey);
-  if (!state || !state.data) return false;
+export async function prefetchCriticalData(queryClient: QueryClient): Promise<void> {
+  const configs = getPrefetchConfigs();
+  const criticalConfigs = configs.filter((c) => c.priority === "critical");
 
-  const staleTime = 5 * 60 * 1000; // Default 5 minutes
-  const isStale = Date.now() - state.dataUpdatedAt > staleTime;
+  logger.info("[Prefetch] Starting critical data prefetch...");
 
-  return !isStale;
+  const results = await Promise.allSettled(
+    criticalConfigs.map(async (config) => {
+      try {
+        await prefetchConfig(queryClient, config);
+        logger.debug(`[Prefetch] ✓ ${config.description}`);
+      } catch (error) {
+        logger.warn(`[Prefetch] ✗ ${config.description}`);
+        throw error;
+      }
+    })
+  );
+
+  const successful = results.filter((r) => r.status === "fulfilled").length;
+  logger.info(`[Prefetch] Critical complete: ${successful}/${criticalConfigs.length}`);
+}
+
+/**
+ * Prefetch high priority data (after critical)
+ */
+export async function prefetchHighPriorityData(queryClient: QueryClient): Promise<void> {
+  const configs = getPrefetchConfigs();
+  const highConfigs = configs.filter((c) => c.priority === "high");
+
+  logger.debug("[Prefetch] Starting high priority data prefetch...");
+
+  await Promise.allSettled(
+    highConfigs.map(async (config) => {
+      try {
+        await prefetchConfig(queryClient, config);
+        logger.debug(`[Prefetch] ✓ ${config.description}`);
+      } catch (error) {
+        logger.warn(`[Prefetch] ✗ ${config.description}`);
+      }
+    })
+  );
+}
+
+/**
+ * Prefetch all data (background)
+ */
+export async function prefetchAllData(queryClient: QueryClient): Promise<void> {
+  const configs = getPrefetchConfigs();
+
+  await Promise.allSettled(
+    configs.map(async (config) => {
+      try {
+        await prefetchConfig(queryClient, config);
+      } catch (error) {
+        logger.debug(`[Prefetch] ✗ ${config.description}`);
+      }
+    })
+  );
+}
+
+/**
+ * Clear all prefetched data
+ */
+export function clearPrefetchedData(queryClient: QueryClient): void {
+  queryClient.clear();
+  logger.info("[Prefetch] Cleared all cached data");
 }

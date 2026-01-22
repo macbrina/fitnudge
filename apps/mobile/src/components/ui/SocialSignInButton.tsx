@@ -11,10 +11,16 @@ interface SocialSignInButtonProps {
   onPress: () => void;
   disabled?: boolean;
   loading?: boolean;
+  isDark?: boolean;
   style?: any;
 }
 
-const makeSocialSignInButtonStyles = (tokens: any, colors: any, brandColors: any) => {
+const makeSocialSignInButtonStyles = (
+  tokens: any,
+  colors: any,
+  brandColors: any,
+  isDark: boolean = false
+) => {
   return {
     button: {
       flexDirection: "row" as const,
@@ -28,12 +34,14 @@ const makeSocialSignInButtonStyles = (tokens: any, colors: any, brandColors: any
       marginBottom: toRN(tokens.spacing[6])
     },
     googleButton: {
-      borderColor: "#e5e7eb",
-      backgroundColor: "#ffffff"
+      borderColor: isDark ? "#374151" : "#e5e7eb",
+      backgroundColor: isDark ? "#121212" : "#ffffff"
     },
     appleButton: {
-      borderColor: "#000000",
-      backgroundColor: "#000000"
+      // In dark mode: white background with black text
+      // In light mode: black background with white text
+      borderColor: isDark ? "#ffffff" : "#000000",
+      backgroundColor: isDark ? "#ffffff" : "#000000"
     },
     buttonDisabled: {
       opacity: 0.5
@@ -44,10 +52,11 @@ const makeSocialSignInButtonStyles = (tokens: any, colors: any, brandColors: any
       fontFamily: fontFamily.groteskMedium
     },
     googleButtonText: {
-      color: "#374151"
+      color: isDark ? "#e5e7eb" : "#374151"
     },
     appleButtonText: {
-      color: "#ffffff"
+      // Inverted in dark mode
+      color: isDark ? "#000000" : "#ffffff"
     },
     iconContainer: {
       width: 20,
@@ -63,9 +72,12 @@ export const SocialSignInButton: React.FC<SocialSignInButtonProps> = ({
   onPress,
   disabled = false,
   loading = false,
+  isDark = false,
   style
 }) => {
-  const styles = useStyles(makeSocialSignInButtonStyles);
+  const styles = useStyles((tokens, colors, brandColors) =>
+    makeSocialSignInButtonStyles(tokens, colors, brandColors, isDark)
+  );
 
   const getButtonStyle = () => {
     const buttonStyle = [styles.button];
@@ -112,13 +124,16 @@ export const SocialSignInButton: React.FC<SocialSignInButtonProps> = ({
 
   const renderIcon = () => {
     if (loading) {
-      const spinnerColor = provider === "apple" ? "#ffffff" : "#374151";
+      // In dark mode, Apple button is white so spinner should be black
+      const spinnerColor =
+        provider === "apple" ? (isDark ? "#000000" : "#ffffff") : isDark ? "#e5e7eb" : "#374151";
       return <ActivityIndicator size="small" color={spinnerColor} />;
     }
     if (provider === "google") {
       return <GoogleIcon size={20} />;
     } else if (provider === "apple") {
-      return <AppleIcon size={20} color="#ffffff" />;
+      // In dark mode, Apple button is white so icon should be black
+      return <AppleIcon size={20} color={isDark ? "#000000" : "#ffffff"} />;
     }
     return null;
   };

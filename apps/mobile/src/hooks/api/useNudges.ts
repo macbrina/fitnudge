@@ -69,14 +69,12 @@ export const useSendQuickNudge = () => {
       type = "nudge",
       message,
       goalId,
-      challengeId,
       partnershipId
     }: {
       recipientId: string;
       type?: NudgeType;
       message?: string;
       goalId?: string;
-      challengeId?: string;
       partnershipId?: string;
     }) =>
       nudgesService.sendNudge({
@@ -84,7 +82,6 @@ export const useSendQuickNudge = () => {
         nudge_type: type,
         message,
         goal_id: goalId,
-        challenge_id: challengeId,
         partnership_id: partnershipId
       }),
     onSuccess: () => {
@@ -103,20 +100,17 @@ export const useSendCheer = () => {
     mutationFn: ({
       recipientId,
       goalId,
-      challengeId,
       emoji = "🎉"
     }: {
       recipientId: string;
       goalId?: string;
-      challengeId?: string;
       emoji?: string;
     }) =>
       nudgesService.sendNudge({
         recipient_id: recipientId,
         nudge_type: "cheer",
         emoji,
-        goal_id: goalId,
-        challenge_id: challengeId
+        goal_id: goalId
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: nudgesQueryKeys.sent() });

@@ -1,12 +1,13 @@
 # 📈 FitNudge Marketing Strategy & Growth Plan
 
+> FitNudge is an AI-powered goal and habit accountability app that helps users stay consistent with any goal they set.
+
 ---
 
 ## 💰 Pricing Strategy & Subscription Tiers
 
-### 📊 Simplified 2-Tier Pricing (Updated December 2024)
+### 📊 Simplified 2-Tier Pricing
 
-> **Last Updated**: December 2024
 > **Rationale**: Simplified to a 2-tier system (Free + Premium) for:
 >
 > - **Higher conversion**: Less choice = faster decisions
@@ -33,40 +34,35 @@
 
 ### 🎯 Feature Matrix (2-Tier System)
 
-| Feature                     | Free | Premium          |
-| --------------------------- | ---- | ---------------- |
-| **Limits**                  |      |                  |
-| Active Goals                | 1    | ∞                |
-| Challenges                  | 1    | ∞                |
-| Accountability Partners     | 0    | ∞                |
-| AI Goal Generations         | 2    | ∞                |
-| **AI Features**             |      |                  |
-| Text Motivation             | ✅   | ✅               |
-| Unlimited Text Motivation   | ❌   | ✅               |
-| AI Chat Motivation          | ❌   | ✅               |
-| AI Progress Reflections     | ❌   | ✅               |
-| AI Memory & Personalization | ❌   | ✅               |
-| AI Voice Motivation         | ❌   | 🔜 (Coming Soon) |
-| **Tracking & Analytics**    |      |                  |
-| Meal Tracking (Basic)       | ✅   | ✅               |
-| Meal Tracking Analytics     | ❌   | ✅               |
-| Advanced Analytics          | ❌   | ✅               |
-| Weekly Recaps               | ❌   | ✅               |
-| **Social Features**         |      |                  |
-| Community Access            | ✅   | ✅               |
-| Join Challenges             | ✅   | ✅               |
-| Create Challenges           | ❌   | ✅               |
-| Social Accountability       | ❌   | ✅               |
-| **Premium Perks**           |      |                  |
-| Priority Features           | ❌   | ✅               |
-| Priority Support            | ❌   | ✅               |
-| API Integrations            | ❌   | 🔜 (Coming Soon) |
-| Ad-Free Experience          | ❌   | ✅               |
-| **Always Free**             |      |                  |
-| Achievement Badges          | ✅   | ✅               |
-| Habit Chains                | ✅   | ✅               |
-| Progress Photos             | ✅   | ✅               |
-| Custom Reminders            | ✅   | ✅               |
+| Feature                   | Free | Premium |
+| ------------------------- | ---- | ------- |
+| **Limits**                |      |         |
+| Active Goals              | 1    | ∞       |
+| Accountability Partners   | 0    | ∞       |
+| **AI Features**           |      |         |
+| Template Motivation       | ✅   | ✅      |
+| AI-Generated Motivation   | ❌   | ✅      |
+| AI Coach Chat             | ❌   | ✅      |
+| Voice Notes               | ❌   | ✅      |
+| Pattern Detection         | ❌   | ✅      |
+| Adaptive Nudging          | ❌   | ✅      |
+| **Tracking & Analytics**  |      |         |
+| Streak Tracking           | ✅   | ✅      |
+| Weekly Progress View      | ❌   | ✅      |
+| Activity Heat Map         | ❌   | ✅      |
+| Advanced Analytics Charts | ❌   | ✅      |
+| Weekly AI Recaps          | ❌   | ✅      |
+| **Social Features**       |      |         |
+| Find Partners             | ❌   | ✅      |
+| Send Cheers/Nudges        | ❌   | ✅      |
+| Partner Insights          | ❌   | ✅      |
+| **Content**               |      |         |
+| Blog Access               | ✅   | ✅      |
+| Achievement Badges        | ✅   | ✅      |
+| Custom Reminders          | ✅   | ✅      |
+| **Premium Perks**         |      |         |
+| Priority Support          | ❌   | ✅      |
+| Ad-Free Experience        | ❌   | ✅      |
 
 ---
 
@@ -191,7 +187,6 @@ Unlock your full fitness potential with FitNudge Premium:
 • AI Chat Motivation (our signature feature!)
 • Advanced analytics and insights
 • Full social features and accountability partners
-• Create and join unlimited challenges
 • AI memory - your coach remembers your journey
 • Priority customer support
 • Ad-free experience
@@ -1180,7 +1175,7 @@ Google typically doesn't require additional screenshots for subscription review,
 
 - Companies pay for employee subscriptions
 - ROI pitch: "Healthier employees = Lower healthcare costs"
-- Team challenges with leaderboards
+- Team accountability groups
 - Wellness program integration
 
 **Pricing:**

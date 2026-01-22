@@ -6,12 +6,11 @@ import {
   ScrollView,
   Animated,
   Dimensions,
-  TextInput,
   KeyboardAvoidingView,
-  Platform,
-  ActivityIndicator
+  Platform
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { TextInput } from "@/components/ui/TextInput";
 import { useStyles, useTheme } from "@/themes";
 import { tokens } from "@/themes/tokens";
 import { toRN } from "@/lib/units";
@@ -19,7 +18,6 @@ import { fontFamily } from "@/lib/fonts";
 import { useTranslation } from "@/lib/i18n";
 import { Ionicons } from "@expo/vector-icons";
 import { useSendNudge } from "@/hooks/api/useNudges";
-import { NudgeType } from "@/services/api/nudges";
 import { NudgeIcon, NudgeEmojiType } from "@/components/icons/NudgeIcons";
 import {
   NUDGE_TYPE_CONFIGS,
@@ -27,8 +25,8 @@ import {
   NudgeTypeConfig,
   NudgeMessage
 } from "@/constants/nudges";
-import { useAlertModal } from "@/contexts/AlertModalContext";
 import * as Haptics from "expo-haptics";
+import { SendNudgeRequest } from "@/services/api/nudges";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -38,7 +36,6 @@ interface NudgeSheetProps {
   recipientId: string;
   recipientName: string;
   goalId?: string;
-  challengeId?: string;
   partnershipId?: string;
   onSuccess?: () => void;
 }
@@ -62,7 +59,6 @@ export function NudgeSheet({
   recipientId,
   recipientName,
   goalId,
-  challengeId,
   partnershipId,
   onSuccess
 }: NudgeSheetProps) {
@@ -70,7 +66,6 @@ export function NudgeSheet({
   const { colors, brandColors } = useTheme();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
-  const { showAlert } = useAlertModal();
 
   // Animation values
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
@@ -84,6 +79,25 @@ export function NudgeSheet({
 
   // Mutation
   const sendNudgeMutation = useSendNudge();
+
+  // Fire-and-forget send with silent retry
+  const sendNudge = useCallback(
+    (request: SendNudgeRequest) => {
+      const attemptSend = (retryCount: number) => {
+        sendNudgeMutation.mutate(request, {
+          onError: () => {
+            // Silent retry once
+            if (retryCount < 1) {
+              setTimeout(() => attemptSend(retryCount + 1), 1000);
+            }
+            // After retry, silently fail - user already moved on
+          }
+        });
+      };
+      attemptSend(0);
+    },
+    [sendNudgeMutation]
+  );
 
   // Animation effect
   useEffect(() => {
@@ -136,127 +150,72 @@ export function NudgeSheet({
   }, []);
 
   const handleQuickReaction = useCallback(
-    async (emoji: NudgeEmojiType) => {
+    (emoji: NudgeEmojiType) => {
+      // Immediate haptic + close (Instagram pattern)
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      setSelectedEmoji(emoji);
+      onClose();
+      onSuccess?.();
 
-      try {
-        await sendNudgeMutation.mutateAsync({
-          recipient_id: recipientId,
-          nudge_type: "cheer",
-          emoji,
-          goal_id: goalId,
-          challenge_id: challengeId,
-          partnership_id: partnershipId
-        });
-
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        onClose();
-        onSuccess?.();
-      } catch (error: any) {
-        showAlert({
-          title: t("common.error"),
-          message: error?.response?.data?.detail || t("social.nudge_error"),
-          variant: "error",
-          confirmLabel: t("common.ok")
-        });
-      }
+      // Fire-and-forget with silent retry
+      sendNudge({
+        recipient_id: recipientId,
+        nudge_type: "cheer",
+        emoji,
+        goal_id: goalId,
+        partnership_id: partnershipId
+      });
     },
-    [
-      recipientId,
-      goalId,
-      challengeId,
-      partnershipId,
-      sendNudgeMutation,
-      onClose,
-      onSuccess,
-      showAlert,
-      t
-    ]
+    [recipientId, goalId, partnershipId, sendNudge, onClose, onSuccess]
   );
 
   const handleMessageSelect = useCallback(
-    async (message: NudgeMessage) => {
+    (message: NudgeMessage) => {
       if (!selectedType) return;
 
+      // Immediate haptic + close (Instagram pattern)
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-      try {
-        await sendNudgeMutation.mutateAsync({
-          recipient_id: recipientId,
-          nudge_type: selectedType.type,
-          message: message.message,
-          emoji: message.emoji,
-          goal_id: goalId,
-          challenge_id: challengeId,
-          partnership_id: partnershipId
-        });
-
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        onClose();
-        onSuccess?.();
-      } catch (error: any) {
-        showAlert({
-          title: t("common.error"),
-          message: error?.response?.data?.detail || t("social.nudge_error"),
-          variant: "error",
-          confirmLabel: t("common.ok")
-        });
-      }
-    },
-    [
-      selectedType,
-      recipientId,
-      goalId,
-      challengeId,
-      partnershipId,
-      sendNudgeMutation,
-      onClose,
-      onSuccess,
-      showAlert,
-      t
-    ]
-  );
-
-  const handleCustomSubmit = useCallback(async () => {
-    if (!customMessage.trim()) return;
-
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-    try {
-      await sendNudgeMutation.mutateAsync({
-        recipient_id: recipientId,
-        nudge_type: "custom",
-        message: customMessage.trim(),
-        emoji: selectedEmoji || undefined,
-        goal_id: goalId,
-        challenge_id: challengeId,
-        partnership_id: partnershipId
-      });
-
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       onClose();
       onSuccess?.();
-    } catch (error: any) {
-      showAlert({
-        title: t("common.error"),
-        message: error?.response?.data?.detail || t("social.nudge_error"),
-        variant: "error",
-        confirmLabel: t("common.ok")
+
+      // Fire-and-forget with silent retry
+      sendNudge({
+        recipient_id: recipientId,
+        nudge_type: selectedType.type,
+        message: message.message,
+        emoji: message.emoji,
+        goal_id: goalId,
+        partnership_id: partnershipId
       });
-    }
+    },
+    [selectedType, recipientId, goalId, partnershipId, sendNudge, onClose, onSuccess]
+  );
+
+  const handleCustomSubmit = useCallback(() => {
+    if (!customMessage.trim()) return;
+
+    // Immediate haptic + close (Instagram pattern)
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    onClose();
+    onSuccess?.();
+
+    // Fire-and-forget with silent retry
+    sendNudge({
+      recipient_id: recipientId,
+      nudge_type: "custom",
+      message: customMessage.trim(),
+      emoji: selectedEmoji || undefined,
+      goal_id: goalId,
+      partnership_id: partnershipId
+    });
   }, [
     customMessage,
     selectedEmoji,
     recipientId,
     goalId,
-    challengeId,
     partnershipId,
-    sendNudgeMutation,
+    sendNudge,
     onClose,
-    onSuccess,
-    showAlert,
-    t
+    onSuccess
   ]);
 
   const handleBack = useCallback(() => {
@@ -273,8 +232,6 @@ export function NudgeSheet({
   }, []);
 
   if (!visible) return null;
-
-  const isSending = sendNudgeMutation.isPending;
 
   return (
     <View style={styles.overlay}>
@@ -304,11 +261,15 @@ export function NudgeSheet({
 
           {/* Header */}
           <View style={styles.header}>
-            {sheetState !== "type" && (
-              <TouchableOpacity style={styles.backButton} onPress={handleBack} activeOpacity={0.7}>
-                <Ionicons name="chevron-back" size={24} color={colors.text.primary} />
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity
+              style={[styles.backButton, { opacity: sheetState !== "type" ? 1 : 0 }]}
+              onPress={handleBack}
+              activeOpacity={0.7}
+              disabled={sheetState === "type"}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="chevron-back" size={24} color={colors.text.primary} />
+            </TouchableOpacity>
             <Text style={styles.headerTitle}>
               {sheetState === "type" &&
                 (t("nudge.send_to", { name: recipientName }) || `Send to ${recipientName}`)}
@@ -334,19 +295,11 @@ export function NudgeSheet({
                 {QUICK_REACTION_EMOJIS.map((emoji) => (
                   <TouchableOpacity
                     key={emoji}
-                    style={[
-                      styles.quickReactionButton,
-                      selectedEmoji === emoji && styles.quickReactionButtonActive
-                    ]}
+                    style={styles.quickReactionButton}
                     onPress={() => handleQuickReaction(emoji)}
                     activeOpacity={0.7}
-                    disabled={isSending}
                   >
-                    {isSending && selectedEmoji === emoji ? (
-                      <ActivityIndicator size="small" color={brandColors.primary} />
-                    ) : (
-                      <NudgeIcon emoji={emoji} size={32} />
-                    )}
+                    <NudgeIcon emoji={emoji} size={32} />
                   </TouchableOpacity>
                 ))}
               </ScrollView>
@@ -368,7 +321,7 @@ export function NudgeSheet({
                     <View
                       style={[styles.typeIconContainer, { backgroundColor: `${config.color}15` }]}
                     >
-                      <NudgeIcon emoji={config.icon} size={28} />
+                      <NudgeIcon emoji={config.icon} size={20} />
                     </View>
                     <Text style={styles.typeLabel}>{t(config.labelKey) || config.label}</Text>
                   </TouchableOpacity>
@@ -400,7 +353,6 @@ export function NudgeSheet({
                     style={[styles.messageCard, { borderLeftColor: selectedType.color }]}
                     onPress={() => handleMessageSelect(message)}
                     activeOpacity={0.7}
-                    disabled={isSending}
                   >
                     <View style={styles.messageContent}>
                       <NudgeIcon emoji={message.emoji} size={36} />
@@ -408,11 +360,7 @@ export function NudgeSheet({
                         {t(message.messageKey) || message.message}
                       </Text>
                     </View>
-                    {isSending ? (
-                      <ActivityIndicator size="small" color={selectedType.color} />
-                    ) : (
-                      <Ionicons name="send" size={18} color={selectedType.color} />
-                    )}
+                    <Ionicons name="send" size={18} color={selectedType.color} />
                   </TouchableOpacity>
                 ))}
               </View>
@@ -449,41 +397,31 @@ export function NudgeSheet({
               {/* Text Input */}
               <View style={styles.inputContainer}>
                 <TextInput
-                  style={styles.textInput}
                   placeholder={t("nudge.type_message") || "Type your message..."}
-                  placeholderTextColor={colors.text.tertiary}
                   value={customMessage}
                   onChangeText={setCustomMessage}
                   multiline
+                  numberOfLines={3}
                   maxLength={200}
-                  textAlignVertical="top"
+                  containerStyle={styles.textInputContainer}
                 />
                 <Text style={styles.charCount}>{customMessage.length}/200</Text>
               </View>
 
               {/* Send Button */}
               <TouchableOpacity
-                style={[
-                  styles.sendButton,
-                  (!customMessage.trim() || isSending) && styles.sendButtonDisabled
-                ]}
+                style={[styles.sendButton, !customMessage.trim() && styles.sendButtonDisabled]}
                 onPress={handleCustomSubmit}
                 activeOpacity={0.7}
-                disabled={!customMessage.trim() || isSending}
+                disabled={!customMessage.trim()}
               >
-                {isSending ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <>
-                    {selectedEmoji && (
-                      <View style={styles.sendButtonEmoji}>
-                        <NudgeIcon emoji={selectedEmoji} size={20} />
-                      </View>
-                    )}
-                    <Text style={styles.sendButtonText}>{t("nudge.send") || "Send"}</Text>
-                    <Ionicons name="send" size={18} color="#FFFFFF" />
-                  </>
+                {selectedEmoji && (
+                  <View style={styles.sendButtonEmoji}>
+                    <NudgeIcon emoji={selectedEmoji} size={20} />
+                  </View>
                 )}
+                <Text style={styles.sendButtonText}>{t("nudge.send") || "Send"}</Text>
+                <Ionicons name="send" size={18} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
           )}
@@ -547,10 +485,11 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
   backButton: {
     position: "absolute" as const,
     left: toRN(tokens.spacing[4]),
-    width: 32,
-    height: 32,
+    width: 44,
+    height: 44,
     alignItems: "center" as const,
-    justifyContent: "center" as const
+    justifyContent: "center" as const,
+    zIndex: 10
   },
   headerTitle: {
     fontSize: toRN(tokens.typography.fontSize.lg),
@@ -563,10 +502,11 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
   closeButton: {
     position: "absolute" as const,
     right: toRN(tokens.spacing[4]),
-    width: 32,
-    height: 32,
+    width: 44,
+    height: 44,
     alignItems: "center" as const,
-    justifyContent: "center" as const
+    justifyContent: "center" as const,
+    zIndex: 10
   },
 
   // Quick Reactions
@@ -595,11 +535,6 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     alignItems: "center" as const,
     justifyContent: "center" as const
   },
-  quickReactionButtonActive: {
-    backgroundColor: `${brand.primary}20`,
-    borderWidth: 2,
-    borderColor: brand.primary
-  },
 
   // Type Selection
   typeSection: {
@@ -608,29 +543,31 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
   typeGrid: {
     flexDirection: "row" as const,
     flexWrap: "wrap" as const,
-    gap: toRN(tokens.spacing[3])
+    justifyContent: "space-between" as const,
+    gap: toRN(tokens.spacing[2])
   },
   typeCard: {
-    width: "47%" as any,
-    backgroundColor: colors.bg.muted,
-    borderRadius: toRN(tokens.borderRadius.xl),
-    padding: toRN(tokens.spacing[4]),
+    width: "48%" as any,
+    flexDirection: "row" as const,
     alignItems: "center" as const,
-    borderWidth: 1
+    backgroundColor: colors.bg.muted,
+    borderRadius: toRN(tokens.borderRadius.lg),
+    paddingVertical: toRN(tokens.spacing[3]),
+    paddingHorizontal: toRN(tokens.spacing[3]),
+    borderWidth: 1,
+    gap: toRN(tokens.spacing[2])
   },
   typeIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 36,
+    height: 36,
+    borderRadius: toRN(tokens.borderRadius.md),
     alignItems: "center" as const,
-    justifyContent: "center" as const,
-    marginBottom: toRN(tokens.spacing[2])
+    justifyContent: "center" as const
   },
   typeLabel: {
     fontSize: toRN(tokens.typography.fontSize.sm),
-    fontFamily: fontFamily.semiBold,
-    color: colors.text.primary,
-    textAlign: "center" as const
+    fontFamily: fontFamily.medium,
+    color: colors.text.primary
   },
   customButton: {
     flexDirection: "row" as const,
@@ -639,6 +576,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     gap: toRN(tokens.spacing[2]),
     marginTop: toRN(tokens.spacing[4]),
     paddingVertical: toRN(tokens.spacing[3]),
+    paddingHorizontal: toRN(tokens.spacing[4]),
     borderRadius: toRN(tokens.borderRadius.lg),
     backgroundColor: colors.bg.muted
   },
@@ -711,6 +649,9 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     color: colors.text.primary,
     minHeight: 80,
     maxHeight: 120
+  },
+  textInputContainer: {
+    marginBottom: 0
   },
   charCount: {
     fontSize: toRN(tokens.typography.fontSize.xs),

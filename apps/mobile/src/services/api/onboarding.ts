@@ -2,201 +2,40 @@ import { BaseApiService, ApiResponse } from "./base";
 import { ROUTES } from "@/lib/routes";
 import { logger } from "@/services/logger";
 
-export interface FitnessProfileRequest {
-  biological_sex?: string; // 'male', 'female', 'prefer_not_to_say'
-  fitness_level?: string;
-  primary_goal?: string;
-  current_frequency?: string;
-  preferred_location?: string;
-  available_time?: string;
-  motivation_style?: string;
-  biggest_challenge?: string;
-  available_equipment?: string[];
-  hydration_unit?: string; // 'ml', 'oz'
-  hydration_daily_target_ml?: number;
+// V2 Onboarding Complete Request
+export interface OnboardingCompleteRequest {
+  name: string;
+  motivation_style: "supportive" | "tough_love" | "calm";
+  morning_motivation_enabled?: boolean;
+  morning_motivation_time?: string; // HH:MM format
 }
 
-export interface FitnessProfileResponse {
-  id: string;
+export interface OnboardingCompleteResponse {
+  success: boolean;
   user_id: string;
-  biological_sex?: string; // 'male', 'female', 'prefer_not_to_say'
-  fitness_level: string;
-  primary_goal: string;
-  current_frequency: string;
-  preferred_location: string;
-  available_time: string;
+  first_name: string;
   motivation_style: string;
-  biggest_challenge: string;
-  available_equipment?: string[];
-  hydration_unit?: string; // 'ml', 'oz'
-  hydration_daily_target_ml?: number;
-  completed_at: string;
-  created_at?: string;
-  updated_at?: string;
-}
-
-export interface SuggestedGoal {
-  id: string;
-  title: string;
-  description: string;
-  category: string;
-  frequency: string;
-  target_days?: number;
-  days_of_week?: number[];
-  reminder_times: string[];
-  match_reason?: string;
-  // Goal type fields
-  goal_type?: "habit" | "time_challenge" | "target_challenge";
-  duration_days?: number; // For time_challenge
-  target_checkins?: number; // For target_challenge
-}
-
-export type SuggestedGoalsStatus = "not_started" | "pending" | "ready" | "failed";
-
-export interface SuggestedGoalsStatusResponse {
-  status: SuggestedGoalsStatus;
-  goals?: SuggestedGoal[];
-  error?: string;
-  updated_at?: string;
-  regeneration_count?: number;
-  goal_type?: "habit" | "time_challenge" | "target_challenge" | "mixed";
+  morning_motivation_enabled: boolean;
+  onboarding_completed: boolean;
 }
 
 class OnboardingApiService extends BaseApiService {
   /**
-   * Save user's fitness profile
+   * Complete V2 onboarding - saves user preferences and marks onboarding as complete.
+   * This sets onboarding_completed_at on the user record.
    */
-  async saveProfile(profileData: FitnessProfileRequest): Promise<FitnessProfileResponse> {
+  async completeOnboarding(data: OnboardingCompleteRequest): Promise<OnboardingCompleteResponse> {
     try {
-      // Saving profile - tracked via PostHog in component
-
-      const response = await this.post<FitnessProfileResponse>(
-        ROUTES.ONBOARDING.PROFILE,
-        profileData
+      const response = await this.post<OnboardingCompleteResponse>(
+        ROUTES.ONBOARDING.COMPLETE,
+        data
       );
-
-      // Profile saved successfully - tracked via PostHog in component
       return response.data!;
     } catch (error) {
-      logger.error("Failed to save fitness profile", {
+      logger.error("Failed to complete onboarding", {
         error: error instanceof Error ? error.message : String(error),
-        profileData
+        data
       });
-      throw error;
-    }
-  }
-
-  /**
-   * Get user's fitness profile
-   */
-  async getProfile(): Promise<FitnessProfileResponse> {
-    try {
-      // Fetching profile - tracked via PostHog in component
-
-      const response = await this.get<FitnessProfileResponse>(ROUTES.ONBOARDING.PROFILE);
-
-      // Profile fetched successfully - tracked via PostHog in component
-      return response.data!;
-    } catch (error) {
-      console.log("Failed to fetch fitness profile", error);
-      logger.error("Failed to fetch fitness profile", {
-        error: error instanceof Error ? error.message : String(error)
-      });
-      throw error;
-    }
-  }
-
-  /**
-   * Update user's fitness profile (partial update via PATCH)
-   */
-  async updateProfile(
-    profileData: Partial<FitnessProfileRequest>
-  ): Promise<FitnessProfileResponse> {
-    try {
-      const response = await this.patch<FitnessProfileResponse>(
-        ROUTES.ONBOARDING.PROFILE,
-        profileData
-      );
-      return response.data!;
-    } catch (error) {
-      logger.error("Failed to update fitness profile", {
-        error: error instanceof Error ? error.message : String(error),
-        profileData
-      });
-      throw error;
-    }
-  }
-
-  /**
-   * Trigger background generation of suggested goals.
-   * @param goalType - Type of goals to generate: "habit" (default), "time_challenge", "target_challenge", or "mixed"
-   */
-  async requestSuggestedGoals(
-    goalType: "habit" | "time_challenge" | "target_challenge" | "mixed" = "habit"
-  ): Promise<SuggestedGoalsStatusResponse> {
-    try {
-      const response = await this.post<SuggestedGoalsStatusResponse>(
-        ROUTES.ONBOARDING.SUGGESTED_GOALS,
-        { goal_type: goalType }
-      );
-      return response.data!;
-    } catch (error) {
-      logger.error("Failed to request suggested goals generation", {
-        error: error instanceof Error ? error.message : String(error),
-        goalType
-      });
-      throw error;
-    }
-  }
-
-  /**
-   * Fetch the current status (and payload, if ready) of suggested goals.
-   */
-  async getSuggestedGoalsStatus(): Promise<SuggestedGoalsStatusResponse> {
-    try {
-      const response = await this.get<SuggestedGoalsStatusResponse>(
-        ROUTES.ONBOARDING.SUGGESTED_GOALS
-      );
-      return response.data!;
-    } catch (error) {
-      logger.error("Failed to fetch suggested goals status", {
-        error: error instanceof Error ? error.message : String(error)
-      });
-      throw error;
-    }
-  }
-
-  /**
-   * Regenerate suggested goals for the current user.
-   * This increments the regeneration count and generates new suggestions.
-   * Free users: Limited to 1 regeneration
-   * Starter+: Unlimited regenerations
-   * @param goalType - Type of goals to generate: "habit" (default), "time_challenge", "target_challenge", or "mixed"
-   */
-  async regenerateSuggestedGoals(
-    goalType: "habit" | "time_challenge" | "target_challenge" | "mixed" = "habit"
-  ): Promise<SuggestedGoalsStatusResponse> {
-    try {
-      const response = await this.put<SuggestedGoalsStatusResponse>(
-        `${ROUTES.ONBOARDING.SUGGESTED_GOALS}/regenerate`,
-        { goal_type: goalType }
-      );
-      return response.data!;
-    } catch (error) {
-      // Check if it's a 403 (regeneration limit reached) - this is expected behavior
-      const is403 =
-        error instanceof Error &&
-        (error.message.includes("403") ||
-          error.message.includes("Upgrade") ||
-          error.message.includes("AI goal generations"));
-
-      if (!is403) {
-        // Expected limit-reached scenario - just log info, don't log as error
-        logger.error("Failed to regenerate suggested goals", {
-          error: error instanceof Error ? error.message : String(error),
-          goalType
-        });
-      }
       throw error;
     }
   }

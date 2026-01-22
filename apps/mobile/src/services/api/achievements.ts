@@ -2,7 +2,13 @@ import { BaseApiService } from "./base";
 import { ROUTES } from "@/lib/routes";
 
 export type AchievementRarity = "common" | "rare" | "epic" | "legendary";
-export type AchievementCategory = "streak" | "milestone" | "consistency" | "social" | "special";
+export type AchievementCategory =
+  | "streak"
+  | "milestone"
+  | "consistency"
+  | "social"
+  | "special"
+  | "engagement";
 
 export interface AchievementType {
   id: string;
@@ -10,7 +16,7 @@ export interface AchievementType {
   badge_name: string;
   badge_description: string | null;
   badge_icon: string | null;
-  unlock_condition: string;
+  unlock_condition: { type: string; value: number }; // JSONB from database
   category: AchievementCategory;
   rarity: AchievementRarity;
   points: number;
@@ -35,11 +41,11 @@ export interface UserAchievement {
 export interface AchievementStats {
   total_achievements: number;
   total_points: number;
-  by_rarity: {
-    common: number;
-    rare: number;
-    epic: number;
-    legendary: number;
+  rarity_breakdown: {
+    common?: number;
+    rare?: number;
+    epic?: number;
+    legendary?: number;
   };
 }
 
@@ -77,7 +83,7 @@ class AchievementsService extends BaseApiService {
       response.data || {
         total_achievements: 0,
         total_points: 0,
-        by_rarity: { common: 0, rare: 0, epic: 0, legendary: 0 }
+        rarity_breakdown: { common: 0, rare: 0, epic: 0, legendary: 0 }
       }
     );
   }

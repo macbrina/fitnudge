@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import smtplib
 import ssl
 import time
@@ -17,13 +16,10 @@ from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-import redis
-from fastapi import status
 from pydantic import BaseModel, Field
 
 from supabase import create_client, Client
 
-from app.core.celery_app import celery_app
 from app.core.config import settings
 from app.core.database import get_supabase_client
 
@@ -92,14 +88,9 @@ class HealthHistoryEntry(BaseModel):
 logger = logging.getLogger(__name__)
 
 COMPONENT_LABELS: Dict[str, str] = {
-    "environment": "Core Configuration",
-    "supabase": "Primary Database",
-    "redis": "Caching Layer",
-    "celery": "Background Jobs",
-    "smtp": "Email Delivery",
-    "openai": "AI Assistance",
-    "elevenlabs": "Voice Coach",
-    "cloudflare_r2": "Media Storage",
+    "supabase": "Core Services",
+    "smtp": "Notifications",
+    "openai": "AI Features",
 }
 
 
@@ -118,117 +109,76 @@ async def _check_supabase() -> HealthCheckResult:
             details="Supabase credentials are not set",
         )
 
-    # Use a fresh client to avoid stale SSL sessions (Cloudflare tunnel issue)
-    supabase = _create_fresh_supabase_client()
+    # Retry logic for transient errors (SSL, network, broken pipe)
+    # Health checks use fresh client to avoid stale SSL, but we retry on transient errors
+    max_retries = 2
+    last_error = None
 
-    try:
-        response = await asyncio.to_thread(
-            lambda: supabase.table("users")
-            .select("id", count="exact")
-            .limit(1)
-            .execute()
-        )
+    for attempt in range(max_retries + 1):
+        try:
+            # Use a fresh client to avoid stale SSL sessions (Cloudflare tunnel issue)
+            supabase = _create_fresh_supabase_client()
 
-        if getattr(response, "error", None):
-            print(f"[Health] Supabase: Error response - {response.error}")
-            return HealthCheckResult(
-                component=component,
-                status=HealthStatus.CRITICAL,
-                details=str(response.error),
-                latency_ms=_elapsed_ms(start),
+            response = await asyncio.to_thread(
+                lambda: supabase.table("users")
+                .select("id", count="exact")
+                .limit(1)
+                .execute()
             )
 
-        metadata = {
-            "rows_sampled": len(getattr(response, "data", []) or []),
-            "total_users": getattr(response, "count", None),
-        }
+            if getattr(response, "error", None):
+                print(f"[Health] Supabase: Error response - {response.error}")
+                return HealthCheckResult(
+                    component=component,
+                    status=HealthStatus.CRITICAL,
+                    details=str(response.error),
+                    latency_ms=_elapsed_ms(start),
+                )
 
-        return HealthCheckResult(
-            component=component,
-            status=HealthStatus.OK,
-            details="Supabase reachable",
-            latency_ms=_elapsed_ms(start),
-            metadata=metadata,
-        )
-    except Exception as exc:  # pragma: no cover - network failures
-        print(f"[Health] Supabase: Exception - {type(exc).__name__}: {exc}")
-        return HealthCheckResult(
-            component=component,
-            status=HealthStatus.CRITICAL,
-            details=f"Supabase request failed: {exc}",
-            latency_ms=_elapsed_ms(start),
-        )
+            metadata = {
+                "rows_sampled": len(getattr(response, "data", []) or []),
+                "total_users": getattr(response, "count", None),
+            }
 
-
-async def _check_redis() -> HealthCheckResult:
-    component = "redis"
-    start = time.perf_counter()
-
-    redis_url = settings.redis_connection_url
-    if not redis_url:
-        return HealthCheckResult(
-            component=component,
-            status=HealthStatus.NOT_CONFIGURED,
-            details="Redis is not configured",
-        )
-
-    try:
-        client = redis.from_url(
-            redis_url,
-            socket_connect_timeout=2,
-            socket_timeout=2,
-            decode_responses=True,
-        )
-        await asyncio.to_thread(client.ping)
-
-        return HealthCheckResult(
-            component=component,
-            status=HealthStatus.OK,
-            details="Redis reachable",
-            latency_ms=_elapsed_ms(start),
-        )
-    except Exception as exc:  # pragma: no cover - network failures
-        # Redis is optional (caching layer) - DEGRADED not CRITICAL
-        # App can still function without caching, just slower
-        print(f"[Health] Redis: Exception - {type(exc).__name__}: {exc}")
-        return HealthCheckResult(
-            component=component,
-            status=HealthStatus.DEGRADED,
-            details=f"Redis unreachable (caching disabled): {exc}",
-            latency_ms=_elapsed_ms(start),
-        )
-
-
-async def _check_celery() -> HealthCheckResult:
-    component = "celery"
-    start = time.perf_counter()
-
-    try:
-        result = await asyncio.to_thread(lambda: celery_app.control.ping(timeout=1.0))
-
-        if not result:
-            print(f"[Health] Celery: No workers responded (result={result})")
             return HealthCheckResult(
                 component=component,
-                status=HealthStatus.DEGRADED,
-                details="No Celery workers responded to ping",
+                status=HealthStatus.OK,
+                details="Supabase reachable",
                 latency_ms=_elapsed_ms(start),
+                metadata=metadata,
             )
+        except Exception as exc:  # pragma: no cover - network failures
+            last_error = exc
+            error_str = str(exc).lower()
+            # Check if transient error that should be retried
+            transient_patterns = [
+                "ssl",
+                "tls",
+                "broken pipe",
+                "connection",
+                "timeout",
+                "eof",
+                "reset",
+            ]
+            is_transient = any(p in error_str for p in transient_patterns)
 
-        return HealthCheckResult(
-            component=component,
-            status=HealthStatus.OK,
-            details=f"{len(result)} worker(s) responding",
-            latency_ms=_elapsed_ms(start),
-        )
-    except Exception as exc:  # pragma: no cover - network failures
-        print(f"[Health] Celery: Exception - {type(exc).__name__}: {exc}")
-        return HealthCheckResult(
-            component=component,
-            status=HealthStatus.DEGRADED,
-            details=f"Celery ping failed: {exc}",
-            latency_ms=_elapsed_ms(start),
-        )
+            if is_transient and attempt < max_retries:
+                print(
+                    f"[Health] Supabase: Transient error, retrying ({attempt + 1}/{max_retries}): {exc}"
+                )
+                await asyncio.sleep(0.5 * (attempt + 1))  # Brief backoff
+                continue
+            else:
+                break
+
+    # All retries failed
+    print(f"[Health] Supabase: Exception - {type(last_error).__name__}: {last_error}")
+    return HealthCheckResult(
+        component=component,
+        status=HealthStatus.CRITICAL,
+        details=f"Supabase request failed: {last_error}",
+        latency_ms=_elapsed_ms(start),
+    )
 
 
 async def _check_smtp() -> HealthCheckResult:
@@ -297,84 +247,21 @@ async def _check_openai() -> HealthCheckResult:
     )
 
 
-async def _check_elevenlabs() -> HealthCheckResult:
-    component = "elevenlabs"
-
-    if not settings.ELEVENLABS_API_KEY:
-        return HealthCheckResult(
-            component=component,
-            status=HealthStatus.NOT_CONFIGURED,
-            details="ElevenLabs API key is not configured",
-        )
-
-    return HealthCheckResult(
-        component=component,
-        status=HealthStatus.OK,
-        details="ElevenLabs API key configured",
-    )
-
-
-async def _check_cloudflare_r2() -> HealthCheckResult:
-    component = "cloudflare_r2"
-
-    required_env = [
-        settings.CLOUDFLARE_ACCOUNT_ID,
-        settings.CLOUDFLARE_ACCESS_KEY_ID,
-        settings.CLOUDFLARE_SECRET_ACCESS_KEY,
-        settings.CLOUDFLARE_BUCKET_NAME,
-    ]
-
-    if not all(required_env):
-        missing = []
-        if not settings.CLOUDFLARE_ACCOUNT_ID:
-            missing.append("CLOUDFLARE_ACCOUNT_ID")
-        if not settings.CLOUDFLARE_ACCESS_KEY_ID:
-            missing.append("CLOUDFLARE_ACCESS_KEY_ID")
-        if not settings.CLOUDFLARE_SECRET_ACCESS_KEY:
-            missing.append("CLOUDFLARE_SECRET_ACCESS_KEY")
-        if not settings.CLOUDFLARE_BUCKET_NAME:
-            missing.append("CLOUDFLARE_BUCKET_NAME")
-
-        return HealthCheckResult(
-            component=component,
-            status=HealthStatus.NOT_CONFIGURED,
-            details="Cloudflare R2 credentials missing",
-            metadata={"missing": missing},
-        )
-
-    # Avoid making an S3 call (boto3 optional); treat config as sufficient.
-    return HealthCheckResult(
-        component=component,
-        status=HealthStatus.OK,
-        details="Cloudflare R2 credentials configured",
-    )
-
-
-async def _check_environment() -> HealthCheckResult:
-    component = "environment"
-    metadata = {
-        "environment": settings.ENVIRONMENT,
-        "debug": settings.DEBUG,
-    }
-
-    return HealthCheckResult(
-        component=component,
-        status=HealthStatus.OK,
-        details="Environment variables loaded",
-        metadata=metadata,
-    )
-
-
 async def gather_health_checks() -> List[HealthCheckResult]:
+    """Gather health checks for user-facing components only.
+
+    We check:
+    - supabase: Core database/auth services
+    - smtp: Email notifications
+    - openai: AI features
+
+    Internal components (redis, celery, cloudflare_r2) are not exposed
+    to users as they don't need to know about infrastructure details.
+    """
     checks = await asyncio.gather(
-        _check_environment(),
         _check_supabase(),
-        _check_redis(),
-        _check_celery(),
         _check_smtp(),
         _check_openai(),
-        _check_elevenlabs(),
-        _check_cloudflare_r2(),
     )
 
     return list(checks)

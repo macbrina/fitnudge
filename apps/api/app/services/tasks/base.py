@@ -72,12 +72,12 @@ def _activate_goal_and_create_checkin(
             )
             return
 
-        # Create check-in
+        # Create check-in (V2: use status, not completed)
         checkin_data = {
             "goal_id": goal_id,
             "user_id": user_id,
             "check_in_date": user_today.isoformat(),
-            "completed": False,
+            "status": "pending",
         }
 
         result = supabase.table("check_ins").insert(checkin_data).execute()

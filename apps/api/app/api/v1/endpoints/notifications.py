@@ -7,7 +7,6 @@ import uuid
 from app.core.database import get_supabase_client
 from app.core.flexible_auth import get_current_user
 from postgrest.exceptions import APIError
-from app.services.expo_push_service import send_push_to_user
 
 router = APIRouter(
     redirect_slashes=False
@@ -24,29 +23,17 @@ class NotificationPreferencesRequest(BaseModel):
     # Core notification types
     ai_motivation: bool = True
     reminders: bool = True
-    social: bool = True
     achievements: bool = True
     reengagement: bool = True
+    weekly_recap: bool = True
 
     # Quiet hours
     quiet_hours_enabled: bool = False
     quiet_hours_start: str = "22:00"
     quiet_hours_end: str = "08:00"
 
-    # Social - Partner notifications
-    social_partner_requests: bool = True
-    social_partner_nudges: bool = True
-    social_partner_cheers: bool = True
-    social_partner_milestones: bool = True
-
-    # Social - Challenge notifications
-    social_challenge_invites: bool = True
-    social_challenge_leaderboard: bool = True
-    social_challenge_nudges: bool = True
-    social_challenge_reminders: bool = True
-
-    # AI/Motivation messages
-    social_motivation_messages: bool = True
+    # Partner notifications (single toggle for all partner types)
+    partners: bool = True
 
 
 class NotificationPreferencesResponse(BaseModel):
@@ -58,29 +45,17 @@ class NotificationPreferencesResponse(BaseModel):
     # Core notification types
     ai_motivation: bool
     reminders: bool
-    social: bool
     achievements: bool
     reengagement: bool
+    weekly_recap: bool
 
     # Quiet hours
     quiet_hours_enabled: bool
     quiet_hours_start: str
     quiet_hours_end: str
 
-    # Social - Partner notifications
-    social_partner_requests: bool
-    social_partner_nudges: bool
-    social_partner_cheers: bool
-    social_partner_milestones: bool
-
-    # Social - Challenge notifications
-    social_challenge_invites: bool
-    social_challenge_leaderboard: bool
-    social_challenge_nudges: bool
-    social_challenge_reminders: bool
-
-    # AI/Motivation messages
-    social_motivation_messages: bool
+    # Partner notifications (single toggle for all partner types)
+    partners: bool
 
 
 class DeviceTokenRequest(BaseModel):
@@ -135,21 +110,13 @@ async def get_notification_preferences(
                 email_notifications=True,
                 ai_motivation=True,
                 reminders=True,
-                social=True,
                 achievements=True,
                 reengagement=True,
+                weekly_recap=True,
                 quiet_hours_enabled=False,
                 quiet_hours_start="22:00",
                 quiet_hours_end="08:00",
-                social_partner_requests=True,
-                social_partner_nudges=True,
-                social_partner_cheers=True,
-                social_partner_milestones=True,
-                social_challenge_invites=True,
-                social_challenge_leaderboard=True,
-                social_challenge_nudges=True,
-                social_challenge_reminders=True,
-                social_motivation_messages=True,
+                partners=True,
             )
 
         prefs = result.data[0]
@@ -159,23 +126,13 @@ async def get_notification_preferences(
             email_notifications=prefs.get("email_notifications", True),
             ai_motivation=prefs["ai_motivation"],
             reminders=prefs["reminders"],
-            social=prefs["social"],
             achievements=prefs["achievements"],
             reengagement=prefs["reengagement"],
+            weekly_recap=prefs.get("weekly_recap", prefs.get("weekly_recaps", True)),
             quiet_hours_enabled=prefs["quiet_hours_enabled"],
             quiet_hours_start=str(prefs["quiet_hours_start"]),
             quiet_hours_end=str(prefs["quiet_hours_end"]),
-            social_partner_requests=prefs.get("social_partner_requests", True),
-            social_partner_nudges=prefs.get("social_partner_nudges", True),
-            social_partner_cheers=prefs.get("social_partner_cheers", True),
-            social_partner_milestones=prefs.get("social_partner_milestones", True),
-            social_challenge_invites=prefs.get("social_challenge_invites", True),
-            social_challenge_leaderboard=prefs.get(
-                "social_challenge_leaderboard", True
-            ),
-            social_challenge_nudges=prefs.get("social_challenge_nudges", True),
-            social_challenge_reminders=prefs.get("social_challenge_reminders", True),
-            social_motivation_messages=prefs.get("social_motivation_messages", True),
+            partners=prefs.get("partners", True),
         )
     except Exception as e:
         raise HTTPException(
@@ -214,21 +171,13 @@ async def update_notification_preferences(
                     "email_notifications": preferences.email_notifications,
                     "ai_motivation": preferences.ai_motivation,
                     "reminders": preferences.reminders,
-                    "social": preferences.social,
                     "achievements": preferences.achievements,
                     "reengagement": preferences.reengagement,
+                    "weekly_recap": preferences.weekly_recap,
                     "quiet_hours_enabled": preferences.quiet_hours_enabled,
                     "quiet_hours_start": preferences.quiet_hours_start,
                     "quiet_hours_end": preferences.quiet_hours_end,
-                    "social_partner_requests": preferences.social_partner_requests,
-                    "social_partner_nudges": preferences.social_partner_nudges,
-                    "social_partner_cheers": preferences.social_partner_cheers,
-                    "social_partner_milestones": preferences.social_partner_milestones,
-                    "social_challenge_invites": preferences.social_challenge_invites,
-                    "social_challenge_leaderboard": preferences.social_challenge_leaderboard,
-                    "social_challenge_nudges": preferences.social_challenge_nudges,
-                    "social_challenge_reminders": preferences.social_challenge_reminders,
-                    "social_motivation_messages": preferences.social_motivation_messages,
+                    "partners": preferences.partners,
                 },
                 on_conflict="user_id",
             )
@@ -242,21 +191,13 @@ async def update_notification_preferences(
             email_notifications=preferences.email_notifications,
             ai_motivation=preferences.ai_motivation,
             reminders=preferences.reminders,
-            social=preferences.social,
             achievements=preferences.achievements,
             reengagement=preferences.reengagement,
+            weekly_recap=preferences.weekly_recap,
             quiet_hours_enabled=preferences.quiet_hours_enabled,
             quiet_hours_start=preferences.quiet_hours_start,
             quiet_hours_end=preferences.quiet_hours_end,
-            social_partner_requests=preferences.social_partner_requests,
-            social_partner_nudges=preferences.social_partner_nudges,
-            social_partner_cheers=preferences.social_partner_cheers,
-            social_partner_milestones=preferences.social_partner_milestones,
-            social_challenge_invites=preferences.social_challenge_invites,
-            social_challenge_leaderboard=preferences.social_challenge_leaderboard,
-            social_challenge_nudges=preferences.social_challenge_nudges,
-            social_challenge_reminders=preferences.social_challenge_reminders,
-            social_motivation_messages=preferences.social_motivation_messages,
+            partners=preferences.partners,
         )
     except HTTPException:
         raise
@@ -470,61 +411,39 @@ async def mark_notification_opened(
         )
 
 
-@router.post("/test")
-async def send_test_notification(
-    notification_type: str,
-    data: Optional[dict] = None,
+@router.post("/history/mark-all-opened")
+async def mark_all_notifications_opened(
     current_user: Dict[str, Any] = Depends(get_current_user),
 ):
-    """Send a test notification (for development)"""
+    """
+    Mark ALL unread notifications as opened for the current user.
+
+    This is a batch operation following SCALABILITY.md best practices:
+    - Single DB query instead of N+1 pattern
+    - Marks ALL unread notifications, not just visible ones
+    """
     try:
         supabase = get_supabase_client()
+        user_id = current_user["id"]
 
-        # Check if notification type is enabled for user
-        result = supabase.rpc(
-            "is_notification_type_enabled",
-            {"p_user_id": current_user["id"], "p_notification_type": notification_type},
-        ).execute()
-
-        if not result.data:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Notification type '{notification_type}' is disabled for this user",
-            )
-
-        payload_data = {
-            "type": notification_type,
-            "test_notification": True,
-            **(data or {}),
-        }
-
-        send_result = await send_push_to_user(
-            current_user["id"],
-            title="Test Notification",
-            body=f"This is a test {notification_type} notification",
-            data=payload_data,
-            notification_type=notification_type,
+        # Single batch update - mark ALL unread notifications as opened
+        # Following SCALABILITY.md: Use batch operations instead of loops
+        result = (
+            supabase.table("notification_history")
+            .update({"opened_at": datetime.utcnow().isoformat()})
+            .eq("user_id", user_id)
+            .is_("opened_at", "null")  # Only update those not yet opened
+            .execute()
         )
 
-        if not send_result.get("notification_id"):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No active Expo push tokens registered for this user.",
-            )
+        # Return count of updated notifications
+        updated_count = len(result.data) if result.data else 0
 
-        return {
-            "success": bool(send_result.get("notification_id")),
-            "message_id": send_result.get("notification_id"),
-            "delivered": send_result.get("delivered"),
-            "tokens_attempted": send_result.get("tokens_attempted", 0),
-            "invalid_tokens": send_result.get("invalid_tokens", []),
-        }
-    except HTTPException:
-        raise
+        return {"success": True, "updated_count": updated_count}
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to send test notification: {str(e)}",
+            detail=f"Failed to mark all notifications as opened: {str(e)}",
         )
 
 

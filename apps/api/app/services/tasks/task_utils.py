@@ -134,7 +134,7 @@ def dispatch_chunked_tasks(
             items=user_ids,
             chunk_size=50,
             # Additional kwargs passed to each task:
-            challenge_id=challenge_id,
+            goal_id=goal_id,
             reason="cancelled",
         )
         # Returns: {"dispatched": 5, "total_items": 247}

@@ -184,6 +184,5 @@ export function useThemedStyles<T extends Record<string, any>>(
   return useMemo(() => {
     const styles = stylesFn(themeTokens, colors, brandColors);
     return styles as T;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [themeTokens, colors, brandColors]);
 }

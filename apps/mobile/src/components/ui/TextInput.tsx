@@ -16,6 +16,7 @@ export interface TextInputProps {
   keyboardType?: "default" | "email-address" | "numeric" | "phone-pad";
   autoCapitalize?: "none" | "sentences" | "words" | "characters";
   autoCorrect?: boolean;
+  autoFocus?: boolean;
   error?: string;
   disabled?: boolean;
   showPasswordToggle?: boolean;
@@ -27,6 +28,8 @@ export interface TextInputProps {
   multiline?: boolean;
   numberOfLines?: number;
   maxLength?: number;
+  onBlur?: () => void;
+  onFocus?: () => void;
 }
 
 const makeTextInputStyles = (tokens: any, colors: any, brandColors: any) => {
@@ -107,6 +110,7 @@ export const TextInput: React.FC<TextInputProps> = ({
   keyboardType = "default",
   autoCapitalize = "none",
   autoCorrect = true,
+  autoFocus = false,
   error,
   disabled = false,
   showPasswordToggle = false,
@@ -117,15 +121,23 @@ export const TextInput: React.FC<TextInputProps> = ({
   labelStyle,
   multiline = false,
   numberOfLines,
-  maxLength
+  maxLength,
+  onBlur,
+  onFocus
 }) => {
   const [isFocused, setIsFocused] = useState(false);
   const [isPasswordVisible, setIsPasswordVisible] = useState(!secureTextEntry);
   const { colors } = useTheme();
   const styles = useStyles(makeTextInputStyles);
 
-  const handleFocus = () => setIsFocused(true);
-  const handleBlur = () => setIsFocused(false);
+  const handleFocus = () => {
+    setIsFocused(true);
+    onFocus?.();
+  };
+  const handleBlur = () => {
+    setIsFocused(false);
+    onBlur?.();
+  };
 
   const togglePasswordVisibility = () => {
     setIsPasswordVisible(!isPasswordVisible);
@@ -164,6 +176,7 @@ export const TextInput: React.FC<TextInputProps> = ({
           keyboardType={keyboardType}
           autoCapitalize={autoCapitalize}
           autoCorrect={autoCorrect}
+          autoFocus={autoFocus}
           editable={!disabled}
           multiline={multiline}
           numberOfLines={numberOfLines}

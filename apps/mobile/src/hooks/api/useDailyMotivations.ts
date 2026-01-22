@@ -10,6 +10,14 @@ export const dailyMotivationsQueryKeys = {
   detail: (id: string) => [...dailyMotivationsQueryKeys.all, "detail", id] as const
 } as const;
 
+// Helper to get milliseconds until midnight (next motivation)
+const getMillisecondsUntilMidnight = () => {
+  const now = new Date();
+  const midnight = new Date(now);
+  midnight.setHours(24, 0, 0, 0);
+  return midnight.getTime() - now.getTime();
+};
+
 // Daily Motivations Hooks
 export const useTodayDailyMotivation = () => {
   return useQuery({
@@ -21,8 +29,8 @@ export const useTodayDailyMotivation = () => {
       }
       return response.data;
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes - refresh every 5 minutes
-    gcTime: 30 * 60 * 1000 // 30 minutes - keep in cache for 30 minutes
+    staleTime: getMillisecondsUntilMidnight(), // Cache until midnight when new motivation is generated
+    gcTime: 24 * 60 * 60 * 1000 // 24 hours - keep in cache for a full day
   });
 };
 

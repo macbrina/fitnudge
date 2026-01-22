@@ -1,5 +1,5 @@
 """
-Expo push notification service using official SDK.
+FitNudge V2 - Expo Push Notification Service
 
 Implements Expo's best practices:
 - Batched sending (max 100 per batch)
@@ -7,6 +7,7 @@ Implements Expo's best practices:
 - Push receipt validation after 15 minutes (or immediate for testing)
 - Automatic invalid token detection and cleanup
 - Proper error handling with specific exception types
+- Centralized notification preference and quiet hours check
 
 Reference: https://docs.expo.dev/push-notifications/sending-notifications/
 """
@@ -16,9 +17,10 @@ from __future__ import annotations
 import logging
 import time
 import httpx
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import datetime, timezone, time as dt_time
+from typing import Any, Dict, List, Optional, Tuple
 from uuid import uuid4
+import pytz
 
 from exponent_server_sdk import (
     DeviceNotRegisteredError,
@@ -31,6 +33,230 @@ from exponent_server_sdk import (
 from app.core.database import get_supabase_client
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# NOTIFICATION PREFERENCE & QUIET HOURS CHECK
+# =============================================================================
+
+# V2 Map notification_type to preference column in notification_preferences table
+# Format: (preference_column, None) - we use a simple single-column mapping
+# If preference_column is None, the notification is always sent (critical notifications)
+NOTIFICATION_TYPE_TO_PREFERENCE = {
+    # Core types (single column)
+    "ai_motivation": ("ai_motivation", None),
+    "reminder": ("reminders", None),
+    "achievement": ("achievements", None),
+    "reengagement": ("reengagement", None),
+    "weekly_recap": ("weekly_recap", None),
+    # Partner types - all use single 'partners' preference toggle
+    "partner_request": ("partners", None),
+    "partner_accepted": ("partners", None),
+    "partner_nudge": ("partners", None),
+    "partner_cheer": ("partners", None),
+    "partner_milestone": ("partners", None),
+    "partner_inactive": ("partners", None),
+    # Always send (critical notifications)
+    "subscription": (None, None),
+    "general": (None, None),
+    # Achievement variants
+    "streak_milestone": ("achievements", None),
+    "goal_complete": ("achievements", None),
+    # Adaptive nudge (uses reminders preference)
+    "adaptive_nudge": ("reminders", None),
+}
+
+
+def should_send_push_notification(user_id: str) -> Tuple[bool, str]:
+    """
+    Check if user has push notifications enabled.
+    Used when skip_preference_check=True but we still need to respect push_notifications toggle.
+
+    Returns:
+        Tuple of (should_send: bool, reason: str)
+    """
+    supabase = get_supabase_client()
+
+    try:
+        prefs_result = (
+            supabase.table("notification_preferences")
+            .select("enabled, push_notifications")
+            .eq("user_id", user_id)
+            .maybe_single()
+            .execute()
+        )
+
+        prefs = prefs_result.data
+
+        # If no preferences, default to sending
+        if not prefs:
+            return (True, "ok")
+
+        # Check global enabled
+        if not prefs.get("enabled", True):
+            return (False, "notifications_disabled")
+
+        # Check push_notifications specifically
+        if not prefs.get("push_notifications", True):
+            return (False, "push_notifications_disabled")
+
+        return (True, "ok")
+
+    except Exception as e:
+        logger.warning(
+            f"Error checking push notification preference for {user_id}: {e}"
+        )
+        return (True, "ok")  # Default to sending on error
+
+
+def should_send_notification(
+    user_id: str,
+    notification_type: str,
+    user_timezone: Optional[str] = None,
+) -> Tuple[bool, str]:
+    """
+    Centralized check for whether to send a notification to a user.
+
+    Checks:
+    1. Global notifications enabled
+    2. Push notifications enabled
+    3. Specific notification type enabled
+    4. Quiet hours (using user's timezone)
+
+    Args:
+        user_id: User ID to check
+        notification_type: Type of notification (ai_motivation, reminder, social, etc.)
+        user_timezone: User's timezone (e.g., "America/New_York"). If None, fetches from users table.
+
+    Returns:
+        Tuple of (should_send: bool, reason: str)
+        - (True, "ok") if notification should be sent
+        - (False, reason) if notification should be skipped
+    """
+    supabase = get_supabase_client()
+
+    try:
+        # Get user's notification preferences (all columns we might need)
+        prefs_result = (
+            supabase.table("notification_preferences")
+            .select("*")
+            .eq("user_id", user_id)
+            .maybe_single()
+            .execute()
+        )
+
+        prefs = prefs_result.data
+
+        # If no preferences, default to sending (user hasn't configured yet)
+        if not prefs:
+            return (True, "ok")
+
+        # Check 1: Global notifications enabled
+        if not prefs.get("enabled", True):
+            return (False, "notifications_disabled")
+
+        # Check 2: Push notifications enabled
+        if not prefs.get("push_notifications", True):
+            return (False, "push_notifications_disabled")
+
+        # Check 3: Specific notification type enabled
+        # Format: (preference_column, unused) - we only use the first value now
+        pref_tuple = NOTIFICATION_TYPE_TO_PREFERENCE.get(
+            notification_type, (None, None)
+        )
+        preference_column, _ = pref_tuple
+
+        # Check the preference toggle (e.g., "partners", "reminders", "achievements")
+        if preference_column:
+            if not prefs.get(preference_column, True):
+                return (False, f"{preference_column}_disabled")
+
+        # Check 3: Quiet hours
+        if prefs.get("quiet_hours_enabled", False):
+            quiet_start = prefs.get("quiet_hours_start")
+            quiet_end = prefs.get("quiet_hours_end")
+
+            if quiet_start and quiet_end:
+                # Get user timezone if not provided
+                if not user_timezone:
+                    user_timezone = _get_user_timezone(supabase, user_id)
+
+                if _is_quiet_hours(quiet_start, quiet_end, user_timezone):
+                    return (False, "quiet_hours")
+
+        return (True, "ok")
+
+    except Exception as e:
+        logger.warning(f"Error checking notification preferences for {user_id}: {e}")
+        # Default to sending if preference check fails
+        return (True, "preference_check_failed")
+
+
+def _get_user_timezone(supabase, user_id: str) -> str:
+    """Get user's timezone from users table."""
+    try:
+        user_result = (
+            supabase.table("users")
+            .select("timezone")
+            .eq("id", user_id)
+            .maybe_single()
+            .execute()
+        )
+
+        if user_result.data and user_result.data.get("timezone"):
+            return user_result.data["timezone"]
+    except Exception:
+        pass
+
+    return "UTC"
+
+
+def _is_quiet_hours(
+    quiet_start: str,
+    quiet_end: str,
+    user_timezone: str,
+) -> bool:
+    """
+    Check if current time (in user's timezone) is within quiet hours.
+
+    Handles overnight ranges (e.g., 22:00 to 08:00).
+
+    Args:
+        quiet_start: Start time as "HH:MM" or "HH:MM:SS"
+        quiet_end: End time as "HH:MM" or "HH:MM:SS"
+        user_timezone: User's timezone string (e.g., "America/New_York")
+
+    Returns:
+        True if within quiet hours, False otherwise
+    """
+    try:
+        # Parse times
+        start_parts = str(quiet_start).split(":")
+        end_parts = str(quiet_end).split(":")
+
+        start_time = dt_time(int(start_parts[0]), int(start_parts[1]))
+        end_time = dt_time(int(end_parts[0]), int(end_parts[1]))
+
+        # Get current time in user's timezone
+        try:
+            tz = pytz.timezone(user_timezone)
+        except pytz.UnknownTimeZoneError:
+            tz = pytz.UTC
+
+        now = datetime.now(tz).time()
+
+        # Handle overnight range (e.g., 22:00 to 08:00)
+        if start_time > end_time:
+            # Overnight: quiet if current >= start OR current <= end
+            return now >= start_time or now <= end_time
+        else:
+            # Same day: quiet if start <= current <= end
+            return start_time <= now <= end_time
+
+    except Exception as e:
+        logger.warning(f"Error checking quiet hours: {e}")
+        return False  # Default to not quiet hours on error
+
 
 # Expo's recommended batch size
 EXPO_BATCH_SIZE = 100
@@ -60,14 +286,18 @@ async def send_push_to_user(
     priority: str = "high",
     entity_type: Optional[str] = None,
     entity_id: Optional[str] = None,
+    category_id: Optional[str] = None,
+    skip_preference_check: bool = False,
 ) -> Dict[str, Any]:
     """
     Persist a notification record and deliver it to all active Expo push tokens for the user.
 
-    This function mimics how the Celery background task works:
-    1. Query device_tokens from database (no user auth needed)
-    2. Send push notification using Expo SDK
-    3. Handle errors and mark invalid tokens as inactive
+    This function:
+    1. ALWAYS save notification to history (inbox) first
+    2. Check notification preferences and quiet hours for push delivery
+    3. Query device_tokens from database (no user auth needed)
+    4. Send push notification using Expo SDK
+    5. Handle errors and mark invalid tokens as inactive
 
     Args:
         user_id: User ID to send notification to
@@ -75,10 +305,14 @@ async def send_push_to_user(
         body: Notification body
         data: Optional data payload
         notification_type: Type of notification (ai_motivation, reminder, etc.)
+            V2 Types: ai_motivation, reminder, reengagement, achievement, general,
+            partner_request, partner_accepted, partner_nudge, partner_cheer,
+            partner_milestone, weekly_recap, subscription
         sound: Sound to play (default: "default")
         priority: Push priority (default: "high")
-        entity_type: Type of entity referenced (goal, challenge, post, comment, etc.)
+        entity_type: Type of entity referenced (goal, achievement, partner_request, etc.)
         entity_id: ID of the referenced entity (no FK - handle deleted at app level)
+        skip_preference_check: If True, skip preference/quiet hours check (for critical notifications)
 
     Returns:
         Dict with notification_id, delivered status, and token info
@@ -96,24 +330,8 @@ async def send_push_to_user(
 
     supabase = get_supabase_client()
 
-    # Get all active device tokens for the user (no auth required - uses service key)
-    tokens_result = (
-        supabase.table("device_tokens")
-        .select("fcm_token, id")
-        .eq("user_id", user_id)
-        .eq("is_active", True)
-        .execute()
-    )
-
-    tokens = [
-        row
-        for row in tokens_result.data or []
-        if isinstance(row.get("fcm_token"), str)
-        and is_valid_expo_token(row["fcm_token"])
-    ]
-
-    # ALWAYS create notification record in database first (for inbox)
-    # Users should see notifications even if they don't have push tokens
+    # STEP 1: ALWAYS create notification record in database first (for inbox)
+    # Users should see notifications in their inbox regardless of push settings
     notification_id = str(uuid4())
     now = datetime.now(timezone.utc).isoformat()
 
@@ -127,9 +345,7 @@ async def send_push_to_user(
         "sent_at": now,
     }
 
-    # Add generic entity reference for tracking
-    # entity_type: 'goal', 'challenge', 'post', 'comment', 'follow', etc.
-    # No FK constraint - handle deleted entities at application level
+    # Add entity reference for tracking (V2: goal, achievement, partner_request, etc.)
     if entity_type and entity_id:
         notification_record["entity_type"] = entity_type
         notification_record["entity_id"] = entity_id
@@ -156,6 +372,51 @@ async def send_push_to_user(
             },
         )
 
+    # STEP 2: Check notification preferences for PUSH delivery
+    # Even with skip_preference_check, we still respect the push_notifications toggle
+    if skip_preference_check:
+        # Only check if push notifications are enabled (skip type-specific checks)
+        should_send, reason = should_send_push_notification(user_id)
+    else:
+        # Full check: push_notifications + type-specific + quiet hours
+        should_send, reason = should_send_notification(user_id, notification_type)
+
+    if not should_send:
+        logger.info(
+            f"Push notification skipped for user {user_id} (saved to inbox)",
+            extra={
+                "user_id": user_id,
+                "notification_id": notification_id,
+                "notification_type": notification_type,
+                "skip_reason": reason,
+            },
+        )
+        return {
+            "notification_id": notification_id,  # Return ID since it's saved to inbox
+            "delivered": False,
+            "reason": reason,
+            "skipped": True,
+            "saved_to_inbox": True,
+            "tokens_attempted": 0,
+            "invalid_tokens": [],
+        }
+
+    # STEP 3: Get all active device tokens for the user (no auth required - uses service key)
+    tokens_result = (
+        supabase.table("device_tokens")
+        .select("fcm_token, id")
+        .eq("user_id", user_id)
+        .eq("is_active", True)
+        .execute()
+    )
+
+    tokens = [
+        row
+        for row in tokens_result.data or []
+        if isinstance(row.get("fcm_token"), str)
+        and is_valid_expo_token(row["fcm_token"])
+    ]
+
     # If no tokens, return early but notification is already saved to history
     if not tokens:
         logger.info(
@@ -170,8 +431,6 @@ async def send_push_to_user(
         }
 
     # Send to device tokens using Expo SDK with proper batching and rate limiting
-    # Expo limits: 600 notifications/second per project
-    # With 100 per batch + 200ms delay = ~500/sec (safe under limit)
     delivered = False
     invalid_tokens: List[str] = []
     successful_tokens: List[str] = []
@@ -199,16 +458,18 @@ async def send_push_to_user(
             fcm_token = token_row["fcm_token"]
             token_map[len(push_messages)] = token_row
 
-            push_messages.append(
-                PushMessage(
-                    to=fcm_token,
-                    title=title,
-                    body=body,
-                    data=data or {"notification_id": notification_id},
-                    sound=sound,
-                    priority=priority,
-                )
-            )
+            message_kwargs = {
+                "to": fcm_token,
+                "title": title,
+                "body": body,
+                "data": data or {"notification_id": notification_id},
+                "sound": sound,
+                "priority": priority,
+            }
+            # Add category identifier for action buttons (iOS)
+            if category_id:
+                message_kwargs["category"] = category_id
+            push_messages.append(PushMessage(**message_kwargs))
 
         # Send batch using SDK with retry logic (exponential backoff)
         responses = None
@@ -394,55 +655,6 @@ async def send_push_to_user(
     }
 
 
-def send_push_message_sync(
-    token: str,
-    title: str,
-    body: str,
-    data: Optional[Dict[str, Any]] = None,
-) -> bool:
-    """
-    Synchronous helper to send a single push notification.
-    Used by background tasks that don't use async.
-
-    Args:
-        token: Expo push token
-        title: Notification title
-        body: Notification body
-        data: Optional data payload
-
-    Returns:
-        bool: True if delivered, False otherwise
-    """
-    try:
-        if not is_valid_expo_token(token):
-            logger.warning(f"Invalid token format: {token[:20]}...")
-            return False
-
-        push_message = PushMessage(
-            to=token,
-            title=title,
-            body=body,
-            data=data or {},
-            sound="default",
-            priority="high",
-        )
-
-        response = PushClient().publish(push_message)
-        response.validate_response()
-
-        return True
-
-    except DeviceNotRegisteredError:
-        logger.warning(f"Device not registered: {token[:20]}...")
-        return False
-    except (PushServerError, PushTicketError) as exc:
-        logger.error(f"Push error for {token[:20]}...: {exc}")
-        return False
-    except Exception as exc:
-        logger.error(f"Unexpected error sending push: {exc}")
-        return False
-
-
 def send_push_to_user_sync(
     user_id: str,
     *,
@@ -452,21 +664,26 @@ def send_push_to_user_sync(
     notification_type: str = "general",
     entity_type: Optional[str] = None,
     entity_id: Optional[str] = None,
+    category_id: Optional[str] = None,
+    skip_preference_check: bool = False,
 ) -> Dict[str, Any]:
     """
     Synchronous version of send_push_to_user for Celery tasks.
 
-    Sends push notification to all active device tokens for a user
-    and creates notification_history record.
+    This function:
+    1. ALWAYS save notification to history (inbox) first
+    2. Check notification preferences and quiet hours for push delivery
+    3. Send push notification to all active device tokens
 
     Args:
         user_id: User ID to send notification to
         title: Notification title
         body: Notification body
         data: Optional data payload (include deep link info here)
-        notification_type: Type of notification (plan_ready, goal, etc.)
-        entity_type: Type of entity (goal, plan, etc.)
+        notification_type: Type of notification (V2: ai_motivation, reminder, etc.)
+        entity_type: Type of entity (goal, achievement, partner_request, etc.)
         entity_id: ID of the entity
+        skip_preference_check: If True, skip preference/quiet hours check (for critical notifications)
 
     Returns:
         Dict with success status and delivery count
@@ -474,24 +691,8 @@ def send_push_to_user_sync(
     supabase = get_supabase_client()
 
     try:
-        # Get all active device tokens for the user
-        tokens_result = (
-            supabase.table("device_tokens")
-            .select("fcm_token, id")
-            .eq("user_id", user_id)
-            .eq("is_active", True)
-            .execute()
-        )
-
-        tokens = [
-            row
-            for row in tokens_result.data or []
-            if isinstance(row.get("fcm_token"), str)
-            and is_valid_expo_token(row["fcm_token"])
-        ]
-
-        # ALWAYS create notification history record first (for inbox)
-        # Users should see notifications even if they don't have push tokens
+        # STEP 1: ALWAYS create notification history record first (for inbox)
+        # Users should see notifications in their inbox regardless of push settings
         notification_id = str(uuid4())
         notification_record = {
             "id": notification_id,
@@ -522,6 +723,50 @@ def send_push_to_user_sync(
         except Exception as e:
             logger.error(f"Failed to create notification history: {e}")
 
+        # STEP 2: Check notification preferences for PUSH delivery
+        # Even with skip_preference_check, we still respect the push_notifications toggle
+        if skip_preference_check:
+            # Only check if push notifications are enabled (skip type-specific checks)
+            should_send, reason = should_send_push_notification(user_id)
+        else:
+            # Full check: push_notifications + type-specific + quiet hours
+            should_send, reason = should_send_notification(user_id, notification_type)
+
+        if not should_send:
+            logger.info(
+                f"Push notification skipped for user {user_id} (saved to inbox)",
+                extra={
+                    "user_id": user_id,
+                    "notification_id": notification_id,
+                    "notification_type": notification_type,
+                    "skip_reason": reason,
+                },
+            )
+            return {
+                "success": True,
+                "delivered": 0,
+                "reason": reason,
+                "skipped": True,
+                "saved_to_inbox": True,
+                "notification_id": notification_id,
+            }
+
+        # STEP 3: Get all active device tokens for the user
+        tokens_result = (
+            supabase.table("device_tokens")
+            .select("fcm_token, id")
+            .eq("user_id", user_id)
+            .eq("is_active", True)
+            .execute()
+        )
+
+        tokens = [
+            row
+            for row in tokens_result.data or []
+            if isinstance(row.get("fcm_token"), str)
+            and is_valid_expo_token(row["fcm_token"])
+        ]
+
         # If no tokens, return early but notification is already saved to history
         if not tokens:
             logger.info(
@@ -545,16 +790,18 @@ def send_push_to_user_sync(
 
         for idx, token_row in enumerate(tokens):
             token = token_row["fcm_token"]
-            push_messages.append(
-                PushMessage(
-                    to=token,
-                    title=title,
-                    body=body,
-                    data=data or {},
-                    sound="default",
-                    priority="high",
-                )
-            )
+            message_kwargs = {
+                "to": token,
+                "title": title,
+                "body": body,
+                "data": data or {},
+                "sound": "default",
+                "priority": "high",
+            }
+            # Add category identifier for action buttons (iOS)
+            if category_id:
+                message_kwargs["category"] = category_id
+            push_messages.append(PushMessage(**message_kwargs))
             token_map[idx] = token_row
 
         # Send batch using Expo SDK with retry logic
@@ -570,7 +817,9 @@ def send_push_to_user_sync(
                 except DeviceNotRegisteredError:
                     invalid_token_ids.append(token_row["id"])
                 except (PushTicketError, Exception) as exc:
-                    logger.warning(f"Push failed for token {token_row['fcm_token'][:20]}...: {exc}")
+                    logger.warning(
+                        f"Push failed for token {token_row['fcm_token'][:20]}...: {exc}"
+                    )
                     invalid_token_ids.append(token_row["id"])
 
         except (PushServerError, Exception) as exc:
@@ -581,9 +830,9 @@ def send_push_to_user_sync(
         # Mark invalid tokens as inactive (batch update)
         if invalid_token_ids:
             try:
-                supabase.table("device_tokens").update(
-                    {"is_active": False}
-                ).in_("id", invalid_token_ids).execute()
+                supabase.table("device_tokens").update({"is_active": False}).in_(
+                    "id", invalid_token_ids
+                ).execute()
             except Exception as e:
                 logger.warning(f"Failed to deactivate invalid tokens: {e}")
 

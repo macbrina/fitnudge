@@ -3,69 +3,97 @@
 import { useTranslation } from "@/lib/i18n";
 import { motion } from "framer-motion";
 import Image from "next/image";
+import { CheckCircle2 } from "lucide-react";
+import { useTheme } from "@/store";
 
 export function Wellness() {
   const { t } = useTranslation();
+  const { theme } = useTheme();
+
+  const mockupImage =
+    theme === "dark" ? "/mockups/home-dark.png" : "/mockups/home-light.png";
+
+  const highlights = [
+    t("wellness.highlights.ai_messages"),
+    t("wellness.highlights.smart_reminders"),
+    t("wellness.highlights.daily_checkins"),
+    t("wellness.highlights.streak_tracking"),
+  ];
 
   return (
-    <section className="relative min-h-screen w-full">
-      {/* Background with padding like hero */}
-      <div className="absolute inset-4 bg-card rounded-3xl"></div>
-      <div className="relative z-10 w-full px-4 sm:px-6 lg:px-8 pt-24 pb-20 flex items-center justify-center min-h-full">
-        <div className="grid lg:grid-cols-2 gap-16 items-center w-full">
-          {/* Left side - Phone mockups */}
-          <motion.div
-            className="relative"
-            initial={{ opacity: 0, x: -50 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.8 }}
-            viewport={{ once: true }}
-          >
-            {/* Body Composition Phone */}
-            <motion.div
-              className="relative w-64 h-[500px] bg-gray-900 rounded-4xl p-3 shadow-2xl mx-auto"
-              animate={{ y: [-10, 10, -10] }}
-              transition={{
-                duration: 4,
-                repeat: Infinity,
-                ease: "easeInOut",
-              }}
-            >
-              <div className="w-full h-full bg-white dark:bg-gray-900 rounded-3xl overflow-hidden">
-                <div className="relative w-full h-full">
+    <section className="relative w-full py-4 sm:py-6 lg:py-8">
+      {/* Background with responsive padding */}
+      <div className="mx-2 sm:mx-4 bg-card rounded-2xl sm:rounded-3xl">
+        <div className="relative z-10 w-full px-4 sm:px-6 lg:px-8 py-12 sm:py-16 lg:py-20">
+          <div className="max-w-7xl mx-auto">
+            <div className="grid lg:grid-cols-2 gap-8 lg:gap-16 items-center">
+              {/* Left side - Phone mockup */}
+              <motion.div
+                className="relative order-2 lg:order-1 flex justify-center"
+                initial={{ opacity: 0, x: -50 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.8 }}
+                viewport={{ once: true }}
+              >
+                <motion.div
+                  className="relative w-48 sm:w-56 md:w-64 h-[380px] sm:h-[440px] md:h-[500px]"
+                  animate={{ y: [-8, 8, -8] }}
+                  transition={{
+                    duration: 4,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                  }}
+                >
                   <Image
-                    src="/iphone-mockup1.png"
+                    src={mockupImage}
                     alt="FitNudge AI Motivation App"
                     fill
-                    className="object-cover rounded-3xl"
+                    className="object-contain drop-shadow-2xl"
                     priority
                   />
+                </motion.div>
+              </motion.div>
+
+              {/* Right side - Content */}
+              <motion.div
+                className="text-foreground order-1 lg:order-2"
+                initial={{ opacity: 0, x: 50 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.8 }}
+                viewport={{ once: true }}
+              >
+                <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-4 sm:mb-6 lg:mb-8 leading-tight">
+                  {t("wellness.title")}
+                </h2>
+
+                <div className="space-y-4 sm:space-y-6 mb-6 sm:mb-8">
+                  <p className="text-sm sm:text-base lg:text-lg text-muted-foreground leading-relaxed">
+                    {t("wellness.description1")}
+                  </p>
+                  <p className="text-sm sm:text-base lg:text-lg text-muted-foreground leading-relaxed">
+                    {t("wellness.description2")}
+                  </p>
                 </div>
-              </div>
-            </motion.div>
-          </motion.div>
 
-          {/* Right side - Content */}
-          <motion.div
-            className="text-foreground"
-            initial={{ opacity: 0, x: 50 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.8 }}
-            viewport={{ once: true }}
-          >
-            <h2 className="text-4xl md:text-5xl font-bold mb-8 leading-tight">
-              {t("wellness.title")}
-            </h2>
-
-            <div className="space-y-6 mb-8">
-              <p className="text-lg text-muted-foreground leading-relaxed">
-                {t("wellness.description1")}
-              </p>
-              <p className="text-lg text-muted-foreground leading-relaxed">
-                {t("wellness.description2")}
-              </p>
+                {/* Highlights list */}
+                <ul className="space-y-3">
+                  {highlights.map((item, index) => (
+                    <motion.li
+                      key={index}
+                      className="flex items-center gap-3 text-sm sm:text-base text-foreground"
+                      initial={{ opacity: 0, x: 20 }}
+                      whileInView={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.5, delay: index * 0.1 }}
+                      viewport={{ once: true }}
+                    >
+                      <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
+                      <span>{item}</span>
+                    </motion.li>
+                  ))}
+                </ul>
+              </motion.div>
             </div>
-          </motion.div>
+          </div>
         </div>
       </div>
     </section>

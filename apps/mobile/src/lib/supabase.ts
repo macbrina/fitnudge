@@ -83,7 +83,7 @@ if (supabaseUrl && supabaseAnonKey) {
       },
       realtime: {
         // Explicitly provide WebSocket for React Native
-        // @ts-ignore - WebSocket is available globally in React Native
+        // @ts-expect-error - WebSocket is available globally in React Native
         constructor: WebSocket,
         // Realtime-specific configuration
         params: {

@@ -1,11 +1,11 @@
 """
-Social Accountability Service
+FitNudge V2 - Social Accountability Service
 
 Handles accountability partners and social nudges.
 """
 
-from typing import Dict, Any, List, Optional
-from datetime import date, datetime
+from typing import Dict, Any
+from datetime import datetime
 from app.core.database import get_supabase_client
 from app.services.logger import logger
 
@@ -19,7 +19,7 @@ class SocialAccountabilityService:
         """
         Touch accountability_partners table to trigger realtime events for partners.
 
-        When a user updates their goals/challenges/check-ins, their partners need
+        When a user updates their goals/check-ins, their partners need
         to be notified so their PartnerDetailScreen can refresh and show updated data.
 
         This updates the updated_at field on all partnerships involving this user,
@@ -89,7 +89,7 @@ class SocialAccountabilityService:
         self, user_ids: list, change_type: str = "data"
     ) -> int:
         """
-        Sync version of partner notification for multiple users (e.g., all challenge participants).
+        Sync version of partner notification for multiple users.
         Used in Celery tasks that affect multiple users at once.
 
         Args:

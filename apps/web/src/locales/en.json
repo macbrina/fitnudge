@@ -2,7 +2,11 @@
   "common": {
     "error": "Error",
     "user": "User",
-    "logout": "Logout"
+    "logout": "Logout",
+    "close": "Close",
+    "loading": "Loading...",
+    "feedback": "Feedback",
+    "send_feedback": "Send feedback"
   },
   "auth": {
     "login": {
@@ -30,7 +34,7 @@
   },
   "home": {
     "welcome_back": "Welcome back, {{name}}!",
-    "subtitle": "Ready to crush your fitness goals today?",
+    "subtitle": "Ready to crush your goals today?",
     "todays_motivation": "Today's Motivation",
     "motivation_quote": "Every step you take is a step closer to your goals. Keep pushing forward! 💪",
     "quick_actions": "Quick Actions",
@@ -74,30 +78,85 @@
   },
   "web": {
     "hero": {
-      "title": "Your AI-Powered Fitness Coach",
+      "title": "Your AI-Powered Accountability Partner",
       "subtitle": "Get personalized motivation, track your goals, and connect with a community that keeps you accountable. Powered by advanced AI technology.",
       "download_free": "Download for Free",
       "learn_more": "Learn More"
     },
     "blog": {
       "title": "FitNudge Blog",
-      "subtitle": "Insights, tips, and stories to help you on your fitness journey. From AI-powered motivation to community success stories."
+      "subtitle": "Insights, tips, and stories to help you build lasting habits. From AI-powered motivation to community success stories.",
+      "article": "Article",
+      "read_article": "Read Article",
+      "read_full_article": "Read Full Article",
+      "featured": "Featured",
+      "featured_article": "Featured Article",
+      "all_posts": "All Posts",
+      "latest_articles": "Latest Articles",
+      "articles": "Articles",
+      "articles_description": "Explore our collection of articles on habit building, productivity, and personal growth.",
+      "min_read": "{{minutes}} min read",
+      "min": "{{minutes}} min",
+      "back_to_blog": "Back to Blog",
+      "loading": "Loading...",
+      "related_articles": "Related Articles",
+      "no_articles_found": "No Articles Found",
+      "no_articles_category": "There are no articles in this category yet. Try selecting a different category or check back soon!",
+      "no_articles_empty": "We're working on creating great content for you. Check back soon for helpful articles on building healthy habits!",
+      "view_all_posts": "View All Posts",
+      "pagination": {
+        "previous": "Previous",
+        "next": "Next"
+      },
+      "newsletter": {
+        "title": "Stay Updated",
+        "description": "Get the latest articles on habit building, productivity tips, and success stories delivered to your inbox.",
+        "placeholder": "Enter your email",
+        "subscribe": "Subscribe"
+      },
+      "cta": {
+        "title": "Ready to Build Better Habits?",
+        "description": "Join thousands who are already using FitNudge to stay accountable and achieve their goals.",
+        "button": "Join the Waitlist"
+      },
+      "share": {
+        "title": "Share",
+        "twitter": "Share on Twitter",
+        "facebook": "Share on Facebook",
+        "linkedin": "Share on LinkedIn",
+        "copy_link": "Copy Link",
+        "link_copied": "Link copied!"
+      },
+      "error": {
+        "not_found_title": "Article Not Found",
+        "not_found_description": "The article you're looking for doesn't exist or has been removed.",
+        "failed_to_load": "Failed to load post",
+        "post_not_found": "Post not found"
+      }
     }
   },
   "nav": {
+    "why_fitnudge": "Why FitNudge",
     "features": "Features",
     "how_it_works": "How It Works",
     "testimonials": "Testimonials",
     "blog": "Blog",
     "contact": "Contact",
     "download": "Download App",
-    "theme": "Theme"
+    "theme": "Theme",
+    "language": "Language",
+    "join_waitlist": "Join Waitlist",
+    "join": "Join",
+    "toggle_menu": "Toggle menu",
+    "close_menu": "Close menu",
+    "select_language": "Select language"
   },
   "hero": {
-    "badge": "Trusted by 50,000+ users worldwide",
-    "title": "Your Personal Fitness Accountability Partner",
-    "subtitle": "Stay consistent with your fitness goals through personalized AI motivation and smart reminders.",
+    "badge": "Launching Soon",
+    "title": "Your AI Accountability Partner for Any Goal",
+    "subtitle": "Stay consistent with any habit or goal - fitness, reading, meditation, learning, or anything else. FitNudge provides the daily nudge you need.",
     "download_free": "Download for Free",
+    "join_waitlist": "Join the Waitlist",
     "watch_demo": "Watch Demo",
     "stats": {
       "users": "Active Users",
@@ -106,19 +165,32 @@
     }
   },
   "features": {
-    "title": "Transform Your Fitness Journey",
-    "subtitle": "Experience the power of AI-driven fitness motivation with our core features designed to keep you consistent and achieve your goals.",
+    "title": "Everything You Need to Stay Consistent",
+    "subtitle": "FitNudge is packed with features designed to keep you accountable and motivated on your journey.",
+    "view_all": "View All Features",
     "ai": {
       "title": "AI Motivation",
       "description": "Personalized AI messages that adapt to your journey and keep you motivated every day."
     },
     "goals": {
       "title": "Goal Tracking",
-      "description": "Set and track your fitness goals with weekly streaks and progress summaries."
+      "description": "Set daily or weekly goals with flexible scheduling. Track any habit you want to build."
     },
     "reminders": {
       "title": "Smart Reminders",
-      "description": "Intelligent notifications that act like an AI 'call' to check in with you."
+      "description": "Intelligent notifications that act like an AI coach checking in on you at the right moments."
+    },
+    "streaks": {
+      "title": "Streak Tracking",
+      "description": "Build momentum with streak tracking. See your current and longest streaks to stay consistent."
+    },
+    "partners": {
+      "title": "Accountability Partners",
+      "description": "Connect with partners who share your goals. Send cheers, nudges, and motivate each other."
+    },
+    "coach": {
+      "title": "AI Coach Chat",
+      "description": "On-demand conversations with your AI coach who knows your goals, patterns, and progress."
     },
     "analytics": {
       "title": "Progress Analytics",
@@ -134,15 +206,53 @@
     },
     "cta": {
       "title": "Ready to get started?",
-      "subtitle": "Join thousands of users who are already transforming their fitness journey with FitNudge."
+      "subtitle": "Join thousands of users who are already building lasting habits with FitNudge."
     }
   },
   "testimonials": {
-    "title": "What Our Users Say",
-    "subtitle": "Don't just take our word for it. See what our community has to say about their FitNudge experience.",
+    "title": "Loved by Goal Achievers",
+    "subtitle": "Join thousands who have transformed their habits with FitNudge",
     "rating": "App Store Rating",
     "users": "Happy Users",
-    "satisfaction": "Satisfaction Rate"
+    "satisfaction": "Satisfaction Rate",
+    "stats": {
+      "active_users": "Active Users",
+      "app_rating": "App Store Rating",
+      "consistency_rate": "Consistency Rate",
+      "check_ins": "Check-ins Completed"
+    },
+    "items": {
+      "sarah": {
+        "name": "Sarah M.",
+        "role": "Goal Achiever",
+        "content": "FitNudge completely changed how I approach my goals. The AI check-ins feel personal and actually motivate me to stay consistent."
+      },
+      "david": {
+        "name": "David R.",
+        "role": "Marathon Runner",
+        "content": "The weekly recaps are amazing! I love seeing my patterns - it shows me what's working, and where I need to improve. Game changer for my training."
+      },
+      "emily": {
+        "name": "Emily T.",
+        "role": "Busy Mom",
+        "content": "As a busy mom, I never thought I could stay consistent with my goals. The smart reminders and celebration of small wins keep me going."
+      },
+      "alex": {
+        "name": "Alex P.",
+        "role": "Software Developer",
+        "content": "I've tried many habit trackers but FitNudge is different. The AI actually remembered why I started and uses that to motivate me."
+      },
+      "jessica": {
+        "name": "Jessica L.",
+        "role": "Yoga Instructor",
+        "content": "The accountability partner feature is brilliant! Having someone to share my journey with makes all the difference."
+      },
+      "michael": {
+        "name": "Michael K.",
+        "role": "Weight Loss Journey",
+        "content": "Down 30 lbs in 6 months! The streak tracking kept me accountable even on days I didn't feel like working out."
+      }
+    }
   },
   "pricing": {
     "title": "Simple, Transparent Pricing",
@@ -166,7 +276,7 @@
       "name": "Pro Plan",
       "price": "$9.99",
       "period": "/month",
-      "description": "For serious fitness enthusiasts",
+      "description": "For serious goal achievers",
       "features": {
         "unlimited_goals": "Unlimited goals",
         "voice_coaching": "Voice posts & AI coaching",
@@ -194,7 +304,7 @@
     }
   },
   "footer": {
-    "description": "Your AI-powered fitness coach for a healthier, happier you. Transform your fitness journey with personalized motivation and smart goal tracking.",
+    "description": "Your AI-powered accountability partner for any goal. Build lasting habits with personalized motivation and smart tracking.",
     "product": "Product",
     "company": "Company",
     "support": "Support",
@@ -211,10 +321,13 @@
     "rights": "All rights reserved.",
     "why_fitnudge": "Why FitNudge",
     "faqs": "FAQs",
+    "system_status": "System Status",
     "legal": "Legal",
+    "made_with": "Made with",
+    "for_goal_achievers": "for goal achievers",
     "download_cta": {
       "title": "Ready to Transform Your Fitness Journey?",
-      "subtitle": "Download FitNudge today and start your AI-powered fitness transformation",
+      "subtitle": "Download FitNudge today and start your AI-powered habit transformation",
       "ios": "Download for iOS",
       "android": "Download for Android"
     }
@@ -341,91 +454,286 @@
       }
     },
     "components": {
-      "environment": {
-        "name": "Core Configuration",
-        "descriptions": {
-          "ok": "Configuration is valid.",
-          "degraded": "Configuration contains unexpected values.",
-          "critical": "Configuration could not be read."
-        }
-      },
       "supabase": {
-        "name": "Primary Database",
+        "name": "Core Services",
         "descriptions": {
-          "ok": "Database connection is healthy.",
-          "critical": "Database is unreachable."
-        }
-      },
-      "redis": {
-        "name": "Caching Layer",
-        "descriptions": {
-          "ok": "Cache server is responding.",
-          "critical": "Cache server is unreachable."
-        }
-      },
-      "celery": {
-        "name": "Background Jobs",
-        "descriptions": {
-          "ok": "Workers are accepting jobs.",
-          "degraded": "Background workers are not responding.",
-          "critical": "Worker queue could not be reached."
+          "ok": "All core services are running smoothly.",
+          "critical": "Core services are currently unavailable."
         }
       },
       "smtp": {
-        "name": "Email Delivery",
+        "name": "Notifications",
         "descriptions": {
-          "ok": "Outbound email service is available.",
-          "degraded": "Email service is experiencing issues."
+          "ok": "Email notifications are working.",
+          "degraded": "Email notifications may be delayed."
         }
       },
       "openai": {
-        "name": "AI Assistance",
+        "name": "AI Features",
         "descriptions": {
-          "ok": "AI provider is configured.",
-          "not_configured": "AI features are not configured."
-        }
-      },
-      "elevenlabs": {
-        "name": "Voice Coach",
-        "descriptions": {
-          "ok": "Voice synthesis provider is configured.",
-          "not_configured": "Voice assistant features are disabled."
-        }
-      },
-      "cloudflare_r2": {
-        "name": "Media Storage",
-        "descriptions": {
-          "ok": "Media storage credentials configured.",
-          "not_configured": "Media storage not configured."
+          "ok": "AI-powered features are available.",
+          "not_configured": "AI features are temporarily unavailable."
         }
       }
     }
   },
   "wellness": {
-    "title": "Your AI-Powered Fitness Coach That Never Sleeps.",
-    "description1": "Get personalized AI motivation messages, smart reminders, and daily check-ins that keep you accountable to your fitness goals. Our AI coach understands your journey and adapts to your needs.",
-    "description2": "Track your progress with intelligent analytics, celebrate your streaks, and connect with a supportive community that shares your fitness journey. Stay consistent with the power of AI.",
-    "cta": "Learn More"
+    "title": "Your AI Coach That Never Sleeps",
+    "description1": "Get personalized AI motivation messages, smart reminders, and daily check-ins that keep you accountable to any goal — whether it's working out, reading, meditating, learning a new skill, or building any positive habit.",
+    "description2": "Track your progress with intelligent analytics, celebrate your streaks, and connect with accountability partners who share your journey. Stay consistent with the power of AI.",
+    "cta": "Learn More",
+    "highlights": {
+      "ai_messages": "Personalized AI motivation messages",
+      "smart_reminders": "Smart reminders that adapt to you",
+      "daily_checkins": "Daily check-ins to keep you accountable",
+      "streak_tracking": "Track streaks and celebrate consistency"
+    }
   },
   "tracker": {
-    "title": "Track Your Progress with Weekly Streaks",
-    "description": "Monitor your fitness journey with intelligent progress tracking. See your weekly streaks, daily check-ins, and achievements with detailed analytics that help you stay consistent and motivated.",
-    "cta": "Learn More"
+    "title": "Track Your Progress with Streaks",
+    "description": "Monitor your journey with intelligent progress tracking. See your streaks, daily check-ins, and achievements with detailed analytics that help you stay consistent and motivated.",
+    "cta": "Learn More",
+    "join_waitlist": "Join the Waitlist",
+    "stats": {
+      "track_progress": "Track Progress",
+      "daily_checkins": "Daily Check-ins",
+      "achievements": "Achievements"
+    }
   },
   "download": {
-    "title": "Download now and begin your journey to better health.",
-    "description": "Join thousands of users who are already transforming their fitness journey with FitNudge. Available on iOS and Android.",
+    "title": "Download now and start building lasting habits.",
+    "description": "Join thousands of users who are building better habits with FitNudge. Coming soon to iOS and Android.",
+    "coming_soon": "Coming Soon",
     "app_store": "App Store",
     "google_play": "Google Play",
-    "downloads": "Downloads"
+    "downloads": "Downloads",
+    "phone_mockup": {
+      "greeting": "Good morning!",
+      "ready": "Ready for your check-in?",
+      "current_streak": "Current Streak",
+      "streak_days": "🔥 14 days",
+      "todays_goal": "Today's Goal",
+      "morning_workout": "Morning Workout"
+    }
+  },
+  "contact": {
+    "title": "Get in Touch",
+    "subtitle": "Have questions? We'd love to hear from you. Send us a message and we'll respond as soon as possible.",
+    "form": {
+      "name": "Your Name",
+      "email": "Email Address",
+      "subject": "Subject",
+      "message": "Your Message",
+      "submit": "Send Message",
+      "sending": "Sending...",
+      "success": "Message sent successfully! We'll get back to you soon.",
+      "error": "Something went wrong. Please try again.",
+      "name_placeholder": "John Doe",
+      "email_placeholder": "john@example.com",
+      "subject_placeholder": "How can we help?",
+      "message_placeholder": "Tell us more about your question or feedback..."
+    },
+    "info": {
+      "title_email": "Email Us",
+      "title_response": "Response Time",
+      "email": "hello@fitnudge.app",
+      "response_time": "We typically respond within 24-48 hours"
+    }
+  },
+  "features_page": {
+    "title": "All Features",
+    "subtitle": "Everything you need to stay consistent and build lasting habits",
+    "free_tier": "Free Features",
+    "premium_tier": "Premium Features",
+    "view_all": "View All Features",
+    "free_price": "$0 forever",
+    "premium_price": "$9.99/month",
+    "cta": {
+      "title": "Ready to Build Lasting Habits?",
+      "description": "Join the waitlist and be the first to know when FitNudge launches.",
+      "button": "Join the Waitlist"
+    },
+    "free_features": {
+      "goals": {
+        "title": "Up to 2 Active Goals",
+        "description": "Track up to 2 goals at a time — fitness, reading, meditation, learning, or any habit you want to build."
+      },
+      "checkins": {
+        "title": "Daily AI Check-ins",
+        "description": "Receive Yes/No check-in prompts at your scheduled time. Simple and effective accountability."
+      },
+      "streaks": {
+        "title": "Streak Tracking",
+        "description": "Track your current and longest streaks. Celebrate milestones at 7, 14, 21, 30, 50, and 100 days."
+      },
+      "motivation": {
+        "title": "Daily Motivation",
+        "description": "Receive AI-generated motivation messages at your scheduled reminder time."
+      },
+      "stats": {
+        "title": "Basic Stats",
+        "description": "View your consistency percentage and basic progress statistics."
+      },
+      "partner": {
+        "title": "1 Accountability Partner",
+        "description": "Connect with one accountability partner to keep each other motivated."
+      }
+    },
+    "premium_features": {
+      "goals": {
+        "title": "Up to 10 Active Goals",
+        "description": "Track up to 10 goals simultaneously. Perfect for building multiple habits."
+      },
+      "coach": {
+        "title": "AI Coach Chat",
+        "description": "Have on-demand conversations with your AI coach who knows your goals, patterns, and progress."
+      },
+      "recaps": {
+        "title": "Weekly AI Recaps",
+        "description": "Receive personalized weekly summaries with wins, insights, and focus areas for the next week."
+      },
+      "analytics": {
+        "title": "Advanced Analytics",
+        "description": "Detailed charts, heatmaps, and trend analysis to understand your patterns better."
+      },
+      "patterns": {
+        "title": "Smart Pattern Detection",
+        "description": "AI detects patterns like your best/worst days and dropout points to help you improve."
+      },
+      "nudging": {
+        "title": "Adaptive Nudging",
+        "description": "Smart nudges when you're about to break a streak or when patterns suggest you need extra support."
+      },
+      "voice": {
+        "title": "Voice Notes",
+        "description": "Record voice reflections after check-ins for deeper self-awareness."
+      },
+      "partners": {
+        "title": "Up to 3 Accountability Partners",
+        "description": "Connect with up to 3 partners. Send cheers, nudges, and motivate each other."
+      },
+      "reminders": {
+        "title": "Multiple Reminder Times",
+        "description": "Set up to 5 reminder times per goal for maximum flexibility."
+      },
+      "ad_free": {
+        "title": "Ad-Free Experience",
+        "description": "Enjoy FitNudge without any interruptions from advertisements."
+      },
+      "support": {
+        "title": "Priority Support",
+        "description": "Get faster response times from our support team when you need help."
+      }
+    }
+  },
+  "why_fitnudge": {
+    "badge": "The Smarter Way to Build Habits",
+    "title": "Why Choose FitNudge?",
+    "subtitle": "Unlike generic habit trackers, FitNudge uses AI to understand you, motivate you personally, and keep you accountable to any goal you set.",
+    "cta_button": "Join the Waitlist",
+    "pain_points": {
+      "title": "Sound Familiar?",
+      "subtitle": "Most people struggle with the same challenges when trying to build new habits.",
+      "motivation": {
+        "problem": "You start strong but lose motivation after a few days",
+        "solution": "FitNudge sends personalized AI motivation messages that actually resonate with you"
+      },
+      "tracking": {
+        "problem": "Tracking feels like a chore and you forget to do it",
+        "solution": "Simple one-tap check-ins with smart reminders at the right moments"
+      },
+      "accountability": {
+        "problem": "You have no one to keep you accountable",
+        "solution": "Connect with accountability partners who cheer you on and nudge you when needed"
+      },
+      "generic": {
+        "problem": "Generic apps don't understand your personal journey",
+        "solution": "AI-powered insights that adapt to your patterns and goals"
+      }
+    },
+    "differentiators": {
+      "title": "What Makes FitNudge Different",
+      "subtitle": "We built FitNudge to solve the real problems with habit building.",
+      "ai": {
+        "title": "AI That Gets You",
+        "description": "Our AI learns your patterns, preferences, and what motivates you to deliver truly personalized support."
+      },
+      "any_goal": {
+        "title": "Any Goal, One App",
+        "description": "Whether it's fitness, reading, meditation, learning a skill, or any positive habit — FitNudge handles it all."
+      },
+      "partners": {
+        "title": "Real Accountability",
+        "description": "Connect with friends or family as accountability partners. Send cheers, nudges, and motivate each other."
+      },
+      "nudges": {
+        "title": "Smart Nudges",
+        "description": "Get reminders at the perfect time based on your habits and schedule, not arbitrary notifications."
+      },
+      "insights": {
+        "title": "Actionable Insights",
+        "description": "See your patterns, understand what works, and get AI-powered suggestions to improve."
+      },
+      "holistic": {
+        "title": "Holistic Approach",
+        "description": "Track multiple goals together and see how they interconnect to build a better you."
+      }
+    },
+    "benefits": {
+      "title": "What You'll Get",
+      "consistency": {
+        "title": "Stay Consistent",
+        "description": "Build streaks and maintain momentum with daily check-ins and motivational nudges."
+      },
+      "motivation": {
+        "title": "Never Lose Motivation",
+        "description": "AI-generated messages that keep you inspired and focused on your goals."
+      },
+      "privacy": {
+        "title": "Your Data, Your Control",
+        "description": "We take privacy seriously. Your data is encrypted and never sold to third parties."
+      }
+    },
+    "cta": {
+      "title": "Ready to Build Lasting Habits?",
+      "description": "Join thousands of goal achievers who are already on the waitlist. Be the first to experience FitNudge.",
+      "button": "Get Early Access"
+    }
+  },
+  "waitlist": {
+    "badge": "Launching Soon",
+    "title": "Join the Waitlist & Get Early Access",
+    "description": "Be among the first to experience FitNudge - your AI-powered accountability partner for any goal. Sign up now to secure your spot and exclusive early-bird benefits.",
+    "reserve_spot": "Reserve Your Spot",
+    "social_proof": "Join 1,000+ goal achievers already on the waitlist",
+    "fallback_link": "Join the waitlist",
+    "privacy_note": "We respect your privacy. Unsubscribe anytime.",
+    "benefits": {
+      "early_access": {
+        "title": "Early Access",
+        "description": "Be the first to try FitNudge when we launch"
+      },
+      "founder_pricing": {
+        "title": "Founder Pricing",
+        "description": "Lock in special pricing for early supporters"
+      },
+      "launch_updates": {
+        "title": "Launch Updates",
+        "description": "Get notified about new features and release date"
+      },
+      "shape_product": {
+        "title": "Shape the Product",
+        "description": "Your feedback will help us build the best app"
+      }
+    }
   },
   "how_it_works": {
     "title": "How It Works",
-    "subtitle": "Transform your fitness journey in just 3 simple steps with AI-powered motivation and smart tracking.",
+    "subtitle": "Build lasting habits in 3 simple steps with AI-powered motivation and smart tracking.",
     "steps": {
       "set_goal": {
         "title": "Set Your Goal",
-        "description": "Choose from templates or create custom fitness goals. Define what you want to achieve and how often you'll work out."
+        "description": "Choose from templates or create custom goals. Define what you want to achieve - fitness, reading, meditation, learning, or anything else."
       },
       "get_motivation": {
         "title": "Get AI Motivation",
@@ -441,28 +749,28 @@
   "about": {
     "hero": {
       "title": "About FitNudge",
-      "subtitle": "We're building the future of fitness motivation through AI-powered coaching and community support."
+      "subtitle": "We're building the future of habit formation through AI-powered accountability and personalized motivation."
     },
     "story": {
       "title": "Our Story",
-      "subtitle": "Born from a simple idea: what if your fitness coach never slept and always knew exactly what to say?",
-      "description": "It's easy to lose focus and motivation when working out. We've all been there – starting the year with ambitious fitness goals, only to find ourselves skipping workouts by February. The gym feels intimidating, personal trainers are expensive, and generic fitness apps just don't understand our unique struggles and motivations. That's where FitNudge came about. We realized that what people really need isn't another workout plan or calorie counter – they need a coach who understands them, believes in them, and is there 24/7 to keep them moving forward. So we set out to build an AI-powered fitness coach that never sleeps, never judges, and always knows exactly what to say to keep you motivated on your journey to better health."
+      "subtitle": "Born from a simple idea: what if you had an accountability partner that never slept and always knew exactly what to say?",
+      "description": "It's easy to lose focus and motivation when building new habits. We've all been there - starting the year with ambitious goals, only to find ourselves giving up by February. Whether it's working out, reading more, learning a new skill, or any other positive habit, staying consistent is hard. That's where FitNudge came about. We realized that what people really need isn't another tracking app or todo list - they need an accountability partner who understands them, believes in them, and is there 24/7 to keep them on track. So we set out to build an AI-powered coach that never sleeps, never judges, and always knows exactly what to say to keep you motivated on your journey to becoming your best self."
     },
     "mission": {
       "title": "Our Mission",
-      "subtitle": "We believe everyone deserves a personal fitness coach that understands their journey and keeps them motivated.",
+      "subtitle": "We believe everyone deserves a personal accountability partner that understands their journey and keeps them motivated.",
       "points": {
         "consistency": {
           "title": "Consistency First",
-          "description": "We focus on helping users build lasting habits through consistent motivation and accountability."
+          "description": "We focus on helping users build lasting habits through daily check-ins, streaks, and personalized motivation."
         },
         "ai": {
           "title": "AI-Powered Coaching",
-          "description": "Our AI coach learns from your progress and adapts its motivation style to keep you engaged."
+          "description": "Our AI coach learns from your progress and adapts its motivation style to keep you engaged and accountable."
         },
         "community": {
-          "title": "Community Support",
-          "description": "We foster a supportive community where users can share their journey and motivate each other."
+          "title": "Accountability Partners",
+          "description": "Connect with partners who share your goals. Motivate each other with cheers and nudges."
         }
       }
     },
@@ -475,40 +783,121 @@
       },
       "community": {
         "title": "Community First",
-        "description": "We believe in the power of community support and peer motivation to achieve fitness goals."
+        "description": "We believe in the power of accountability partners and peer motivation to achieve any goal."
       },
       "innovation": {
         "title": "Innovation",
-        "description": "We continuously innovate to provide the most effective AI-powered fitness coaching experience."
+        "description": "We continuously innovate to provide the most effective AI-powered accountability experience."
       },
       "empathy": {
         "title": "Empathy",
-        "description": "We understand that fitness journeys have ups and downs, and we're here to support you through both."
+        "description": "We understand that building habits has ups and downs, and we're here to support you through both."
       }
     },
     "team": {
       "title": "Meet Our Team",
-      "subtitle": "The passionate people behind FitNudge, working to make fitness motivation accessible to everyone.",
+      "subtitle": "The passionate people behind FitNudge, working to make accountability accessible to everyone.",
       "founder": {
         "name": "Alex Johnson",
         "role": "Founder & CEO",
-        "bio": "Fitness enthusiast and AI researcher with 10+ years in health tech. Passionate about making fitness accessible to everyone."
+        "bio": "Habit enthusiast and AI researcher with 10+ years in tech. Passionate about making personal growth accessible to everyone."
       },
       "cto": {
         "name": "Sarah Chen",
         "role": "CTO",
-        "bio": "Full-stack engineer and AI specialist. Leads our technical team in building scalable, intelligent fitness solutions."
+        "bio": "Full-stack engineer and AI specialist. Leads our technical team in building scalable, intelligent solutions."
       },
       "designer": {
         "name": "Mike Rodriguez",
         "role": "Head of Design",
-        "bio": "UX/UI designer focused on creating intuitive, engaging experiences that motivate users to achieve their fitness goals."
+        "bio": "UX/UI designer focused on creating intuitive, engaging experiences that motivate users to achieve their goals."
       }
     }
+  },
+  "reset_password": {
+    "invalid_link": "Invalid Reset Link",
+    "invalid_link_description": "This password reset link is invalid or missing a token. Please request a new password reset.",
+    "opening_app": "Opening FitNudge app...",
+    "validating": "Validating your reset link...",
+    "expired_title": "Reset Link Expired",
+    "expired_description": "This password reset link is no longer valid. Please request a new reset email.",
+    "request_new": "Request a new reset email",
+    "need_help": "Need help? Contact support and we'll get you back in quickly.",
+    "title": "Reset Your Password",
+    "opening_mobile": "Opening the FitNudge app...",
+    "download_prompt": "Download the app to reset your password",
+    "no_app_installed": "Do not have the app installed?",
+    "app_store_alt": "Download on App Store",
+    "play_store_alt": "Get it on Google Play",
+    "manual_instructions": "If the app did not open automatically, open the FitNudge app and use \"Forgot password\" to request a fresh link. Your reset code from this link has already been applied inside the app if it opened successfully.",
+    "security_note": "Password reset links expire in 1 hour for your security. If you did not request a reset, you can safely ignore this email.",
+    "loading": "Loading reset page...",
+    "validation_error_missing": "This password reset link is invalid or missing a token. Please request a new reset email.",
+    "validation_error_expired": "This password reset link is no longer valid. Please request a new reset email.",
+    "validation_error_network": "We couldn't verify this reset link right now. Please request a new password reset email."
   },
   "errors": {
     "validation_error": "Please fill in all fields",
     "authentication_error": "Login failed. Please try again.",
-    "registration_error": "Signup failed. Please try again."
+    "registration_error": "Signup failed. Please try again.",
+    "not_found_title": "Page Not Found",
+    "not_found_description": "Oops! The page you're looking for doesn't exist or has been moved.",
+    "go_home": "Go Home",
+    "go_back": "Go Back",
+    "looking_for": "Looking for something?",
+    "error_title": "Something Went Wrong",
+    "error_description": "We encountered an unexpected error. Don't worry, our team has been notified.",
+    "try_again": "Try Again",
+    "persist_message": "If this problem persists,",
+    "contact_support": "contact our support team"
+  },
+  "legal": {
+    "legal_document": "Legal Document",
+    "terms_of_service": "Terms of Service",
+    "privacy_policy": "Privacy Policy",
+    "cookie_policy": "Cookie Policy",
+    "last_updated": "Last Updated",
+    "version": "Version",
+    "not_available": "This document is currently not available. Please try again later.",
+    "load_error": "Failed to load document. Please try again later.",
+    "unavailable_title": "Document Unavailable",
+    "contact_for_help": "Contact us for assistance",
+    "also_see": "Also see"
+  },
+  "recaps": {
+    "title": "Weekly Recaps",
+    "detail_title": "Weekly Recap",
+    "check_ins": "Check-ins",
+    "completion": "Completion",
+    "goals_completed": "Goals",
+    "streak": "Streak",
+    "total_check_ins": "Check-ins",
+    "current_streak": "Streak",
+    "ai_summary": "AI Summary",
+    "highlights": "Highlights",
+    "recommendations": "Recommendations",
+    "goal_breakdown": "Goal Breakdown",
+    "trend": "4-Week Trend",
+    "achievements": "Achievements Unlocked",
+    "partner": "Accountability Partner",
+    "partners": "Accountability Partners",
+    "week_over_week": "vs last week",
+    "active_days": "active days",
+    "active_days_count": "{{count}}/7 active days",
+    "best_day": "Best day: {{day}}",
+    "day_streak": "{{count}} day streak",
+    "completed_count": "{{completed}}/{{total}} completed",
+    "archived_label": "(Archived)",
+    "goals_hit_count": "{{hit}}/{{total}} Goals Hit",
+    "premium_title": "Weekly Recaps",
+    "premium_description": "Get AI-powered weekly summaries of your progress, achievements, and personalized insights to help you stay on track.",
+    "empty_title": "No recaps yet",
+    "empty_description": "Your weekly recaps will appear here once you've completed your first week of activity.",
+    "not_found_title": "Recap not found",
+    "not_found_description": "This weekly recap could not be found.",
+    "win": "Your Big Win",
+    "insight": "Key Insight",
+    "focus_next_week": "Focus for Next Week",
+    "motivational_close": "Keep Going!"
   }
 }

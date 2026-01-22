@@ -1,10 +1,10 @@
 """
-Social Notification Service
+FitNudge V2 - Social Notification Service
 
-Handles sending push notifications for social features including:
+Handles sending push notifications for social features:
 - Accountability Partners
-- Challenges
 - Social Nudges
+
 """
 
 from enum import Enum
@@ -23,59 +23,26 @@ class SocialNotificationType(Enum):
     PARTNER_MILESTONE = "partner_milestone"
     PARTNER_INACTIVE = "partner_inactive"
 
-    # Challenges
-    CHALLENGE_INVITE = "challenge_invite"
-    CHALLENGE_JOINED = "challenge_joined"
-    CHALLENGE_OVERTAKEN = "challenge_overtaken"
-    CHALLENGE_LEAD = "challenge_lead"
-    CHALLENGE_NUDGE = "challenge_nudge"
-    CHALLENGE_STARTING = "challenge_starting"
-    CHALLENGE_ENDING = "challenge_ending"
-    CHALLENGE_ENDED = "challenge_ended"
-
-    # Motivation
-    MOTIVATION_MESSAGE = "motivation_message"
-
 
 # Notification templates with placeholders
 SOCIAL_NOTIFICATION_TEMPLATES = {
     # Accountability Partners
-    "partner_request": "👋 {sender_name} wants to be your accountability partner! As partners, you'll be able to see each other's goals, progress, and can send motivational nudges.",
-    "partner_accepted": "🎉 {sender_name} accepted your partner request! You can now see their goals, track their progress, and nudge them to stay on track.",
+    "partner_request": "👋 {sender_name} wants to be your accountability partner! As partners, you'll be able to see each other's goals and send motivational nudges.",
+    "partner_accepted": "🎉 {sender_name} accepted your partner request! You can now see their goals and track their progress.",
     "partner_nudge": "👋 {sender_name}: {message}",
-    "partner_cheer": "🎉 {sender_name} cheered your check-in!",
+    "partner_cheer": "🎉 {sender_name} sent you a cheer!",
     "partner_milestone": "🔥 Your partner {sender_name} just hit a {count}-day streak!",
     "partner_inactive": "💙 {sender_name} hasn't checked in for {days} days. Send encouragement?",
-    # Challenges
-    "challenge_invite": "🏆 {sender_name} invited you to '{challenge_title}'",
-    "challenge_joined": "🙌 {sender_name} joined your challenge!",
-    "challenge_overtaken": "😱 {sender_name} just passed you! You're now #{rank}",
-    "challenge_lead": "👑 You're now in 1st place!",
-    "challenge_nudge": "🏃 {sender_name}: {message}",
-    "challenge_starting": "⏰ '{challenge_title}' starts tomorrow!",
-    "challenge_ending": "⏰ {days} days left in '{challenge_title}'! You're #{rank}",
-    "challenge_ended": "🏆 '{challenge_title}' complete! You finished #{rank}!",
-    # Motivation
-    "motivation_message": "💪 {sender_name}: {message}",
 }
 
 # Map notification types to preference column names
 NOTIFICATION_PREFERENCE_MAPPING = {
-    SocialNotificationType.PARTNER_REQUEST: "social_partner_requests",
-    SocialNotificationType.PARTNER_ACCEPTED: "social_partner_requests",
-    SocialNotificationType.PARTNER_NUDGE: "social_partner_nudges",
-    SocialNotificationType.PARTNER_CHEER: "social_partner_cheers",
-    SocialNotificationType.PARTNER_MILESTONE: "social_partner_milestones",
-    SocialNotificationType.PARTNER_INACTIVE: "social_partner_nudges",
-    SocialNotificationType.CHALLENGE_INVITE: "social_challenge_invites",
-    SocialNotificationType.CHALLENGE_JOINED: "social_challenge_invites",
-    SocialNotificationType.CHALLENGE_OVERTAKEN: "social_challenge_leaderboard",
-    SocialNotificationType.CHALLENGE_LEAD: "social_challenge_leaderboard",
-    SocialNotificationType.CHALLENGE_NUDGE: "social_challenge_nudges",
-    SocialNotificationType.CHALLENGE_STARTING: "social_challenge_reminders",
-    SocialNotificationType.CHALLENGE_ENDING: "social_challenge_reminders",
-    SocialNotificationType.CHALLENGE_ENDED: "social_challenge_reminders",
-    SocialNotificationType.MOTIVATION_MESSAGE: "social_motivation_messages",
+    SocialNotificationType.PARTNER_REQUEST: "partner_requests",
+    SocialNotificationType.PARTNER_ACCEPTED: "partner_requests",
+    SocialNotificationType.PARTNER_NUDGE: "partner_nudges",
+    SocialNotificationType.PARTNER_CHEER: "partner_cheers",
+    SocialNotificationType.PARTNER_MILESTONE: "partner_milestones",
+    SocialNotificationType.PARTNER_INACTIVE: "partner_nudges",
 }
 
 
@@ -89,50 +56,8 @@ def get_notification_title(notification_type: SocialNotificationType) -> str:
         SocialNotificationType.PARTNER_CHEER: "Cheer!",
         SocialNotificationType.PARTNER_MILESTONE: "Partner Milestone",
         SocialNotificationType.PARTNER_INACTIVE: "Check on Partner",
-        # Challenges
-        SocialNotificationType.CHALLENGE_INVITE: "Challenge Invite",
-        SocialNotificationType.CHALLENGE_JOINED: "New Challenger",
-        SocialNotificationType.CHALLENGE_OVERTAKEN: "Leaderboard Update",
-        SocialNotificationType.CHALLENGE_LEAD: "You're Winning!",
-        SocialNotificationType.CHALLENGE_NUDGE: "Challenge",
-        SocialNotificationType.CHALLENGE_STARTING: "Challenge Starting",
-        SocialNotificationType.CHALLENGE_ENDING: "Challenge Ending Soon",
-        SocialNotificationType.CHALLENGE_ENDED: "Challenge Complete",
-        # Motivation
-        SocialNotificationType.MOTIVATION_MESSAGE: "Motivation",
     }
     return titles.get(notification_type, "FitNudge")
-
-
-async def get_notification_preferences(user_id: str, supabase) -> Dict[str, bool]:
-    """Get user's notification preferences"""
-    try:
-        result = (
-            supabase.table("notification_preferences")
-            .select("*")
-            .eq("user_id", user_id)
-            .maybe_single()
-            .execute()
-        )
-
-        if result.data:
-            return result.data
-
-        # Return defaults if no preferences found
-        return {
-            "social_partner_requests": True,
-            "social_partner_nudges": True,
-            "social_partner_cheers": True,
-            "social_partner_milestones": True,
-            "social_challenge_invites": True,
-            "social_challenge_leaderboard": True,
-            "social_challenge_nudges": True,
-            "social_challenge_reminders": True,
-            "social_motivation_messages": True,
-        }
-    except Exception as e:
-        logger.error(f"Failed to get notification preferences: {e}")
-        return {}
 
 
 async def send_social_notification(
@@ -158,28 +83,28 @@ async def send_social_notification(
     from app.services.expo_push_service import send_push_to_user
 
     try:
-        # Check user preferences
-        prefs = await get_notification_preferences(recipient_id, supabase)
-        pref_key = NOTIFICATION_PREFERENCE_MAPPING.get(notification_type)
-
-        if pref_key and not prefs.get(pref_key, True):
-            logger.info(
-                f"Social notification skipped - user disabled {pref_key}",
-                {"recipient_id": recipient_id, "type": notification_type.value},
-            )
-            return False
-
         # Get template and format message
-        template = SOCIAL_NOTIFICATION_TEMPLATES.get(
-            notification_type.value, "{message}"
-        )
+        # If a custom message is provided and it's not empty, use it directly
+        # This allows callers to override templates when needed (e.g., achievements)
+        custom_message = data.get("message", "")
+        if custom_message and notification_type in [
+            SocialNotificationType.PARTNER_MILESTONE,
+            SocialNotificationType.PARTNER_NUDGE,
+            SocialNotificationType.PARTNER_CHEER,
+        ]:
+            # Use custom message directly for these types when provided
+            message = custom_message
+        else:
+            template = SOCIAL_NOTIFICATION_TEMPLATES.get(
+                notification_type.value, "{message}"
+            )
 
-        # Safely format the message
-        try:
-            message = template.format(**data)
-        except KeyError as e:
-            logger.warning(f"Missing template key: {e}, using fallback")
-            message = data.get("message", "You have a new notification")
+            # Safely format the message
+            try:
+                message = template.format(**data)
+            except KeyError as e:
+                logger.warning(f"Missing template key: {e}, using fallback")
+                message = data.get("message", "You have a new notification")
 
         # Get title
         title = get_notification_title(notification_type)
@@ -192,25 +117,22 @@ async def send_social_notification(
         }
 
         # Determine entity type and ID
-        # First check if explicitly passed in data, otherwise infer from notification type
         entity_type = data.get("entity_type")
         entity_id = data.get("entity_id")
 
+        # Determine category_id for actionable notifications
+        # partner_activity category adds "Cheer Back" action button
+        category_id = None
+        if notification_type in [
+            SocialNotificationType.PARTNER_NUDGE,
+            SocialNotificationType.PARTNER_CHEER,
+            SocialNotificationType.PARTNER_MILESTONE,
+        ]:
+            category_id = "partner_activity"
+
         if not entity_type or not entity_id:
-            # Infer entity type and ID based on notification type
+            # Partner notifications point to partnership or sender
             if notification_type in [
-                SocialNotificationType.CHALLENGE_INVITE,
-                SocialNotificationType.CHALLENGE_JOINED,
-                SocialNotificationType.CHALLENGE_OVERTAKEN,
-                SocialNotificationType.CHALLENGE_LEAD,
-                SocialNotificationType.CHALLENGE_NUDGE,
-                SocialNotificationType.CHALLENGE_STARTING,
-                SocialNotificationType.CHALLENGE_ENDING,
-                SocialNotificationType.CHALLENGE_ENDED,
-            ]:
-                entity_type = entity_type or "challenge"
-                entity_id = entity_id or data.get("challenge_id")
-            elif notification_type in [
                 SocialNotificationType.PARTNER_REQUEST,
                 SocialNotificationType.PARTNER_ACCEPTED,
             ]:
@@ -224,18 +146,11 @@ async def send_social_notification(
                 SocialNotificationType.PARTNER_MILESTONE,
                 SocialNotificationType.PARTNER_INACTIVE,
             ]:
-                # These are partner-related but may reference a goal or challenge
-                if data.get("goal_id"):
-                    entity_type = entity_type or "goal"
-                    entity_id = entity_id or data.get("goal_id")
-                elif data.get("challenge_id"):
-                    entity_type = entity_type or "challenge"
-                    entity_id = entity_id or data.get("challenge_id")
-                else:
-                    entity_type = entity_type or "user"
-                    entity_id = entity_id or sender_id
+                # For nudges/cheers, entity is the sender (partner)
+                entity_type = entity_type or "user"
+                entity_id = entity_id or sender_id
 
-        # Send push notification
+        # Send push notification (fire-and-forget for non-blocking)
         await send_push_to_user(
             user_id=recipient_id,
             title=title,
@@ -244,6 +159,7 @@ async def send_social_notification(
             notification_type=notification_type.value,
             entity_type=entity_type,
             entity_id=entity_id,
+            category_id=category_id,
         )
 
         logger.info(
@@ -278,11 +194,10 @@ async def send_partner_notification(
     count: Optional[int] = None,
     days: Optional[int] = None,
     partnership_id: Optional[str] = None,
-    goal_id: Optional[str] = None,
-    challenge_id: Optional[str] = None,
     entity_type: Optional[str] = None,
     entity_id: Optional[str] = None,
     deep_link: Optional[str] = None,
+    goal_id: Optional[str] = None,
     supabase=None,
 ) -> bool:
     """Convenience function for partner notifications
@@ -293,14 +208,13 @@ async def send_partner_notification(
         sender_id: User ID who triggered the notification
         sender_name: Display name of sender
         message: Optional message content
-        count: Optional count (for milestones)
+        count: Optional count (for milestones like streak days)
         days: Optional days count (for inactive)
         partnership_id: ID of the accountability_partners record
-        goal_id: ID of related goal (if any)
-        challenge_id: ID of related challenge (if any)
-        entity_type: Entity type for notification_history (e.g., 'partner_request', 'goal', 'challenge')
+        entity_type: Entity type for notification_history
         entity_id: Entity ID for notification_history
-        deep_link: Deep link URL for navigation (e.g., '/goal?id=xxx', '/activity')
+        deep_link: Deep link URL for navigation
+        goal_id: Optional goal ID for goal-related nudges
         supabase: Supabase client
     """
     data = {
@@ -309,56 +223,10 @@ async def send_partner_notification(
         "count": count or 0,
         "days": days or 0,
         "partnership_id": partnership_id,
-        "goal_id": goal_id,
-        "challenge_id": challenge_id,
         "entity_type": entity_type,
         "entity_id": entity_id,
         "deepLink": deep_link,  # Use camelCase for frontend compatibility
-    }
-    return await send_social_notification(
-        notification_type, recipient_id, sender_id, data, supabase
-    )
-
-
-async def send_challenge_notification(
-    notification_type: SocialNotificationType,
-    recipient_id: str,
-    sender_id: Optional[str],
-    challenge_title: str,
-    challenge_id: Optional[str] = None,
-    sender_name: Optional[str] = None,
-    message: Optional[str] = None,
-    rank: Optional[int] = None,
-    days: Optional[int] = None,
-    entity_type: Optional[str] = None,
-    entity_id: Optional[str] = None,
-    supabase=None,
-) -> bool:
-    """Convenience function for challenge notifications
-
-    Args:
-        notification_type: Type of notification
-        recipient_id: User ID to send to
-        sender_id: User ID who triggered the notification (optional)
-        challenge_title: Title of the challenge
-        challenge_id: ID of the challenge
-        sender_name: Display name of sender
-        message: Optional message content
-        rank: Optional rank in challenge
-        days: Optional days count
-        entity_type: Entity type for notification_history (default: 'challenge')
-        entity_id: Entity ID for notification_history (default: challenge_id)
-        supabase: Supabase client
-    """
-    data = {
-        "sender_name": sender_name or "FitNudge",
-        "challenge_title": challenge_title,
-        "challenge_id": challenge_id,
-        "message": message or "",
-        "rank": rank or 0,
-        "days": days or 0,
-        "entity_type": entity_type or "challenge",
-        "entity_id": entity_id or challenge_id,
+        "goal_id": goal_id,  # For goal-related nudges
     }
     return await send_social_notification(
         notification_type, recipient_id, sender_id, data, supabase

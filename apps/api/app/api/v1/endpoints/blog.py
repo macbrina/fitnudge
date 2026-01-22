@@ -25,6 +25,7 @@ class BlogPostResponse(BaseModel):
     author: dict  # Author info
     categories: List[dict]
     tags: List[dict]
+    reading_time_minutes: int = 1
 
 
 class BlogPostCreate(BaseModel):
@@ -74,8 +75,41 @@ class BlogTagCreate(BaseModel):
     slug: str
 
 
+def _calculate_reading_time(content: str) -> int:
+    """Calculate reading time in minutes (average 200 words per minute)"""
+    if not content:
+        return 1
+    word_count = len(content.split())
+    return max(1, round(word_count / 200))
+
+
+def _transform_blog_post(post: dict) -> dict:
+    """Transform blog post to flatten nested categories/tags and add reading_time"""
+    # Flatten categories: [{category: {id, name, slug}}] -> [{id, name, slug}]
+    categories = []
+    for cat_entry in post.get("categories", []) or []:
+        if cat_entry and cat_entry.get("category"):
+            categories.append(cat_entry["category"])
+
+    # Flatten tags: [{tag: {id, name, slug}}] -> [{id, name, slug}]
+    tags = []
+    for tag_entry in post.get("tags", []) or []:
+        if tag_entry and tag_entry.get("tag"):
+            tags.append(tag_entry["tag"])
+
+    # Calculate reading time
+    reading_time = _calculate_reading_time(post.get("content", ""))
+
+    return {
+        **post,
+        "categories": categories,
+        "tags": tags,
+        "reading_time_minutes": reading_time,
+    }
+
+
 # Public blog endpoints (no authentication required)
-@router.get("/posts", response_model=List[BlogPostResponse])
+@router.get("/posts")
 async def get_blog_posts(
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=50),
@@ -89,6 +123,78 @@ async def get_blog_posts(
     supabase = get_supabase_client()
     offset = (page - 1) * limit
 
+    # Build base query for counting and fetching
+    post_ids_filter = None
+
+    if category:
+        # Filter by category - get category ID first, then filter
+        cat_result = (
+            supabase.table("blog_categories")
+            .select("id")
+            .eq("slug", category)
+            .execute()
+        )
+        if cat_result.data:
+            category_id = cat_result.data[0]["id"]
+            post_ids_result = (
+                supabase.table("blog_post_categories")
+                .select("post_id")
+                .eq("category_id", category_id)
+                .execute()
+            )
+            post_ids_filter = [p["post_id"] for p in (post_ids_result.data or [])]
+            if not post_ids_filter:
+                return {
+                    "data": [],
+                    "total": 0,
+                    "page": page,
+                    "limit": limit,
+                    "has_more": False,
+                }
+        else:
+            return {
+                "data": [],
+                "total": 0,
+                "page": page,
+                "limit": limit,
+                "has_more": False,
+            }
+
+    if tag:
+        # Filter by tag
+        tag_result = supabase.table("blog_tags").select("id").eq("slug", tag).execute()
+        if tag_result.data:
+            tag_id = tag_result.data[0]["id"]
+            post_ids_result = (
+                supabase.table("blog_post_tags")
+                .select("post_id")
+                .eq("tag_id", tag_id)
+                .execute()
+            )
+            tag_post_ids = [p["post_id"] for p in (post_ids_result.data or [])]
+            if post_ids_filter is not None:
+                # Intersect with category filter
+                post_ids_filter = list(set(post_ids_filter) & set(tag_post_ids))
+            else:
+                post_ids_filter = tag_post_ids
+            if not post_ids_filter:
+                return {
+                    "data": [],
+                    "total": 0,
+                    "page": page,
+                    "limit": limit,
+                    "has_more": False,
+                }
+        else:
+            return {
+                "data": [],
+                "total": 0,
+                "page": page,
+                "limit": limit,
+                "has_more": False,
+            }
+
+    # Build query
     query = (
         supabase.table("blog_posts")
         .select(
@@ -106,51 +212,49 @@ async def get_blog_posts(
         .eq("status", "published")
     )
 
-    if category:
-        # Filter by category
-        query = query.in_(
-            "id",
-            supabase.table("blog_post_categories")
-            .select("post_id")
-            .in_(
-                "category_id",
-                supabase.table("blog_categories")
-                .select("id")
-                .eq("slug", category)
-                .execute()
-                .data,
-            )
-            .execute()
-            .data,
-        )
-
-    if tag:
-        # Filter by tag
-        query = query.in_(
-            "id",
-            supabase.table("blog_post_tags")
-            .select("post_id")
-            .in_(
-                "tag_id",
-                supabase.table("blog_tags").select("id").eq("slug", tag).execute().data,
-            )
-            .execute()
-            .data,
-        )
+    # Apply post ID filter if we have category/tag filters
+    if post_ids_filter is not None:
+        query = query.in_("id", post_ids_filter)
 
     if search:
-        # Full-text search
-        query = query.text_search("title,content,excerpt", search)
+        # Full-text search on title and excerpt (content is too large)
+        query = query.or_(f"title.ilike.%{search}%,excerpt.ilike.%{search}%")
 
+    # Get total count for pagination
+    count_query = (
+        supabase.table("blog_posts")
+        .select("id", count="exact")
+        .eq("status", "published")
+    )
+    if post_ids_filter is not None:
+        count_query = count_query.in_("id", post_ids_filter)
+    if search:
+        count_query = count_query.or_(
+            f"title.ilike.%{search}%,excerpt.ilike.%{search}%"
+        )
+    count_result = count_query.execute()
+    total = count_result.count or 0
+
+    # Fetch paginated results
     result = (
         query.order("published_at", desc=True)
         .range(offset, offset + limit - 1)
         .execute()
     )
-    return result.data
+
+    # Transform posts to flatten categories/tags and add reading time
+    posts = [_transform_blog_post(post) for post in result.data]
+
+    return {
+        "data": posts,
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "has_more": offset + len(posts) < total,
+    }
 
 
-@router.get("/posts/{slug}", response_model=BlogPostResponse)
+@router.get("/posts/{slug}")
 async def get_blog_post(slug: str):
     """Get single blog post by slug (public)"""
     from app.core.database import get_supabase_client
@@ -180,27 +284,40 @@ async def get_blog_post(slug: str):
             status_code=status.HTTP_404_NOT_FOUND, detail="Blog post not found"
         )
 
-    return result.data[0]
+    return _transform_blog_post(result.data[0])
 
 
-@router.get("/categories", response_model=List[BlogCategoryResponse])
+@router.get("/categories")
 async def get_blog_categories():
     """Get blog categories with post counts"""
     from app.core.database import get_supabase_client
 
     supabase = get_supabase_client()
-    result = (
-        supabase.table("blog_categories")
-        .select(
-            """
-        *,
-        post_count:blog_post_categories(count)
-    """
-        )
+
+    # Get categories
+    categories_result = supabase.table("blog_categories").select("*").execute()
+
+    # Get post counts per category (only published posts)
+    post_counts_result = (
+        supabase.table("blog_post_categories")
+        .select("category_id, post:blog_posts!inner(status)")
+        .eq("post.status", "published")
         .execute()
     )
 
-    return result.data
+    # Count posts per category
+    category_counts = {}
+    for entry in post_counts_result.data or []:
+        cat_id = entry.get("category_id")
+        if cat_id:
+            category_counts[cat_id] = category_counts.get(cat_id, 0) + 1
+
+    # Add post_count to each category
+    categories = []
+    for cat in categories_result.data or []:
+        categories.append({**cat, "post_count": category_counts.get(cat["id"], 0)})
+
+    return categories
 
 
 @router.post("/posts/{post_id}/view")

@@ -72,7 +72,7 @@ export const makeOnboardingCarouselStyles = (
       marginBottom: toRN(tokens.spacing[4])
     },
     title: {
-      fontSize: toRN(tokens.typography.fontSize["4xl"]),
+      fontSize: toRN(tokens.typography.fontSize["2xl"]),
       fontWeight: tokens.typography.fontWeight.bold,
       marginBottom: toRN(tokens.spacing[4]),
       color: currentIndex === 0 ? "#ffffff" : "#151157",

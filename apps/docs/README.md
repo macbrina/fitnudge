@@ -1,76 +1,86 @@
 # 📚 FitNudge Documentation
 
-Comprehensive documentation for the FitNudge fitness motivation AI app, including project overview, architecture, API specifications, and setup guides.
+Comprehensive documentation for FitNudge — an AI-powered goal and habit accountability app.
 
 ## 📖 Documentation Overview
 
-This directory contains all the essential documentation for understanding, developing, and maintaining the FitNudge application.
+This directory contains all essential documentation for understanding, developing, and maintaining FitNudge.
 
 ## 📁 Documentation Files
 
 ### Core Documentation
 
-- **[ProjectOverview.md](./ProjectOverview.md)** - Product vision, MVP features, tech stack, and monorepo structure
-- **[Architecture.md](./Architecture.md)** - System architecture, design patterns, scalability, and security
-- **[DataModels.md](./DataModels.md)** - Complete database schema with OAuth support and relationships
-- **[API-Spec.md](./API-Spec.md)** - All API endpoints with request/response examples and authentication
-- **[EnvironmentSetup.md](./EnvironmentSetup.md)** - Step-by-step setup guide with all credentials and configuration
-- **[Marketing.md](./Marketing.md)** - Pricing strategy, revenue projections, and growth tactics
+| File                                         | Description                                            |
+| -------------------------------------------- | ------------------------------------------------------ |
+| [ProjectOverview.md](./ProjectOverview.md)   | Product vision, features, tech stack, and architecture |
+| [Architecture.md](./Architecture.md)         | System design, patterns, and scalability               |
+| [DataModels.md](./DataModels.md)             | Database schema and relationships                      |
+| [API-Spec.md](./API-Spec.md)                 | API endpoints with examples                            |
+| [EnvironmentSetup.md](./EnvironmentSetup.md) | Development setup guide                                |
+| [DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md)       | UI components and theming                              |
+| [SCALABILITY.md](./SCALABILITY.md)           | Performance patterns for 100K+ users                   |
 
-## 🎯 Project Overview
+### Feature Documentation
 
-FitNudge is an AI-powered motivation and accountability app that helps users stay consistent with their fitness and gym habits through:
+| File                                                               | Description                      |
+| ------------------------------------------------------------------ | -------------------------------- |
+| [BACKEND_PUSH_NOTIFICATIONS.md](./BACKEND_PUSH_NOTIFICATIONS.md)   | Push notification implementation |
+| [PUSH_NOTIFICATIONS_FLOW.md](./PUSH_NOTIFICATIONS_FLOW.md)         | Notification flow diagrams       |
+| [SUBSCRIPTION_IMPLEMENTATION.md](./SUBSCRIPTION_IMPLEMENTATION.md) | RevenueCat integration           |
+| [REALTIME_IMPLEMENTATION.md](./REALTIME_IMPLEMENTATION.md)         | Supabase realtime setup          |
+| [REACT_QUERY_GUIDE.md](./REACT_QUERY_GUIDE.md)                     | React Query patterns             |
 
-- **AI Motivation**: Personalized motivational messages and voice notes
-- **Progress Tracking**: Goal setting, check-ins, and streak tracking
-- **Social Features**: Community posts, comments, likes, and following
-- **Smart Reminders**: Scheduled notifications and "AI calls"
-- **Subscription Tiers**: Free and Premium plans with In-App Purchases
+### Setup Guides
 
-## 🏗️ Architecture
+| File                                             | Description           |
+| ------------------------------------------------ | --------------------- |
+| [SETUP_DEV_SUPABASE.md](./SETUP_DEV_SUPABASE.md) | Local Supabase setup  |
+| [Deployment.md](./Deployment.md)                 | Production deployment |
 
-### Monorepo Structure
+## 🎯 What is FitNudge?
+
+FitNudge is an AI-powered motivation and accountability app that helps users stay consistent with **any goal or habit** — whether it's working out, reading, meditating, learning, or building any positive routine.
+
+**Core Features:**
+
+- **AI Check-ins**: Daily "How did it go?" prompts with personalized AI responses
+- **Goal Templates**: Pre-built templates for common goals (workout, read, meditate, water, etc.)
+- **Streak Tracking**: Visual progress with milestone celebrations (7, 14, 21, 30, 50, 100 days)
+- **Accountability Partners**: Connect with others for mutual motivation
+- **AI Coach Chat**: Real-time chat with AI for support and advice
+- **Smart Notifications**: Adaptive nudges based on behavior patterns
+- **Analytics Dashboard**: Charts and insights for premium users
+
+## 🏗️ Project Structure
 
 ```
 apps/
-├── web/           # Marketing landing page (Next.js)
-├── api/           # FastAPI backend (Python)
 ├── mobile/        # React Native app (Expo)
+├── api/           # FastAPI backend (Python)
+├── web/           # Marketing landing page (Next.js)
 ├── admin-portal/  # Admin dashboard (Next.js)
-└── docs/          # Documentation (this directory)
+└── docs/          # This documentation
 
 packages/
 ├── ui/            # Shared components
-├── lib/           # Utilities and hooks
-├── db/            # Database client and migrations
-├── ai/            # AI prompt templates
-├── themes/        # Design system and tokens
-├── types/         # TypeScript definitions
-└── n8n/           # Localization automation
+├── lib/           # Utilities
+├── assets/        # Fonts
+└── tsconfig/      # TypeScript configs
 ```
 
-### Tech Stack
+## 🧭 Tech Stack
 
-- **Frontend**: React Native (mobile), Next.js (web/admin)
-- **Backend**: FastAPI (Python) with async/await
-- **Database**: Supabase (PostgreSQL) with realtime
-- **Authentication**: Supabase Auth + OAuth (Apple, Google)
-- **AI**: OpenAI GPT-5 + ElevenLabs for voice
-- **Media**: Cloudflare R2 for images and voice files
-- **Notifications**: Firebase Cloud Messaging
-- **Monorepo**: Turborepo for build orchestration
+| Layer         | Technology            |
+| ------------- | --------------------- |
+| Mobile        | React Native + Expo   |
+| Backend       | FastAPI (Python)      |
+| Database      | Supabase (PostgreSQL) |
+| AI            | OpenAI GPT-4          |
+| Subscriptions | RevenueCat            |
+| Task Queue    | Celery + Redis        |
+| Media Storage | Cloudflare R2         |
 
 ## 🚀 Quick Start
-
-### Prerequisites
-
-- Node.js 18+
-- Python 3.11+
-- pnpm
-- Supabase CLI
-- Expo CLI
-
-### Setup
 
 ```bash
 # Clone repository
@@ -83,149 +93,42 @@ pnpm install
 # Set up environment variables
 cp apps/api/.env.example apps/api/.env
 cp apps/mobile/.env.example apps/mobile/.env
-cp apps/web/.env.local.example apps/web/.env.local
 
-# Start development servers
-pnpm turbo dev
+# Start development
+pnpm dev
 ```
 
-## 📱 Apps Overview
+## 💳 Subscription Tiers
 
-### Web App (`apps/web/`)
+| Plan    | Price    | Features                                       |
+| ------- | -------- | ---------------------------------------------- |
+| Free    | $0       | 1 goal, template motivation, basic tracking    |
+| Premium | $9.99/mo | Unlimited goals, AI coach, partners, analytics |
 
-- **Purpose**: Marketing landing page and blog
-- **Tech**: Next.js with TypeScript
-- **Features**: Hero section, features, testimonials, blog, download CTAs
-- **SEO**: Optimized for search engines and social sharing
+## 📱 Core Features
 
-### API (`apps/api/`)
+### Free Features
 
-- **Purpose**: Backend API for all clients
-- **Tech**: FastAPI with Python
-- **Features**: Authentication, AI motivation, social features, IAP
-- **Endpoints**: 50+ RESTful endpoints with comprehensive documentation
+- 1 fitness goal with templates
+- Daily check-in prompts
+- Template-based motivation messages
+- Basic streak tracking
+- Blog access
 
-### Mobile App (`apps/mobile/`)
+### Premium Features
 
-- **Purpose**: Core user experience
-- **Tech**: React Native with Expo
-- **Features**: AI motivation, social feed, progress tracking, subscriptions
-- **Platforms**: iOS and Android with native features
-
-### Admin Portal (`apps/admin-portal/`)
-
-- **Purpose**: Management dashboard
-- **Tech**: Next.js with TypeScript
-- **Features**: User management, content moderation, analytics, blog management
-- **Access**: Role-based access control for admin users
-
-## 🎨 Design System
-
-### Color Tokens
-
-- **Light Mode**: Clean whites and subtle grays with blue primary
-- **Dark Mode**: Deep slate backgrounds with brighter accents
-- **Semantic Colors**: Success, warning, destructive states
-- **Accessibility**: WCAG 2.1 AA compliant contrast ratios
-
-### Typography
-
-- **Font Family**: Space Grotesk for modern, clean appearance
-- **Scale**: 12px to 36px with consistent hierarchy
-- **Weights**: Normal to bold with semantic usage
-
-### Components
-
-- **Shared Library**: shadcn/ui components across all apps
-- **Theme Support**: Light/dark mode with system detection
-- **Responsive**: Mobile-first design with consistent breakpoints
-
-## 🔐 Authentication
-
-### OAuth Integration
-
-- **Apple Sign In**: iOS native authentication
-- **Google Sign In**: Cross-platform OAuth
-- **Email/Password**: Traditional authentication
-- **JWT Tokens**: Secure session management with refresh
-
-### Security
-
-- **Row Level Security**: Database-level access control
-- **Encryption**: Data encryption at rest and in transit
-- **Audit Logging**: Comprehensive action tracking
-- **GDPR Compliance**: Data protection and user rights
-
-## 💳 Monetization
-
-### Subscription Tiers
-
-- **Free**: 1 goal, basic text motivation, community access
-- **Premium ($9.99/month, $79.99/year)**: Unlimited goals, AI chat motivation, advanced analytics, all features
-
-### In-App Purchases
-
-- **Apple IAP**: iOS App Store integration
-- **Google Play Billing**: Android Play Store integration
-- **Platform Compliance**: Full App Store and Play Store compliance
-- **Webhook Handling**: Automated subscription management
-
-## 🌍 Localization
-
-### Scope
-
-- **Mobile App**: Full translation support
-- **Web Landing Page**: Marketing content translation
-- **Admin Portal**: English only (no translation needed)
-
-### Languages
-
-- **Initial**: English, Spanish, French, German
-- **Future**: Arabic, Hebrew, Portuguese, Japanese
-- **Automation**: n8n workflows for translation management
-
-## 📊 Analytics & Monitoring
-
-### User Analytics
-
-- **PostHog**: User behavior and conversion tracking
-- **Custom Events**: Business-specific metrics
-- **Cohort Analysis**: User retention and engagement
-
-### System Monitoring
-
-- **Sentry**: Error tracking and performance monitoring
-- **New Relic**: Application performance monitoring
-- **Health Checks**: System status and uptime monitoring
-
-## 🚀 Deployment
-
-### Platforms
-
-- **Web**: Vercel with automatic deployments
-- **API**: Railway/Render with health checks
-- **Mobile**: EAS Build for iOS/Android
-- **Database**: Supabase with realtime sync
-
-### CI/CD
-
-- **GitHub Actions**: Automated testing and deployment
-- **Environment Management**: Staging and production environments
-- **Rollback**: Automatic rollback on failures
-
-## 📞 Support
-
-For questions about the documentation or development:
-
-1. **Check the relevant documentation file** for specific information
-2. **Review the Architecture.md** for system design questions
-3. **Consult the API-Spec.md** for endpoint details
-4. **Follow the EnvironmentSetup.md** for configuration issues
+- Unlimited goals
+- AI-generated personalized motivation
+- AI Coach chat
+- Accountability partners
+- Voice notes
+- Weekly AI recaps
+- Advanced analytics dashboard
+- Pattern detection & adaptive nudging
 
 ## 🔗 External Resources
 
-- [Supabase Documentation](https://supabase.com/docs)
-- [Expo Documentation](https://docs.expo.dev/)
-- [Next.js Documentation](https://nextjs.org/docs)
-- [FastAPI Documentation](https://fastapi.tiangolo.com/)
-- [React Native Documentation](https://reactnative.dev/docs/getting-started)
+- [Supabase Docs](https://supabase.com/docs)
+- [Expo Docs](https://docs.expo.dev/)
+- [FastAPI Docs](https://fastapi.tiangolo.com/)
+- [RevenueCat Docs](https://docs.revenuecat.com/)

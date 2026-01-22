@@ -9,37 +9,35 @@
  * 2. Use useRevenueCat() hook in any component
  */
 
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  useCallback,
-  useRef,
-  ReactNode
-} from "react";
-import { Platform } from "react-native";
-import { useQueryClient } from "@tanstack/react-query";
-import { partnersQueryKeys } from "@/hooks/api/queryKeys";
 import { useAlertModal } from "@/contexts/AlertModalContext";
+import { partnersQueryKeys } from "@/hooks/api/queryKeys";
 import { useTranslation } from "@/lib/i18n";
+import { subscriptionsService, SyncSubscriptionRequest } from "@/services/api/subscriptions";
+import type {
+  BillingPeriod,
+  CustomerInfo,
+  IAPError,
+  IAPOffering,
+  IAPProduct,
+  PurchaseState,
+  SubscriptionStatus,
+  SubscriptionTier
+} from "@/services/iap/types";
 import { useAuthStore } from "@/stores/authStore";
 import { useExitOfferStore } from "@/stores/exitOfferStore";
 import { usePricingStore } from "@/stores/pricingStore";
 import { useSubscriptionStore } from "@/stores/subscriptionStore";
 import { isIOS } from "@/utils/platform";
-import { subscriptionsService, SyncSubscriptionRequest } from "@/services/api/subscriptions";
-import type { SubscriptionPlan } from "@/services/api/subscriptionPlans";
-import type {
-  IAPProduct,
-  IAPOffering,
-  IAPError,
-  SubscriptionStatus,
-  SubscriptionTier,
-  BillingPeriod,
-  PurchaseState,
-  CustomerInfo
-} from "@/services/iap/types";
+import {
+  createContext,
+  ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState
+} from "react";
+import { Platform } from "react-native";
 
 // Conditionally import RevenueCat
 
@@ -137,8 +135,9 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
   const { refresh: refreshSubscription, setOptimisticPlan } = useSubscriptionStore();
   const { markAsSubscribed } = useExitOfferStore();
 
-  // Query client for cache invalidation
-  const queryClient = useQueryClient();
+  // Note: Previously used queryClient for cache invalidation, but this caused issues
+  // with pricingStore getting emptied. Now we rely solely on subscriptionStore.refresh()
+  // which updates hasFeature() values and triggers component re-renders.
 
   // Alert modal for showing messages
   const { showAlert } = useAlertModal();
@@ -182,7 +181,11 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
           // console.info("[RevenueCat] Customer info updated");
           setCustomerInfo(info);
           updateSubscriptionStatus(info);
-          refreshSubscription();
+
+          // IMPORTANT: Await refresh to ensure new features are loaded
+          // hasFeature() will return correct values when components re-render
+          await refreshSubscription();
+          console.log("[RevenueCat] ✅ Subscription store refreshed");
 
           // Sync with backend in case webhook was missed
           // This runs in background after customer info update
@@ -211,7 +214,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
               if (needsSync) {
                 // console.info("[RevenueCat] Detected mismatch, syncing...");
                 await subscriptionsService.syncSubscription(syncRequest);
-                refreshSubscription();
+                await refreshSubscription();
               }
             } catch (err) {
               // console.error("[RevenueCat] Background sync failed", err);
@@ -269,7 +272,8 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
             platform: getPlatformFromStore(entitlement?.store || "") || null,
             product_id: info.activeSubscriptions?.[0] || entitlement?.productIdentifier || null
           });
-          refreshSubscription();
+          await refreshSubscription();
+          console.log("[RevenueCat] ✅ Initial sync: store refreshed");
         }
       }
     } catch (err) {
@@ -590,10 +594,33 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
         await markAsSubscribed();
 
         // Note: No success alert here - Apple/Google already show their own confirmation
-        refreshSubscription();
+        // refreshSubscription() moved to after sync below
 
-        // Invalidate partner limits cache so new feature limits are reflected
-        queryClient.invalidateQueries({ queryKey: partnersQueryKeys.limits() });
+        // 🆕 Force sync to backend immediately after purchase
+        // This ensures database is updated before user tries to use premium features
+        // Solves the race condition where webhook hasn't arrived yet
+        try {
+          const entitlementId = getEntitlementIdForTier(purchasedTier);
+          const entitlement = entitlementId ? info.entitlements?.active?.[entitlementId] : null;
+
+          await subscriptionsService.syncSubscription({
+            tier: purchasedTier,
+            is_active: true,
+            expires_at: entitlement?.expirationDate || null,
+            will_renew: entitlement?.willRenew || false,
+            platform: getPlatformFromStore(entitlement?.store || "") || null,
+            product_id: product.identifier
+          });
+
+          // Refresh subscription store - hasFeature() will return correct values
+          await refreshSubscription();
+          console.log("[RevenueCat] ✅ Post-purchase: store refreshed");
+        } catch (syncErr) {
+          // Log but don't fail - webhook will eventually catch up
+          console.warn("[RevenueCat] Post-purchase sync failed, webhook will catch up", syncErr);
+          // Still refresh to pick up data when webhook arrives
+          await refreshSubscription();
+        }
 
         return true;
       } catch (err: any) {
@@ -778,10 +805,32 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
         });
 
         await markAsSubscribed();
-        refreshSubscription();
 
-        // Invalidate partner limits cache so new feature limits are reflected
-        queryClient.invalidateQueries({ queryKey: partnersQueryKeys.limits() });
+        // 🆕 Force sync to backend immediately after restore
+        // This ensures database is updated before user tries to use premium features
+        // Solves the race condition where webhook hasn't arrived yet
+        try {
+          const entitlementId = getEntitlementIdForTier(restoredTier);
+          const entitlement = entitlementId ? info.entitlements?.active?.[entitlementId] : null;
+
+          await subscriptionsService.syncSubscription({
+            tier: restoredTier,
+            is_active: true,
+            expires_at: entitlement?.expirationDate || null,
+            will_renew: entitlement?.willRenew || false,
+            platform: getPlatformFromStore(entitlement?.store || "") || null,
+            product_id: info.activeSubscriptions?.[0] || entitlement?.productIdentifier || null
+          });
+
+          // Refresh subscription store - hasFeature() will return correct values
+          await refreshSubscription();
+          console.log("[RevenueCat] ✅ Post-restore: store refreshed");
+        } catch (syncErr) {
+          // Log but don't fail - webhook will eventually catch up
+          console.warn("[RevenueCat] Post-restore sync failed, webhook will catch up", syncErr);
+          // Still refresh to pick up data when webhook arrives
+          await refreshSubscription();
+        }
 
         return true;
       } else {
@@ -878,8 +927,9 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
 
       if (response.data?.synced) {
         // console.info("[RevenueCat] Backend synced", response.data);
-        // Refresh subscription store to get updated data
-        refreshSubscription();
+        // Refresh subscription store - hasFeature() will return correct values
+        await refreshSubscription();
+        console.log("[RevenueCat] ✅ Sync: store refreshed");
       }
     } catch (err) {
       // console.error("[RevenueCat] Failed to sync with backend", err);

@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { View, Text, TouchableOpacity } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "@/lib/i18n";
 import { fontFamily } from "@/lib/fonts";
 import { toRN } from "@/lib/units";
@@ -8,34 +9,39 @@ import { lineHeight } from "@/themes/tokens";
 import { useTheme } from "@/themes";
 import PersonalizationLayout from "./PersonalizationLayout";
 import { useOnboardingStore } from "@/stores/onboardingStore";
-import { MOTIVATION_STYLES } from "@/constants/personalization";
 
 interface MotivationStyleScreenProps {
-  onContinue: (motivationStyle: string) => void;
+  onContinue: (motivationStyle: "supportive" | "tough_love" | "calm") => void;
   onBack?: () => void;
-  isSubmitting: boolean;
-  hasExistingProfile?: boolean;
   currentStep: number;
   totalSteps: number;
 }
 
+const MOTIVATION_OPTIONS: Array<{
+  value: "supportive" | "tough_love" | "calm";
+  key: string;
+  icon: keyof typeof Ionicons.glyphMap;
+}> = [
+  { value: "supportive", key: "supportive", icon: "heart" },
+  { value: "tough_love", key: "tough_love", icon: "flash" },
+  { value: "calm", key: "calm", icon: "leaf" }
+];
+
 export default function MotivationStyleScreen({
   onContinue,
   onBack,
-  isSubmitting,
-  hasExistingProfile = false,
   currentStep,
   totalSteps
 }: MotivationStyleScreenProps) {
-  const { motivation_style } = useOnboardingStore();
-  const [selectedStyle, setSelectedStyle] = useState<string>(motivation_style || "");
+  // Get initial value from store (persisted)
+  const storedStyle = useOnboardingStore((state) => state.motivation_style);
+  const [selectedStyle, setSelectedStyle] = useState<"supportive" | "tough_love" | "calm" | "">(
+    storedStyle
+  );
+
   const { t } = useTranslation();
   const styles = useStyles(makeStyles);
   const { brandColors } = useTheme();
-
-  useEffect(() => {
-    setSelectedStyle(motivation_style || "");
-  }, [motivation_style]);
 
   const handleContinue = () => {
     if (selectedStyle) {
@@ -50,45 +56,45 @@ export default function MotivationStyleScreen({
       onContinue={handleContinue}
       onBack={onBack}
       canContinue={!!selectedStyle}
-      isLoading={isSubmitting}
-      buttonText={
-        isSubmitting
-          ? hasExistingProfile
-            ? t("onboarding.personalization.updating")
-            : t("onboarding.personalization.submitting")
-          : hasExistingProfile
-            ? t("onboarding.personalization.update_profile")
-            : t("onboarding.personalization.generate_goals")
-      }
+      buttonText={t("onboarding.motivation_style.continue")}
     >
       <View style={styles.content}>
-        <Text style={styles.title}>{t("onboarding.personalization.motivation_style.title")}</Text>
-
-        <Text style={styles.subtitle}>
-          {t("onboarding.personalization.motivation_style.subtitle")}
-        </Text>
+        <Text style={styles.title}>{t("onboarding.motivation_style.title")}</Text>
+        <Text style={styles.subtitle}>{t("onboarding.motivation_style.subtitle")}</Text>
 
         <View style={styles.optionsContainer}>
-          {MOTIVATION_STYLES.map((motivationStyle) => {
-            const isSelected = selectedStyle === motivationStyle.value;
+          {MOTIVATION_OPTIONS.map((option) => {
+            const isSelected = selectedStyle === option.value;
             return (
               <TouchableOpacity
-                key={motivationStyle.value}
-                onPress={() => setSelectedStyle(motivationStyle.value)}
+                key={option.value}
+                onPress={() => setSelectedStyle(option.value)}
                 activeOpacity={0.7}
                 style={[
                   styles.optionCard,
                   isSelected && [styles.optionCardSelected, { borderColor: brandColors.primary }]
                 ]}
               >
-                <Text
+                <View
                   style={[
-                    styles.optionLabel,
-                    isSelected && [styles.optionLabelSelected, { color: brandColors.primary }]
+                    styles.iconContainer,
+                    isSelected && { backgroundColor: brandColors.primary + "15" }
                   ]}
                 >
-                  {t(motivationStyle.onboardingLabelKey)}
-                </Text>
+                  <Ionicons
+                    name={option.icon}
+                    size={28}
+                    color={isSelected ? brandColors.primary : styles.iconColor.color}
+                  />
+                </View>
+                <View style={styles.optionTextContainer}>
+                  <Text style={[styles.optionTitle, isSelected && { color: brandColors.primary }]}>
+                    {t(`onboarding.motivation_style.${option.key}.title`)}
+                  </Text>
+                  <Text style={styles.optionDescription}>
+                    {t(`onboarding.motivation_style.${option.key}.description`)}
+                  </Text>
+                </View>
               </TouchableOpacity>
             );
           })}
@@ -102,7 +108,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => {
   return {
     content: {
       flex: 1,
-      paddingTop: toRN(tokens.spacing[2])
+      paddingTop: toRN(tokens.spacing[4])
     },
     title: {
       fontSize: toRN(tokens.typography.fontSize["2xl"]),
@@ -123,22 +129,44 @@ const makeStyles = (tokens: any, colors: any, brand: any) => {
       gap: toRN(tokens.spacing[3])
     },
     optionCard: {
-      backgroundColor: colors.bg.muted,
+      backgroundColor: colors.bg.card,
       borderRadius: toRN(tokens.borderRadius.xl),
-      paddingVertical: toRN(tokens.spacing[5]),
-      paddingHorizontal: toRN(tokens.spacing[5]),
+      padding: toRN(tokens.spacing[4]),
       borderWidth: 2,
-      borderColor: colors.border.subtle
+      borderColor: colors.border.subtle,
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: toRN(tokens.spacing[4])
     },
     optionCardSelected: {
       backgroundColor: brand.primary + "08"
     },
-    optionLabel: {
+    iconContainer: {
+      width: 52,
+      height: 52,
+      borderRadius: toRN(tokens.borderRadius.xl),
+      backgroundColor: colors.bg.subtle,
+      alignItems: "center" as const,
+      justifyContent: "center" as const
+    },
+    iconColor: {
+      color: colors.text.secondary
+    },
+    optionTextContainer: {
+      flex: 1
+    },
+    optionTitle: {
       fontSize: toRN(tokens.typography.fontSize.lg),
       fontWeight: tokens.typography.fontWeight.semibold,
       color: colors.text.primary,
-      fontFamily: fontFamily.groteskSemiBold
+      fontFamily: fontFamily.groteskSemiBold,
+      marginBottom: toRN(tokens.spacing[1])
     },
-    optionLabelSelected: {}
+    optionDescription: {
+      fontSize: toRN(tokens.typography.fontSize.sm),
+      color: colors.text.secondary,
+      fontFamily: fontFamily.groteskRegular,
+      lineHeight: lineHeight(tokens.typography.fontSize.sm, tokens.typography.lineHeight.relaxed)
+    }
   };
 };
