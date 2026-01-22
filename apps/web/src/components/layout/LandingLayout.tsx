@@ -2,7 +2,7 @@
 
 import { Header } from "@/components/landing/header";
 import { Footer } from "@/components/landing/footer";
-import { CookieConsent } from "@/components/ui/cookie-consent";
+// import { CookieConsent } from "@/components/ui/cookie-consent";
 
 interface LandingLayoutProps {
   children: React.ReactNode;
@@ -16,7 +16,7 @@ export function LandingLayout({ children }: LandingLayoutProps) {
         {children}
       </main>
       <Footer />
-      <CookieConsent />
+      {/* <CookieConsent /> */}
     </div>
   );
 }

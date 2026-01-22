@@ -3,7 +3,7 @@
 import { ReactNode } from "react";
 import { AppConfigProvider, ThemeProvider } from "@/store";
 import { TawkChat } from "@/components/ui/TawkChat";
-import { CookieConsent } from "@/components/ui/cookie-consent";
+// import { CookieConsent } from "@/components/ui/cookie-consent";
 import { FeedbackButton } from "@/components/ui/FeedbackButton";
 
 interface ProvidersProps {
@@ -17,7 +17,7 @@ export function Providers({ children }: ProvidersProps) {
         {children}
         <FeedbackButton />
         <TawkChat />
-        <CookieConsent />
+        {/* <CookieConsent /> */}
       </AppConfigProvider>
     </ThemeProvider>
   );
