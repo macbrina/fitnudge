@@ -1,0 +1,898 @@
+{
+  "common": {
+    "error": "Fehler",
+    "user": "Benutzer",
+    "logout": "Abmelden",
+    "close": "Schließen",
+    "loading": "Wird geladen...",
+    "feedback": "Feedback",
+    "send_feedback": "Feedback senden"
+  },
+  "auth": {
+    "login": {
+      "title": "Willkommen bei FitNudge",
+      "subtitle": "Anmelden, um fortzufahren",
+      "email_placeholder": "E-Mail",
+      "password_placeholder": "Passwort",
+      "sign_in": "Anmelden",
+      "signing_in": "Anmelden...",
+      "no_account": "Noch kein Konto?",
+      "sign_up": "Anmelden"
+    },
+    "signup": {
+      "title": "Konto erstellen",
+      "subtitle": "Tritt noch heute FitNudge bei",
+      "name_placeholder": "Vollständiger Name",
+      "username_placeholder": "Benutzername",
+      "email_placeholder": "E-Mail",
+      "password_placeholder": "Passwort",
+      "create_account": "Konto erstellen",
+      "creating_account": "Konto wird erstellt...",
+      "already_have_account": "Haben Sie schon ein Konto?",
+      "sign_in": "Anmelden"
+    }
+  },
+  "home": {
+    "welcome_back": "Willkommen zurück, {{name}}!",
+    "subtitle": "Bereit, heute deine Ziele zu erreichen?",
+    "todays_motivation": "Die heutige Motivation",
+    "motivation_quote": "Jeder Schritt, den du machst, bringt dich deinen Zielen näher. Mach weiter so! 💪",
+    "quick_actions": "Schnellaktionen",
+    "log_workout": "Workout protokollieren",
+    "set_goal": "Ziel festlegen",
+    "recent_activity": "Kürzliche Aktivitäten",
+    "activity_message": "Du warst diese Woche konsequent bei deinen Workouts! 🎉"
+  },
+  "goals": {
+    "title": "Meine Ziele",
+    "subtitle": "Verfolge deinen Fortschritt und bleibe motiviert",
+    "active_goals": "Aktive Ziele",
+    "no_goals_message": "Du hast noch keine aktiven Ziele. Erstelle dein erstes Ziel, um loszulegen!",
+    "create_goal": "Ziel erstellen",
+    "categories": "Zielkategorien",
+    "category_fitness": "Fitness",
+    "category_nutrition": "Ernährung",
+    "category_wellness": "Wellness",
+    "category_sleep": "Schlaf"
+  },
+  "feed": {
+    "title": "Motivations-Feed",
+    "subtitle": "Von KI unterstützte Motivations- und Community-Beiträge",
+    "ai_motivation": "KI-Motivation",
+    "ai_quote_1": "Du machst das großartig! Jedes Training zählt und du baust eine unstoppable Dynamik auf! 🚀",
+    "time_ago": "vor {{hours}} Stunden"
+  },
+  "profile": {
+    "account_settings": "Kontoeinstellungen",
+    "edit_profile": "Profil bearbeiten",
+    "notifications": "Benachrichtigungen",
+    "privacy": "Privatsphäre",
+    "subscription": "Abonnement",
+    "manage_subscription": "Abonnement verwalten",
+    "billing_history": "Abrechnungshistorie",
+    "support": "Unterstützung",
+    "help_center": "Hilfezentrum",
+    "contact_us": "Kontaktieren Sie uns",
+    "free_plan": "Kostenloser Plan",
+    "pro_plan": "Pro-Plan"
+  },
+  "web": {
+    "hero": {
+      "title": "Ihr KI-gestützter Partner für Verantwortung",
+      "subtitle": "Erhalte persönliche Motivation, verfolge deine Ziele und verbinde dich mit einer Community, die dich zur Rechenschaft zieht. Angetrieben von modernster KI-Technologie.",
+      "download_free": "Kostenlos herunterladen",
+      "learn_more": "Mehr erfahren"
+    },
+    "blog": {
+      "title": "FitNudge Blog",
+      "subtitle": "Einblicke, Tipps und Geschichten, die Ihnen helfen, nachhaltige Gewohnheiten aufzubauen. Von KI-gestützter Motivation bis hin zu Erfolgsgeschichten aus der Community.",
+      "article": "Artikel",
+      "read_article": "Artikel lesen",
+      "read_full_article": "Vollständigen Artikel lesen",
+      "featured": "Ausgewählt",
+      "featured_article": "Ausgewählter Artikel",
+      "all_posts": "Alle Beiträge",
+      "latest_articles": "Neueste Artikel",
+      "articles": "Artikel",
+      "articles_description": "Entdecken Sie unsere Sammlung von Artikeln über Gewohnheitsbildung, Produktivität und persönliche Entwicklung.",
+      "min_read": "{{minutes}} Min. Lesezeit",
+      "min": "{{minutes}} Min",
+      "back_to_blog": "Zurück zum Blog",
+      "loading": "Wird geladen...",
+      "related_articles": "Verwandte Artikel",
+      "no_articles_found": "Keine Artikel gefunden",
+      "no_articles_category": "In dieser Kategorie gibt es noch keine Artikel. Versuchen Sie, eine andere Kategorie auszuwählen, oder schauen Sie bald wieder vorbei!",
+      "no_articles_empty": "Wir arbeiten daran, großartige Inhalte für Sie zu erstellen. Schauen Sie bald wieder vorbei für hilfreiche Artikel zum Aufbau gesunder Gewohnheiten!",
+      "view_all_posts": "Alle Beiträge ansehen",
+      "pagination": { "previous": "Zurück", "next": "Weiter" },
+      "newsletter": {
+        "title": "Auf dem Laufenden bleiben",
+        "description": "Erhalten Sie die neuesten Artikel über Gewohnheitsbildung, Produktivitätstipps und Erfolgsgeschichten direkt in Ihren Posteingang.",
+        "placeholder": "Geben Sie Ihre E-Mail-Adresse ein",
+        "subscribe": "Abonnieren"
+      },
+      "cta": {
+        "title": "Bereit, bessere Gewohnheiten zu entwickeln?",
+        "description": "Schließe dich tausenden Menschen an, die bereits FitNudge nutzen, um verantwortungsbewusst zu bleiben und ihre Ziele zu erreichen.",
+        "button": "Auf die Warteliste setzen"
+      },
+      "share": {
+        "title": "Teilen",
+        "twitter": "Auf Twitter teilen",
+        "facebook": "Auf Facebook teilen",
+        "linkedin": "Auf LinkedIn teilen",
+        "copy_link": "Link kopieren",
+        "link_copied": "Link kopiert!"
+      },
+      "error": {
+        "not_found_title": "Artikel nicht gefunden",
+        "not_found_description": "Der von Ihnen gesuchte Artikel existiert nicht oder wurde entfernt.",
+        "failed_to_load": "Beitrag konnte nicht geladen werden",
+        "post_not_found": "Beitrag nicht gefunden"
+      }
+    }
+  },
+  "nav": {
+    "why_fitnudge": "Warum FitNudge",
+    "features": "Funktionen",
+    "how_it_works": "Wie es funktioniert",
+    "testimonials": "Kundenbewertungen",
+    "blog": "Blog",
+    "contact": "Kontakt",
+    "download": "App herunterladen",
+    "theme": "Thema",
+    "language": "Sprache",
+    "join_waitlist": "Zur Warteliste hinzufügen",
+    "join": "Beitreten",
+    "toggle_menu": "Menü umschalten",
+    "close_menu": "Menü schließen",
+    "select_language": "Sprache auswählen"
+  },
+  "hero": {
+    "badge": "Demnächst verfügbar",
+    "title": "Ihr KI-Verantwortungspartner für jedes Ziel",
+    "subtitle": "Bleib konsequent bei jeder Gewohnheit oder jedem Ziel – Fitness, Lesen, Meditation, Lernen oder irgendetwas anderes. FitNudge gibt dir den täglichen Anstoß, den du brauchst.",
+    "download_free": "Kostenlos herunterladen",
+    "join_waitlist": "Auf die Warteliste setzen",
+    "watch_demo": "Demo ansehen",
+    "stats": {
+      "users": "Aktive Nutzer",
+      "rating": "App-Store-Bewertung",
+      "support": "KI-Unterstützung"
+    }
+  },
+  "features": {
+    "title": "Alles, was Sie brauchen, um konsequent zu bleiben",
+    "subtitle": "FitNudge ist voller Funktionen, die darauf ausgelegt sind, dich auf deinem Weg verantwortlich und motiviert zu halten.",
+    "view_all": "Alle Funktionen ansehen",
+    "ai": {
+      "title": "KI-Motivation",
+      "description": "Personalisierte KI-Nachrichten, die sich an deinen Weg anpassen und dich jeden Tag motiviert halten."
+    },
+    "goals": {
+      "title": "Zielverfolgung",
+      "description": "Setze tägliche oder wöchentliche Ziele mit flexibler Zeitplanung. Verfolge jede Gewohnheit, die du entwickeln möchtest."
+    },
+    "reminders": {
+      "title": "Intelligente Erinnerungen",
+      "description": "Intelligente Benachrichtigungen, die wie ein KI-Coach in den richtigen Momenten bei Ihnen nachhaken."
+    },
+    "streaks": {
+      "title": "Serie verfolgen",
+      "description": "Baue Schwung auf mit der Verfolgung deiner Serien. Sieh dir deine aktuelle und längste Serie an, um konsequent zu bleiben."
+    },
+    "partners": {
+      "title": "Verantwortungspartner",
+      "description": "Vernetze dich mit Partnern, die deine Ziele teilen. Schicke Grüße, Anstöße und motiviert euch gegenseitig."
+    },
+    "coach": {
+      "title": "KI-Coach-Chat",
+      "description": "Bedarfsorientierte Gespräche mit Ihrem KI-Coach, der Ihre Ziele, Muster und Fortschritte kennt."
+    },
+    "analytics": {
+      "title": "Fortschrittsanalyse",
+      "description": "Verfolge deinen Fortschritt mit detaillierten Analysen und Einblicken in deine Fitnessreise."
+    },
+    "community": {
+      "title": "Gemeinschaftsunterstützung",
+      "description": "Tausche dich mit gleichgesinnten Fitnessbegeisterten aus und teile gemeinsam eure Reise."
+    },
+    "privacy": {
+      "title": "Datenschutz & Sicherheit",
+      "description": "Ihre Daten sind durch Sicherheits- und Datenschutzmaßnahmen auf Unternehmensniveau geschützt."
+    },
+    "cta": {
+      "title": "Bereit loszulegen?",
+      "subtitle": "Schließen Sie sich tausenden von Nutzern an, die bereits dauerhafte Gewohnheiten mit FitNudge aufbauen."
+    }
+  },
+  "testimonials": {
+    "title": "Beliebt bei Zielstrebigen",
+    "subtitle": "Schließen Sie sich Tausenden an, die ihre Gewohnheiten mit FitNudge verändert haben",
+    "rating": "App-Store-Bewertung",
+    "users": "Zufriedene Nutzer",
+    "satisfaction": "Zufriedenheitsrate",
+    "stats": {
+      "active_users": "Aktive Nutzer",
+      "app_rating": "App-Store-Bewertung",
+      "consistency_rate": "Konsistenzrate",
+      "check_ins": "Check-ins abgeschlossen"
+    },
+    "items": {
+      "sarah": {
+        "name": "Sarah M.",
+        "role": "Zielerreicher",
+        "content": "FitNudge hat völlig verändert, wie ich meine Ziele angehe. Die KI-Check-ins fühlen sich persönlich an und motivieren mich wirklich, konsequent zu bleiben."
+      },
+      "david": {
+        "name": "David R.",
+        "role": "Marathonläufer",
+        "content": "Die wöchentlichen Rückblicke sind fantastisch! Ich liebe es, meine Muster zu sehen – sie zeigen mir, was gut funktioniert und wo ich mich verbessern muss. Ein echter Game-Changer für mein Training."
+      },
+      "emily": {
+        "name": "Emily T.",
+        "role": "Beschäftigte Mama",
+        "content": "Als vielbeschäftigte Mutter hätte ich nie gedacht, dass ich meine Ziele konsequent verfolgen könnte. Die cleveren Erinnerungen und das Feiern kleiner Erfolge motivieren mich."
+      },
+      "alex": {
+        "name": "Alex P.",
+        "role": "Softwareentwickler",
+        "content": "Ich habe viele Gewohnheitstracker ausprobiert, aber FitNudge ist anders. Die KI erinnert sich tatsächlich daran, warum ich angefangen habe, und nutzt das, um mich zu motivieren."
+      },
+      "jessica": {
+        "name": "Jessica L.",
+        "role": "Yoga-Lehrer",
+        "content": "Die Funktion des Verantwortlichkeitspartners ist genial! Jemanden zu haben, mit dem ich meine Reise teilen kann, macht den ganzen Unterschied."
+      },
+      "michael": {
+        "name": "Michael K.",
+        "role": "Gewichtsverlustreise",
+        "content": "30 Pfund in 6 Monaten abgenommen! Das Streak-Tracking hat mich auch an Tagen, an denen ich keine Lust auf Training hatte, verantwortlich gehalten."
+      }
+    }
+  },
+  "pricing": {
+    "title": "Einfache, transparente Preisgestaltung",
+    "subtitle": "Wählen Sie den Plan, der am besten zu Ihnen passt. Alle Pläne beinhalten unsere grundlegenden KI-Funktionen.",
+    "popular": "Am beliebtesten",
+    "note": "Alle Pläne beinhalten eine 14-tägige kostenlose Testphase. Keine Kreditkarte erforderlich.",
+    "free": {
+      "name": "Kostenloser Plan",
+      "price": "0 $",
+      "period": "/Monat",
+      "description": "Perfekt zum Starten",
+      "features": {
+        "basic_ai": "Grundlegende KI-Motivation",
+        "one_goal": "1 aktives Ziel",
+        "community": "Gemeinschaftszugang",
+        "basic_analytics": "Grundlegende Fortschrittsverfolgung"
+      },
+      "cta": "Kostenlos starten"
+    },
+    "pro": {
+      "name": "Pro-Plan",
+      "price": "9,99 $",
+      "period": "/Monat",
+      "description": "Für ernsthafte Zielstrebige",
+      "features": {
+        "unlimited_goals": "Unbegrenzte Ziele",
+        "voice_coaching": "Sprachbeiträge & KI-Coaching",
+        "advanced_analytics": "Fortgeschrittene Analytik",
+        "priority_support": "Priorisierter Support",
+        "personalized_plans": "Personalisierte Trainingspläne",
+        "export_data": "Datenexport"
+      },
+      "cta": "Pro-Testversion starten"
+    },
+    "enterprise": {
+      "name": "Unternehmen",
+      "price": "Benutzerdefiniert",
+      "period": "",
+      "description": "Für Teams und Organisationen",
+      "features": {
+        "everything_pro": "Alles in Pro",
+        "team_management": "Teammanagement",
+        "custom_integrations": "Benutzerdefinierte Integrationen",
+        "dedicated_support": "Engagierte Unterstützung",
+        "advanced_security": "Erweiterte Sicherheit",
+        "sla_guarantee": "SLA-Garantie"
+      },
+      "cta": "Vertrieb kontaktieren"
+    }
+  },
+  "footer": {
+    "description": "Dein KI-gestützter Partner für Verantwortlichkeit bei jedem Ziel. Baue dauerhafte Gewohnheiten mit personalisierter Motivation und intelligenter Verfolgung auf.",
+    "product": "Produkt",
+    "company": "Unternehmen",
+    "support": "Unterstützung",
+    "features": "Funktionen",
+    "pricing": "Preise",
+    "download": "Herunterladen",
+    "blog": "Blog",
+    "contact": "Kontakt",
+    "about": "Über",
+    "help_center": "Hilfezentrum",
+    "privacy": "Datenschutzerklärung",
+    "terms": "Nutzungsbedingungen",
+    "cookies": "Cookie-Richtlinie",
+    "rights": "Alle Rechte vorbehalten.",
+    "why_fitnudge": "Warum FitNudge",
+    "faqs": "Häufig gestellte Fragen",
+    "system_status": "Systemstatus",
+    "legal": "Rechtlich",
+    "made_with": "Hergestellt mit",
+    "for_goal_achievers": "für Zielstrebige",
+    "download_cta": {
+      "title": "Bereit, dein Fitnessprogramm zu verändern?",
+      "subtitle": "Lade FitNudge noch heute herunter und starte deine KI-gestützte Gewohnheitsveränderung",
+      "ios": "Für iOS herunterladen",
+      "android": "Für Android herunterladen"
+    }
+  },
+  "cookies": {
+    "title": "Wir verwenden Cookies",
+    "description": "Wir verwenden Cookies, um Ihr Erlebnis zu verbessern, den Seitenverkehr zu analysieren und Inhalte zu personalisieren. Sie können Ihre Einstellungen unten anpassen.",
+    "accept_all": "Alles akzeptieren",
+    "customize": "Anpassen",
+    "reject_all": "Alles ablehnen",
+    "preferences": {
+      "title": "Cookie-Einstellungen",
+      "save": "Einstellungen speichern",
+      "cancel": "Abbrechen",
+      "required": "Erforderlich",
+      "necessary": {
+        "title": "Notwendige Cookies",
+        "description": "Unverzichtbar für das ordnungsgemäße Funktionieren der Website. Diese können nicht deaktiviert werden."
+      },
+      "analytics": {
+        "title": "Analyse-Cookies",
+        "description": "Helfen Sie uns zu verstehen, wie Besucher mit unserer Website interagieren, indem Sie anonyme Informationen sammeln."
+      },
+      "marketing": {
+        "title": "Marketing-Cookies",
+        "description": "Wird verwendet, um Besucher über Websites hinweg zu verfolgen, um relevante und ansprechende Werbung anzuzeigen."
+      },
+      "functional": {
+        "title": "Funktionale Cookies",
+        "description": "Ermöglichen Sie erweiterte Funktionen und Personalisierung, wie das Merken Ihrer Einstellungen."
+      }
+    }
+  },
+  "health": {
+    "badge": "FitNudge Systemstatus",
+    "title": "Plattformverfügbarkeit",
+    "tagline": "Live-Ansicht unserer Kerninfrastruktur. Jeder Balken unten steht für die zuletzt durchgeführte Gesundheitsprüfung. Grün bedeutet gesund, Gelb zeigt eine teilweise Beeinträchtigung an und Rot weist auf eine Störung des Dienstes hin.",
+    "status": {
+      "operational": "Betriebsbereit",
+      "degraded": "Herabgesetzt",
+      "critical": "Ausfall",
+      "not_configured": "Nicht konfiguriert",
+      "checking": "Überprüfen…"
+    },
+    "metrics": {
+      "overall_uptime": "Gesamtbetriebszeit (rollierend)",
+      "healthy_checks": "{{value}}% gesunde Kontrollen",
+      "last_updated": "Zuletzt aktualisiert",
+      "environment": "Umwelt",
+      "api_version": "API-Version",
+      "loading_placeholder": "—"
+    },
+    "labels": { "unknown": "unbekannt" },
+    "how_we_track": {
+      "button": "Wie wir den Status verfolgen",
+      "title": "Wie wir den Status verfolgen",
+      "description": "Jede Minute führen wir automatisierte Prüfungen der kritischen Infrastruktur durch. Das überwachen wir:",
+      "items": {
+        "api": "API-Heartbeat, Datenbankerreichbarkeit, Cache-Verbindungen.",
+        "queues": "Hintergrundwarteschlangenstatus, E-Mail-Transport, Analyseanbieter.",
+        "third_party": "KI-Dienste von Drittanbietern und Analyse-Integrationen."
+      }
+    },
+    "cards": {
+      "uptime": "{{value}}% Betriebszeit",
+      "last_check": "Letzte Überprüfung {{value}}",
+      "affected_one": "{{count}} Komponente betroffen",
+      "affected_other": "{{count}} Komponenten betroffen"
+    },
+    "incidents": {
+      "loading": "Wird geladen…",
+      "none": "Keine aktiven Zwischenfälle",
+      "show_details": "Details anzeigen",
+      "hide_details": "Details ausblenden",
+      "title": "Aktive Vorfälle",
+      "investigating": "Untersuchen."
+    },
+    "loading_banner": "Systemstatus wird überprüft…",
+    "error": {
+      "title": "Statusdienst kann nicht erreicht werden.",
+      "developer_hint": "Entwickler: Stellt sicher, dass das Backend unter {{url}} läuft, bevor ihr neu ladet.",
+      "default_url": "Ihre API-Basis-URL",
+      "missing_api": "Die API-Basis-URL ist nicht konfiguriert."
+    },
+    "components_section": {
+      "title": "Komponentengesundheit",
+      "description": "Jede Karte stellt eine kritische Abhängigkeit dar. Wir behalten ein rollierendes Prüfungsfenster bei, damit Sie Trends auf einen Blick erkennen können."
+    },
+    "history": {
+      "view_button": "Verlauf anzeigen",
+      "title": "Vorfallhistorie",
+      "description": "Kürzlich von unseren automatisierten Prüfungen erfasste Aufzeichnungen.",
+      "loading": "Lade Verlauf…",
+      "error": "Verlauf kann gerade nicht geladen werden.",
+      "missing_api": "Die API-Basis-URL ist nicht konfiguriert.",
+      "empty": "Noch keine Vorfälle aufgezeichnet.",
+      "list_heading": "Historische Vorfälle",
+      "list_description": "Durchsuchen Sie frühere Vorfälle, die von unseren automatisierten Prüfungen erfasst wurden, und verfolgen Sie deren Aktualisierungen zur Lösung.",
+      "back_to_status": "Zurück zum Systemstatus",
+      "back_to_history": "Zurück zur Vorfall-Historie",
+      "detail_not_found": "Wir konnten diesen Vorfall nicht finden.",
+      "detail_impacted": "Betroffene Komponenten",
+      "detail_no_impacted": "Keine Komponenten wurden als betroffen markiert.",
+      "detail_updates": "Aktualisierungszeitplan",
+      "detail_update_count": "{{count}} Updates",
+      "detail_reported": "Gemeldet {{value}}",
+      "latest_update": "Neueste Aktualisierung",
+      "view_details": "Details anzeigen",
+      "no_updates": "Noch keine Updates veröffentlicht.",
+      "timestamp": "Protokolliert {{value}}",
+      "impacted": "Betroffene Komponenten",
+      "no_details": "Keine weiteren Angaben gemacht.",
+      "summary": {
+        "operational": "Alle Systeme funktionsfähig",
+        "single": "{{component}} meldete einen {{status}}-Zustand",
+        "multiple": "{{count}} betroffene Komponenten"
+      },
+      "update_status": {
+        "identified": "Identifiziert",
+        "monitoring": "Überwachung",
+        "resolved": "Gelöst"
+      }
+    },
+    "components": {
+      "supabase": {
+        "name": "Kernleistungen",
+        "descriptions": {
+          "ok": "Alle Kernservices laufen reibungslos.",
+          "critical": "Die Kernservices sind derzeit nicht verfügbar."
+        }
+      },
+      "smtp": {
+        "name": "Benachrichtigungen",
+        "descriptions": {
+          "ok": "E-Mail-Benachrichtigungen funktionieren.",
+          "degraded": "E-Mail-Benachrichtigungen können verzögert zugestellt werden."
+        }
+      },
+      "openai": {
+        "name": "KI-Funktionen",
+        "descriptions": {
+          "ok": "KI-gestützte Funktionen sind verfügbar.",
+          "not_configured": "KI-Funktionen sind vorübergehend nicht verfügbar."
+        }
+      }
+    }
+  },
+  "wellness": {
+    "title": "Dein KI-Coach, der nie schläft",
+    "description1": "Erhalte personalisierte KI-Motivationsnachrichten, clevere Erinnerungen und tägliche Check-ins, die dich bei jedem Ziel zur Rechenschaft ziehen – egal, ob es ums Training, Lesen, Meditieren, Erlernen einer neuen Fähigkeit oder das Aufbauen einer positiven Gewohnheit geht.",
+    "description2": "Verfolge deinen Fortschritt mit intelligenten Analysen, feiere deine Serien und verbinde dich mit Accountability-Partnern, die deinen Weg teilen. Bleibe konsequent mit der Kraft von KI.",
+    "cta": "Mehr erfahren",
+    "highlights": {
+      "ai_messages": "Personalisierte KI-Motivationsnachrichten",
+      "smart_reminders": "Intelligente Erinnerungen, die sich an dich anpassen",
+      "daily_checkins": "Tägliche Check-ins, um dich zur Rechenschaft zu ziehen",
+      "streak_tracking": "Verfolge Serien und feiere Beständigkeit"
+    }
+  },
+  "tracker": {
+    "title": "Verfolge deinen Fortschritt mit Serien",
+    "description": "Behalte deinen Fortschritt mit intelligentem Fortschritts-Tracking im Blick. Sieh deine Serien, täglichen Check-ins und Erfolge mit detaillierten Analysen, die dir helfen, konsequent und motiviert zu bleiben.",
+    "cta": "Mehr erfahren",
+    "join_waitlist": "Auf die Warteliste setzen",
+    "stats": {
+      "track_progress": "Fortschritt verfolgen",
+      "daily_checkins": "Tägliche Check-ins",
+      "achievements": "Errungenschaften"
+    }
+  },
+  "download": {
+    "title": "Jetzt herunterladen und damit beginnen, nachhaltige Gewohnheiten aufzubauen.",
+    "description": "Schließe dich tausenden Nutzern an, die mit FitNudge bessere Gewohnheiten aufbauen. Bald verfügbar für iOS und Android.",
+    "coming_soon": "Demnächst",
+    "app_store": "App Store",
+    "google_play": "Google Play",
+    "downloads": "Downloads",
+    "phone_mockup": {
+      "greeting": "Guten Morgen!",
+      "ready": "Bereit für Ihren Check-in?",
+      "current_streak": "Aktuelle Serie",
+      "streak_days": "🔥 14 Tage",
+      "todays_goal": "Heutiges Ziel",
+      "morning_workout": "Morgendliches Training"
+    }
+  },
+  "contact": {
+    "title": "Kontakt aufnehmen",
+    "subtitle": "Haben Sie Fragen? Wir würden uns freuen, von Ihnen zu hören. Senden Sie uns eine Nachricht und wir werden so schnell wie möglich antworten.",
+    "form": {
+      "name": "Dein Name",
+      "email": "E-Mail-Adresse",
+      "subject": "Betreff",
+      "message": "Ihre Nachricht",
+      "submit": "Nachricht senden",
+      "sending": "Senden...",
+      "success": "Nachricht erfolgreich gesendet! Wir werden uns bald bei Ihnen melden.",
+      "error": "Etwas ist schiefgelaufen. Bitte versuchen Sie es erneut.",
+      "name_placeholder": "John Doe",
+      "email_placeholder": "john@example.com",
+      "subject_placeholder": "Wie können wir helfen?",
+      "message_placeholder": "Erzählen Sie uns mehr über Ihre Frage oder Ihr Feedback..."
+    },
+    "info": {
+      "title_email": "Schreiben Sie uns eine E-Mail",
+      "title_response": "Antwortzeit",
+      "email": "hello@fitnudge.app",
+      "response_time": "Wir antworten in der Regel innerhalb von 24-48 Stunden"
+    }
+  },
+  "features_page": {
+    "title": "Alle Funktionen",
+    "subtitle": "Alles, was Sie brauchen, um konsequent zu bleiben und dauerhafte Gewohnheiten aufzubauen",
+    "free_tier": "Kostenlose Funktionen",
+    "premium_tier": "Premium-Funktionen",
+    "view_all": "Alle Funktionen ansehen",
+    "free_price": "0 $ für immer",
+    "premium_price": "9,99 $/Monat",
+    "cta": {
+      "title": "Bereit, dauerhafte Gewohnheiten aufzubauen?",
+      "description": "Melde dich auf der Warteliste an und sei der Erste, der erfährt, wann FitNudge startet.",
+      "button": "Auf die Warteliste setzen"
+    },
+    "free_features": {
+      "goals": {
+        "title": "Bis zu 2 aktive Ziele",
+        "description": "Verfolge bis zu 2 Ziele gleichzeitig – Fitness, Lesen, Meditation, Lernen oder jede andere Gewohnheit, die du aufbauen möchtest."
+      },
+      "checkins": {
+        "title": "Tägliche KI-Überprüfungen",
+        "description": "Erhalten Sie Ja/Nein-Check-in-Benachrichtigungen zu Ihrer geplanten Zeit. Einfach und effektiv zur Rechenschaftspflicht."
+      },
+      "streaks": {
+        "title": "Serie verfolgen",
+        "description": "Verfolge deine aktuellen und längsten Serien. Feier Meilensteine bei 7, 14, 21, 30, 50 und 100 Tagen."
+      },
+      "motivation": {
+        "title": "Tägliche Motivation",
+        "description": "Erhalte KI-generierte Motivationsnachrichten zu deiner geplanten Erinnerungszeit."
+      },
+      "stats": {
+        "title": "Grundlegende Statistiken",
+        "description": "Sehen Sie Ihren Konsistenzprozentsatz und grundlegende Fortschrittsstatistiken ein."
+      },
+      "partner": {
+        "title": "1 Verantwortlichkeitspartner",
+        "description": "Verbinde dich mit einem Rechenschaftspartner, um euch gegenseitig motiviert zu halten."
+      }
+    },
+    "premium_features": {
+      "goals": {
+        "title": "Bis zu 10 aktive Ziele",
+        "description": "Verfolge bis zu 10 Ziele gleichzeitig. Perfekt, um mehrere Gewohnheiten aufzubauen."
+      },
+      "coach": {
+        "title": "KI-Coach-Chat",
+        "description": "Führen Sie bedarfsgesteuerte Gespräche mit Ihrem KI-Coach, der Ihre Ziele, Muster und Fortschritte kennt."
+      },
+      "recaps": {
+        "title": "Wöchentliche KI-Zusammenfassungen",
+        "description": "Erhalten Sie personalisierte wöchentliche Zusammenfassungen mit Erfolgen, Erkenntnissen und Fokuspunkten für die nächste Woche."
+      },
+      "analytics": {
+        "title": "Fortgeschrittene Analytik",
+        "description": "Detaillierte Diagramme, Heatmaps und Trendanalysen, um Ihre Muster besser zu verstehen."
+      },
+      "patterns": {
+        "title": "Intelligente Mustenerkennung",
+        "description": "KI erkennt Muster wie Ihre besten/schlechtesten Tage und Abbruchpunkte, um Ihnen zu helfen, sich zu verbessern."
+      },
+      "nudging": {
+        "title": "Adaptives Anstupsen",
+        "description": "Intelligente Hinweise, wenn Sie kurz davor sind, eine Serie zu unterbrechen, oder wenn Muster darauf hindeuten, dass Sie zusätzliche Unterstützung benötigen."
+      },
+      "voice": {
+        "title": "Sprachaufnahmen",
+        "description": "Nimm nach Check-ins Sprachaufnahmen deiner Gedanken auf, um ein tieferes Selbstbewusstsein zu entwickeln."
+      },
+      "partners": {
+        "title": "Bis zu 3 Verantwortungspartner",
+        "description": "Verbinde dich mit bis zu 3 Partnern. Schicke Grüße, Anstupser und motiviert euch gegenseitig."
+      },
+      "reminders": {
+        "title": "Mehrere Erinnerungszeiten",
+        "description": "Richte bis zu 5 Erinnerungszeiten pro Ziel für maximale Flexibilität ein."
+      },
+      "ad_free": {
+        "title": "Werbefreies Erlebnis",
+        "description": "Genießen Sie FitNudge ohne Unterbrechungen durch Werbung."
+      },
+      "support": {
+        "title": "Priorisierter Support",
+        "description": "Erhalten Sie schnellere Antwortzeiten von unserem Support-Team, wenn Sie Hilfe benötigen."
+      }
+    }
+  },
+  "why_fitnudge": {
+    "badge": "Der klügere Weg, Gewohnheiten aufzubauen",
+    "title": "Warum FitNudge wählen?",
+    "subtitle": "Im Gegensatz zu herkömmlichen Gewohnheitstrackern nutzt FitNudge KI, um Sie zu verstehen, Sie persönlich zu motivieren und Sie für jedes von Ihnen gesetzte Ziel verantwortlich zu halten.",
+    "cta_button": "Auf die Warteliste setzen",
+    "pain_points": {
+      "title": "Kommt Ihnen das bekannt vor?",
+      "subtitle": "Die meisten Menschen haben mit denselben Herausforderungen zu kämpfen, wenn sie versuchen, neue Gewohnheiten zu entwickeln.",
+      "motivation": {
+        "problem": "Du startest stark, verlierst aber nach ein paar Tagen die Motivation",
+        "solution": "FitNudge sendet personalisierte KI-Motivationsnachrichten, die wirklich bei dir ankommen"
+      },
+      "tracking": {
+        "problem": "Tracking fühlt sich wie eine lästige Pflicht an und man vergisst, es zu tun",
+        "solution": "Einfache Check-ins mit einem Fingertipp und intelligente Erinnerungen zum richtigen Zeitpunkt"
+      },
+      "accountability": {
+        "problem": "Du hast niemanden, der dich zur Rechenschaft zieht",
+        "solution": "Vernetze dich mit Verantwortlichkeitspartnern, die dich anfeuern und bei Bedarf antreiben"
+      },
+      "generic": {
+        "problem": "Generische Apps verstehen deine persönliche Reise nicht",
+        "solution": "KI-gestützte Einblicke, die sich an Ihre Muster und Ziele anpassen"
+      }
+    },
+    "differentiators": {
+      "title": "Was FitNudge besonders macht",
+      "subtitle": "Wir haben FitNudge entwickelt, um die echten Probleme beim Aufbau von Gewohnheiten zu lösen.",
+      "ai": {
+        "title": "KI, die Sie versteht",
+        "description": "Unsere KI lernt Ihre Muster, Vorlieben und das, was Sie motiviert, um wirklich personalisierten Support zu bieten."
+      },
+      "any_goal": {
+        "title": "Jedes Ziel, eine App",
+        "description": "Ob Fitness, Lesen, Meditation, das Erlernen einer Fähigkeit oder eine andere positive Gewohnheit – FitNudge erledigt alles."
+      },
+      "partners": {
+        "title": "Echte Rechenschaft",
+        "description": "Verbinde dich mit Freunden oder Familie als Verantwortlichkeitspartner. Schicke Zusprüche, Anstupser und motiviere euch gegenseitig."
+      },
+      "nudges": {
+        "title": "Intelligente Anstöße",
+        "description": "Erhalten Sie Erinnerungen zum perfekten Zeitpunkt basierend auf Ihren Gewohnheiten und Ihrem Zeitplan, nicht durch willkürliche Benachrichtigungen."
+      },
+      "insights": {
+        "title": "Umsetzbare Erkenntnisse",
+        "description": "Erkennen Sie Ihre Muster, verstehen Sie, was funktioniert, und erhalten Sie KI-gestützte Vorschläge zur Verbesserung."
+      },
+      "holistic": {
+        "title": "Ganzheitlicher Ansatz",
+        "description": "Verfolge mehrere Ziele gleichzeitig und sieh, wie sie miteinander verbunden sind, um ein besseres Ich aufzubauen."
+      }
+    },
+    "benefits": {
+      "title": "Das werden Sie bekommen",
+      "consistency": {
+        "title": "Bleib konsequent",
+        "description": "Baue aufeinanderfolgende Tage auf und behalte den Schwung mit täglichen Check-ins und motivierenden Anstößen bei."
+      },
+      "motivation": {
+        "title": "Verliere niemals die Motivation",
+        "description": "KI-generierte Nachrichten, die dich inspiriert halten und auf deine Ziele fokussieren."
+      },
+      "privacy": {
+        "title": "Ihre Daten, Ihre Kontrolle",
+        "description": "Wir nehmen den Datenschutz ernst. Ihre Daten werden verschlüsselt und niemals an Dritte verkauft."
+      }
+    },
+    "cta": {
+      "title": "Bereit, dauerhafte Gewohnheiten aufzubauen?",
+      "description": "Schließe dich Tausenden von Zielerreichern an, die bereits auf der Warteliste stehen. Sei der Erste, der FitNudge erlebt.",
+      "button": "Frühen Zugang erhalten"
+    }
+  },
+  "waitlist": {
+    "badge": "Demnächst verfügbar",
+    "title": "Tritt der Warteliste bei und erhalte frühzeitigen Zugang",
+    "description": "Seien Sie unter den Ersten, die FitNudge erleben – Ihren KI-gestützten Partner für Verantwortung bei jedem Ziel. Melden Sie sich jetzt an, um Ihren Platz und exklusive Frühbuchervorteile zu sichern.",
+    "reserve_spot": "Reserviere deinen Platz",
+    "social_proof": "Schließe dich über 1.000 Zielerreichern an, die bereits auf der Warteliste stehen",
+    "fallback_link": "Auf die Warteliste setzen",
+    "privacy_note": "Wir respektieren Ihre Privatsphäre. Sie können sich jederzeit abmelden.",
+    "benefits": {
+      "early_access": {
+        "title": "Früher Zugang",
+        "description": "Seien Sie der Erste, der FitNudge ausprobiert, wenn wir starten"
+      },
+      "founder_pricing": {
+        "title": "Gründerpreis",
+        "description": "Sichern Sie sich Sonderpreise für frühe Unterstützer"
+      },
+      "launch_updates": {
+        "title": "Start-Updates",
+        "description": "Lassen Sie sich über neue Funktionen und das Veröffentlichungsdatum benachrichtigen"
+      },
+      "shape_product": {
+        "title": "Das Produkt gestalten",
+        "description": "Ihr Feedback wird uns helfen, die beste App zu entwickeln"
+      }
+    }
+  },
+  "how_it_works": {
+    "title": "Wie es funktioniert",
+    "subtitle": "Baue dauerhafte Gewohnheiten in 3 einfachen Schritten mit KI-gestützter Motivation und intelligenter Nachverfolgung auf.",
+    "steps": {
+      "set_goal": {
+        "title": "Setze dein Ziel",
+        "description": "Wähle aus Vorlagen oder erstelle eigene Ziele. Definiere, was du erreichen möchtest – Fitness, Lesen, Meditation, Lernen oder etwas anderes."
+      },
+      "get_motivation": {
+        "title": "Hol dir KI-Motivation",
+        "description": "Erhalte personalisierte Nachrichten und intelligente Erinnerungen von deinem KI-Coach. Bekomme die Motivation, die du am meisten brauchst, genau dann, wenn du sie brauchst."
+      },
+      "track_progress": {
+        "title": "Fortschritt verfolgen",
+        "description": "Verfolge deine Beständigkeit und feiere Erfolge. Sieh dir deine Serien, Fortschritte an und bleibe deinen Zielen gegenüber verantwortlich."
+      }
+    },
+    "cta": "Bereit loszulegen?"
+  },
+  "about": {
+    "hero": {
+      "title": "Über FitNudge",
+      "subtitle": "Wir gestalten die Zukunft der Gewohnheitsbildung durch KI-gestützte Verantwortlichkeit und personalisierte Motivation."
+    },
+    "story": {
+      "title": "Unsere Geschichte",
+      "subtitle": "Entstanden aus einer einfachen Idee: Was wäre, wenn Sie einen Verantwortlichkeitspartner hätten, der niemals schläft und immer genau weiß, was zu sagen ist?",
+      "description": "Es ist leicht, den Fokus und die Motivation zu verlieren, wenn man neue Gewohnheiten aufbaut. Wir alle kennen das – das Jahr mit ehrgeizigen Zielen zu beginnen, nur um im Februar wieder aufzugeben. Ganz gleich, ob es ums Trainieren, mehr Lesen, das Erlernen einer neuen Fähigkeit oder jede andere positive Gewohnheit geht, es ist schwer, konsequent zu bleiben. Genau hier kam FitNudge ins Spiel. Wir haben erkannt, dass die Menschen nicht noch eine weitere Tracking-App oder To-do-Liste brauchen – sie brauchen einen Partner zur Verantwortung, der sie versteht, an sie glaubt und rund um die Uhr dafür da ist, sie auf Kurs zu halten. Also haben wir uns daran gemacht, einen KI-gestützten Coach zu entwickeln, der niemals schläft, niemals urteilt und immer genau weiß, was er sagen muss, um dich auf deinem Weg zu deinem besten Ich motiviert zu halten."
+    },
+    "mission": {
+      "title": "Unsere Mission",
+      "subtitle": "Wir glauben, dass jeder einen persönlichen Verantwortlichkeitspartner verdient, der seine Reise versteht und ihn motiviert hält.",
+      "points": {
+        "consistency": {
+          "title": "Konsistenz zuerst",
+          "description": "Wir konzentrieren uns darauf, den Nutzern zu helfen, dauerhafte Gewohnheiten durch tägliche Check-ins, Serien und personalisierte Motivation aufzubauen."
+        },
+        "ai": {
+          "title": "KI-gestütztes Coaching",
+          "description": "Unser KI-Coach lernt aus deinem Fortschritt und passt seinen Motivationsstil an, um dich engagiert und verantwortlich zu halten."
+        },
+        "community": {
+          "title": "Verantwortungspartner",
+          "description": "Vernetze dich mit Partnern, die deine Ziele teilen. Motviert euch gegenseitig mit Anfeuerungen und kleinen Stupsern."
+        }
+      }
+    },
+    "values": {
+      "title": "Unsere Werte",
+      "subtitle": "Diese grundlegenden Werte leiten alles, was wir bei FitNudge tun.",
+      "privacy": {
+        "title": "Datenschutz & Sicherheit",
+        "description": "Ihre Daten sind mit unternehmensgerechter Sicherheit geschützt. Wir geben Ihre persönlichen Informationen niemals ohne Zustimmung weiter."
+      },
+      "community": {
+        "title": "Gemeinschaft zuerst",
+        "description": "Wir glauben an die Kraft von Verantwortlichkeitspartnern und gegenseitiger Motivation, um jedes Ziel zu erreichen."
+      },
+      "innovation": {
+        "title": "Innovation",
+        "description": "Wir innovieren kontinuierlich, um das effektivste KI-gestützte Erlebnis für Verantwortlichkeit zu bieten."
+      },
+      "empathy": {
+        "title": "Empathie",
+        "description": "Wir verstehen, dass das Aufbauen von Gewohnheiten Höhen und Tiefen hat, und wir sind hier, um dich dabei in beiden Phasen zu unterstützen."
+      }
+    },
+    "team": {
+      "title": "Lernen Sie unser Team kennen",
+      "subtitle": "Die leidenschaftlichen Menschen hinter FitNudge, die daran arbeiten, Verantwortlichkeit für jeden zugänglich zu machen.",
+      "founder": {
+        "name": "Alex Johnson",
+        "role": "Gründer & Geschäftsführer",
+        "bio": "Gewohnheitsenthusiast und KI-Forscher mit über 10 Jahren Erfahrung in der Technik. Leidenschaftlich daran interessiert, persönliches Wachstum für alle zugänglich zu machen."
+      },
+      "cto": {
+        "name": "Sarah Chen",
+        "role": "CTO",
+        "bio": "Full-Stack-Entwickler und KI-Spezialist. Leitet unser technisches Team beim Aufbau skalierbarer, intelligenter Lösungen."
+      },
+      "designer": {
+        "name": "Mike Rodriguez",
+        "role": "Leiter/-in Design",
+        "bio": "UX/UI-Designer, der sich darauf konzentriert, intuitive und ansprechende Erlebnisse zu schaffen, die Nutzer dazu motivieren, ihre Ziele zu erreichen."
+      }
+    }
+  },
+  "reset_password": {
+    "invalid_link": "Ungültiger Zurücksetzungslink",
+    "invalid_link_description": "Dieser Link zum Zurücksetzen des Passworts ist ungültig oder es fehlt ein Token. Bitte fordere ein neues Zurücksetzen des Passworts an.",
+    "opening_app": "FitNudge-App wird geöffnet...",
+    "validating": "Überprüfe deinen Reset-Link...",
+    "expired_title": "Link zum Zurücksetzen abgelaufen",
+    "expired_description": "Dieser Link zum Zurücksetzen des Passworts ist nicht mehr gültig. Bitte fordere eine neue E-Mail zum Zurücksetzen an.",
+    "request_new": "Fordern Sie eine neue Reset-E-Mail an",
+    "need_help": "Brauchen Sie Hilfe? Kontaktieren Sie den Support und wir bringen Sie schnell wieder zurück.",
+    "title": "Setze dein Passwort zurück",
+    "opening_mobile": "Öffne die FitNudge-App...",
+    "download_prompt": "Lade die App herunter, um dein Passwort zurückzusetzen",
+    "no_app_installed": "Haben Sie die App nicht installiert?",
+    "app_store_alt": "Im App Store herunterladen",
+    "play_store_alt": "Im Google Play Store erhältlich",
+    "manual_instructions": "Wenn sich die App nicht automatisch öffnet, öffnen Sie die FitNudge-App und nutzen Sie „Passwort vergessen“, um einen neuen Link anzufordern. Ihr Rücksetzcode aus diesem Link wurde bereits in der App hinterlegt, falls sie erfolgreich geöffnet wurde.",
+    "security_note": "Passwort-Zurücksetzungslinks verfallen aus Sicherheitsgründen nach 1 Stunde. Wenn Sie keine Zurücksetzung angefordert haben, können Sie diese E-Mail bedenkenlos ignorieren.",
+    "loading": "Reset-Seite wird geladen...",
+    "validation_error_missing": "Dieser Link zum Zurücksetzen des Passworts ist ungültig oder es fehlt ein Token. Bitte fordere eine neue E-Mail zum Zurücksetzen an.",
+    "validation_error_expired": "Dieser Link zum Zurücksetzen des Passworts ist nicht mehr gültig. Bitte fordere eine neue E-Mail zum Zurücksetzen an.",
+    "validation_error_network": "Wir konnten diesen Zurücksetzungslink im Moment nicht überprüfen. Bitte fordere eine neue E-Mail zum Zurücksetzen des Passworts an."
+  },
+  "errors": {
+    "validation_error": "Bitte füllen Sie alle Felder aus",
+    "authentication_error": "Anmeldung fehlgeschlagen. Bitte versuche es erneut.",
+    "registration_error": "Anmeldung fehlgeschlagen. Bitte versuche es erneut.",
+    "not_found_title": "Seite Nicht Gefunden",
+    "not_found_description": "Hoppla! Die gesuchte Seite existiert nicht oder wurde verschoben.",
+    "go_home": "Startseite",
+    "go_back": "Zurück",
+    "looking_for": "Suchen Sie etwas?",
+    "error_title": "Etwas Ist Schiefgelaufen",
+    "error_description": "Wir haben einen unerwarteten Fehler festgestellt. Keine Sorge, unser Team wurde benachrichtigt.",
+    "try_again": "Erneut Versuchen",
+    "persist_message": "Wenn dieses Problem weiterhin besteht,",
+    "contact_support": "kontaktieren Sie unser Support-Team"
+  },
+  "legal": {
+    "legal_document": "Rechtsdokument",
+    "terms_of_service": "Nutzungsbedingungen",
+    "privacy_policy": "Datenschutzerklärung",
+    "cookie_policy": "Cookie-Richtlinie",
+    "last_updated": "Zuletzt aktualisiert",
+    "version": "Version",
+    "not_available": "Dieses Dokument ist derzeit nicht verfügbar. Bitte versuchen Sie es später erneut.",
+    "load_error": "Dokument konnte nicht geladen werden. Bitte versuchen Sie es später erneut.",
+    "unavailable_title": "Dokument nicht verfügbar",
+    "contact_for_help": "Kontaktieren Sie uns für Hilfe",
+    "also_see": "Siehe auch"
+  },
+  "recaps": {
+    "title": "Wöchentliche Zusammenfassungen",
+    "detail_title": "Wöchentliche Zusammenfassung",
+    "check_ins": "Check-ins",
+    "completion": "Abschluss",
+    "goals_completed": "Ziele",
+    "streak": "Strähne",
+    "total_check_ins": "Check-ins",
+    "current_streak": "Strähne",
+    "ai_summary": "KI-Zusammenfassung",
+    "highlights": "Höhepunkte",
+    "recommendations": "Empfehlungen",
+    "goal_breakdown": "Zielaufteilung",
+    "trend": "4-Wochen-Trend",
+    "achievements": "Erfolg freigeschaltet",
+    "partner": "Verantwortungspartner",
+    "partners": "Verantwortungspartner",
+    "week_over_week": "gegen letzte Woche",
+    "active_days": "aktive Tage",
+    "active_days_count": "{{count}}/7 aktive Tage",
+    "best_day": "Bester Tag: {{day}}",
+    "day_streak": "{{count}}-Tage-Serie",
+    "completed_count": "{{completed}}/{{total}} abgeschlossen",
+    "archived_label": "(Archiviert)",
+    "goals_hit_count": "{{hit}}/{{total}} Ziele erreicht",
+    "premium_title": "Wöchentliche Zusammenfassungen",
+    "premium_description": "Erhalten Sie KI-gestützte wöchentliche Zusammenfassungen Ihres Fortschritts, Ihrer Erfolge und personalisierten Einblicke, die Ihnen helfen, auf Kurs zu bleiben.",
+    "empty_title": "Noch keine Zusammenfassungen",
+    "empty_description": "Deine wöchentlichen Zusammenfassungen werden hier erscheinen, sobald du deine erste Woche Aktivität beendet hast.",
+    "not_found_title": "Zusammenfassung nicht gefunden",
+    "not_found_description": "Dieses wöchentliche Resümee konnte nicht gefunden werden.",
+    "win": "Ihr großer Gewinn",
+    "insight": "Wichtige Erkenntnis",
+    "focus_next_week": "Fokus für die nächste Woche",
+    "motivational_close": "Mach weiter!"
+  }
+}

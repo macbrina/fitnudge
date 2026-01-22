@@ -139,16 +139,22 @@ class SecurityConfig:
             # Core User Data (health/fitness - privacy sensitive)
             "/goals",
             "/check-ins",
-            "/challenges",
-            "/meals",
-            "/hydration",
-            "/workout-sessions",
+            # AI Features (personal data)
+            "/ai-coach",
+            "/daily-motivations",
+            "/recaps",
             # Social Features
             "/partners",  # Accountability partnerships
             "/nudges",
-            "/social",
-            # API Access
-            "/api-keys",
+            # Gamification
+            "/achievements",
+            # Notifications & Setup
+            "/notifications",
+            "/onboarding",
+            # Data Export (GDPR)
+            "/data-export",
+            # Analytics (personal stats)
+            "/analytics",
         ],
         "retention_days": 90,
         "log_user_agents": True,

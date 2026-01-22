@@ -5,6 +5,7 @@ import time
 import hashlib
 import json
 import re
+import asyncio
 from typing import Optional, List
 from app.core.database import get_supabase_client
 from app.core.cache import get_redis_client
@@ -416,3 +417,79 @@ class SessionManagementMiddleware(BaseHTTPMiddleware):
             redis.srem(user_sessions_key, oldest_session)
 
         return session_token
+
+
+class UserActivityMiddleware(BaseHTTPMiddleware):
+    """
+    Updates user's last_active_at timestamp for activity tracking.
+    
+    Features:
+    - Only updates for authenticated API requests
+    - Debounced: max one update per 5 minutes per user (reduces DB writes)
+    - Non-blocking: runs update asynchronously after response
+    """
+
+    DEBOUNCE_SECONDS = 300  # 5 minutes
+
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+
+        # Only process successful authenticated API requests
+        if (
+            response.status_code >= 200
+            and response.status_code < 300
+            and request.url.path.startswith("/api/v1")
+            and request.url.path not in ["/api/v1/health", "/api/v1/version"]
+        ):
+            # Try to extract user_id from auth header (non-blocking)
+            auth_header = request.headers.get("Authorization", "")
+            if auth_header.startswith("Bearer "):
+                # Schedule async update (don't await - fire and forget)
+                asyncio.create_task(
+                    self._update_user_activity(auth_header)
+                )
+
+        return response
+
+    async def _update_user_activity(self, auth_header: str):
+        """Update user's last_active_at (debounced)"""
+        try:
+            import jwt
+            from app.core.config import settings
+
+            # Decode token to get user_id (without full validation for speed)
+            token = auth_header.replace("Bearer ", "")
+            try:
+                # Try to decode - if invalid, just skip
+                payload = jwt.decode(
+                    token,
+                    settings.SUPABASE_JWT_SECRET,
+                    algorithms=["HS256"],
+                    options={"verify_exp": False}  # Don't verify expiry for activity tracking
+                )
+                user_id = payload.get("sub")
+                if not user_id:
+                    return
+            except Exception:
+                return  # Invalid token, skip
+
+            # Check debounce in Redis
+            redis = get_redis_client()
+            debounce_key = f"user_activity:{user_id}"
+            
+            # If key exists, skip update (already updated recently)
+            if redis.exists(debounce_key):
+                return
+
+            # Set debounce key (expires after DEBOUNCE_SECONDS)
+            redis.setex(debounce_key, self.DEBOUNCE_SECONDS, "1")
+
+            # Update last_active_at in database
+            supabase = get_supabase_client()
+            supabase.table("users").update({
+                "last_active_at": "now()"
+            }).eq("id", user_id).execute()
+
+        except Exception as e:
+            # Silently fail - activity tracking shouldn't break requests
+            print(f"⚠️ UserActivityMiddleware error: {e}")

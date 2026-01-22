@@ -12,13 +12,13 @@ export interface PlanFeature {
   minimum_tier: number; // 0=free, 1=premium
 }
 
-export interface SubscriptionPlan {
+export interface PricingPlan {
   id: string;
   name: string;
   description: string;
   monthly_price: number;
   annual_price: number;
-  goal_limit: number | null; // null means unlimited
+  active_goal_limit: number | null; // null means unlimited
   features: PlanFeature[];
   is_popular: boolean;
   has_trial: boolean;
@@ -37,14 +37,14 @@ export interface SubscriptionPlan {
 }
 
 export interface SubscriptionPlansResponse {
-  plans: SubscriptionPlan[];
+  plans: PricingPlan[];
 }
 
 export class SubscriptionPlansApiService extends BaseApiService {
   /**
    * Get all active subscription plans
    */
-  async getPlans(): Promise<SubscriptionPlan[]> {
+  async getPlans(): Promise<PricingPlan[]> {
     const response = await this.get<SubscriptionPlansResponse>(ROUTES.SUBSCRIPTION_PLANS.PLANS);
     return response.data?.plans ?? [];
   }
@@ -52,8 +52,8 @@ export class SubscriptionPlansApiService extends BaseApiService {
   /**
    * Get a specific subscription plan by ID
    */
-  async getPlan(planId: string): Promise<SubscriptionPlan | null> {
-    const response = await this.get<SubscriptionPlan>(
+  async getPlan(planId: string): Promise<PricingPlan | null> {
+    const response = await this.get<PricingPlan>(
       ROUTES.SUBSCRIPTION_PLANS.PLAN_BY_ID.replace(":id", planId)
     );
 

@@ -21,7 +21,7 @@ export {
   type CreateGoalRequest,
   type UpdateGoalRequest,
   type GoalTemplate,
-  type GoalStats
+  type GoalStatus
 } from "./goals";
 export {
   CheckInsService,
@@ -29,18 +29,8 @@ export {
   type CheckIn,
   type CreateCheckInRequest,
   type UpdateCheckInRequest,
-  type CheckInStats,
-  type CheckInCalendar
+  type CheckInStats
 } from "./checkins";
-export {
-  SocialService,
-  socialService,
-  type Post,
-  type CreatePostRequest,
-  type Comment,
-  type CreateCommentRequest,
-  type UserProfile
-} from "./social";
 export {
   DailyMotivationService,
   dailyMotivationService,
@@ -54,13 +44,6 @@ export {
   type PlanFeature
 } from "./subscriptions";
 export { MediaService, mediaService, type MediaUploadResponse } from "./media";
-export {
-  actionablePlansService,
-  type PlanStatus,
-  type PlanStatusResponse,
-  type ActionablePlan,
-  type GoalPlanResponse
-} from "./actionablePlans";
 export {
   achievementsService,
   type AchievementType,
@@ -77,43 +60,13 @@ export {
   type UnreadCountResponse
 } from "./nudges";
 export {
-  challengesService,
-  type Challenge,
-  type ChallengeType,
-  type ChallengeStatus,
-  type ChallengeParticipant,
-  type ChallengeCheckIn,
-  type ChallengeCheckInRequest,
-  type ChallengeCheckInResponse,
-  type LeaderboardEntry,
-  type ShareAsChallengeRequest,
-  type ShareAsChallengeResponse
-} from "./challenges";
-export {
   partnersService,
   type Partner,
   type PartnershipStatus,
   type PartnerRequest,
   type SearchUserResult
 } from "./partners";
-export {
-  homeService,
-  type ActiveItem,
-  type PendingCheckIn,
-  type DashboardStats,
-  type HomeDashboardResponse
-} from "./home";
-
-// Tracking Stats
-export {
-  trackingStatsService,
-  type TrackingStatsResponse,
-  type TrackingType,
-  type WorkoutStats,
-  type MealStats,
-  type HydrationStats,
-  type CheckinStats
-} from "./trackingStats";
+export { homeService, type PendingCheckIn, type HomeDashboardResponse } from "./home";
 
 // Notifications
 export {
@@ -121,6 +74,48 @@ export {
   type NotificationHistoryItem,
   type NotificationType
 } from "./notifications";
+
+// Weekly Recaps
+export {
+  recapsService,
+  type WeeklyRecap,
+  type WeeklyRecapsListResponse,
+  type WeeklyRecapStats,
+  type GoalBreakdown,
+  type CompletionRateTrend,
+  type AchievementUnlocked,
+  type PartnerContext
+} from "./recaps";
+
+// AI Coach
+export {
+  aiCoachService,
+  type ConversationSummary,
+  type ConversationDetail,
+  type ConversationMessage,
+  type RateLimitStatus,
+  type FeatureAccessResponse,
+  type StreamEvent
+} from "./aiCoach";
+
+// Analytics
+export {
+  analyticsService,
+  type AnalyticsDashboard,
+  type WeeklyConsistencyItem,
+  type StreakHistoryItem,
+  type MonthlyTrendItem,
+  type SkipReasonItem
+} from "./analytics";
+
+// App Config (public, no auth required)
+export {
+  appConfigService,
+  type AppConfigResponse,
+  type AppConfigItem,
+  type AppConfigKey,
+  type AppConfigCategory
+} from "./appConfig";
 
 // Legacy compatibility - re-export the main services as apiService
 export { authService as apiService } from "./auth";

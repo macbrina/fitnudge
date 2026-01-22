@@ -2,22 +2,25 @@ import { MOBILE_ROUTES } from "@/lib/routes";
 import { storageUtil, STORAGE_KEYS } from "@/utils/storageUtil";
 
 interface RedirectionOptions {
-  /** If provided, skip personalization if user already has a fitness profile */
-  hasFitnessProfile?: boolean;
+  /** V2: If user has completed onboarding (onboarding_completed_at is set) */
+  hasCompletedOnboarding?: boolean;
 }
 
 /**
  * Determine the redirect URL based on user's onboarding status
- * Checks all onboarding flags in order and returns the first incomplete step
- * Returns home route if all onboarding steps are complete
  *
- * @param options.hasFitnessProfile - If true, skip personalization (user already completed it before)
+ * V2 Flow:
+ * 1. Check notification permission
+ * 2. Check if personalization is complete (onboarding_completed_at)
+ * 3. If all complete → home
+ *
+ * @param options.hasCompletedOnboarding - If true, skip personalization (user.onboarding_completed_at is set)
  */
 export async function getRedirection(options: RedirectionOptions = {}): Promise<string> {
-  const { hasFitnessProfile } = options;
+  const { hasCompletedOnboarding } = options;
 
-  // Check onboarding flags in order
   try {
+    // Check if user has seen notification permission screen
     const hasSeenNotificationPermission = await storageUtil.getItem<boolean>(
       STORAGE_KEYS.HAS_SEEN_NOTIFICATION_PERMISSION
     );
@@ -25,15 +28,21 @@ export async function getRedirection(options: RedirectionOptions = {}): Promise<
       return MOBILE_ROUTES.ONBOARDING.NOTIFICATION_PERMISSION;
     }
 
+    // Check if user has completed V2 personalization
+    // Skip if:
+    // 1. User has seen it before (local storage), OR
+    // 2. User has onboarding_completed_at set (from API - handles reinstall case)
     const hasSeenPersonalization = await storageUtil.getItem<boolean>(
       STORAGE_KEYS.HAS_SEEN_PERSONALIZATION
     );
 
-    // Skip personalization if:
-    // 1. User has seen it before (local storage), OR
-    // 2. User already has a fitness profile (from API - handles reinstall case)
-    if (!hasSeenPersonalization && !hasFitnessProfile) {
+    if (!hasSeenPersonalization && !hasCompletedOnboarding) {
       return MOBILE_ROUTES.ONBOARDING.PERSONALIZATION;
+    }
+
+    if (hasCompletedOnboarding) {
+      // set hasSeenPersonalization to true
+      await storageUtil.setItem(STORAGE_KEYS.HAS_SEEN_PERSONALIZATION, true);
     }
 
     // All onboarding steps complete → home
@@ -43,4 +52,13 @@ export async function getRedirection(options: RedirectionOptions = {}): Promise<
     // On error, default to home
     return MOBILE_ROUTES.MAIN.HOME;
   }
+}
+
+/**
+ * Helper to check if user has completed V2 onboarding from user object
+ */
+export function hasCompletedV2Onboarding(
+  user: { onboarding_completed_at?: string | null } | null
+): boolean {
+  return !!user?.onboarding_completed_at;
 }

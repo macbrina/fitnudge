@@ -279,3 +279,23 @@ export const formatTimeAgo = (date: string | Date, options?: { addSuffix?: boole
 export const formatRelativeTime = (date: string | Date): string => {
   return formatTimeAgo(date, { addSuffix: true });
 };
+
+/**
+ * Format a time string (HH:MM) for display, respecting device locale settings
+ * Automatically uses 12-hour or 24-hour format based on device preferences
+ * @param timeString - Time in "HH:MM" format (e.g., "18:00", "09:30")
+ * @returns Formatted time string (e.g., "6:00 PM" or "18:00" based on device locale)
+ */
+export const formatReminderTime = (timeString: string): string => {
+  if (!timeString || !timeString.includes(":")) return "";
+
+  try {
+    const [hours, minutes] = timeString.split(":").map(Number);
+    const date = new Date();
+    date.setHours(hours, minutes, 0, 0);
+    return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  } catch (error) {
+    console.error("Error formatting reminder time:", error);
+    return timeString; // Return original on error
+  }
+};

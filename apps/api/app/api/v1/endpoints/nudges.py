@@ -26,6 +26,37 @@ NUDGE_TYPE_TO_NOTIFICATION_TYPE = {
     "custom": SocialNotificationType.PARTNER_NUDGE,  # Uses nudge template
 }
 
+# Map emoji names to Unicode emojis for notifications
+EMOJI_MAP = {
+    "clap": "👏",
+    "muscle": "💪",
+    "fire": "🔥",
+    "target": "🎯",
+    "star": "⭐",
+    "trophy": "🏆",
+    "rocket": "🚀",
+    "heart": "❤️",
+    "hands_up": "🙌",
+    "crown": "👑",
+    "wave": "👋",
+    "thumbs_up": "👍",
+    "sparkles": "✨",
+    "lightning": "⚡",
+    "checkmark": "✅",
+    "medal": "🥇",
+    "bicep": "💪",
+    "pray": "🙏",
+    "eyes": "👀",
+    "bell": "🔔",
+}
+
+
+def get_emoji(emoji_name: Optional[str]) -> str:
+    """Convert emoji name to Unicode emoji, or return as-is if already an emoji."""
+    if not emoji_name:
+        return ""
+    return EMOJI_MAP.get(emoji_name, emoji_name)
+
 
 # =====================================================
 # Pydantic Models
@@ -39,7 +70,6 @@ class NudgeCreate(BaseModel):
     emoji: Optional[str] = None
     # Context - at least one should be provided
     goal_id: Optional[str] = None
-    challenge_id: Optional[str] = None
     partnership_id: Optional[str] = None
 
 
@@ -53,9 +83,7 @@ class NudgeResponse(BaseModel):
     message: Optional[str]
     emoji: Optional[str]
     goal_id: Optional[str]
-    challenge_id: Optional[str]
     partnership_id: Optional[str]
-    is_ai_generated: bool
     is_read: bool
     created_at: str
     sender: Optional[dict] = None  # Include sender info for display
@@ -126,13 +154,18 @@ async def send_nudge(
         # Check daily limit
         limit = {"nudge": 1, "competitive": 3, "custom": 5}.get(data.nudge_type, 5)
 
+        # Use created_at date range for daily limit check
+        today_start = f"{today.isoformat()}T00:00:00"
+        today_end = f"{today.isoformat()}T23:59:59"
+
         existing_count = (
             supabase.table("social_nudges")
             .select("id", count="exact")
             .eq("sender_id", sender_id)
             .eq("recipient_id", data.recipient_id)
             .eq("nudge_type", data.nudge_type)
-            .eq("nudge_date", today.isoformat())
+            .gte("created_at", today_start)
+            .lte("created_at", today_end)
             .execute()
         )
 
@@ -156,17 +189,15 @@ async def send_nudge(
         "message": data.message,
         "emoji": data.emoji,
         "goal_id": data.goal_id,
-        "challenge_id": data.challenge_id,
         "partnership_id": data.partnership_id,
-        "is_ai_generated": False,
         "is_read": False,
-        "nudge_date": today.isoformat(),
     }
 
     try:
         result = supabase.table("social_nudges").insert(nudge_data).execute()
     except Exception as e:
         error_msg = str(e)
+        print(error_msg)
         if (
             "duplicate key" in error_msg.lower()
             or "unique constraint" in error_msg.lower()
@@ -209,23 +240,52 @@ async def send_nudge(
         data.nudge_type, SocialNotificationType.PARTNER_NUDGE
     )
 
-    # Build message for notification
-    notification_message = data.message or ""
-    if data.emoji:
-        notification_message = f"{data.emoji} {notification_message}".strip()
-    if not notification_message:
-        # Default messages for each type
-        default_messages = {
-            "nudge": "Time to check in!",
-            "cheer": "Keep up the great work!",
-            "milestone": "Congratulations on your milestone!",
-            "competitive": "Game on!",
-            "custom": "sent you a message",
-        }
-        notification_message = default_messages.get(data.nudge_type, "sent you a nudge")
+    # Build message for notification based on context
+    sender_name = current_user.get("name", "Your partner")
+    emoji = get_emoji(data.emoji)  # Convert emoji name to Unicode
+    notification_message = ""
+
+    if data.nudge_type == "cheer":
+        # Cheers: emphasize the emoji reaction
+        if emoji and data.message:
+            notification_message = f"{sender_name} sent {emoji}: {data.message}"
+        elif emoji:
+            notification_message = f"{sender_name} sent you {emoji}"
+        elif data.message:
+            notification_message = f"{sender_name}: {data.message}"
+        else:
+            notification_message = f"{sender_name} cheered you on! 👏"
+    elif data.nudge_type == "nudge":
+        # Nudges: motivational push
+        if data.message:
+            notification_message = (
+                f"{emoji} {data.message}".strip() if emoji else data.message
+            )
+        else:
+            notification_message = (
+                f"{emoji} Time to check in!".strip()
+                if emoji
+                else "👋 Time to check in!"
+            )
+    elif data.nudge_type == "milestone":
+        notification_message = data.message or "🎉 Congratulations on your milestone!"
+    elif data.nudge_type == "competitive":
+        notification_message = (
+            f"{emoji} {data.message}".strip()
+            if emoji and data.message
+            else (data.message or "⚡ Game on!")
+        )
+    elif data.nudge_type == "custom":
+        notification_message = data.message or "sent you a message"
+        if emoji:
+            notification_message = f"{emoji} {notification_message}"
+    else:
+        notification_message = data.message or "sent you a nudge"
+        if emoji:
+            notification_message = f"{emoji} {notification_message}"
 
     # Deep link always goes to ActivityScreen (nudge inbox)
-    # User can see the nudge details first, then tap to go to goal/challenge
+    # User can see the nudge details first, then tap to go to goal
     deep_link = "/(user)/profile/activity"
 
     async def send_notification_task():
@@ -238,7 +298,6 @@ async def send_nudge(
                 message=notification_message,
                 partnership_id=data.partnership_id,
                 goal_id=data.goal_id,
-                challenge_id=data.challenge_id,
                 entity_type="nudge",
                 entity_id=nudge["id"],
                 deep_link=deep_link,
@@ -269,9 +328,7 @@ async def send_nudge(
         message=nudge.get("message"),
         emoji=nudge.get("emoji"),
         goal_id=nudge.get("goal_id"),
-        challenge_id=nudge.get("challenge_id"),
         partnership_id=nudge.get("partnership_id"),
-        is_ai_generated=nudge.get("is_ai_generated", False),
         is_read=nudge.get("is_read", False),
         created_at=nudge["created_at"],
         sender=sender_info,
@@ -317,9 +374,7 @@ async def get_nudges(
                 message=n.get("message"),
                 emoji=n.get("emoji"),
                 goal_id=n.get("goal_id"),
-                challenge_id=n.get("challenge_id"),
                 partnership_id=n.get("partnership_id"),
-                is_ai_generated=n.get("is_ai_generated", False),
                 is_read=n.get("is_read", False),
                 created_at=n["created_at"],
                 sender=n.get("sender"),
@@ -363,9 +418,7 @@ async def get_sent_nudges(
                 message=n.get("message"),
                 emoji=n.get("emoji"),
                 goal_id=n.get("goal_id"),
-                challenge_id=n.get("challenge_id"),
                 partnership_id=n.get("partnership_id"),
-                is_ai_generated=n.get("is_ai_generated", False),
                 is_read=n.get("is_read", False),
                 created_at=n["created_at"],
                 sender=None,  # Sender is current user

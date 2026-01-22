@@ -51,7 +51,7 @@ const makeLoadingOverlayStyles = (tokens: any, colors: any, brand: any) => ({
     elevation: 999 // For Android
   },
   container: {
-    backgroundColor: colors.bg.canvas,
+    backgroundColor: colors.bg.card,
     borderRadius: toRN(tokens.borderRadius.xl),
     padding: toRN(tokens.spacing[8]),
     alignItems: "center" as const,

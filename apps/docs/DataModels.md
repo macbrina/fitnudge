@@ -7,8 +7,8 @@
 **Database**: PostgreSQL via Supabase  
 **Primary Keys**: UUID (universally unique identifiers)  
 **Relationships**: Cascade delete for data integrity  
-**Realtime**: Enabled for social features (posts, likes, comments)  
-**Indexing**: Comprehensive strategy for performance optimization
+**Realtime**: Enabled for partners, nudges, and notifications  
+**Row Level Security**: Enabled on all tables
 
 ---
 
@@ -20,9 +20,8 @@
 
 ```sql
 CREATE TABLE users (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     email TEXT UNIQUE NOT NULL,
-    password_hash TEXT, -- NULL for OAuth users
     name TEXT NOT NULL,
     username TEXT UNIQUE,
     profile_picture_url TEXT,
@@ -30,37 +29,18 @@ CREATE TABLE users (
     plan TEXT DEFAULT 'free' CHECK (plan IN ('free', 'premium')),
     timezone TEXT DEFAULT 'UTC',
     language TEXT DEFAULT 'en',
+    motivation_style TEXT DEFAULT 'supportive' CHECK (motivation_style IN ('supportive', 'tough_love', 'balanced', 'analytical')),
     is_active BOOLEAN DEFAULT true,
     email_verified BOOLEAN DEFAULT false,
-    auth_provider TEXT DEFAULT 'email' CHECK (auth_provider IN ('email', 'apple', 'google')),
-    last_login_at TIMESTAMP,
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
+    expo_push_token TEXT,
+    morning_motivation_enabled BOOLEAN DEFAULT true,
+    morning_motivation_time TIME DEFAULT '08:00',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 ```
 
-**oauth_accounts**
-
-```sql
-CREATE TABLE oauth_accounts (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    provider TEXT NOT NULL CHECK (provider IN ('apple', 'google')),
-    provider_user_id TEXT NOT NULL, -- Apple/Google user ID
-    provider_email TEXT,
-    provider_name TEXT,
-    provider_picture TEXT,
-    access_token TEXT, -- encrypted
-    refresh_token TEXT, -- encrypted
-    token_expires_at TIMESTAMP,
-    raw_user_data JSONB, -- store full OAuth response
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW(),
-    UNIQUE(provider, provider_user_id)
-);
-```
-
-### 🎯 Goals & Progress
+### 🎯 Goals & Check-ins
 
 **goals**
 
@@ -70,13 +50,22 @@ CREATE TABLE goals (
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
     description TEXT,
-    category TEXT CHECK (category IN ('fitness', 'nutrition', 'wellness', 'mindfulness', 'sleep')),
-    frequency TEXT NOT NULL, -- 'daily', 'weekly', 'custom'
-    target_days INTEGER, -- for weekly goals
-    reminder_times TEXT[], -- array of times like ['09:00', '18:00']
-    is_active BOOLEAN DEFAULT true,
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
+    emoji TEXT DEFAULT '🎯',
+    category TEXT CHECK (category IN ('fitness', 'wellness', 'learning', 'productivity', 'mindfulness', 'health', 'other')),
+    frequency_type TEXT NOT NULL DEFAULT 'daily' CHECK (frequency_type IN ('daily', 'weekly')),
+    target_days_per_week INTEGER DEFAULT 7 CHECK (target_days_per_week BETWEEN 1 AND 7),
+    reminder_times JSONB DEFAULT '["09:00"]',
+    status TEXT DEFAULT 'active' CHECK (status IN ('active', 'paused', 'completed', 'archived')),
+    current_streak INTEGER DEFAULT 0,
+    longest_streak INTEGER DEFAULT 0,
+    total_completions INTEGER DEFAULT 0,
+    streak_start_date DATE,
+    last_checkin_date DATE,
+    last_completed_date DATE,
+    week_completions INTEGER DEFAULT 0,
+    week_start_date DATE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 ```
 
@@ -87,232 +76,230 @@ CREATE TABLE check_ins (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     goal_id UUID NOT NULL REFERENCES goals(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    date DATE NOT NULL,
-    completed BOOLEAN NOT NULL,
-    reflection TEXT,
-    mood INTEGER CHECK (mood >= 1 AND mood <= 5), -- 1-5 scale
-    created_at TIMESTAMP DEFAULT NOW(),
-    UNIQUE(goal_id, date)
+    check_in_date DATE NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'skipped', 'missed', 'rest_day')),
+    mood TEXT CHECK (mood IN ('great', 'good', 'okay', 'tired', 'stressed')),
+    skip_reason TEXT CHECK (skip_reason IN ('work', 'tired', 'sick', 'schedule', 'other')),
+    note TEXT,
+    voice_note_url TEXT,
+    voice_note_duration INTEGER,
+    ai_response TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(user_id, goal_id, check_in_date)
 );
+
+-- V2: status is the single source of truth
+-- pending: Pre-created, awaiting user response
+-- completed: User checked in (Yes)
+-- skipped: User explicitly skipped (No + optional skip_reason)
+-- missed: Day passed without response (set by Celery task)
+-- rest_day: User marked as rest day
 ```
 
-**motivations**
+### 🤖 AI & Motivation
+
+**daily_motivations**
 
 ```sql
-CREATE TABLE motivations (
+CREATE TABLE daily_motivations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    goal_id UUID REFERENCES goals(id) ON DELETE CASCADE,
     message TEXT NOT NULL,
-    message_type TEXT DEFAULT 'ai' CHECK (message_type IN ('ai', 'community', 'system')),
+    motivation_date DATE NOT NULL,
     is_sent BOOLEAN DEFAULT false,
-    scheduled_for TIMESTAMP,
-    sent_at TIMESTAMP,
-    created_at TIMESTAMP DEFAULT NOW()
+    sent_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(user_id, motivation_date)
 );
 ```
 
-### 🌐 Social Features
-
-**posts**
+**ai_coach_sessions**
 
 ```sql
-CREATE TABLE posts (
+CREATE TABLE ai_coach_sessions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    content TEXT,
-    media_url TEXT, -- for voice posts
-    media_type TEXT CHECK (media_type IN ('text', 'voice', 'image')),
-    is_public BOOLEAN DEFAULT true,
-    likes_count INTEGER DEFAULT 0,
-    comments_count INTEGER DEFAULT 0,
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
+    goal_id UUID REFERENCES goals(id) ON DELETE SET NULL,
+    title TEXT,
+    status TEXT DEFAULT 'active' CHECK (status IN ('active', 'archived')),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 ```
 
-**comments**
+**ai_coach_messages**
 
 ```sql
-CREATE TABLE comments (
+CREATE TABLE ai_coach_messages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    post_id UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+    session_id UUID NOT NULL REFERENCES ai_coach_sessions(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
     content TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 ```
 
-**likes**
+### 👥 Accountability Partners
+
+**accountability_partners**
 
 ```sql
-CREATE TABLE likes (
+CREATE TABLE accountability_partners (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    post_id UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    reaction_type TEXT DEFAULT 'like' CHECK (reaction_type IN ('like', 'cheer', 'love')),
-    created_at TIMESTAMP DEFAULT NOW(),
-    UNIQUE(post_id, user_id)
+    requester_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    recipient_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'active', 'declined', 'blocked')),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(requester_id, recipient_id)
 );
 ```
 
-**follows**
+**nudges**
 
 ```sql
-CREATE TABLE follows (
+CREATE TABLE nudges (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    follower_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    following_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    created_at TIMESTAMP DEFAULT NOW(),
-    UNIQUE(follower_id, following_id),
-    CHECK(follower_id != following_id)
+    sender_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    recipient_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    nudge_type TEXT NOT NULL CHECK (nudge_type IN ('cheer', 'nudge', 'celebrate')),
+    message TEXT,
+    goal_id UUID REFERENCES goals(id) ON DELETE SET NULL,
+    check_in_id UUID REFERENCES check_ins(id) ON DELETE SET NULL,
+    is_read BOOLEAN DEFAULT false,
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 ```
 
-**feed_preferences**
+### 🔔 Notifications
+
+**notification_history**
 
 ```sql
-CREATE TABLE feed_preferences (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    show_ai_posts BOOLEAN DEFAULT true,
-    show_community_posts BOOLEAN DEFAULT true,
-    show_following_only BOOLEAN DEFAULT false,
-    categories TEXT[], -- array of categories to show
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
-);
-```
-
-### 💳 Subscriptions & Payments
-
-**subscriptions**
-
-```sql
-CREATE TABLE subscriptions (
+CREATE TABLE notification_history (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    plan TEXT NOT NULL CHECK (plan IN ('free', 'premium')),
-    status TEXT NOT NULL CHECK (status IN ('active', 'cancelled', 'expired', 'past_due')),
-    platform TEXT NOT NULL CHECK (platform IN ('ios', 'android')),
-    product_id TEXT NOT NULL, -- Apple/Google product ID
-    original_transaction_id TEXT, -- Apple/Google transaction ID
-    purchase_date TIMESTAMP NOT NULL,
-    expires_date TIMESTAMP,
-    auto_renew BOOLEAN DEFAULT true,
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
+    notification_type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    data JSONB,
+    entity_type TEXT,
+    entity_id UUID,
+    is_read BOOLEAN DEFAULT false,
+    sent_at TIMESTAMPTZ DEFAULT NOW(),
+    read_at TIMESTAMPTZ
 );
 ```
 
-**iap_receipts**
+**notification_preferences**
 
 ```sql
-CREATE TABLE iap_receipts (
+CREATE TABLE notification_preferences (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    enabled BOOLEAN DEFAULT true,
+    reminder_enabled BOOLEAN DEFAULT true,
+    motivation_enabled BOOLEAN DEFAULT true,
+    partner_enabled BOOLEAN DEFAULT true,
+    achievement_enabled BOOLEAN DEFAULT true,
+    weekly_recap BOOLEAN DEFAULT true,
+    quiet_hours_enabled BOOLEAN DEFAULT false,
+    quiet_hours_start TIME DEFAULT '22:00',
+    quiet_hours_end TIME DEFAULT '07:00',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+### 🏆 Achievements
+
+**achievements**
+
+```sql
+CREATE TABLE achievements (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    subscription_id UUID REFERENCES subscriptions(id) ON DELETE CASCADE,
-    platform TEXT NOT NULL CHECK (platform IN ('ios', 'android')),
-    transaction_id TEXT NOT NULL,
-    product_id TEXT NOT NULL,
-    receipt_data TEXT NOT NULL, -- encrypted receipt
-    purchase_date TIMESTAMP NOT NULL,
-    expires_date TIMESTAMP,
-    is_sandbox BOOLEAN DEFAULT false,
-    created_at TIMESTAMP DEFAULT NOW()
+    achievement_type TEXT NOT NULL,
+    unlocked_at TIMESTAMPTZ DEFAULT NOW(),
+    notified BOOLEAN DEFAULT false,
+    UNIQUE(user_id, achievement_type)
 );
 ```
 
-**offer_codes**
+**achievement_definitions**
 
 ```sql
-CREATE TABLE offer_codes (
+CREATE TABLE achievement_definitions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    code TEXT UNIQUE NOT NULL,
-    offer_type TEXT NOT NULL CHECK (offer_type IN ('introductory', 'promotional', 'win_back')),
-    platform TEXT NOT NULL CHECK (platform IN ('ios', 'android')),
-    product_id TEXT NOT NULL,
-    discount_percentage INTEGER, -- for percentage discounts
-    discount_amount DECIMAL(10,2), -- for fixed amount discounts
-    duration_days INTEGER, -- for time-limited offers
-    max_uses INTEGER,
-    used_count INTEGER DEFAULT 0,
-    is_active BOOLEAN DEFAULT true,
-    valid_from TIMESTAMP,
-    valid_until TIMESTAMP,
-    created_at TIMESTAMP DEFAULT NOW()
+    type TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT NOT NULL,
+    icon TEXT NOT NULL,
+    points INTEGER DEFAULT 10,
+    category TEXT CHECK (category IN ('streak', 'completion', 'social', 'milestone')),
+    requirement_value INTEGER,
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 ```
 
-### 👨‍💼 Admin & Management
+### 📊 Analytics & Insights
 
-**admin_users**
+**weekly_recaps**
 
 ```sql
-CREATE TABLE admin_users (
+CREATE TABLE weekly_recaps (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    role TEXT NOT NULL CHECK (role IN ('admin', 'moderator', 'support')),
-    permissions JSONB, -- specific permissions
-    is_active BOOLEAN DEFAULT true,
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
+    week_start DATE NOT NULL,
+    week_end DATE NOT NULL,
+    total_goals INTEGER DEFAULT 0,
+    completed_checkins INTEGER DEFAULT 0,
+    total_checkins INTEGER DEFAULT 0,
+    completion_rate NUMERIC(5,2) DEFAULT 0,
+    best_streak INTEGER DEFAULT 0,
+    insights JSONB,
+    ai_summary TEXT,
+    is_sent BOOLEAN DEFAULT false,
+    sent_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(user_id, week_start)
 );
 ```
 
-**audit_logs**
+**pattern_insights**
 
 ```sql
-CREATE TABLE audit_logs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    admin_user_id UUID REFERENCES admin_users(id),
-    action TEXT NOT NULL,
-    resource_type TEXT NOT NULL,
-    resource_id UUID,
-    old_values JSONB,
-    new_values JSONB,
-    ip_address INET,
-    user_agent TEXT,
-    created_at TIMESTAMP DEFAULT NOW()
-);
-```
-
-### 📱 Media & Files
-
-**media_uploads**
-
-```sql
-CREATE TABLE media_uploads (
+CREATE TABLE pattern_insights (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    post_id UUID REFERENCES posts(id) ON DELETE CASCADE,
-    cloudflare_r2_key TEXT NOT NULL,
-    cloudflare_r2_url TEXT NOT NULL,
-    file_type TEXT NOT NULL,
-    file_size INTEGER,
-    duration INTEGER, -- for audio/video files
-    created_at TIMESTAMP DEFAULT NOW()
+    insight_type TEXT NOT NULL,
+    insight_data JSONB NOT NULL,
+    confidence NUMERIC(3,2),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    expires_at TIMESTAMPTZ
 );
 ```
 
-### 📝 Blog & Content
+### 📝 Blog
 
 **blog_posts**
 
 ```sql
 CREATE TABLE blog_posts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    title TEXT NOT NULL,
     slug TEXT UNIQUE NOT NULL,
-    content TEXT NOT NULL, -- rich text content
+    title TEXT NOT NULL,
     excerpt TEXT,
-    featured_image_url TEXT,
+    content TEXT NOT NULL,
+    cover_image_url TEXT,
+    author_name TEXT DEFAULT 'FitNudge Team',
     status TEXT DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'archived')),
-    author_id UUID NOT NULL REFERENCES users(id),
-    published_at TIMESTAMP,
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
+    published_at TIMESTAMPTZ,
+    view_count INTEGER DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 ```
 
@@ -324,402 +311,78 @@ CREATE TABLE blog_categories (
     name TEXT NOT NULL,
     slug TEXT UNIQUE NOT NULL,
     description TEXT,
-    created_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 ```
 
-**blog_post_categories**
+### 💳 Subscriptions
+
+**subscriptions**
 
 ```sql
-CREATE TABLE blog_post_categories (
+CREATE TABLE subscriptions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    post_id UUID NOT NULL REFERENCES blog_posts(id) ON DELETE CASCADE,
-    category_id UUID NOT NULL REFERENCES blog_categories(id) ON DELETE CASCADE,
-    created_at TIMESTAMP DEFAULT NOW(),
-    UNIQUE(post_id, category_id)
+    user_id UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    revenuecat_customer_id TEXT,
+    plan_id TEXT DEFAULT 'free',
+    status TEXT DEFAULT 'active' CHECK (status IN ('active', 'expired', 'cancelled', 'grace_period')),
+    current_period_start TIMESTAMPTZ,
+    current_period_end TIMESTAMPTZ,
+    auto_renew BOOLEAN DEFAULT true,
+    platform TEXT CHECK (platform IN ('ios', 'android', 'web')),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 ```
 
-**blog_tags**
+**user_reports**
 
 ```sql
-CREATE TABLE blog_tags (
+CREATE TABLE user_reports (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name TEXT NOT NULL,
-    slug TEXT UNIQUE NOT NULL,
-    created_at TIMESTAMP DEFAULT NOW()
-);
-```
-
-**blog_post_tags**
-
-```sql
-CREATE TABLE blog_post_tags (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    post_id UUID NOT NULL REFERENCES blog_posts(id) ON DELETE CASCADE,
-    tag_id UUID NOT NULL REFERENCES blog_tags(id) ON DELETE CASCADE,
-    created_at TIMESTAMP DEFAULT NOW(),
-    UNIQUE(post_id, tag_id)
-);
-```
-
-### 🔒 Privacy & Compliance
-
-**user_consents**
-
-```sql
-CREATE TABLE user_consents (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    consent_type TEXT NOT NULL CHECK (consent_type IN ('marketing', 'analytics', 'data_processing')),
-    granted BOOLEAN NOT NULL,
-    granted_at TIMESTAMP,
-    revoked_at TIMESTAMP,
-    ip_address INET,
-    user_agent TEXT,
-    created_at TIMESTAMP DEFAULT NOW()
-);
-```
-
-### 🎯 Goal Templates
-
-**goal_templates**
-
-```sql
-CREATE TABLE goal_templates (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    title TEXT NOT NULL,  -- Changed from 'name' to match goals table
-    description TEXT,
-    category goal_category NOT NULL,  -- Use enum instead of TEXT
-    frequency goal_frequency NOT NULL,  -- Use enum instead of TEXT
-    target_days INTEGER,
-    reminder_times TEXT[],
-    is_ai_generated BOOLEAN DEFAULT false,  -- Track AI vs manual templates
-    match_reason TEXT,  -- For AI suggestion reasoning
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    reporter_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    reported_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    reason TEXT NOT NULL CHECK (reason IN ('inappropriate_username', 'harassment', 'spam', 'other')),
+    details TEXT,
+    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'reviewed', 'resolved', 'dismissed')),
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 ```
 
 ---
 
-## 🔍 Indexes
+## 📊 Materialized Views (Analytics)
 
-### Performance Indexes
+**mv_user_daily_stats** - Pre-aggregated daily stats per user for analytics dashboard
 
-```sql
--- Users
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_username ON users(username);
-CREATE INDEX idx_users_auth_provider ON users(auth_provider);
-CREATE INDEX idx_users_plan ON users(plan);
+**mv_goal_stats** - Pre-aggregated goal completion rates
 
--- OAuth
-CREATE INDEX idx_oauth_accounts_user_id ON oauth_accounts(user_id);
-CREATE INDEX idx_oauth_accounts_provider_user_id ON oauth_accounts(provider, provider_user_id);
+---
 
--- Goals & Progress
-CREATE INDEX idx_goals_user_id ON goals(user_id);
-CREATE INDEX idx_goals_category ON goals(category);
-CREATE INDEX idx_check_ins_goal_id ON check_ins(goal_id);
-CREATE INDEX idx_check_ins_date ON check_ins(date);
-CREATE INDEX idx_check_ins_user_id ON check_ins(user_id);
+## 🔗 Key Relationships
 
--- Social Features
-CREATE INDEX idx_posts_user_id ON posts(user_id);
-CREATE INDEX idx_posts_created_at ON posts(created_at DESC);
-CREATE INDEX idx_posts_media_type ON posts(media_type);
-CREATE INDEX idx_comments_post_id ON comments(post_id);
-CREATE INDEX idx_likes_post_id ON likes(post_id);
-CREATE INDEX idx_likes_user_id ON likes(user_id);
-CREATE INDEX idx_follows_follower_id ON follows(follower_id);
-CREATE INDEX idx_follows_following_id ON follows(following_id);
-
--- Subscriptions
-CREATE INDEX idx_subscriptions_user_id ON subscriptions(user_id);
-CREATE INDEX idx_subscriptions_status ON subscriptions(status);
-CREATE INDEX idx_subscriptions_platform ON subscriptions(platform);
-CREATE INDEX idx_iap_receipts_user_id ON iap_receipts(user_id);
-CREATE INDEX idx_iap_receipts_transaction_id ON iap_receipts(transaction_id);
-
--- Blog
-CREATE INDEX idx_blog_posts_slug ON blog_posts(slug);
-CREATE INDEX idx_blog_posts_status ON blog_posts(status);
-CREATE INDEX idx_blog_posts_published_at ON blog_posts(published_at DESC);
+```
+users
+  ├── goals (1:many)
+  │     └── check_ins (1:many)
+  ├── daily_motivations (1:many)
+  ├── ai_coach_sessions (1:many)
+  │     └── ai_coach_messages (1:many)
+  ├── accountability_partners (many:many via join)
+  ├── nudges (sender/recipient)
+  ├── notification_history (1:many)
+  ├── notification_preferences (1:1)
+  ├── achievements (1:many)
+  ├── weekly_recaps (1:many)
+  ├── pattern_insights (1:many)
+  └── subscriptions (1:1)
 ```
 
 ---
 
-## 🔐 Row Level Security (RLS)
-
-### Users Table
-
-```sql
--- Users can read their own data
-CREATE POLICY "Users can read own data" ON users
-    FOR SELECT USING (auth.uid() = id);
-
--- Users can update their own data
-CREATE POLICY "Users can update own data" ON users
-    FOR UPDATE USING (auth.uid() = id);
-```
-
-### OAuth Accounts
-
-```sql
--- Users can read their own OAuth accounts
-CREATE POLICY "Users can read own oauth accounts" ON oauth_accounts
-    FOR SELECT USING (auth.uid() = user_id);
-```
-
-### Posts
-
-```sql
--- All users can read public posts
-CREATE POLICY "Anyone can read public posts" ON posts
-    FOR SELECT USING (is_public = true);
-
--- Users can create their own posts
-CREATE POLICY "Users can create posts" ON posts
-    FOR INSERT WITH CHECK (auth.uid() = user_id);
-
--- Users can update their own posts
-CREATE POLICY "Users can update own posts" ON posts
-    FOR UPDATE USING (auth.uid() = user_id);
-```
-
-### Admin Tables
-
-```sql
--- Only admins can access admin tables
-CREATE POLICY "Only admins can access admin_users" ON admin_users
-    FOR ALL USING (
-        EXISTS (
-            SELECT 1 FROM admin_users au
-            WHERE au.user_id = auth.uid()
-            AND au.role = 'admin'
-            AND au.is_active = true
-        )
-    );
-```
-
----
-
-## 📊 Sample Data
-
-### Test Users
-
-```sql
--- Test user with email/password
-INSERT INTO users (email, password_hash, name, username, auth_provider)
-VALUES ('test@fitnudge.app', '$2b$12$...', 'Test User', 'testuser', 'email');
-
--- Test user with Apple Sign In
-INSERT INTO users (email, name, username, auth_provider)
-VALUES ('user@privaterelay.appleid.com', 'Apple User', 'appleuser', 'apple');
-
-INSERT INTO oauth_accounts (user_id, provider, provider_user_id, provider_email, provider_name)
-VALUES (
-    (SELECT id FROM users WHERE email = 'user@privaterelay.appleid.com'),
-    'apple',
-    '000123.abc456def789',
-    'user@privaterelay.appleid.com',
-    'Apple User'
-);
-```
-
-### Goal Templates
-
-```sql
-INSERT INTO goal_templates (title, description, category, frequency, target_days, reminder_times, is_ai_generated, match_reason) VALUES
-('Gym 3x Weekly', 'Go to the gym 3 times per week', 'fitness', 'weekly', 3, ARRAY['09:00', '18:00'], false, 'Perfect for beginners starting their fitness journey'),
-('Daily Workout', 'Exercise every day', 'fitness', 'daily', 7, ARRAY['07:00'], false, 'Great for building consistent habits'),
-('Morning Run', 'Run every morning', 'fitness', 'daily', 7, ARRAY['06:00'], false, 'Outdoor activity to start your day'),
-('Strength Building', 'Build muscle and strength through progressive training', 'fitness', 'weekly', 4, ARRAY['18:00'], false, 'Focused on muscle building');
-```
-
-### Blog Categories
-
-```sql
-INSERT INTO blog_categories (name, slug, description) VALUES
-('Success Stories', 'success-stories', 'Real user transformation stories'),
-('AI Motivation', 'ai-motivation', 'How AI helps with fitness motivation'),
-('Fitness Tips', 'fitness-tips', 'Expert fitness advice and tips'),
-('Industry News', 'industry-news', 'Latest fitness industry updates');
-```
-
----
-
-## 🔄 Realtime Configuration
-
-### ⚡ Critical: Realtime-Enabled Tables
-
-**All implementations using these tables MUST use Supabase Realtime for instant updates.**
-
-#### 🔒 **PHASE 1: Security & User Management**
-
-- ✅ **`users`** - Force logout on ban/suspend/disable (CRITICAL)
-
-#### 🎯 **PHASE 2: Core Features**
-
-- ✅ **`check_ins`** - Instant updates when Celery creates/completes check-ins
-- ✅ **`goals`** - Multi-device goal sync, CRUD operations
-- ✅ **`actionable_plans`** - Real-time AI plan generation status (generating → completed)
-- ✅ **`daily_motivations`** - Instant motivation regeneration updates
-
-#### 🔔 **PHASE 3: Notifications & Motivation**
-
-- ✅ **`motivations`** - Scheduled push notification status tracking
-- ✅ **`notification_history`** - Delivery tracking, analytics
-
-#### 🍎 **PHASE 4: Meal Tracking**
-
-- ✅ **`meal_logs`** - Real-time meal logging, multi-device sync
-- ✅ **`daily_nutrition_summaries`** - Auto-updated nutrition totals
-
-#### 🏆 **PHASE 5: Gamification & Social**
-
-- ✅ **`achievement_types`** - New badges added by admins
-- ✅ **`user_achievements`** - Instant badge unlock notifications
-- ✅ **`accountability_partners`** - Partner request status changes
-- ✅ **`challenges`** - Live challenge updates
-- ✅ **`challenge_participants`** - Join/leave updates
-- ✅ **`challenge_leaderboard`** - Live competitive rankings
-
-#### 🌐 **Already Enabled: Social Features**
-
-- ✅ **`posts`** - Real-time feed updates
-- ✅ **`comments`** - Live comment threads
-- ✅ **`likes`** - Instant reaction updates
-- ✅ **`follows`** - Follow/unfollow notifications
-
----
-
-### 📋 Implementation Requirements
-
-**When implementing features using Realtime-enabled tables:**
-
-1. **Subscribe to table changes** using Supabase Realtime client
-2. **Auto-invalidate React Query cache** on INSERT/UPDATE/DELETE events
-3. **Handle connection/reconnection** gracefully with exponential backoff
-4. **Force logout** on `users` table status changes (disabled/suspended)
-5. **Use optimistic updates** for better UX during network delays
-6. **Clean up subscriptions** on component unmount to prevent memory leaks
-
-**Example Implementation:**
-
-```typescript
-// Mobile: apps/mobile/src/services/realtime/realtimeService.ts
-// Subscribe to check_ins table for instant updates
-supabase
-  .channel("check_ins_changes")
-  .on(
-    "postgres_changes",
-    { event: "*", schema: "public", table: "check_ins" },
-    (payload) => {
-      // Invalidate React Query cache for check-ins
-      queryClient.invalidateQueries({ queryKey: ["check-ins"] });
-    }
-  )
-  .subscribe();
-```
-
----
-
-### Enable Realtime via Migration
-
-```sql
--- See: apps/api/supabase/migrations/20251203000000_enable_realtime_for_core_tables.sql
--- Uses conditional enablement to avoid errors if already enabled
-
-SELECT add_table_to_realtime_if_not_exists('users');
-SELECT add_table_to_realtime_if_not_exists('check_ins');
-SELECT add_table_to_realtime_if_not_exists('goals');
--- ... (18 tables total)
-```
-
-### Realtime Filters
-
-```sql
--- Only send realtime updates for public posts
-ALTER TABLE posts REPLICA IDENTITY FULL;
-```
-
----
-
-## 📈 Analytics Views
-
-### User Engagement Summary
-
-```sql
-CREATE VIEW user_engagement_summary AS
-SELECT
-    u.id,
-    u.username,
-    u.plan,
-    COUNT(DISTINCT g.id) as total_goals,
-    COUNT(DISTINCT ci.id) as total_check_ins,
-    COUNT(DISTINCT p.id) as total_posts,
-    COUNT(DISTINCT f.follower_id) as followers_count,
-    COUNT(DISTINCT f2.following_id) as following_count,
-    AVG(ci.mood) as avg_mood
-FROM users u
-LEFT JOIN goals g ON u.id = g.user_id
-LEFT JOIN check_ins ci ON g.id = ci.goal_id
-LEFT JOIN posts p ON u.id = p.user_id
-LEFT JOIN follows f ON u.id = f.following_id
-LEFT JOIN follows f2 ON u.id = f2.follower_id
-GROUP BY u.id, u.username, u.plan;
-```
-
-### Subscription Analytics
-
-```sql
-CREATE VIEW subscription_analytics AS
-SELECT
-    plan,
-    status,
-    platform,
-    COUNT(*) as user_count,
-    AVG(EXTRACT(EPOCH FROM (expires_date - purchase_date))/86400) as avg_duration_days
-FROM subscriptions
-GROUP BY plan, status, platform;
-```
-
----
-
-## 🚀 Migration Strategy
-
-### Initial Migration
-
-1. Create all tables with proper constraints
-2. Set up indexes for performance
-3. Configure RLS policies
-4. Enable realtime for social features
-5. Create analytics views
-6. Insert sample data for development
-
-### Future Migrations
-
-- Use Alembic for version-controlled migrations
-- Test migrations on staging environment
-- Backup database before major changes
-- Use blue-green deployment for zero downtime
-
----
-
-## 🔧 Maintenance
-
-### Regular Tasks
-
-- Monitor slow queries and optimize indexes
-- Clean up old audit logs (retention policy)
-- Archive old posts and media files
-- Update statistics for query optimization
-- Monitor RLS policy performance
-
-### Backup Strategy
-
-- Daily automated backups
-- Point-in-time recovery capability
-- Cross-region backup replication
-- Test restore procedures monthly
+## 🔒 Row Level Security
+
+All tables have RLS enabled with policies ensuring:
+- Users can only read/write their own data
+- Partners can see limited data of connected users
+- Admins have full access via service role

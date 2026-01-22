@@ -22,12 +22,12 @@ export const ProgressIllustration: React.FC<ProgressIllustrationProps> = ({
 }) => {
   return (
     <Svg width={width} height={height} viewBox="0 0 280 280">
-      <Defs>
+      {/* <Defs>
         <LinearGradient id="purpleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
           <Stop offset="0%" stopColor="#afabf8" />
           <Stop offset="100%" stopColor="#d1cffa" />
         </LinearGradient>
-      </Defs>
+      </Defs> */}
 
       {/* Purple rounded rectangle background */}
       <Rect x="40" y="40" width="200" height="200" fill="url(#purpleGradient)" rx="20" />

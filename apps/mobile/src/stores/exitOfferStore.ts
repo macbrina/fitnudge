@@ -24,6 +24,7 @@ import { storageUtil, STORAGE_KEYS } from "@/utils/storageUtil";
 // Use the same storage keys as storageUtil for consistency
 const EXIT_OFFER_LAST_SHOWN = STORAGE_KEYS.EXIT_OFFER_LAST_SHOWN;
 const EXIT_OFFER_SHOW_COUNT = STORAGE_KEYS.EXIT_OFFER_SHOW_COUNT;
+const EXIT_OFFER_EXPIRY_TIME = STORAGE_KEYS.EXIT_OFFER_EXPIRY_TIME;
 const HAS_EVER_SUBSCRIBED = STORAGE_KEYS.HAS_EVER_SUBSCRIBED;
 const HAS_DISMISSED_EXIT_INTENT = STORAGE_KEYS.HAS_DISMISSED_EXIT_INTENT;
 
@@ -74,14 +75,18 @@ export const useExitOfferStore = create<ExitOfferState>((set, get) => ({
   hasCheckedProactive: false,
   showExitIntentModal: false,
 
-  setExitOffer: (expiryTime: Date) => {
+  setExitOffer: async (expiryTime: Date) => {
+    // Persist to storage
+    await storageUtil.setItem(EXIT_OFFER_EXPIRY_TIME, expiryTime.toISOString());
     set({
       expiryTime,
       isActive: true
     });
   },
 
-  clearExitOffer: () => {
+  clearExitOffer: async () => {
+    // Remove from storage
+    await storageUtil.removeItem(EXIT_OFFER_EXPIRY_TIME);
     set({
       expiryTime: null,
       isActive: false
@@ -132,8 +137,9 @@ export const useExitOfferStore = create<ExitOfferState>((set, get) => ({
     const now = Date.now();
     const remaining = Math.max(0, Math.floor((expiryTime.getTime() - now) / 1000));
 
-    // Auto-clear if expired
+    // Auto-clear if expired (async, but don't block return)
     if (remaining <= 0) {
+      storageUtil.removeItem(EXIT_OFFER_EXPIRY_TIME).catch(console.error);
       set({ expiryTime: null, isActive: false });
     }
 
@@ -266,6 +272,8 @@ export const useExitOfferStore = create<ExitOfferState>((set, get) => ({
 
     // Start the countdown
     const expiryTime = new Date(Date.now() + COUNTDOWN_MINUTES * 60 * 1000);
+    // Persist to storage
+    await storageUtil.setItem(EXIT_OFFER_EXPIRY_TIME, expiryTime.toISOString());
     set({
       expiryTime,
       isActive: true
@@ -288,6 +296,9 @@ export const useExitOfferStore = create<ExitOfferState>((set, get) => ({
     await storageUtil.removeItem(EXIT_OFFER_SHOW_COUNT);
     await storageUtil.removeItem(HAS_EVER_SUBSCRIBED);
     await storageUtil.removeItem(HAS_DISMISSED_EXIT_INTENT);
+
+    // Clear expiryTime from storage
+    await storageUtil.removeItem(EXIT_OFFER_EXPIRY_TIME);
 
     // Reset in-memory state
     set({

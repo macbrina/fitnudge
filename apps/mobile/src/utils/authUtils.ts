@@ -23,10 +23,6 @@ let logoutPromise: Promise<string> | null = null;
  * @returns Status-specific error message
  */
 export async function handleAutoLogout(reason: LogoutReason): Promise<string> {
-  console.log(`[Auth] handleAutoLogout: ${reason}`);
-  console.log("isLoaggingo", isLoggingOut);
-  console.log("logoutPromise", logoutPromise);
-
   // If already logging out, return the existing promise (silently ignore duplicates)
   if (isLoggingOut && logoutPromise) {
     return logoutPromise;

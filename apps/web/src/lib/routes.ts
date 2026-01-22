@@ -2,31 +2,30 @@
 export const ROUTES = {
   // Main navigation
   HOME: "/",
-  FEATURES: "/#features",
-  PRICING: "/#pricing",
+  FEATURES: "/features",
   BLOG: "/blog",
   HOW_IT_WORKS: "/#how-it-works",
-
-  CONTACT: "/contact-us",
+  CONTACT: "/contact",
   DOWNLOAD: "/#download",
 
   // Footer links
-  FAQS: "/faqs",
   PRIVACY: "/privacy-policy",
   COOKIES: "/cookie-policy",
   TERMS: "/terms-of-service",
   WHY_FITNUDGE: "/why-fitnudge",
   ABOUT: "/about-us",
+  HEALTH: "/health",
 
   // App download links
   APP_STORE: "https://apps.apple.com/app/fitnudge",
   GOOGLE_PLAY: "https://play.google.com/store/apps/details?id=com.fitnudge.app",
 
   // Social links
-  TWITTER: "https://twitter.com/fitnudge",
-  INSTAGRAM: "https://instagram.com/fitnudge",
-  FACEBOOK: "https://facebook.com/fitnudge",
-  LINKEDIN: "https://linkedin.com/company/fitnudge",
+  TWITTER: "https://twitter.com/fitnudgeapp",
+  INSTAGRAM: "https://instagram.com/fitnudgeapp",
+  FACEBOOK: "https://facebook.com/fitnudgeapp",
+  LINKEDIN: "https://linkedin.com/company/fitnudgeapp",
+  TIKTOK: "https://tiktok.com/@fitnudgeapp",
 } as const;
 
 export type RouteKey = keyof typeof ROUTES;

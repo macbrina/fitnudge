@@ -16,12 +16,6 @@ import { STORAGE_KEYS } from "@/utils/storageUtil";
 import posthog from "@/lib/posthog";
 import { notificationsService } from "@/services/api/notifications";
 import { handleDeepLink as routeDeepLink } from "@/utils/deepLinkHandler";
-import { queryClient } from "@/lib/queryClient";
-import {
-  actionablePlansQueryKeys,
-  goalsQueryKeys,
-  challengesQueryKeys
-} from "@/hooks/api/queryKeys";
 
 // Configure notification behavior
 Notifications.setNotificationHandler({
@@ -62,6 +56,7 @@ class NotificationService {
         vibration: true,
         lights: true
       },
+      // Core V2 notification channels
       {
         id: NotificationCategory.REMINDER,
         name: "Workout Reminders",
@@ -72,11 +67,11 @@ class NotificationService {
         lights: false
       },
       {
-        id: NotificationCategory.SOCIAL,
-        name: "Social Activity",
-        description: "Likes, comments, and social interactions",
-        importance: "low",
-        sound: false,
+        id: NotificationCategory.AI_MOTIVATION,
+        name: "AI Motivation",
+        description: "AI-powered motivational messages",
+        importance: "default",
+        sound: true,
         vibration: false,
         lights: false
       },
@@ -99,15 +94,6 @@ class NotificationService {
         lights: false
       },
       {
-        id: NotificationCategory.PLAN_READY,
-        name: "Plan Ready",
-        description: "Notifications when your AI-generated plan is ready",
-        importance: "high",
-        sound: true,
-        vibration: true,
-        lights: true
-      },
-      {
         id: NotificationCategory.SUBSCRIPTION,
         name: "Subscription",
         description: "Subscription status updates and billing notifications",
@@ -123,6 +109,15 @@ class NotificationService {
         importance: "default",
         sound: true,
         vibration: false,
+        lights: false
+      },
+      {
+        id: NotificationCategory.ADAPTIVE_NUDGE,
+        name: "Smart Nudges",
+        description: "AI-powered adaptive nudges based on your patterns",
+        importance: "default",
+        sound: true,
+        vibration: true,
         lights: false
       },
 
@@ -182,99 +177,7 @@ class NotificationService {
         lights: false
       },
 
-      // Challenge notifications
-      {
-        id: NotificationCategory.CHALLENGE,
-        name: "Challenges",
-        description: "General challenge notifications",
-        importance: "default",
-        sound: true,
-        vibration: true,
-        lights: false
-      },
-      {
-        id: NotificationCategory.CHALLENGE_INVITE,
-        name: "Challenge Invites",
-        description: "Invitations to join challenges",
-        importance: "high",
-        sound: true,
-        vibration: true,
-        lights: true
-      },
-      {
-        id: NotificationCategory.CHALLENGE_JOINED,
-        name: "Challenge Joined",
-        description: "When someone joins your challenge",
-        importance: "default",
-        sound: true,
-        vibration: false,
-        lights: false
-      },
-      {
-        id: NotificationCategory.CHALLENGE_OVERTAKEN,
-        name: "Challenge Overtaken",
-        description: "When someone passes you on the leaderboard",
-        importance: "default",
-        sound: true,
-        vibration: true,
-        lights: false
-      },
-      {
-        id: NotificationCategory.CHALLENGE_LEAD,
-        name: "Challenge Lead",
-        description: "When you take the lead in a challenge",
-        importance: "default",
-        sound: true,
-        vibration: true,
-        lights: true
-      },
-      {
-        id: NotificationCategory.CHALLENGE_NUDGE,
-        name: "Challenge Nudges",
-        description: "Nudges from challenge participants",
-        importance: "default",
-        sound: true,
-        vibration: true,
-        lights: false
-      },
-      {
-        id: NotificationCategory.CHALLENGE_STARTING,
-        name: "Challenge Starting",
-        description: "Reminders when a challenge is about to start",
-        importance: "high",
-        sound: true,
-        vibration: true,
-        lights: true
-      },
-      {
-        id: NotificationCategory.CHALLENGE_ENDING,
-        name: "Challenge Ending",
-        description: "Reminders when a challenge is about to end",
-        importance: "default",
-        sound: true,
-        vibration: true,
-        lights: false
-      },
-      {
-        id: NotificationCategory.CHALLENGE_ENDED,
-        name: "Challenge Ended",
-        description: "Notifications when a challenge has ended",
-        importance: "default",
-        sound: true,
-        vibration: false,
-        lights: false
-      },
-
-      // Other notifications
-      {
-        id: NotificationCategory.MOTIVATION_MESSAGE,
-        name: "Motivation Messages",
-        description: "Motivational messages and tips",
-        importance: "low",
-        sound: false,
-        vibration: false,
-        lights: false
-      },
+      // Other V2 notifications
       {
         id: NotificationCategory.WEEKLY_RECAP,
         name: "Weekly Recap",
@@ -289,15 +192,6 @@ class NotificationService {
         name: "Streak Milestones",
         description: "Celebrations for streak achievements",
         importance: "default",
-        sound: true,
-        vibration: true,
-        lights: true
-      },
-      {
-        id: NotificationCategory.GOAL_COMPLETE,
-        name: "Goal Complete",
-        description: "Notifications when you complete a goal",
-        importance: "high",
         sound: true,
         vibration: true,
         lights: true
@@ -362,99 +256,24 @@ class NotificationService {
   }
 
   private handleNotificationReceived = (notification: Notifications.Notification) => {
+    // V2: Handle foreground notifications
+    // Currently just logs - specific handling can be added per notification type
     const data = notification.request.content.data as unknown as NotificationData;
-
-    // 🔥 For plan_ready notifications received in foreground, invalidate queries
-    // This updates the UI immediately if user is viewing the goal/challenge
-    if (data?.type === NotificationCategory.PLAN_READY) {
-      this.invalidatePlanQueries(data);
-    }
-
-    // Track notification received event
-    // TODO: Add PostHog tracking
-    // posthog.capture('notification_received', {
-    //   type: notification.request.content.data?.type,
-    //   category: notification.request.content.categoryIdentifier,
-    // });
+    console.log("📬 Notification received in foreground:", data?.type);
   };
 
-  private handleNotificationResponse = (response: Notifications.NotificationResponse) => {
-    console.log("Notification tapped:", response);
-
+  private handleNotificationResponse = async (response: Notifications.NotificationResponse) => {
     const data = response.notification.request.content.data as unknown as NotificationData;
 
-    // Track notification tap event
-    // TODO: Add PostHog tracking
-    // posthog.capture('notification_tapped', {
-    //   type: data.type,
-    //   category: response.notification.request.content.categoryIdentifier,
-    // });
+    console.log("📱 Notification tapped:", { type: data?.type, goalId: data?.goalId });
 
-    // Handle deep linking based on notification type
+    // All notifications use tap-to-open behavior with deep linking
+    // For check-in prompts: deep link opens goal detail which auto-opens CheckInModal
     this.handleDeepLink(data);
   };
 
-  /**
-   * Update plan status immediately when a plan_ready notification is received.
-   * Uses OPTIMISTIC updates for instant UI feedback, then invalidates for fresh data.
-   */
-  private invalidatePlanQueries(data: NotificationData): void {
-    const goalId = data.goalId as string | undefined;
-    const challengeId = data.challengeId as string | undefined;
-
-    if (goalId) {
-      // 🆕 OPTIMISTICALLY set status to "completed" immediately
-      // The notification tells us plan is ready, so we update the cache instantly
-      // This provides instant UI feedback without waiting for network
-      queryClient.setQueryData(actionablePlansQueryKeys.planStatus(goalId), (old: any) => ({
-        ...(old || {}),
-        status: "completed" as const,
-        goal_id: goalId
-      }));
-
-      // Also invalidate to get full fresh data in background (with plan details)
-      queryClient.invalidateQueries({
-        queryKey: actionablePlansQueryKeys.plan(goalId)
-      });
-      queryClient.invalidateQueries({
-        queryKey: goalsQueryKeys.detail(goalId)
-      });
-      queryClient.invalidateQueries({
-        queryKey: goalsQueryKeys.active()
-      });
-      console.log("📲 Set goal plan status to completed for:", goalId);
-    }
-
-    if (challengeId) {
-      // 🆕 OPTIMISTICALLY set status to "completed" immediately
-      queryClient.setQueryData(
-        actionablePlansQueryKeys.challengePlanStatus(challengeId),
-        (old: any) => ({
-          ...(old || {}),
-          status: "completed" as const,
-          challenge_id: challengeId
-        })
-      );
-
-      // Also invalidate to get full fresh data in background
-      queryClient.invalidateQueries({
-        queryKey: actionablePlansQueryKeys.challengePlan(challengeId)
-      });
-      queryClient.invalidateQueries({
-        queryKey: challengesQueryKeys.detail(challengeId)
-      });
-      console.log("📲 Set challenge plan status to completed for:", challengeId);
-    }
-  }
-
   private handleDeepLink(data: NotificationData): void {
     console.log("📲 Handling notification deep link:", data);
-
-    // 🔥 For plan_ready notifications, invalidate queries BEFORE navigation
-    // This ensures fresh data is fetched when the screen loads
-    if (data.type === NotificationCategory.PLAN_READY) {
-      this.invalidatePlanQueries(data);
-    }
 
     // Use the deepLink from notification data if available
     if (data.deepLink) {
@@ -714,21 +533,13 @@ class NotificationService {
           email_notifications: data.email_notifications,
           ai_motivation: data.ai_motivation,
           reminders: data.reminders,
-          social: data.social,
           achievements: data.achievements,
           reengagement: data.reengagement,
+          weekly_recap: data.weekly_recap ?? true,
           quiet_hours_enabled: data.quiet_hours_enabled,
           quiet_hours_start: data.quiet_hours_start,
           quiet_hours_end: data.quiet_hours_end,
-          social_partner_requests: data.social_partner_requests,
-          social_partner_nudges: data.social_partner_nudges,
-          social_partner_cheers: data.social_partner_cheers,
-          social_partner_milestones: data.social_partner_milestones,
-          social_challenge_invites: data.social_challenge_invites,
-          social_challenge_leaderboard: data.social_challenge_leaderboard,
-          social_challenge_nudges: data.social_challenge_nudges,
-          social_challenge_reminders: data.social_challenge_reminders,
-          social_motivation_messages: data.social_motivation_messages
+          partners: data.partners ?? true
         };
 
         // Store locally for offline access
@@ -762,21 +573,13 @@ class NotificationService {
       email_notifications: true,
       ai_motivation: true,
       reminders: true,
-      social: true,
       achievements: true,
       reengagement: true,
+      weekly_recap: true,
       quiet_hours_enabled: false,
       quiet_hours_start: "22:00",
       quiet_hours_end: "08:00",
-      social_partner_requests: true,
-      social_partner_nudges: true,
-      social_partner_cheers: true,
-      social_partner_milestones: true,
-      social_challenge_invites: true,
-      social_challenge_leaderboard: true,
-      social_challenge_nudges: true,
-      social_challenge_reminders: true,
-      social_motivation_messages: true
+      partners: true
     };
   }
 
@@ -797,56 +600,34 @@ class NotificationService {
         return false;
       }
 
-      // Check specific notification type
+      // Check specific notification type (V2)
       switch (notificationType) {
         // Core notification types
         case NotificationCategory.AI_MOTIVATION:
-        case NotificationCategory.MOTIVATION_MESSAGE:
-          return preferences.ai_motivation && preferences.social_motivation_messages;
+          return preferences.ai_motivation;
         case NotificationCategory.REMINDER:
+        case NotificationCategory.ADAPTIVE_NUDGE:
           return preferences.reminders;
-        case NotificationCategory.SOCIAL:
-          return preferences.social;
         case NotificationCategory.ACHIEVEMENT:
         case NotificationCategory.STREAK_MILESTONE:
-        case NotificationCategory.GOAL_COMPLETE:
           return preferences.achievements;
         case NotificationCategory.REENGAGEMENT:
           return preferences.reengagement;
 
         // Always-enabled types
-        case NotificationCategory.PLAN_READY:
         case NotificationCategory.SUBSCRIPTION:
         case NotificationCategory.GENERAL:
         case NotificationCategory.WEEKLY_RECAP:
           return true;
 
-        // Partner notifications - check social + specific partner prefs
+        // Partner notifications - all use single 'partners' toggle
         case NotificationCategory.PARTNER_REQUEST:
         case NotificationCategory.PARTNER_ACCEPTED:
-          return preferences.social && preferences.social_partner_requests;
         case NotificationCategory.PARTNER_NUDGE:
-          return preferences.social && preferences.social_partner_nudges;
         case NotificationCategory.PARTNER_CHEER:
-          return preferences.social && preferences.social_partner_cheers;
         case NotificationCategory.PARTNER_MILESTONE:
         case NotificationCategory.PARTNER_INACTIVE:
-          return preferences.social && preferences.social_partner_milestones;
-
-        // Challenge notifications - check social + specific challenge prefs
-        case NotificationCategory.CHALLENGE:
-        case NotificationCategory.CHALLENGE_STARTING:
-        case NotificationCategory.CHALLENGE_ENDING:
-        case NotificationCategory.CHALLENGE_ENDED:
-          return preferences.social && preferences.social_challenge_reminders;
-        case NotificationCategory.CHALLENGE_INVITE:
-        case NotificationCategory.CHALLENGE_JOINED:
-          return preferences.social && preferences.social_challenge_invites;
-        case NotificationCategory.CHALLENGE_OVERTAKEN:
-        case NotificationCategory.CHALLENGE_LEAD:
-          return preferences.social && preferences.social_challenge_leaderboard;
-        case NotificationCategory.CHALLENGE_NUDGE:
-          return preferences.social && preferences.social_challenge_nudges;
+          return preferences.partners;
 
         default:
           return true; // Default to enabled for unknown types

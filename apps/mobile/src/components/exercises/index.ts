@@ -1,1 +1,0 @@
-export { ExerciseDetailModal } from "./ExerciseDetailModal";

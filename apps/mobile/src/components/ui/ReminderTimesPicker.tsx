@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { View, Text, TouchableOpacity, Platform, Modal } from "react-native";
+import React, { useState, useMemo } from "react";
+import { View, Text, TouchableOpacity, Platform, Modal, NativeModules } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
 import { useStyles } from "@/themes/makeStyles";
@@ -8,6 +8,26 @@ import { fontFamily } from "@/lib/fonts";
 import { toRN } from "@/lib/units";
 import { useTranslation } from "@/lib/i18n";
 import Button from "@/components/ui/Button";
+import { formatReminderTime } from "@/utils/helper";
+
+// Detect device 24-hour preference
+const getDeviceIs24Hour = (): boolean => {
+  try {
+    // Check device locale by formatting a test time
+    const testDate = new Date();
+    testDate.setHours(14, 0); // 2:00 PM
+    const formatted = testDate.toLocaleTimeString([], { hour: "numeric" });
+    // If it contains "14" or "2" without AM/PM indicator
+    return (
+      formatted.includes("14") ||
+      (!formatted.toLowerCase().includes("am") &&
+        !formatted.toLowerCase().includes("pm") &&
+        formatted.includes("2"))
+    );
+  } catch {
+    return false; // Default to 12-hour
+  }
+};
 
 interface ReminderTimesPickerProps {
   value: string[]; // Array of HH:MM format strings
@@ -17,7 +37,7 @@ interface ReminderTimesPickerProps {
   error?: string;
   disabled?: boolean;
   maxTimes?: number;
-  is24Hour?: boolean;
+  is24Hour?: boolean; // If not provided, will use device preference
 }
 
 const makeStyles = (tokens: any, colors: any, brand: any) => ({
@@ -126,7 +146,7 @@ export function ReminderTimesPicker({
   error,
   disabled = false,
   maxTimes = 5,
-  is24Hour = true
+  is24Hour
 }: ReminderTimesPickerProps) {
   const { t } = useTranslation();
   const styles = useStyles(makeStyles);
@@ -138,6 +158,11 @@ export function ReminderTimesPicker({
     return date;
   });
 
+  // Use device preference if is24Hour not explicitly set
+  const effectiveIs24Hour = useMemo(() => {
+    return is24Hour ?? getDeviceIs24Hour();
+  }, [is24Hour]);
+
   // Format Date to HH:MM (24-hour format for backend)
   const formatTimeForStorage = (date: Date): string => {
     const hours = String(date.getHours()).padStart(2, "0");
@@ -145,19 +170,9 @@ export function ReminderTimesPicker({
     return `${hours}:${minutes}`;
   };
 
-  // Format time for display
+  // Format time for display (uses device locale via formatReminderTime)
   const formatTimeForDisplay = (timeStr: string): string => {
-    if (!timeStr || !timeStr.includes(":")) return "";
-
-    const [hours, minutes] = timeStr.split(":").map(Number);
-
-    if (is24Hour) {
-      return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
-    }
-
-    const period = hours >= 12 ? "PM" : "AM";
-    const displayHours = hours % 12 || 12;
-    return `${displayHours}:${String(minutes).padStart(2, "0")} ${period}`;
+    return formatReminderTime(timeStr);
   };
 
   const handleTimeChange = (event: any, selectedDate?: Date) => {
@@ -262,7 +277,7 @@ export function ReminderTimesPicker({
         <DateTimePicker
           value={selectedTime}
           mode="time"
-          is24Hour={is24Hour}
+          is24Hour={effectiveIs24Hour}
           display="default"
           onChange={handleTimeChange}
           themeVariant={isDark ? "dark" : "light"}
@@ -296,7 +311,7 @@ export function ReminderTimesPicker({
               <DateTimePicker
                 value={selectedTime}
                 mode="time"
-                is24Hour={is24Hour}
+                is24Hour={effectiveIs24Hour}
                 display="spinner"
                 onChange={handleTimeChange}
                 style={{ height: 200 }}

@@ -11,22 +11,70 @@ export interface LoginRequest {
   device_info?: DeviceInfo;
 }
 
+// Auth response user type (may have fewer fields than User)
+export interface AuthUserResponse {
+  id: string;
+  email: string;
+  auth_provider: "email" | "google" | "apple";
+  email_verified: boolean;
+  username: string;
+  name: string;
+  timezone: string;
+  country?: string;
+  plan: "free" | "premium";
+  status?: "active" | "disabled" | "suspended";
+  created_at: string;
+  last_login_at?: string;
+  linked_providers?: string[];
+  has_password?: boolean;
+  motivation_style?: "supportive" | "tough_love" | "calm";
+  onboarding_completed_at?: string | null;
+  referral_code?: string;
+  // These fields may be present but not always returned
+  language?: string;
+  profile_picture_url?: string;
+  bio?: string;
+  role?: "user" | "admin";
+  morning_motivation_enabled?: boolean;
+  updated_at?: string;
+}
+
 export interface LoginResponse {
-  user: {
-    id: string;
-    email: string;
-    name: string;
-    username: string;
-    plan: string;
-    timezone: string;
-    country?: string; // ISO 3166-1 alpha-2 code
-    email_verified: boolean;
-    auth_provider: string;
-    created_at: string;
-    linked_providers?: string[];
-  };
+  user: import("./user").User; // Transformed User type
   access_token: string;
   refresh_token: string;
+}
+
+/**
+ * Transform auth API response user to frontend User type
+ * Handles missing fields gracefully by providing defaults
+ */
+function transformAuthUserResponse(authUser: AuthUserResponse): import("./user").User {
+  return {
+    id: authUser.id,
+    email: authUser.email,
+    auth_provider: authUser.auth_provider,
+    email_verified: authUser.email_verified,
+    username: authUser.username,
+    name: authUser.name,
+    profile_picture_url: authUser.profile_picture_url,
+    bio: authUser.bio,
+    timezone: authUser.timezone,
+    language: authUser.language || "en", // Default to "en" if missing
+    country: authUser.country,
+    status: authUser.status || "active", // Default to "active" if missing
+    role: authUser.role,
+    motivation_style: authUser.motivation_style,
+    morning_motivation_enabled: authUser.morning_motivation_enabled,
+    plan: authUser.plan,
+    referral_code: authUser.referral_code,
+    onboarding_completed_at: authUser.onboarding_completed_at,
+    created_at: authUser.created_at,
+    updated_at: authUser.updated_at || authUser.created_at, // Fallback to created_at if missing
+    last_login_at: authUser.last_login_at,
+    linked_providers: authUser.linked_providers,
+    has_password: authUser.has_password
+  };
 }
 
 export interface SignupRequest {
@@ -64,7 +112,7 @@ export interface AppleLoginPayload {
 
 export interface LinkAccountResponse {
   message: string;
-  user: LoginResponse["user"];
+  user: AuthUserResponse;
 }
 
 // Auth Service
@@ -73,17 +121,31 @@ export class AuthService extends BaseApiService {
     // Get device info for session tracking
     const deviceInfo = getCachedDeviceInfo() || (await getDeviceInfo());
 
-    const response = await this.post<LoginResponse>(ROUTES.AUTH.LOGIN, {
+    const response = await this.post<{
+      user: AuthUserResponse;
+      access_token: string;
+      refresh_token: string;
+    }>(ROUTES.AUTH.LOGIN, {
       ...credentials,
       device_info: deviceInfo
     });
 
+    // Transform the response to match LoginResponse with transformed user
     if (response.data) {
       const { TokenManager } = await import("./base");
       await TokenManager.setTokens(response.data.access_token, response.data.refresh_token);
+
+      return {
+        ...response,
+        data: {
+          user: transformAuthUserResponse(response.data.user),
+          access_token: response.data.access_token,
+          refresh_token: response.data.refresh_token
+        }
+      };
     }
 
-    return response;
+    return response as ApiResponse<LoginResponse>;
   }
 
   async signup(userData: SignupRequest): Promise<ApiResponse<LoginResponse>> {
@@ -98,7 +160,11 @@ export class AuthService extends BaseApiService {
     // Get device info for session tracking
     const deviceInfo = getCachedDeviceInfo() || (await getDeviceInfo());
 
-    const response = await this.post<LoginResponse>(ROUTES.AUTH.SIGNUP, {
+    const response = await this.post<{
+      user: AuthUserResponse;
+      access_token: string;
+      refresh_token: string;
+    }>(ROUTES.AUTH.SIGNUP, {
       ...userData,
       // Backend requires 'name'; use username as display name if not collected separately
       name: userData.username,
@@ -110,12 +176,22 @@ export class AuthService extends BaseApiService {
       device_info: deviceInfo
     });
 
+    // Transform the response to match LoginResponse with transformed user
     if (response.data) {
       const { TokenManager } = await import("./base");
       await TokenManager.setTokens(response.data.access_token, response.data.refresh_token);
+
+      return {
+        ...response,
+        data: {
+          user: transformAuthUserResponse(response.data.user),
+          access_token: response.data.access_token,
+          refresh_token: response.data.refresh_token
+        }
+      };
     }
 
-    return response;
+    return response as ApiResponse<LoginResponse>;
   }
 
   async logout(): Promise<ApiResponse> {
@@ -196,18 +272,32 @@ export class AuthService extends BaseApiService {
     // Get device info for session tracking
     const deviceInfo = getCachedDeviceInfo() || (await getDeviceInfo());
 
-    const response = await this.post<LoginResponse>(ROUTES.AUTH.OAUTH.GOOGLE, {
+    const response = await this.post<{
+      user: AuthUserResponse;
+      access_token: string;
+      refresh_token: string;
+    }>(ROUTES.AUTH.OAUTH.GOOGLE, {
       id_token: idToken,
       device_info: deviceInfo,
       referral_code: referralCode || undefined
     });
 
+    // Transform the response to match LoginResponse with transformed user
     if (response.data) {
       const { TokenManager } = await import("./base");
       await TokenManager.setTokens(response.data.access_token, response.data.refresh_token);
+
+      return {
+        ...response,
+        data: {
+          user: transformAuthUserResponse(response.data.user),
+          access_token: response.data.access_token,
+          refresh_token: response.data.refresh_token
+        }
+      };
     }
 
-    return response;
+    return response as ApiResponse<LoginResponse>;
   }
 
   async loginWithApple(
@@ -217,7 +307,11 @@ export class AuthService extends BaseApiService {
     // Get device info for session tracking
     const deviceInfo = getCachedDeviceInfo() || (await getDeviceInfo());
 
-    const response = await this.post<LoginResponse>(ROUTES.AUTH.OAUTH.APPLE, {
+    const response = await this.post<{
+      user: AuthUserResponse;
+      access_token: string;
+      refresh_token: string;
+    }>(ROUTES.AUTH.OAUTH.APPLE, {
       identity_token: payload.identityToken,
       authorization_code: payload.authorizationCode,
       email: payload.email,
@@ -226,12 +320,22 @@ export class AuthService extends BaseApiService {
       referral_code: referralCode || undefined
     });
 
+    // Transform the response to match LoginResponse with transformed user
     if (response.data) {
       const { TokenManager } = await import("./base");
       await TokenManager.setTokens(response.data.access_token, response.data.refresh_token);
+
+      return {
+        ...response,
+        data: {
+          user: transformAuthUserResponse(response.data.user),
+          access_token: response.data.access_token,
+          refresh_token: response.data.refresh_token
+        }
+      };
     }
 
-    return response;
+    return response as ApiResponse<LoginResponse>;
   }
 
   async changePassword(currentPassword: string, newPassword: string): Promise<ApiResponse> {

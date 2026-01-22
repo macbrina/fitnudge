@@ -8,8 +8,15 @@ export interface PartnerUserInfo {
   name?: string;
   username?: string;
   profile_picture_url?: string;
-  has_social_accountability?: boolean;
+  has_partner_feature?: boolean; // Whether partner has accountability_partner_limit feature
   is_active?: boolean; // Whether partner's account is active
+}
+
+export interface PartnerTodayGoal {
+  id: string;
+  title: string;
+  logged_today: boolean;
+  is_scheduled_today: boolean;
 }
 
 export interface Partner {
@@ -21,31 +28,21 @@ export interface Partner {
   created_at: string;
   accepted_at?: string;
   partner?: PartnerUserInfo;
-  has_active_items?: boolean; // Whether partner has active goals or challenges
+  has_active_items?: boolean; // Whether partner has active goals
+  // Extended fields (when include_today_goals=true)
+  overall_streak?: number;
+  today_goals?: PartnerTodayGoal[];
+  logged_today?: boolean;
 }
 
-// Partner Dashboard types (for viewing partner's goals and challenges)
+// Partner Dashboard types (for viewing partner's goals)
+// V2: Only exposes what accountability partners need to see
 export interface PartnerGoalSummary {
   id: string;
   title: string;
-  category: string;
-  tracking_type?: string;
   status: string;
-  progress_percentage: number;
+  frequency_type: "daily" | "weekly";
   current_streak: number;
-  logged_today: boolean;
-  frequency?: string;
-}
-
-export interface PartnerChallengeSummary {
-  id: string;
-  title: string;
-  category?: string;
-  tracking_type?: string;
-  status: string;
-  progress: number;
-  target_value?: number;
-  participants_count: number;
   logged_today: boolean;
 }
 
@@ -54,12 +51,10 @@ export interface PartnerDashboard {
   partnership_id: string;
   partnership_created_at: string;
   goals: PartnerGoalSummary[];
-  challenges: PartnerChallengeSummary[];
   total_active_goals: number;
-  total_active_challenges: number;
   overall_streak: number;
   logged_today: boolean;
-  has_scheduled_today: boolean; // Whether partner has any goals/challenges scheduled for today
+  has_scheduled_today: boolean; // Whether partner has any goals scheduled for today
 }
 
 export interface PartnerLimits {
@@ -83,10 +78,15 @@ export interface SearchUserResult {
   name: string;
   username?: string;
   profile_picture_url?: string;
+  last_active_at?: string; // ISO timestamp for activity indicator
   is_partner?: boolean;
   has_pending_request?: boolean;
   request_status?: RequestStatus;
   partnership_id?: string;
+  // V2 Smart Matching fields
+  match_score?: number; // 0-100 match percentage
+  match_reasons?: string[]; // ["Similar goals", "Same timezone"]
+  matched_goals?: string[]; // Goal titles they share
 }
 
 export interface PaginatedSearchResponse {
@@ -100,9 +100,11 @@ export interface PaginatedSearchResponse {
 class PartnersService extends BaseApiService {
   /**
    * Get list of accepted accountability partners
+   * @param includeTodayGoals - If true, includes today's goals with check-in status
    */
-  async getPartners(): Promise<ApiResponse<Partner[]>> {
-    return this.get<Partner[]>(ROUTES.PARTNERS.LIST);
+  async getPartners(includeTodayGoals: boolean = false): Promise<ApiResponse<Partner[]>> {
+    const params = includeTodayGoals ? "?include_today_goals=true" : "";
+    return this.get<Partner[]>(`${ROUTES.PARTNERS.LIST}${params}`);
   }
 
   /**
@@ -117,6 +119,13 @@ class PartnersService extends BaseApiService {
    */
   async getSentRequests(): Promise<ApiResponse<Partner[]>> {
     return this.get<Partner[]>(ROUTES.PARTNERS.SENT);
+  }
+
+  /**
+   * Get blocked partners
+   */
+  async getBlockedPartners(): Promise<ApiResponse<Partner[]>> {
+    return this.get<Partner[]>(ROUTES.PARTNERS.BLOCKED);
   }
 
   /**
@@ -155,6 +164,39 @@ class PartnersService extends BaseApiService {
   }
 
   /**
+   * Block a partner - prevents future matching
+   */
+  async blockPartner(partnershipId: string): Promise<ApiResponse<{ message: string }>> {
+    return this.post<{ message: string }>(ROUTES.PARTNERS.BLOCK(partnershipId), {});
+  }
+
+  /**
+   * Unblock a partner
+   */
+  async unblockPartner(partnershipId: string): Promise<ApiResponse<{ message: string }>> {
+    return this.post<{ message: string }>(ROUTES.PARTNERS.UNBLOCK(partnershipId), {});
+  }
+
+  /**
+   * Report a user for inappropriate username or behavior
+   */
+  async reportUser(
+    userId: string,
+    reason: "inappropriate_username" | "harassment" | "spam" | "other",
+    details?: string,
+    blockPartner?: boolean
+  ): Promise<ApiResponse<{ message: string; report_id?: string; blocked?: boolean }>> {
+    return this.post<{ message: string; report_id?: string; blocked?: boolean }>(
+      ROUTES.PARTNERS.REPORT(userId),
+      {
+        reason,
+        details,
+        block_partner: blockPartner ?? false
+      }
+    );
+  }
+
+  /**
    * Search for users to add as partners (with pagination)
    */
   async searchUsers(
@@ -189,7 +231,7 @@ class PartnersService extends BaseApiService {
   }
 
   /**
-   * Get partner's accountability dashboard (goals, challenges, progress)
+   * Get partner's accountability dashboard (goals, progress)
    */
   async getPartnerDashboard(partnerUserId: string): Promise<ApiResponse<PartnerDashboard>> {
     return this.get<PartnerDashboard>(ROUTES.PARTNERS.DASHBOARD(partnerUserId));

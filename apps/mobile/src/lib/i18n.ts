@@ -7,9 +7,13 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import en from "../locales/en.json";
 import es from "../locales/es.json";
 import fr from "../locales/fr.json";
+import de from "../locales/de.json";
+import it from "../locales/it.json";
+import nl from "../locales/nl.json";
+import pt from "../locales/pt.json";
 
 // Constants
-export const SUPPORTED_LANGS = ["en", "es", "fr"] as const;
+export const SUPPORTED_LANGS = ["en", "es", "fr", "de", "it", "nl", "pt"] as const;
 export const DEFAULT_LANG = "en" as const;
 export const STORAGE_KEY = "app.language";
 
@@ -28,7 +32,7 @@ const languageDetector = {
       // Use device language detection
       const locales = RNLocalize.getLocales();
       const best = locales?.[0]?.languageCode || "en";
-      const supported = ["en", "es", "fr"];
+      const supported = SUPPORTED_LANGS as readonly string[];
       const normalized = best.split("-")[0];
       cb(supported.includes(normalized) ? normalized : "en");
     } catch {
@@ -48,7 +52,11 @@ const languageDetector = {
 const resources = {
   en: { translation: en },
   es: { translation: es },
-  fr: { translation: fr }
+  fr: { translation: fr },
+  de: { translation: de },
+  it: { translation: it },
+  nl: { translation: nl },
+  pt: { translation: pt }
 };
 
 // Initialize i18next
@@ -58,7 +66,7 @@ i18next
   .init({
     compatibilityJSON: "v3",
     resources,
-    supportedLngs: ["en", "es", "fr"],
+    supportedLngs: SUPPORTED_LANGS as unknown as string[],
     fallbackLng: "en",
     load: "languageOnly",
     returnEmptyString: false,

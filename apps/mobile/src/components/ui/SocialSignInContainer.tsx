@@ -4,6 +4,7 @@ import { useStyles } from "@/themes/makeStyles";
 import { fontFamily } from "@/lib/fonts";
 import { toRN } from "@/lib/units";
 import SocialSignInButton from "./SocialSignInButton";
+import { useTheme } from "@/themes";
 
 interface SocialSignInContainerProps {
   onGooglePress?: () => void;
@@ -45,6 +46,7 @@ export const SocialSignInContainer: React.FC<SocialSignInContainerProps> = ({
   showDividerText = true,
   containerStyle
 }) => {
+  const { isDark } = useTheme();
   const styles = useStyles(makeSocialSignInContainerStyles);
 
   const renderGoogle = showGoogle;
@@ -64,6 +66,7 @@ export const SocialSignInContainer: React.FC<SocialSignInContainerProps> = ({
           onPress={googleHandler}
           disabled={googleDisabled}
           loading={googleLoading}
+          isDark={isDark}
         />
       )}
 
@@ -73,6 +76,7 @@ export const SocialSignInContainer: React.FC<SocialSignInContainerProps> = ({
           onPress={appleHandler}
           disabled={appleDisabled}
           loading={appleLoading}
+          isDark={isDark}
         />
       )}
 

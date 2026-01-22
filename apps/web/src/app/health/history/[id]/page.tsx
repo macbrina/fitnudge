@@ -141,8 +141,7 @@ export default function HealthHistoryDetailPage() {
             updates: data.updates ?? [],
           });
         }
-      } catch (err) {
-        console.error("Failed to load incident detail", err);
+      } catch {
         if (!cancelled) {
           setError(t("health.history.error"));
         }
@@ -240,22 +239,6 @@ export default function HealthHistoryDetailPage() {
                         </p>
                       )}
                     </div>
-                    <dl className="grid gap-4 text-sm text-slate-600 dark:text-slate-300 sm:grid-cols-2">
-                      <div>
-                        <dt className="font-semibold text-slate-900 dark:text-white">
-                          {t("health.metrics.environment")}
-                        </dt>
-                        <dd className="capitalize">
-                          {entry.environment || t("health.labels.unknown")}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="font-semibold text-slate-900 dark:text-white">
-                          {t("health.metrics.api_version")}
-                        </dt>
-                        <dd>{entry.version || t("health.labels.unknown")}</dd>
-                      </div>
-                    </dl>
                   </div>
                 </section>
 

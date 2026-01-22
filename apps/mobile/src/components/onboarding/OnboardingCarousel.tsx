@@ -20,20 +20,20 @@ interface OnboardingCarouselProps {
 
 const getOnboardingData = (t: any) => [
   {
-    title: t("onboarding.ai_motivation.title"),
-    description: t("onboarding.ai_motivation.description"),
+    title: t("onboarding.carousel.slide1.title"),
+    description: t("onboarding.carousel.slide1.description"),
     illustration: <AICoachIllustration width={320} height={320} />,
     gradientColors: ["#10b981", "#10b981"] as [string, string] // Green background
   },
   {
-    title: t("onboarding.track_progress.title"),
-    description: t("onboarding.track_progress.description"),
+    title: t("onboarding.carousel.slide2.title"),
+    description: t("onboarding.carousel.slide2.description"),
     illustration: <ProgressIllustration width={320} height={320} />,
     gradientColors: ["#10b981", "#10b981"] as [string, string] // Green background
   },
   {
-    title: t("onboarding.join_community.title"),
-    description: t("onboarding.join_community.description"),
+    title: t("onboarding.carousel.slide3.title"),
+    description: t("onboarding.carousel.slide3.description"),
     illustration: <CommunityIllustration width={320} height={320} />,
     gradientColors: ["#10b981", "#10b981"] as [string, string] // Green background
   }

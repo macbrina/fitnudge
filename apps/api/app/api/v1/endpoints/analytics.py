@@ -1,516 +1,418 @@
+"""
+FitNudge V2 - Analytics API Endpoints (Per-Goal)
+
+PREMIUM FEATURE: advanced_analytics requires premium subscription (minimum_tier: 1)
+
+V2 Changes:
+- Analytics are now per-goal (requires goal_id)
+- Added heatmap_data, this_week_summary, mood_trend
+- Removed goal_comparison (not needed for single goal view)
+
+Optimized for 100K+ users:
+1. PostgreSQL RPC with parallel CTEs
+2. Materialized views for pre-aggregation
+3. Redis caching (1 hour TTL)
+
+Following SCALABILITY.md patterns.
+"""
+
 from fastapi import APIRouter, HTTPException, status, Depends, Query
 from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
-from datetime import datetime, date, timedelta
+from typing import List, Optional
+from datetime import datetime
 from app.core.flexible_auth import get_current_user
+from app.services.subscription_service import has_user_feature
+from app.services.tasks.analytics_refresh_tasks import (
+    get_cached_analytics,
+    set_cached_analytics,
+)
+from app.services.logger import logger
 
-router = APIRouter(
-    redirect_slashes=False
-)  # Disable redirects to preserve Authorization header
-
-
-# Pydantic models
-class AnalyticsDashboard(BaseModel):
-    user_stats: Dict[str, Any]
-    goals_overview: Dict[str, Any]
-    recent_activity: List[Dict[str, Any]]
-    motivation_stats: Dict[str, Any]
-    social_stats: Dict[str, Any]
+router = APIRouter(redirect_slashes=False)
 
 
-class GoalsAnalytics(BaseModel):
-    total_goals: int
-    active_goals: int
-    completed_goals: int
+# =============================================================================
+# V2 PYDANTIC MODELS - Chart Data Structures
+# =============================================================================
+
+
+class HeatmapDataItem(BaseModel):
+    """Check-in status for a single day (calendar heatmap)."""
+
+    date: str
+    status: str  # completed, rest_day, skipped, missed
+    intensity: int  # 0-4 for coloring
+
+
+class ThisWeekItem(BaseModel):
+    """Status for a single day in the current week."""
+
+    date: str
+    day_name: str  # Mon, Tue, etc.
+    day_of_week: int  # 0=Sun, 1=Mon, etc.
+    status: str  # completed, rest_day, skipped, missed, pending, no_data
+
+
+class MoodTrendItem(BaseModel):
+    """Mood data for a single day."""
+
+    date: str
+    mood: str  # tough, good, amazing
+    mood_score: int  # 1, 2, 3
+    label: str  # "Jan 15" format
+
+
+class WeeklyConsistencyItem(BaseModel):
+    """Consistency data for a single day of the week."""
+
+    day: str
+    day_index: int
+    percentage: int
+    completed: int
+    total: int
+
+
+class StreakHistoryItem(BaseModel):
+    """Streak data for a single week."""
+
+    week: str
+    week_start: str
+    max_streak: int
+
+
+class MonthlyTrendItem(BaseModel):
+    """Trend data for a single month."""
+
+    month: str
+    month_index: int
+    year: int
+    percentage: int
+    completed: int
+    total: int
+
+
+class SkipReasonItem(BaseModel):
+    """Distribution of a skip reason."""
+
+    reason: str
+    label: str
+    count: int
+    percentage: int
+    color: str
+
+
+class AnalyticsDashboardResponse(BaseModel):
+    """Complete per-goal analytics dashboard data."""
+
+    # Goal info
+    goal_id: Optional[str] = None
+    goal_title: Optional[str] = None
+    goal_created_at: Optional[str] = None  # ISO date when goal was created
+    # Target days for schedule: null = daily (all days), array = specific days (0=Sun, 1=Mon, etc.)
+    target_days: Optional[List[int]] = None
+
+    # Summary stats
+    total_check_ins: int
+    completed_check_ins: int
     completion_rate: float
-    goals_by_category: Dict[str, int]
-    goals_timeline: List[Dict[str, Any]]
-    streak_analytics: Dict[str, Any]
+    current_streak: int
+    longest_streak: int
+
+    # New: Heatmap and this week data
+    heatmap_data: List[HeatmapDataItem]
+    this_week_summary: List[ThisWeekItem]
+
+    # Chart data
+    weekly_consistency: List[WeeklyConsistencyItem]
+    streak_history: List[StreakHistoryItem]
+    monthly_trend: List[MonthlyTrendItem]
+    skip_reasons: List[SkipReasonItem]
+
+    # New: Mood trend
+    mood_trend: List[MoodTrendItem]
+
+    # Metadata
+    data_range_days: int
+    generated_at: str
+    cache_hit: bool = False  # Indicates if served from cache
 
 
-class MotivationAnalytics(BaseModel):
-    total_motivations: int
-    sent_motivations: int
-    response_rate: float
-    motivation_timeline: List[Dict[str, Any]]
-    tone_preferences: Dict[str, int]
-    engagement_metrics: Dict[str, Any]
+# =============================================================================
+# MAIN ENDPOINT - Per-Goal Analytics with Redis Caching
+# =============================================================================
 
 
-class SocialAnalytics(BaseModel):
-    total_posts: int
-    total_likes: int
-    total_comments: int
-    followers_count: int
-    following_count: int
-    engagement_rate: float
-    posts_timeline: List[Dict[str, Any]]
-    top_posts: List[Dict[str, Any]]
-
-
-@router.get("/dashboard", response_model=AnalyticsDashboard)
-async def get_dashboard_analytics(
+@router.get("/dashboard", response_model=AnalyticsDashboardResponse)
+async def get_analytics_dashboard(
+    goal_id: str = Query(..., description="Goal ID to analyze (required)"),
+    days: int = Query(30, ge=7, le=180, description="Number of days to analyze"),
+    skip_cache: bool = Query(False, description="Force fresh data (skip Redis cache)"),
     current_user: dict = Depends(get_current_user),
-    days: int = Query(30, ge=7, le=365),
 ):
-    """Get comprehensive dashboard analytics"""
+    """
+    Get per-goal analytics dashboard data (PREMIUM FEATURE).
+
+    V2: Analytics are now per-goal. Each goal has its own:
+    - Heatmap calendar
+    - This week summary
+    - Weekly consistency patterns
+    - Streak history
+    - Mood trend
+    - Skip reason breakdown
+    - Monthly trend
+
+    Performance optimizations:
+    1. Redis cache (1 hour TTL) - instant response
+    2. PostgreSQL parallel CTEs - efficient SQL execution
+
+    Query params:
+    - goal_id: Goal ID to analyze (required)
+    - days: Number of days to analyze (7-180, default 30)
+    - skip_cache: Force fresh data from database
+    """
     from app.core.database import get_supabase_client
 
     supabase = get_supabase_client()
-    end_date = date.today()
-    start_date = end_date - timedelta(days=days)
-
-    # User stats
-    user_stats = await get_user_stats(
-        supabase, current_user["id"], start_date, end_date
-    )
-
-    # Goals overview
-    goals_overview = await get_goals_overview(
-        supabase, current_user["id"], start_date, end_date
-    )
-
-    # Recent activity
-    recent_activity = await get_recent_activity(supabase, current_user["id"], 10)
-
-    # Motivation stats
-    motivation_stats = await get_motivation_stats(
-        supabase, current_user["id"], start_date, end_date
-    )
-
-    # Social stats
-    social_stats = await get_social_stats(
-        supabase, current_user["id"], start_date, end_date
-    )
-
-    return AnalyticsDashboard(
-        user_stats=user_stats,
-        goals_overview=goals_overview,
-        recent_activity=recent_activity,
-        motivation_stats=motivation_stats,
-        social_stats=social_stats,
-    )
-
-
-@router.get("/goals", response_model=GoalsAnalytics)
-async def get_goals_analytics(
-    current_user: dict = Depends(get_current_user),
-    days: int = Query(30, ge=7, le=365),
-):
-    """Get detailed goals analytics"""
-    from app.core.database import get_supabase_client
-
-    supabase = get_supabase_client()
-    end_date = date.today()
-    start_date = end_date - timedelta(days=days)
-
-    # Get goals data
-    goals_result = (
-        supabase.table("goals")
-        .select("*")
-        .eq("user_id", current_user["id"])
-        .gte("created_at", start_date.isoformat())
-        .execute()
-    )
-
-    goals = goals_result.data
-    total_goals = len(goals)
-    active_goals = len([g for g in goals if g.get("status") == "active"])
-    completed_goals = total_goals - active_goals
-    completion_rate = (completed_goals / total_goals * 100) if total_goals > 0 else 0
-
-    # Goals by category
-    goals_by_category = {}
-    for goal in goals:
-        category = goal["category"]
-        goals_by_category[category] = goals_by_category.get(category, 0) + 1
-
-    # Goals timeline (goals created over time)
-    goals_timeline = []
-    for i in range(days):
-        current_date = start_date + timedelta(days=i)
-        goals_created = len(
-            [
-                g
-                for g in goals
-                if datetime.fromisoformat(g["created_at"]).date() == current_date
-            ]
-        )
-        goals_timeline.append(
-            {"date": current_date.isoformat(), "goals_created": goals_created}
-        )
-
-    # Streak analytics - use cached user_stats_cache for O(1) lookup
     user_id = current_user["id"]
 
-    # Get cached stats
-    stats_result = (
-        supabase.table("user_stats_cache")
-        .select("current_streak, longest_streak, total_checkins, completed_checkins")
+    # Check premium access
+    has_access = await has_user_feature(supabase, user_id, "advanced_analytics")
+    if not has_access:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Advanced analytics require a premium subscription",
+        )
+
+    # Validate goal exists and belongs to user
+    goal_check = (
+        supabase.table("goals")
+        .select("id, title, status, created_at, target_days, frequency_type")
+        .eq("id", goal_id)
         .eq("user_id", user_id)
         .maybe_single()
         .execute()
     )
 
-    if stats_result.data:
-        # Use cached values
-        current_streak = stats_result.data.get("current_streak", 0)
-        longest_streak = stats_result.data.get("longest_streak", 0)
-        total_checkins = stats_result.data.get("total_checkins", 0)
-        completed_checkins = stats_result.data.get("completed_checkins", 0)
-    else:
-        # Fallback: calculate from raw data (only if cache doesn't exist)
-        checkins_result = (
-            supabase.table("check_ins")
-            .select("check_in_date, completed")
-            .eq("user_id", user_id)
-            .gte("check_in_date", start_date.isoformat())
-            .execute()
+    if not goal_check.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Goal not found",
         )
-        checkins = checkins_result.data or []
-        current_streak = calculate_current_streak(checkins)
-        longest_streak = calculate_longest_streak(checkins)
-        total_checkins = len(checkins)
-        completed_checkins = len([c for c in checkins if c["completed"]])
 
-    return GoalsAnalytics(
-        total_goals=total_goals,
-        active_goals=active_goals,
-        completed_goals=completed_goals,
-        completion_rate=completion_rate,
-        goals_by_category=goals_by_category,
-        goals_timeline=goals_timeline,
-        streak_analytics={
-            "current_streak": current_streak,
-            "longest_streak": longest_streak,
-            "total_check_ins": total_checkins,
-            "completed_check_ins": completed_checkins,
-        },
-    )
-
-
-@router.get("/motivation", response_model=MotivationAnalytics)
-async def get_motivation_analytics(
-    current_user: dict = Depends(get_current_user),
-    days: int = Query(30, ge=7, le=365),
-):
-    """Get detailed motivation analytics"""
-    from app.core.database import get_supabase_client
-
-    supabase = get_supabase_client()
-    end_date = date.today()
-    start_date = end_date - timedelta(days=days)
-
-    # Get motivations data
-    motivations_result = (
-        supabase.table("motivations")
-        .select("*")
-        .eq("user_id", current_user["id"])
-        .gte("created_at", start_date.isoformat())
-        .execute()
-    )
-
-    motivations = motivations_result.data
-    total_motivations = len(motivations)
-    sent_motivations = len([m for m in motivations if m["is_sent"]])
-    response_rate = (
-        (sent_motivations / total_motivations * 100) if total_motivations > 0 else 0
-    )
-
-    # Motivation timeline
-    motivation_timeline = []
-    for i in range(days):
-        current_date = start_date + timedelta(days=i)
-        motivations_created = len(
-            [
-                m
-                for m in motivations
-                if datetime.fromisoformat(m["created_at"]).date() == current_date
-            ]
+    if goal_check.data.get("status") != "active":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Analytics are only available for active goals",
         )
-        motivation_timeline.append(
+
+    # ==========================================================================
+    # Defensive: Pre-create today's check-in if it doesn't exist
+    # This ensures accurate "today" status in heatmap/this_week_summary
+    # (Covers edge case where hourly task hasn't run yet)
+    # ==========================================================================
+    checkin_created = False
+    try:
+        user_tz = current_user.get("timezone", "UTC")
+        result = supabase.rpc(
+            "precreate_checkin_for_goal",
             {
-                "date": current_date.isoformat(),
-                "motivations_created": motivations_created,
-            }
+                "p_goal_id": goal_id,
+                "p_user_id": user_id,
+                "p_frequency_type": goal_check.data.get("frequency_type"),
+                "p_target_days": goal_check.data.get("target_days"),
+                "p_user_timezone": user_tz,
+            },
+        ).execute()
+        # RPC returns: 'inserted', 'existed', or 'not_scheduled'
+        checkin_created = result.data == "inserted"
+    except Exception:
+        # Non-critical - don't fail the request if pre-creation fails
+        pass
+
+    # If a new check-in was created, invalidate cache to ensure fresh data
+    if checkin_created:
+        from app.services.tasks.analytics_refresh_tasks import (
+            invalidate_user_analytics_cache,
         )
 
-    # Tone preferences (if stored)
-    tone_preferences = {}
-    for motivation in motivations:
-        tone = motivation.get("tone", "friendly")
-        tone_preferences[tone] = tone_preferences.get(tone, 0) + 1
+        invalidate_user_analytics_cache(user_id, goal_id)
 
-    return MotivationAnalytics(
-        total_motivations=total_motivations,
-        sent_motivations=sent_motivations,
-        response_rate=response_rate,
-        motivation_timeline=motivation_timeline,
-        tone_preferences=tone_preferences,
-        engagement_metrics={
-            "avg_motivations_per_day": total_motivations / days,
-            "most_active_day": get_most_active_day(motivation_timeline),
-        },
-    )
+    # ==========================================================================
+    # Check Redis cache first (key now includes goal_id)
+    # ==========================================================================
+    if not skip_cache:
+        cached_data = get_cached_analytics(user_id, days, goal_id)
+        if cached_data:
+            return _transform_to_response(cached_data, cache_hit=True)
+
+    # ==========================================================================
+    # Cache miss - fetch from database
+    # ==========================================================================
+    try:
+        # Call RPC function with goal_id
+        result = supabase.rpc(
+            "get_analytics_dashboard",
+            {"p_user_id": user_id, "p_goal_id": goal_id, "p_days": days},
+        ).execute()
+
+        if not result.data:
+            # Extract goal created_at as date string
+            goal_created_at = None
+            if goal_check.data.get("created_at"):
+                from datetime import datetime as dt
+
+                try:
+                    created_dt = dt.fromisoformat(
+                        goal_check.data["created_at"].replace("Z", "+00:00")
+                    )
+                    goal_created_at = created_dt.strftime("%Y-%m-%d")
+                except (ValueError, AttributeError):
+                    pass
+            return _empty_dashboard(
+                days,
+                goal_id,
+                goal_check.data.get("title"),
+                goal_created_at,
+                goal_check.data.get("target_days"),
+            )
+
+        data = result.data
+
+        # ==========================================================================
+        # Store in Redis cache for next request
+        # ==========================================================================
+        set_cached_analytics(user_id, days, data, goal_id)
+
+        return _transform_to_response(data, cache_hit=False)
+
+    except Exception as e:
+        logger.error(f"Analytics dashboard error: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to generate analytics dashboard",
+        )
 
 
-@router.get("/social", response_model=SocialAnalytics)
-async def get_social_analytics(
+# =============================================================================
+# CACHE STATUS ENDPOINT (for debugging/monitoring)
+# =============================================================================
+
+
+@router.get("/cache-status")
+async def get_analytics_cache_status(
     current_user: dict = Depends(get_current_user),
-    days: int = Query(30, ge=7, le=365),
 ):
-    """Get detailed social analytics"""
-    from app.core.database import get_supabase_client
+    """
+    Check analytics cache status for current user.
+    Useful for debugging and monitoring.
+    """
+    from app.core.cache import get_redis_client
 
-    supabase = get_supabase_client()
-    end_date = date.today()
-    start_date = end_date - timedelta(days=days)
+    user_id = current_user["id"]
+    redis = get_redis_client()
 
-    # Get posts data
-    posts_result = (
-        supabase.table("posts")
-        .select("*")
-        .eq("user_id", current_user["id"])
-        .gte("created_at", start_date.isoformat())
-        .execute()
-    )
+    if not redis:
+        return {
+            "redis_available": False,
+            "cached": False,
+            "message": "Redis not configured",
+        }
 
-    posts = posts_result.data
-    total_posts = len(posts)
-    total_likes = sum(post["likes_count"] for post in posts)
-    total_comments = sum(post["comments_count"] for post in posts)
+    # Check if cached for common time ranges
+    cache_status = {}
+    for days in [7, 30, 90, 365]:
+        cache_key = f"analytics:dashboard:{user_id}:{days}"
+        try:
+            cached = redis.get(cache_key)
+            cache_status[f"{days}_days"] = cached is not None
+        except Exception:
+            cache_status[f"{days}_days"] = False
 
-    # Get followers/following counts
-    followers_result = (
-        supabase.table("follows")
-        .select("id")
-        .eq("following_id", current_user["id"])
-        .execute()
-    )
-    followers_count = len(followers_result.data)
-
-    following_result = (
-        supabase.table("follows")
-        .select("id")
-        .eq("follower_id", current_user["id"])
-        .execute()
-    )
-    following_count = len(following_result.data)
-
-    engagement_rate = (
-        ((total_likes + total_comments) / total_posts) if total_posts > 0 else 0
-    )
-
-    # Posts timeline
-    posts_timeline = []
-    for i in range(days):
-        current_date = start_date + timedelta(days=i)
-        posts_created = len(
-            [
-                p
-                for p in posts
-                if datetime.fromisoformat(p["created_at"]).date() == current_date
-            ]
-        )
-        posts_timeline.append(
-            {"date": current_date.isoformat(), "posts_created": posts_created}
-        )
-
-    # Top posts (by engagement)
-    top_posts = sorted(
-        posts, key=lambda x: x["likes_count"] + x["comments_count"], reverse=True
-    )[:5]
-
-    return SocialAnalytics(
-        total_posts=total_posts,
-        total_likes=total_likes,
-        total_comments=total_comments,
-        followers_count=followers_count,
-        following_count=following_count,
-        engagement_rate=engagement_rate,
-        posts_timeline=posts_timeline,
-        top_posts=top_posts,
-    )
-
-
-# Helper functions
-async def get_user_stats(
-    supabase, user_id: str, start_date: date, end_date: date
-) -> Dict[str, Any]:
-    """Get user statistics"""
-    # Get basic user info
-    user_result = supabase.table("users").select("*").eq("id", user_id).execute()
-    user = user_result.data[0] if user_result.data else {}
-
-    # Get goals count
-    goals_result = supabase.table("goals").select("id").eq("user_id", user_id).execute()
-    goals_count = len(goals_result.data)
-
-    # Get check-ins count
-    checkins_result = (
-        supabase.table("check_ins")
-        .select("id")
-        .eq("user_id", user_id)
-        .gte("check_in_date", start_date.isoformat())
-        .lte("check_in_date", end_date.isoformat())
-        .execute()
-    )
-    checkins_count = len(checkins_result.data)
+    # Get last refresh time
+    try:
+        last_refresh = redis.get("analytics:last_refresh")
+        last_refresh_str = last_refresh.decode() if last_refresh else None
+    except Exception:
+        last_refresh_str = None
 
     return {
+        "redis_available": True,
         "user_id": user_id,
-        "name": user.get("name", ""),
-        "username": user.get("username", ""),
-        "plan": user.get("plan", "free"),
-        "goals_count": goals_count,
-        "check_ins_count": checkins_count,
-        "period_days": (end_date - start_date).days,
+        "cache_status": cache_status,
+        "last_mv_refresh": last_refresh_str,
     }
 
 
-async def get_goals_overview(
-    supabase, user_id: str, start_date: date, end_date: date
-) -> Dict[str, Any]:
-    """Get goals overview"""
-    goals_result = (
-        supabase.table("goals")
-        .select("*")
-        .eq("user_id", user_id)
-        .gte("created_at", start_date.isoformat())
-        .lte("created_at", end_date.isoformat())
-        .execute()
+# =============================================================================
+# HELPER FUNCTIONS
+# =============================================================================
+
+
+def _transform_to_response(data: dict, cache_hit: bool) -> AnalyticsDashboardResponse:
+    """Transform RPC/cache result to response model."""
+    return AnalyticsDashboardResponse(
+        # Goal info
+        goal_id=data.get("goal_id"),
+        goal_title=data.get("goal_title"),
+        goal_created_at=data.get("goal_created_at"),
+        target_days=data.get("target_days"),
+        # Summary stats
+        total_check_ins=data.get("total_check_ins", 0),
+        completed_check_ins=data.get("completed_check_ins", 0),
+        completion_rate=float(data.get("completion_rate", 0)),
+        current_streak=data.get("current_streak", 0),
+        longest_streak=data.get("longest_streak", 0),
+        # New: Heatmap and this week
+        heatmap_data=[HeatmapDataItem(**item) for item in data.get("heatmap_data", [])],
+        this_week_summary=[
+            ThisWeekItem(**item) for item in data.get("this_week_summary", [])
+        ],
+        # Chart data
+        weekly_consistency=[
+            WeeklyConsistencyItem(**item) for item in data.get("weekly_consistency", [])
+        ],
+        streak_history=[
+            StreakHistoryItem(**item) for item in data.get("streak_history", [])
+        ],
+        monthly_trend=[
+            MonthlyTrendItem(**item) for item in data.get("monthly_trend", [])
+        ],
+        skip_reasons=[SkipReasonItem(**item) for item in data.get("skip_reasons", [])],
+        # New: Mood trend
+        mood_trend=[MoodTrendItem(**item) for item in data.get("mood_trend", [])],
+        # Metadata
+        data_range_days=data.get("data_range_days", 30),
+        generated_at=data.get("generated_at", datetime.utcnow().isoformat()),
+        cache_hit=cache_hit,
     )
 
-    goals = goals_result.data
-    active_goals = len([g for g in goals if g.get("status") == "active"])
 
-    return {
-        "total_goals": len(goals),
-        "active_goals": active_goals,
-        "completed_goals": len(goals) - active_goals,
-    }
-
-
-async def get_recent_activity(
-    supabase, user_id: str, limit: int
-) -> List[Dict[str, Any]]:
-    """Get recent activity"""
-    # Get recent check-ins
-    checkins_result = (
-        supabase.table("check_ins")
-        .select("check_in_date, completed, goal:goals(title)")
-        .eq("user_id", user_id)
-        .order("created_at", desc=True)
-        .limit(limit)
-        .execute()
+def _empty_dashboard(
+    days: int,
+    goal_id: str = None,
+    goal_title: str = None,
+    goal_created_at: str = None,
+    target_days: List[int] = None,
+) -> AnalyticsDashboardResponse:
+    """Return empty dashboard for goals with no data."""
+    return AnalyticsDashboardResponse(
+        goal_id=goal_id,
+        goal_title=goal_title,
+        goal_created_at=goal_created_at,
+        target_days=target_days,
+        total_check_ins=0,
+        completed_check_ins=0,
+        completion_rate=0,
+        current_streak=0,
+        longest_streak=0,
+        heatmap_data=[],
+        this_week_summary=[],
+        weekly_consistency=[],
+        streak_history=[],
+        monthly_trend=[],
+        skip_reasons=[],
+        mood_trend=[],
+        data_range_days=days,
+        generated_at=datetime.utcnow().isoformat(),
+        cache_hit=False,
     )
-
-    activities = []
-    for checkin in checkins_result.data:
-        activities.append(
-            {
-                "type": "check_in",
-                "date": checkin["check_in_date"],
-                "description": f"Checked in for goal: {checkin['goal']['title']}",
-                "completed": checkin["completed"],
-            }
-        )
-
-    return activities[:limit]
-
-
-async def get_motivation_stats(
-    supabase, user_id: str, start_date: date, end_date: date
-) -> Dict[str, Any]:
-    """Get motivation statistics"""
-    motivations_result = (
-        supabase.table("motivations")
-        .select("*")
-        .eq("user_id", user_id)
-        .gte("created_at", start_date.isoformat())
-        .lte("created_at", end_date.isoformat())
-        .execute()
-    )
-
-    motivations = motivations_result.data
-    sent_motivations = len([m for m in motivations if m["is_sent"]])
-
-    return {
-        "total_motivations": len(motivations),
-        "sent_motivations": sent_motivations,
-        "response_rate": (
-            (sent_motivations / len(motivations) * 100) if motivations else 0
-        ),
-    }
-
-
-async def get_social_stats(
-    supabase, user_id: str, start_date: date, end_date: date
-) -> Dict[str, Any]:
-    """Get social statistics"""
-    posts_result = (
-        supabase.table("posts")
-        .select("*")
-        .eq("user_id", user_id)
-        .gte("created_at", start_date.isoformat())
-        .lte("created_at", end_date.isoformat())
-        .execute()
-    )
-
-    posts = posts_result.data
-    total_likes = sum(post["likes_count"] for post in posts)
-    total_comments = sum(post["comments_count"] for post in posts)
-
-    return {
-        "total_posts": len(posts),
-        "total_likes": total_likes,
-        "total_comments": total_comments,
-        "engagement_rate": (
-            ((total_likes + total_comments) / len(posts)) if posts else 0
-        ),
-    }
-
-
-def calculate_current_streak(checkins: List[Dict]) -> int:
-    """Calculate current streak from check-ins"""
-    if not checkins:
-        return 0
-
-    sorted_checkins = sorted(checkins, key=lambda x: x["check_in_date"], reverse=True)
-    streak = 0
-
-    for checkin in sorted_checkins:
-        if checkin["completed"]:
-            streak += 1
-        else:
-            break
-
-    return streak
-
-
-def calculate_longest_streak(checkins: List[Dict]) -> int:
-    """Calculate longest streak from check-ins"""
-    if not checkins:
-        return 0
-
-    sorted_checkins = sorted(checkins, key=lambda x: x["check_in_date"], reverse=True)
-    longest_streak = 0
-    current_streak = 0
-
-    for checkin in sorted_checkins:
-        if checkin["completed"]:
-            current_streak += 1
-            longest_streak = max(longest_streak, current_streak)
-        else:
-            current_streak = 0
-
-    return longest_streak
-
-
-def get_most_active_day(timeline: List[Dict]) -> str:
-    """Get the most active day from timeline data"""
-    if not timeline:
-        return ""
-
-    max_activity = max(timeline, key=lambda x: x.get("motivations_created", 0))
-    return max_activity["date"]

@@ -145,7 +145,7 @@ const makeStyles = (tokens: any, colors: any, brandColors: any) => ({
     width: "100%",
     maxWidth: SIZE_CONFIG.md, // Default, overridden dynamically
     borderRadius: toRN(tokens.borderRadius["2xl"]),
-    backgroundColor: colors.bg.canvas,
+    backgroundColor: colors.bg.card,
     paddingTop: toRN(tokens.spacing[6]),
     paddingBottom: toRN(tokens.spacing[5]),
     paddingHorizontal: toRN(tokens.spacing[6]),

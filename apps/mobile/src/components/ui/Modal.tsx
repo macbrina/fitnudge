@@ -94,7 +94,7 @@ export default function Modal({
                   title={footerButtonTitle || t("common.done")}
                   onPress={onFooterPress || onClose}
                   variant="primary"
-                  size="lg"
+                  size="md"
                   fullWidth
                 />
               )}

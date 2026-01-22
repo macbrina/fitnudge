@@ -1,12 +1,14 @@
 import Button from "@/components/ui/Button";
+import CheckmarkCircle from "@/components/ui/CheckmarkCircle";
 import { useNotificationPermissions } from "@/hooks/notifications/useNotificationPermissions";
 import { usePostHog } from "@/hooks/usePostHog";
 import { fontFamily } from "@/lib/fonts";
 import { useTranslation } from "@/lib/i18n";
-import { MOBILE_ROUTES } from "@/lib/routes";
 import { toRN } from "@/lib/units";
 import { logger } from "@/services/logger";
+import { useAuthStore } from "@/stores/authStore";
 import { useStyles, useTheme } from "@/themes";
+import { getRedirection, hasCompletedV2Onboarding } from "@/utils/getRedirection";
 import { STORAGE_KEYS, storageUtil } from "@/utils/storageUtil";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -22,17 +24,7 @@ export default function NotificationPermissionScreen() {
   const insets = useSafeAreaInsets();
   const { requestPermissionsWithSoftPrompt } = useNotificationPermissions();
   const { capture } = usePostHog();
-
-  // Check if user has fitness profile (for personalization skip)
-  const checkFitnessProfile = async (): Promise<boolean> => {
-    try {
-      const { useOnboardingStore } = await import("@/stores/onboardingStore");
-      return await useOnboardingStore.getState().checkHasFitnessProfile();
-    } catch (error) {
-      console.warn("[Login] Failed to check fitness profile:", error);
-      return false;
-    }
-  };
+  const { user } = useAuthStore();
 
   const handleEnableNotifications = async () => {
     try {
@@ -68,42 +60,43 @@ export default function NotificationPermissionScreen() {
       // Mark step as seen
       await storageUtil.setItem(STORAGE_KEYS.HAS_SEEN_NOTIFICATION_PERMISSION, true);
 
-      // Navigate to personalization flow regardless of permission result
-
-      const hasFitnessProfile = await checkFitnessProfile();
-
-      if (hasFitnessProfile) {
-        router.push(MOBILE_ROUTES.MAIN.HOME);
-      } else {
-        router.push(MOBILE_ROUTES.ONBOARDING.PERSONALIZATION);
-      }
+      // Use getRedirection to determine where to go next
+      // It handles: personalization check, onboarding_completed_at from API
+      const destination = await getRedirection({
+        hasCompletedOnboarding: hasCompletedV2Onboarding(user)
+      });
+      router.replace(destination);
     } catch (error) {
       logger.error("Error requesting notification permissions", {
         error: error instanceof Error ? error.message : String(error),
         screen: "notification_permission"
       });
 
-      // Still navigate to personalization flow
-      router.push(MOBILE_ROUTES.ONBOARDING.PERSONALIZATION);
+      // On error, use getRedirection to determine where to go
+      const destination = await getRedirection({
+        hasCompletedOnboarding: hasCompletedV2Onboarding(user)
+      });
+      router.replace(destination);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleMaybeLater = () => {
+  const handleMaybeLater = async () => {
     // Track skip
     capture("notification_permission_skipped", {
       source: "onboarding",
       screen: "notification_permission"
     });
 
-    // Permission skipped - tracked via PostHog above
-
     // Mark step as seen
-    storageUtil.setItem(STORAGE_KEYS.HAS_SEEN_NOTIFICATION_PERMISSION, true).catch(() => {});
+    await storageUtil.setItem(STORAGE_KEYS.HAS_SEEN_NOTIFICATION_PERMISSION, true);
 
-    // Navigate to personalization flow
-    router.push(MOBILE_ROUTES.ONBOARDING.PERSONALIZATION);
+    // Use getRedirection to determine where to go next
+    const destination = await getRedirection({
+      hasCompletedOnboarding: hasCompletedV2Onboarding(user)
+    });
+    router.replace(destination);
   };
 
   return (
@@ -120,34 +113,19 @@ export default function NotificationPermissionScreen() {
         {/* Benefits List */}
         <View style={styles.benefitsContainer}>
           <View style={styles.benefitItem}>
-            <Ionicons
-              name="checkmark-circle"
-              size={22}
-              color={brandColors.primary}
-              style={styles.benefitIcon}
-            />
+            <CheckmarkCircle size={22} mr={3} />
             <Text style={styles.benefitText}>
               {t("onboarding.notifications.benefit_reminders")}
             </Text>
           </View>
           <View style={styles.benefitItem}>
-            <Ionicons
-              name="checkmark-circle"
-              size={22}
-              color={brandColors.primary}
-              style={styles.benefitIcon}
-            />
+            <CheckmarkCircle size={22} mr={3} />
             <Text style={styles.benefitText}>
               {t("onboarding.notifications.benefit_motivation")}
             </Text>
           </View>
           <View style={styles.benefitItem}>
-            <Ionicons
-              name="checkmark-circle"
-              size={22}
-              color={brandColors.primary}
-              style={styles.benefitIcon}
-            />
+            <CheckmarkCircle size={22} mr={3} />
             <Text style={styles.benefitText}>
               {t("onboarding.notifications.benefit_celebrations")}
             </Text>
@@ -227,9 +205,6 @@ const makeNotificationPermissionScreenStyles = (tokens: any, colors: any, brand:
       flexDirection: "row" as const,
       alignItems: "center" as const,
       marginBottom: toRN(tokens.spacing[4])
-    },
-    benefitIcon: {
-      marginRight: toRN(tokens.spacing[3])
     },
     benefitText: {
       fontSize: toRN(tokens.typography.fontSize.base),

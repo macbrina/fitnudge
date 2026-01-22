@@ -19,6 +19,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { View, Text, Modal, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import CheckmarkCircle from "@/components/ui/CheckmarkCircle";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "@/lib/i18n";
 import { useTheme } from "@/themes";
@@ -166,7 +167,9 @@ export function ExitIntentModal({
 
           {/* Discount Badge */}
           <View style={styles.discountBadge}>
-            <Text style={styles.discountText}>{discountPercent}% OFF</Text>
+            <Text style={styles.discountText}>
+              {t("onboarding.subscription.exit_offer.discount_badge", { percent: discountPercent })}
+            </Text>
           </View>
 
           {/* Emoji/Icon */}
@@ -186,7 +189,9 @@ export function ExitIntentModal({
             <View style={styles.offerHeader}>
               <Text style={styles.planName}>{bestPlan.name}</Text>
               <View style={[styles.bestValueBadge, { backgroundColor: brandColors.primary }]}>
-                <Text style={styles.bestValueText}>BEST VALUE</Text>
+                <Text style={styles.bestValueText}>
+                  {t("onboarding.subscription.exit_offer.best_value")}
+                </Text>
               </View>
             </View>
 
@@ -196,29 +201,36 @@ export function ExitIntentModal({
               <Text style={[styles.discountedPrice, { color: brandColors.primary }]}>
                 ${discountedPrice.toFixed(2)}
               </Text>
-              <Text style={styles.perYear}>/year</Text>
+              <Text style={styles.perYear}>{t("onboarding.subscription.exit_offer.per_year")}</Text>
             </View>
 
             {/* Monthly breakdown */}
             <Text style={styles.monthlyBreakdown}>
-              Just ${monthlyEquivalent.toFixed(2)}/month • Save ${savings.toFixed(0)}
+              {t("onboarding.subscription.exit_offer.monthly_breakdown", {
+                monthly: monthlyEquivalent.toFixed(2),
+                savings: savings.toFixed(0)
+              })}
             </Text>
 
             {/* Features preview - AI Chat is the key hook */}
             <View style={styles.featuresPreview}>
               <View style={styles.featureRow}>
-                <Ionicons name="checkmark-circle" size={18} color={brandColors.primary} />
+                <CheckmarkCircle size={18} mr={2} />
                 <Text style={[styles.featureText, styles.featureHighlight]}>
-                  AI Chat Motivation
+                  {t("onboarding.subscription.exit_offer.feature_ai_chat")}
                 </Text>
               </View>
               <View style={styles.featureRow}>
-                <Ionicons name="checkmark-circle" size={18} color={brandColors.primary} />
-                <Text style={styles.featureText}>Unlimited goals</Text>
+                <CheckmarkCircle size={18} mr={2} />
+                <Text style={styles.featureText}>
+                  {t("onboarding.subscription.exit_offer.feature_unlimited_goals")}
+                </Text>
               </View>
               <View style={styles.featureRow}>
-                <Ionicons name="checkmark-circle" size={18} color={brandColors.primary} />
-                <Text style={styles.featureText}>Advanced analytics</Text>
+                <CheckmarkCircle size={18} mr={2} />
+                <Text style={styles.featureText}>
+                  {t("onboarding.subscription.exit_offer.feature_advanced_analytics")}
+                </Text>
               </View>
             </View>
           </View>
@@ -236,7 +248,9 @@ export function ExitIntentModal({
             <View style={[styles.countdownContainer, { backgroundColor: colors.bg.warning }]}>
               <Ionicons name="alarm-outline" size={18} color={colors.text.onWarning} />
               <Text style={[styles.countdownText, { color: colors.text.onWarning }]}>
-                Offer expires in {formatTimeRemaining(timeRemaining)}
+                {t("onboarding.subscription.exit_offer.offer_expires_in", {
+                  time: formatTimeRemaining(timeRemaining)
+                })}
               </Text>
             </View>
           )}

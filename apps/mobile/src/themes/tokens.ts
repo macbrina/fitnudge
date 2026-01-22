@@ -7,7 +7,7 @@ export const tokens = {
     light: {
       background: "#f9fafc",
       foreground: "#0f172a",
-      primary: "#2563eb",
+      primary: "#0066ff", // Deep electric blue for light mode
       primaryForeground: "#ffffff",
       secondary: "#ffffff",
       secondaryForeground: "#0f172a",
@@ -24,30 +24,30 @@ export const tokens = {
       border: "#e2e8f0",
       borderSubtle: "#f1f5f9",
       input: "#e2e8f0",
-      ring: "#2563eb"
+      ring: "#0066ff"
     },
-    // Dark mode colors
+    // Dark mode colors - Pure black aesthetic with electric blue
     dark: {
-      background: "#0f172a",
-      foreground: "#f8fafc",
-      primary: "#60a5fa", // Lighter blue for better visibility on dark backgrounds
+      background: "#000000", // Pure black - base canvas
+      foreground: "#ffffff",
+      primary: "#00a3ff", // Bright electric blue for dark mode (lighter than light mode)
       primaryForeground: "#ffffff",
-      secondary: "#1e293b",
-      secondaryForeground: "#f8fafc",
-      muted: "#1e293b",
-      mutedForeground: "#94a3b8",
-      accent: "#1e293b",
-      accentForeground: "#f8fafc",
-      destructive: "#dc2626",
+      secondary: "#121212", // Near-black cards/elevated surfaces
+      secondaryForeground: "#ffffff",
+      muted: "#0a0a0a", // Slightly elevated from pure black
+      mutedForeground: "#8e8e8e", // Neutral gray for muted text
+      accent: "#1a1a1a", // Subtle accent areas
+      accentForeground: "#ffffff",
+      destructive: "#ff4757", // Vibrant red for errors
       destructiveForeground: "#ffffff",
-      success: "#34d399",
-      successForeground: "#064e3b",
-      warning: "#fbbf24",
-      warningForeground: "#78350f",
-      border: "#334155",
-      borderSubtle: "#1e293b",
-      input: "#334155",
-      ring: "#60a5fa" // Match primary color
+      success: "#00d68f", // Vibrant green for success
+      successForeground: "#000000",
+      warning: "#ffaa00", // Warm amber for warnings
+      warningForeground: "#000000",
+      border: "#2f2f2f", // Subtle dark border
+      borderSubtle: "#1f1f1f", // Very subtle border
+      input: "#2f2f2f",
+      ring: "#00a3ff" // Electric blue ring
     }
   },
   typography: {
@@ -95,7 +95,9 @@ export const tokens = {
     12: "3rem",
     16: "4rem",
     20: "5rem",
+    22: "5.5rem",
     24: "6rem",
+    28: "7rem",
     32: "8rem",
     40: "10rem",
     48: "12rem",

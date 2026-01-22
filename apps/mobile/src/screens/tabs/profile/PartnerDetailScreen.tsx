@@ -1,16 +1,22 @@
 import { NudgeSheet } from "@/components/social/NudgeSheet";
+import { ReportUserSheet } from "@/components/social/ReportUserSheet";
+import { PartnerDetailSkeleton } from "@/components/skeletons";
 import { BackButton } from "@/components/ui/BackButton";
 import Button from "@/components/ui/Button";
-import { SkeletonBox, SkeletonCard } from "@/components/ui/SkeletonBox";
 import { useAlertModal } from "@/contexts/AlertModalContext";
 import { ApiError } from "@/services/api/base";
-import { usePartnerDashboard, usePartners, useRemovePartner } from "@/hooks/api/usePartners";
+import {
+  usePartnerDashboard,
+  usePartners,
+  useRemovePartner,
+  useBlockPartner
+} from "@/hooks/api/usePartners";
 import { fontFamily } from "@/lib/fonts";
 import { useTranslation } from "@/lib/i18n";
 import { MOBILE_ROUTES } from "@/lib/routes";
 import { toRN } from "@/lib/units";
-import type { PartnerChallengeSummary, PartnerGoalSummary } from "@/services/api/partners";
-import { useSubscriptionStore } from "@/stores/subscriptionStore";
+import type { PartnerGoalSummary } from "@/services/api/partners";
+import { usePartnerAccess } from "@/hooks/api/usePartners";
 import { useStyles, useTheme } from "@/themes";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -24,22 +30,8 @@ import Svg, {
   LinearGradient as SvgLinearGradient
 } from "react-native-svg";
 
-// Category icons matching GoalsScreen
-const CATEGORY_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
-  fitness: "fitness-outline",
-  nutrition: "nutrition-outline",
-  wellness: "leaf-outline",
-  mindfulness: "headset-outline",
-  sleep: "moon-outline"
-};
-
-const CATEGORY_COLORS: Record<string, { primary: string; secondary: string }> = {
-  fitness: { primary: "#EF4444", secondary: "#FCA5A5" },
-  nutrition: { primary: "#22C55E", secondary: "#86EFAC" },
-  wellness: { primary: "#8B5CF6", secondary: "#C4B5FD" },
-  mindfulness: { primary: "#3B82F6", secondary: "#93C5FD" },
-  sleep: { primary: "#6366F1", secondary: "#A5B4FC" }
-};
+// Default styling for goals (V2 - no categories)
+const DEFAULT_GOAL_COLOR = { primary: "#6366F1", secondary: "#A5B4FC" };
 
 // Gradient background component
 const GradientBackground = ({ colors, style }: { colors: string[]; style?: any }) => (
@@ -111,6 +103,7 @@ export function PartnerDetailScreen() {
 
   const [refreshing, setRefreshing] = useState(false);
   const [showNudgeSheet, setShowNudgeSheet] = useState(false);
+  const [showReportSheet, setShowReportSheet] = useState(false);
 
   // Fetch partner dashboard data
   const {
@@ -122,6 +115,7 @@ export function PartnerDetailScreen() {
   } = usePartnerDashboard(partnerUserId);
 
   const removePartner = useRemovePartner();
+  const blockPartner = useBlockPartner();
 
   // Fetch partners list to detect if partnership is removed
   const { data: partnersData } = usePartners();
@@ -147,10 +141,17 @@ export function PartnerDetailScreen() {
     }
   }, [isStillPartner, dashboard, partnersData?.data]);
 
-  // Premium access check
-  const { hasFeature } = useSubscriptionStore();
-  const userHasFeature = hasFeature("social_accountability");
-  const partnerHasFeature = dashboard?.partner?.has_social_accountability ?? false;
+  // Navigate away if 404 (partnership blocked/removed before screen loaded)
+  useEffect(() => {
+    // Only redirect after loading is complete and we have no dashboard data
+    if (!isLoading && !isFetching && !dashboard && error) {
+      router.back();
+    }
+  }, [isLoading, isFetching, dashboard, error, router]);
+
+  // Premium access check - use unified hook for consistency
+  const { hasFeature: userHasFeature, openSubscriptionModal } = usePartnerAccess();
+  const partnerHasFeature = dashboard?.partner?.has_partner_feature ?? false;
   const hasAccess = userHasFeature || partnerHasFeature;
 
   const handleRefresh = async () => {
@@ -178,7 +179,6 @@ export function PartnerDetailScreen() {
 
     try {
       await removePartner.mutateAsync(partnershipId);
-      router.back();
     } catch (error: unknown) {
       const errorMessage =
         error instanceof ApiError
@@ -197,13 +197,53 @@ export function PartnerDetailScreen() {
     setShowNudgeSheet(true);
   }, []);
 
-  const handleNudgeSuccess = useCallback(() => {
-    showToast({
-      title: t("partners.nudge_sent") || "Nudge Sent! 👋",
-      message: t("partners.nudge_sent_message") || "Your partner will be notified to stay on track",
-      variant: "success"
+  const handleBlockPartner = useCallback(async () => {
+    if (!partnershipId) return;
+
+    const confirmed = await showConfirm({
+      title: t("partners.block_partner_title") || "Block Partner",
+      message:
+        t("partners.block_partner_message") ||
+        "Are you sure you want to block this partner? They won't be able to see your activity and won't appear in your suggestions.",
+      variant: "warning",
+      size: "lg",
+      messageAlign: "left",
+      confirmLabel: t("common.block") || "Block",
+      cancelLabel: t("common.cancel")
     });
-  }, [showToast, t]);
+
+    if (!confirmed) return;
+
+    // Fire-and-forget with optimistic update
+    // The useBlockPartner hook handles cache update in onMutate
+    const attemptBlock = (retryCount: number) => {
+      blockPartner.mutate(partnershipId, {
+        onError: () => {
+          // Silent retry once
+          if (retryCount < 1) {
+            setTimeout(() => attemptBlock(retryCount + 1), 1000);
+          } else {
+            // Show error after retry fails
+            showAlert({
+              title: t("common.error"),
+              message: t("partners.block_partner_error") || "Failed to block partner",
+              variant: "error",
+              confirmLabel: t("common.ok")
+            });
+          }
+        }
+      });
+    };
+
+    attemptBlock(0);
+
+    // Navigate immediately - optimistic update already removed from cache
+    router.back();
+  }, [partnershipId, showConfirm, t, blockPartner, router, showAlert]);
+
+  const handleReportUser = useCallback(() => {
+    setShowReportSheet(true);
+  }, []);
 
   const handleGoalPress = (goal: PartnerGoalSummary) => {
     router.push(
@@ -211,16 +251,9 @@ export function PartnerDetailScreen() {
     );
   };
 
-  const handleChallengePress = (challenge: PartnerChallengeSummary) => {
-    router.push(
-      `${MOBILE_ROUTES.CHALLENGES.DETAILS(challenge.id)}?viewMode=partner&partnerId=${partnerUserId}`
-    );
-  };
-
   // Render goal card - premium style
   const renderGoalCard = (goal: PartnerGoalSummary, index: number) => {
-    const categoryColor = CATEGORY_COLORS[goal.category] || CATEGORY_COLORS.fitness;
-    const categoryIcon = CATEGORY_ICONS[goal.category] || "flag-outline";
+    const goalColor = DEFAULT_GOAL_COLOR;
     const isLogged = goal.logged_today;
 
     return (
@@ -232,18 +265,15 @@ export function PartnerDetailScreen() {
       >
         {/* Left accent bar with gradient */}
         <View style={styles.cardAccent}>
-          <GradientBackground colors={[categoryColor.primary, categoryColor.secondary]} />
+          <GradientBackground colors={[goalColor.primary, goalColor.secondary]} />
         </View>
 
         <View style={styles.activityCardContent}>
           {/* Icon with gradient background */}
           <View
-            style={[
-              styles.activityIconContainer,
-              { backgroundColor: `${categoryColor.primary}12` }
-            ]}
+            style={[styles.activityIconContainer, { backgroundColor: `${goalColor.primary}12` }]}
           >
-            <Ionicons name={categoryIcon} size={22} color={categoryColor.primary} />
+            <Ionicons name="flag-outline" size={22} color={goalColor.primary} />
           </View>
 
           {/* Content */}
@@ -253,7 +283,9 @@ export function PartnerDetailScreen() {
             </Text>
             <View style={styles.activityMeta}>
               <Text style={styles.activityCategory}>
-                {t(`goals.category_${goal.category}`) || goal.category}
+                {goal.frequency_type === "daily"
+                  ? t("goals.schedule_daily")
+                  : t("goals.schedule_weekly")}
               </Text>
               {goal.current_streak > 0 && (
                 <View style={styles.miniStreakBadge}>
@@ -280,100 +312,9 @@ export function PartnerDetailScreen() {
     );
   };
 
-  // Render challenge card - premium style
-  const renderChallengeCard = (challenge: PartnerChallengeSummary, index: number) => {
-    const categoryColor =
-      CATEGORY_COLORS[challenge.category || "fitness"] || CATEGORY_COLORS.fitness;
-    const isLogged = challenge.logged_today;
-    const progress = challenge.target_value ? challenge.progress / challenge.target_value : 0;
-
-    return (
-      <TouchableOpacity
-        key={challenge.id}
-        style={styles.activityCard}
-        onPress={() => handleChallengePress(challenge)}
-        activeOpacity={0.85}
-      >
-        {/* Left accent bar with gradient */}
-        <View style={styles.cardAccent}>
-          <GradientBackground colors={[categoryColor.primary, categoryColor.secondary]} />
-        </View>
-
-        <View style={styles.activityCardContent}>
-          {/* Icon with progress ring */}
-          <View style={styles.challengeIconWrapper}>
-            <ProgressRing
-              progress={progress}
-              size={48}
-              strokeWidth={3}
-              color={categoryColor.primary}
-            />
-            <View style={styles.challengeIconInner}>
-              <Ionicons name="trophy" size={18} color={categoryColor.primary} />
-            </View>
-          </View>
-
-          {/* Content */}
-          <View style={styles.activityInfo}>
-            <Text style={styles.activityTitle} numberOfLines={1}>
-              {challenge.title}
-            </Text>
-            <View style={styles.activityMeta}>
-              <View style={styles.participantsBadge}>
-                <Ionicons name="people" size={10} color={colors.text.tertiary} />
-                <Text style={styles.participantsText}>{challenge.participants_count}</Text>
-              </View>
-              {challenge.target_value && (
-                <Text style={styles.progressText}>
-                  {challenge.progress}/{challenge.target_value}
-                </Text>
-              )}
-            </View>
-          </View>
-
-          {/* Status indicator */}
-          <View
-            style={[
-              styles.statusDot,
-              {
-                backgroundColor: isLogged ? colors.feedback.success : colors.feedback.warning
-              }
-            ]}
-          >
-            <Ionicons name={isLogged ? "checkmark" : "time"} size={12} color="#FFFFFF" />
-          </View>
-        </View>
-      </TouchableOpacity>
-    );
-  };
-
-  // Loading state - premium skeleton
+  // Loading state
   if (isLoading) {
-    return (
-      <View style={styles.container}>
-        <BackButton
-          title={t("partners.partner_details") || "Partner Details"}
-          onPress={() => router.back()}
-        />
-        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-          {/* Profile skeleton */}
-          <View style={styles.profileSkeletonContainer}>
-            <SkeletonBox width={100} height={100} borderRadius={50} />
-            <SkeletonBox width={140} height={24} borderRadius={8} style={{ marginTop: 16 }} />
-            <SkeletonBox width={100} height={16} borderRadius={6} style={{ marginTop: 8 }} />
-          </View>
-          {/* Stats skeleton */}
-          <View style={styles.statsSkeletonRow}>
-            <SkeletonBox width="30%" height={80} borderRadius={16} />
-            <SkeletonBox width="30%" height={80} borderRadius={16} />
-            <SkeletonBox width="30%" height={80} borderRadius={16} />
-          </View>
-          {/* Cards skeleton */}
-          <SkeletonCard width="100%" height={72} />
-          <SkeletonCard width="100%" height={72} />
-        </ScrollView>
-      </View>
-    );
+    return <PartnerDetailSkeleton />;
   }
 
   // Error state
@@ -445,7 +386,7 @@ export function PartnerDetailScreen() {
           </Text>
           <Button
             title={t("common.upgrade") || "Upgrade to Unlock"}
-            onPress={() => router.push(MOBILE_ROUTES.ONBOARDING.SUBSCRIPTION)}
+            onPress={openSubscriptionModal}
             style={styles.upgradeButton}
           />
         </View>
@@ -453,10 +394,9 @@ export function PartnerDetailScreen() {
     );
   }
 
-  const { partner, goals, challenges, overall_streak, logged_today, has_scheduled_today } =
-    dashboard;
+  const { partner, goals, overall_streak, logged_today, has_scheduled_today } = dashboard;
 
-  const hasActiveItems = goals.length > 0 || challenges.length > 0;
+  const hasActiveItems = goals.length > 0;
 
   return (
     <View style={styles.container}>
@@ -519,11 +459,31 @@ export function PartnerDetailScreen() {
             )}
             <Button
               title={t("partners.remove_partner") || "Remove Partner"}
-              variant="danger"
+              variant="dangerOutline"
               size="sm"
               onPress={handleRemovePartner}
               loading={removePartner.isPending}
             />
+          </View>
+
+          {/* Secondary Actions - Block & Report */}
+          <View style={styles.secondaryActionsRow}>
+            <TouchableOpacity
+              style={styles.secondaryActionButton}
+              onPress={handleBlockPartner}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="ban-outline" size={16} color={colors.text.tertiary} />
+              <Text style={styles.secondaryActionText}>{t("partners.block") || "Block"}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.secondaryActionButton}
+              onPress={handleReportUser}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="flag-outline" size={16} color={colors.text.tertiary} />
+              <Text style={styles.secondaryActionText}>{t("partners.report") || "Report"}</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -533,11 +493,6 @@ export function PartnerDetailScreen() {
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{dashboard.total_active_goals}</Text>
             <Text style={styles.statLabel}>{t("partners.active_goals") || "Active Goals"}</Text>
-          </View>
-
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{dashboard.total_active_challenges}</Text>
-            <Text style={styles.statLabel}>{t("partners.challenges") || "Challenges"}</Text>
           </View>
 
           {/* Row 2 */}
@@ -590,35 +545,18 @@ export function PartnerDetailScreen() {
           </View>
         )}
 
-        {/* Challenges Section */}
-        {challenges.length > 0 && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>
-                {t("partners.their_challenges") || "Their Challenges"}
-              </Text>
-              <View style={styles.sectionBadge}>
-                <Text style={styles.sectionBadgeText}>{challenges.length}</Text>
-              </View>
-            </View>
-            <View style={styles.activityList}>
-              {challenges.map((challenge, index) => renderChallengeCard(challenge, index))}
-            </View>
-          </View>
-        )}
-
         {/* Empty state */}
-        {goals.length === 0 && challenges.length === 0 && (
+        {goals.length === 0 && (
           <View style={styles.emptyState}>
             <View style={styles.emptyIconContainer}>
               <Ionicons name="leaf-outline" size={40} color={colors.text.tertiary} />
             </View>
             <Text style={styles.emptyTitle}>
-              {t("partners.no_active_items") || "No Active Goals or Challenges"}
+              {t("partners.no_active_items") || "No Active Goals"}
             </Text>
             <Text style={styles.emptyDesc}>
               {t("partners.no_active_items_desc") ||
-                "Your partner hasn't set up any active goals or joined any challenges yet."}
+                "Your partner hasn't set up any active goals yet."}
             </Text>
           </View>
         )}
@@ -663,7 +601,15 @@ export function PartnerDetailScreen() {
         recipientId={partnerUserId || ""}
         recipientName={partner?.name || partner?.username || t("partners.partner")}
         partnershipId={partnershipId}
-        onSuccess={handleNudgeSuccess}
+      />
+
+      {/* Report User Sheet */}
+      <ReportUserSheet
+        visible={showReportSheet}
+        onClose={() => setShowReportSheet(false)}
+        userId={partnerUserId || ""}
+        username={partner?.username || partner?.name}
+        onSuccess={() => router.back()}
       />
     </View>
   );
@@ -750,6 +696,22 @@ const makePartnerDetailStyles = (tokens: any, colors: any, brand: any) => ({
     alignItems: "center" as const,
     gap: toRN(tokens.spacing[3])
   },
+  secondaryActionsRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: toRN(tokens.spacing[4]),
+    marginTop: toRN(tokens.spacing[3])
+  },
+  secondaryActionButton: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: toRN(tokens.spacing[1])
+  },
+  secondaryActionText: {
+    fontFamily: fontFamily.medium,
+    fontSize: toRN(tokens.typography.fontSize.sm),
+    color: colors.text.tertiary
+  },
 
   // Stats Grid - 2x2
   statsGrid: {
@@ -806,7 +768,7 @@ const makePartnerDetailStyles = (tokens: any, colors: any, brand: any) => ({
   },
   sectionBadge: {
     backgroundColor: `${brand.primary}15`,
-    paddingHorizontal: toRN(tokens.spacing[2.5]),
+    paddingHorizontal: toRN(tokens.spacing[2]),
     paddingVertical: toRN(tokens.spacing[1]),
     borderRadius: toRN(tokens.borderRadius.full)
   },
@@ -839,7 +801,7 @@ const makePartnerDetailStyles = (tokens: any, colors: any, brand: any) => ({
     flex: 1,
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    padding: toRN(tokens.spacing[3.5]),
+    padding: toRN(tokens.spacing[3]),
     gap: toRN(tokens.spacing[3])
   },
   activityIconContainer: {
@@ -886,7 +848,7 @@ const makePartnerDetailStyles = (tokens: any, colors: any, brand: any) => ({
     alignItems: "center" as const,
     gap: 2,
     backgroundColor: "#FEF3C7",
-    paddingHorizontal: toRN(tokens.spacing[1.5]),
+    paddingHorizontal: toRN(tokens.spacing[1]),
     paddingVertical: 2,
     borderRadius: toRN(tokens.borderRadius.full)
   },
@@ -1017,16 +979,6 @@ const makePartnerDetailStyles = (tokens: any, colors: any, brand: any) => ({
   retryButton: {
     minWidth: 160
   },
-  profileSkeletonContainer: {
-    alignItems: "center" as const,
-    paddingVertical: toRN(tokens.spacing[6])
-  },
-  statsSkeletonRow: {
-    flexDirection: "row" as const,
-    justifyContent: "space-between" as const,
-    marginBottom: toRN(tokens.spacing[4])
-  },
-
   // Premium Gate
   premiumGate: {
     flex: 1,

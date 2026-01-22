@@ -1,25 +1,24 @@
 """
-Celery Signal Handlers
+FitNudge V2 - Celery Signal Handlers
 
 Hooks for Celery lifecycle events (e.g., worker startup).
+
+V2 Changes:
+- Removed auto_create_daily_checkins_task (V1 - check-ins are now on-demand)
+- Worker ready just logs startup, no automatic task queuing
 """
 
 from celery.signals import worker_ready
+from app.services.logger import logger
 
 
 @worker_ready.connect
 def on_worker_ready(sender, **kwargs):
     """
-    Run critical tasks immediately when worker starts.
+    V2: Log worker startup.
 
-    This ensures check-ins are created/verified without waiting for
-    the first scheduled beat interval.
+    In V2, check-ins are created on-demand when users respond to notifications,
+    not pre-created. So we don't need to run any tasks on worker startup.
     """
-    from app.services.tasks import auto_create_daily_checkins_task
-
-    print("🚀 Celery worker ready! Running initial check-in creation...")
-
-    # Run check-in creation immediately (countdown=0)
-    auto_create_daily_checkins_task.apply_async(countdown=0)
-
-    print("✅ Initial check-in creation task queued")
+    logger.info("🚀 FitNudge V2 Celery worker ready!")
+    print("🚀 FitNudge V2 Celery worker ready!")

@@ -32,10 +32,12 @@ class AchievementTypeResponse(BaseModel):
     badge_name: str
     badge_description: Optional[str]
     badge_icon: Optional[str]
-    unlock_condition: str
+    unlock_condition: dict  # JSONB in database
     category: str
     rarity: str
     points: int
+    sort_order: int
+    is_active: bool
 
 
 @router.get("/types", response_model=List[AchievementTypeResponse])

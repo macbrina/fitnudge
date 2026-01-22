@@ -213,6 +213,8 @@ async def generate_verification_code(user_id: str) -> Optional[str]:
     Returns:
         str: The generated 6-digit code, or None if generation fails
     """
+    from app.services.logger import logger
+
     try:
         from app.services.email_service import email_service
         from app.core.database import get_supabase_client
@@ -220,11 +222,10 @@ async def generate_verification_code(user_id: str) -> Optional[str]:
         supabase = get_supabase_client()
 
         # Get user email
-        from app.services.logger import logger
-
         user_result = (
             supabase.table("users").select("email").eq("id", user_id).execute()
         )
+
         if not user_result.data:
             logger.error(f"User not found for verification code generation: {user_id}")
             return None
@@ -255,20 +256,22 @@ async def generate_verification_code(user_id: str) -> Optional[str]:
 
         # Send verification email
         email_sent = email_service.send_verification_email(user_email, code)
+
         if not email_sent:
             logger.warning(
                 f"Verification code generated but email sending failed for user {user_id} Code: {code}",
                 {"user_id": user_id, "email": user_email},
             )
+            # Return None to signal email failure, so create_user() can auto-verify
+            return None
 
         return code
 
     except Exception as e:
-        from app.services.logger import logger
-
         logger.error(
             f"Failed to generate verification code for user {user_id}",
-            {"error": str(e), "user_id": user_id},
+            {"error": str(e), "user_id": user_id, "exception_type": type(e).__name__},
+            exc_info=True,
         )
         return None
 
@@ -344,6 +347,7 @@ async def create_user(user_data: Dict[str, Any]) -> Dict[str, Any]:
                 for auth_user in existing_auth_users:
                     if auth_user.email == email:
                         auth_user_id = str(auth_user.id)
+                        # Use the same ID for public.users (V2: id references auth.users(id))
                         user_data["id"] = auth_user_id
                         logger.info(
                             f"Found existing auth.users entry for {email}",
@@ -376,7 +380,7 @@ async def create_user(user_data: Dict[str, Any]) -> Dict[str, Any]:
             f"User ID mismatch! auth.users={auth_user_id}, public.users={user_id}"
         )
 
-    # Create default notification_preferences
+    # Create default notification_preferences (V2 schema)
     try:
         supabase.table("notification_preferences").insert(
             {
@@ -388,6 +392,7 @@ async def create_user(user_data: Dict[str, Any]) -> Dict[str, Any]:
                 "reminders": True,
                 "social": True,
                 "achievements": True,
+                "weekly_recaps": True,
                 "reengagement": True,
                 "quiet_hours_enabled": False,
                 "quiet_hours_start": "22:00:00",
@@ -401,34 +406,30 @@ async def create_user(user_data: Dict[str, Any]) -> Dict[str, Any]:
             {"error": str(e), "user_id": user_id},
         )
 
-    # Create default feed_preferences
-    try:
-        supabase.table("feed_preferences").insert(
-            {
-                "user_id": user_id,
-                "show_ai_posts": True,
-                "show_community_posts": True,
-                "show_following_only": False,
-                "categories": [],
-            }
-        ).execute()
-    except Exception as e:
-        # Log error but don't fail user creation
-        logger.error(
-            f"Failed to create default feed_preferences for user {user_id}",
-            {"error": str(e), "user_id": user_id},
-        )
-
     # Generate and send verification email for email/password users
     if user.get("auth_provider") == "email" and user.get("email"):
         try:
-            await generate_verification_code(user_id)
+            code = await generate_verification_code(user_id)
+            if not code:
+                supabase.table("users").update({"email_verified": True}).eq(
+                    "id", user_id
+                ).execute()
+                user["email_verified"] = True
         except Exception as e:
-            # Don't fail user creation if email sending fails
-            logger.error(
-                f"Failed to send verification email for user {user_id}",
-                {"error": str(e), "user_id": user_id},
-            )
+            # Don't fail user creation if email sending fails - auto-verify instead
+            try:
+                supabase.table("users").update({"email_verified": True}).eq(
+                    "id", user_id
+                ).execute()
+                user["email_verified"] = True
+                logger.info(
+                    f"[create_user] Auto-verified email for user {user_id} due to exception"
+                )
+            except Exception as update_error:
+                logger.error(
+                    f"[create_user] Failed to auto-verify email after email service failure",
+                    {"error": str(update_error), "user_id": user_id},
+                )
 
     return user
 

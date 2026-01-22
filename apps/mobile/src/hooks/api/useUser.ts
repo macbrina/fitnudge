@@ -17,8 +17,8 @@ export const useCurrentUser = () => {
   return useQuery({
     queryKey: userQueryKeys.currentUser,
     queryFn: () => userService.getCurrentUser(),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    refetchOnMount: false
+    staleTime: 60 * 1000, // 1 minute - user data can change from other devices
+    refetchOnMount: true // Always check for fresh data on mount
   });
 };
 
@@ -93,8 +93,8 @@ export const useUserStats = (userId?: string) => {
     queryKey: userQueryKeys.userStats(userId),
     queryFn: () => userService.getUserStats(userId),
     enabled: isAuthenticated,
-    staleTime: 0, // Refetch immediately when invalidated (realtime updates)
-    refetchOnMount: false
+    staleTime: 30 * 1000, // 30 seconds - stats change frequently with check-ins
+    refetchOnMount: true // Always check for fresh data on mount
   });
 };
 

@@ -69,6 +69,16 @@ export async function handleDeepLink(url: string): Promise<void> {
       return;
     }
 
+    // Reconstruct full path with query params for Expo Router paths
+    const queryString =
+      queryParams && Object.keys(queryParams).length > 0
+        ? `?${new URLSearchParams(queryParams as Record<string, string>).toString()}`
+        : "";
+    const fullPath = `${normalizedPath}${queryString}`;
+
+    console.log("normalizedPath", normalizedPath);
+    console.log("fullPath", fullPath);
+
     // If the path is already an Expo Router path (starts with /(user) or /(auth) or /(onboarding)),
     // route directly - these come from notification data.deepLink
     if (
@@ -77,11 +87,12 @@ export async function handleDeepLink(url: string): Promise<void> {
       normalizedPath.startsWith("/(onboarding)")
     ) {
       const authenticated = await isUserAuthenticated();
+      console.log("authenticated", authenticated);
       if (authenticated || normalizedPath.startsWith("/(auth)")) {
-        router.push(normalizedPath as any);
+        router.push(fullPath as any);
       } else {
         // User not authenticated - redirect to auth with original destination
-        const params = new URLSearchParams({ redirectTo: normalizedPath });
+        const params = new URLSearchParams({ redirectTo: fullPath });
         router.push(`${MOBILE_ROUTES.AUTH.SIGNUP}?${params.toString()}`);
       }
       return;
@@ -158,10 +169,13 @@ export async function handleDeepLink(url: string): Promise<void> {
       // Profile
       case "/profile":
         if (queryParams?.id) {
-          await routeWithAuthCheck(`${MOBILE_ROUTES.SOCIAL.USER_PROFILE}?id=${queryParams.id}`, {
-            redirectTo: "profile",
-            profileId: queryParams.id as string
-          });
+          await routeWithAuthCheck(
+            `${MOBILE_ROUTES.PROFILE.PROFILE_SETTINGS}?id=${queryParams.id}`,
+            {
+              redirectTo: "profile",
+              profileId: queryParams.id as string
+            }
+          );
         } else {
           await routeWithAuthCheck(MOBILE_ROUTES.PROFILE.MAIN, {
             redirectTo: "profile"
@@ -186,8 +200,7 @@ export async function handleDeepLink(url: string): Promise<void> {
         break;
 
       // Check-ins (from push notifications)
-      // Route directly to Goal/Challenge detail screen where user can tap the check-in button
-      // This works for all tracking types (checkin, meal, hydration, workout)
+      // Route directly to Goal detail screen where user can tap the check-in button
       case "/checkin":
         if (queryParams?.goalId) {
           // Goal check-in - route to goal detail screen
@@ -195,42 +208,9 @@ export async function handleDeepLink(url: string): Promise<void> {
             redirectTo: "goal",
             goalId: queryParams.goalId as string
           });
-        } else if (queryParams?.challengeId) {
-          // Challenge check-in - route to challenge detail screen
-          await routeWithAuthCheck(
-            MOBILE_ROUTES.CHALLENGES.DETAILS(queryParams.challengeId as string),
-            {
-              redirectTo: "challenge",
-              challengeId: queryParams.challengeId as string
-            }
-          );
         } else {
           await routeWithAuthCheck(MOBILE_ROUTES.MAIN.HOME, {
             redirectTo: "home"
-          });
-        }
-        break;
-
-      // Challenges - handles /challenge?id=xxx (from plan_ready notifications)
-      case "/challenge":
-        if (queryParams?.id) {
-          await routeWithAuthCheck(MOBILE_ROUTES.CHALLENGES.DETAILS(queryParams.id as string), {
-            redirectTo: "challenge",
-            challengeId: queryParams.id as string
-          });
-        } else if (queryParams?.challengeId) {
-          // Handle challengeId param (from push notifications)
-          await routeWithAuthCheck(
-            MOBILE_ROUTES.CHALLENGES.DETAILS(queryParams.challengeId as string),
-            {
-              redirectTo: "challenge",
-              challengeId: queryParams.challengeId as string
-            }
-          );
-        } else {
-          // No ID provided, go to goals list (challenges are shown there)
-          await routeWithAuthCheck(MOBILE_ROUTES.MAIN.GOALS, {
-            redirectTo: "goals"
           });
         }
         break;
@@ -239,11 +219,12 @@ export async function handleDeepLink(url: string): Promise<void> {
       // PARTNER NOTIFICATIONS (moved to Profile section)
       // =====================================================
 
-      // Partner request received - go to partners screen
+      // Partner request received - go to partners screen with "received" tab
       case "/partner-request":
       case "/partners/received":
-        await routeWithAuthCheck(MOBILE_ROUTES.PROFILE.PARTNERS, {
-          redirectTo: "partners"
+        await routeWithAuthCheck(`${MOBILE_ROUTES.PROFILE.PARTNERS}?tab=received`, {
+          redirectTo: "partners",
+          tab: "received"
         });
         break;
 
@@ -304,65 +285,6 @@ export async function handleDeepLink(url: string): Promise<void> {
         } else {
           await routeWithAuthCheck(MOBILE_ROUTES.PROFILE.PARTNERS, {
             redirectTo: "partners"
-          });
-        }
-        break;
-
-      // =====================================================
-      // CHALLENGE NOTIFICATIONS
-      // =====================================================
-
-      // Challenge invite
-      case "/challenge-invite":
-        if (queryParams?.challengeId) {
-          await routeWithAuthCheck(
-            MOBILE_ROUTES.CHALLENGES.DETAILS(queryParams.challengeId as string),
-            {
-              redirectTo: "challenge",
-              challengeId: queryParams.challengeId as string
-            }
-          );
-        } else {
-          await routeWithAuthCheck(`${MOBILE_ROUTES.GOALS.LIST}?tab=challenges`, {
-            redirectTo: "challenges"
-          });
-        }
-        break;
-
-      // Challenge leaderboard updates (overtaken, lead)
-      case "/challenge-leaderboard":
-      case "/challenge-overtaken":
-      case "/challenge-lead":
-        if (queryParams?.challengeId) {
-          await routeWithAuthCheck(
-            MOBILE_ROUTES.CHALLENGES.DETAILS(queryParams.challengeId as string),
-            {
-              redirectTo: "challenge",
-              challengeId: queryParams.challengeId as string
-            }
-          );
-        } else {
-          await routeWithAuthCheck(`${MOBILE_ROUTES.GOALS.LIST}?tab=challenges`, {
-            redirectTo: "challenges"
-          });
-        }
-        break;
-
-      // Challenge starting/ending/ended
-      case "/challenge-starting":
-      case "/challenge-ending":
-      case "/challenge-ended":
-        if (queryParams?.challengeId) {
-          await routeWithAuthCheck(
-            MOBILE_ROUTES.CHALLENGES.DETAILS(queryParams.challengeId as string),
-            {
-              redirectTo: "challenge",
-              challengeId: queryParams.challengeId as string
-            }
-          );
-        } else {
-          await routeWithAuthCheck(`${MOBILE_ROUTES.GOALS.LIST}?tab=challenges`, {
-            redirectTo: "challenges"
           });
         }
         break;
@@ -429,13 +351,6 @@ export async function handleDeepLink(url: string): Promise<void> {
         });
         break;
 
-      // Social tab (for general social notifications)
-      case "/social":
-        await routeWithAuthCheck(MOBILE_ROUTES.SOCIAL.FEED, {
-          redirectTo: "social"
-        });
-        break;
-
       // Nudges/activity (moved to Profile section)
       case "/nudges":
       case "/activity":
@@ -453,18 +368,6 @@ export async function handleDeepLink(url: string): Promise<void> {
 
       // Default: handle dynamic paths or go to home
       default:
-        // Challenge detail link: /challenge/{id}
-        if (normalizedPath.startsWith("/challenge/")) {
-          const challengeId = normalizedPath.replace("/challenge/", "");
-          if (challengeId && challengeId !== "join") {
-            await routeWithAuthCheck(MOBILE_ROUTES.CHALLENGES.DETAILS(challengeId), {
-              redirectTo: "challenge",
-              challengeId
-            });
-            break;
-          }
-        }
-
         // Handle /goal/{goalId} format (from push notifications)
         if (normalizedPath.startsWith("/goal/")) {
           const goalId = normalizedPath.replace("/goal/", "");

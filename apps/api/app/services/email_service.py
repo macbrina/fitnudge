@@ -55,23 +55,51 @@ class EmailService:
             text_part = MIMEText(body, "plain")
             message.attach(text_part)
 
-            # Send email
-            with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
+            # Send email with timeout (10 seconds for connection, 30 seconds total)
+            with smtplib.SMTP(timeout=10) as server:
+                server.connect(self.smtp_host, self.smtp_port)
                 server.starttls()
+
                 server.login(self.smtp_username, self.smtp_password)
+
                 server.sendmail(self.from_email, user_email, message.as_string())
 
             return True
 
-        except Exception as e:
+        except smtplib.SMTPException as e:
             logger.error(
-                "Failed to send verification email",
+                f"[email_service] SMTP error sending verification email",
+                {
+                    "to": user_email,
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                    "smtp_host": self.smtp_host,
+                    "smtp_port": self.smtp_port,
+                },
+            )
+            return False
+        except TimeoutError as e:
+            logger.error(
+                f"[email_service] Timeout sending verification email",
                 {
                     "to": user_email,
                     "error": str(e),
                     "smtp_host": self.smtp_host,
                     "smtp_port": self.smtp_port,
                 },
+            )
+            return False
+        except Exception as e:
+            logger.error(
+                f"[email_service] Failed to send verification email",
+                {
+                    "to": user_email,
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                    "smtp_host": self.smtp_host,
+                    "smtp_port": self.smtp_port,
+                },
+                exc_info=True,
             )
             return False
 
@@ -195,7 +223,7 @@ The FitNudge Team
             attachment.add_header(
                 "Content-Disposition",
                 "attachment",
-                filename="fitnudge_data_export.json"
+                filename="fitnudge_data_export.json",
             )
             message.attach(attachment)
 

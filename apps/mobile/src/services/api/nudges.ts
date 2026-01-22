@@ -11,9 +11,7 @@ export interface Nudge {
   message?: string;
   emoji?: string;
   goal_id?: string;
-  challenge_id?: string;
   partnership_id?: string;
-  is_ai_generated: boolean;
   is_read: boolean;
   created_at: string;
   sender?: {
@@ -30,7 +28,6 @@ export interface SendNudgeRequest {
   message?: string;
   emoji?: string;
   goal_id?: string;
-  challenge_id?: string;
   partnership_id?: string;
 }
 

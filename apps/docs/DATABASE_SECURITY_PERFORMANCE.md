@@ -122,14 +122,14 @@ Implemented **Row Level Security** for all tables:
 - `suggested_goals`: Users manage own
 - `user_achievements`: Users read own, admin write
 - `achievement_badges`: Public read, admin write
-- `progress_photos`: Users manage own
 
-##### ✅ Social & Challenges
+##### ✅ Social & Partners
 
-- `challenges`: Public read active, users create/manage own
-- `challenge_participants`: Users manage own participation
-- `meal_logs`, `meal_photos`: Users manage own
-- `habit_chain_logs`: Users manage own (via goal ownership)
+- `nudges`: Sender/recipient access
+- `accountability_partners`: Users manage own partnerships
+- `achievements`: Users read own
+- `weekly_recaps`: Users read own
+- `blog_posts`: Public read for published posts
 
 ##### ✅ Subscriptions & Plans
 

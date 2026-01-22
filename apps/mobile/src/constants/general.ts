@@ -1,21 +1,38 @@
 /**
  * General app constants
+ *
+ * IMPORTANT: These are FALLBACK values used when the backend is unreachable.
+ * The actual values are fetched from the database via useAppConfig hook.
+ * Update via admin panel, not here (unless updating fallbacks).
  */
 
-// App Store URLs for rating
-export const APP_STORE_URLS = {
+// FALLBACK App Store URLs - used when API is unreachable
+// Actual values are fetched from app_config table
+export const FALLBACK_APP_STORE_URLS = {
   IOS: "https://apps.apple.com/app/fitnudge/id123456789", // TODO: Replace with actual App Store ID
   ANDROID: "https://play.google.com/store/apps/details?id=com.fitnudge.app" // TODO: Replace with actual package name
 } as const;
 
-// External URLs
-export const EXTERNAL_URLS = {
+// FALLBACK External URLs - used when API is unreachable
+// Actual values are fetched from app_config table
+export const FALLBACK_EXTERNAL_URLS = {
   PRIVACY_POLICY: "https://fitnudge.app/privacy-policy",
   TERMS_OF_SERVICE: "https://fitnudge.app/terms-of-service",
   HELP_CENTER: "https://fitnudge.tawk.help/",
+  TALLY_SO: "https://tally.so/r/2EaLE9",
   TAWK_TO_CHAT: "https://tawk.to/chat/695732b53a0c9b197f142f94/1jdu9s5a9",
   CONTACT: "mailto:hello@fitnudge.app"
 } as const;
+
+/**
+ * @deprecated Use useAppStoreUrls() hook instead for dynamic values
+ */
+export const APP_STORE_URLS = FALLBACK_APP_STORE_URLS;
+
+/**
+ * @deprecated Use useExternalUrls() hook instead for dynamic values
+ */
+export const EXTERNAL_URLS = FALLBACK_EXTERNAL_URLS;
 
 // Predefined profile avatars
 export const PROFILE_AVATARS = [

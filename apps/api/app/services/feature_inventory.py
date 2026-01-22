@@ -67,12 +67,12 @@ def _fetch_features_from_database() -> Dict[str, Dict[str, Any]]:
     try:
         supabase = _get_supabase_client()
 
-        # Fetch all plan features with their plan info
+        # Fetch all plan features with their plan info (V2: no minimum_tier)
         response = (
             supabase.table("plan_features")
             .select(
                 "feature_key, feature_name, feature_description, ai_description, "
-                "feature_value, is_enabled, minimum_tier, plan_id"
+                "feature_value, is_enabled, plan_id"
             )
             .execute()
         )
@@ -81,66 +81,62 @@ def _fetch_features_from_database() -> Dict[str, Dict[str, Any]]:
             logger.warning("No features found in database")
             return {}
 
-        # Group features by feature_key and collect which plans have access
+        # Group features by feature_key and collect plan-specific access
         features: Dict[str, Dict[str, Any]] = {}
 
         for row in response.data:
             feature_key = row["feature_key"]
             plan_id = row["plan_id"]
             is_enabled = row.get("is_enabled", True)
-            minimum_tier = row.get("minimum_tier", 0)
+            feature_value = row.get("feature_value")
 
             if feature_key not in features:
                 features[feature_key] = {
                     "name": row["feature_name"],
                     "description": row.get("feature_description", ""),
-                    "ai_description": row.get("ai_description", ""),
-                    "plans": set(),  # Plans that have this feature
-                    "is_enabled": is_enabled,
-                    "minimum_tier": minimum_tier,
-                    "feature_value": row.get("feature_value"),  # For limits
+                    # Plan-specific access: {"free": True, "premium": False}
+                    "plan_access": {},
+                    # Plan-specific feature values (for limits that differ by plan)
+                    "plan_values": {},
+                    # Plan-specific ai_descriptions (different for free vs premium)
+                    "plan_ai_descriptions": {},
                 }
-            else:
-                # Update if this row has a value and existing doesn't
-                if row.get("feature_value") and not features[feature_key].get(
-                    "feature_value"
-                ):
-                    features[feature_key]["feature_value"] = row["feature_value"]
 
-            # Add this plan to the feature's access list if enabled
-            if is_enabled:
-                features[feature_key]["plans"].add(plan_id)
+            # Store plan-specific is_enabled status
+            features[feature_key]["plan_access"][plan_id] = is_enabled
 
-            # Track the minimum tier across all entries
-            if minimum_tier < features[feature_key]["minimum_tier"]:
-                features[feature_key]["minimum_tier"] = minimum_tier
+            # Store plan-specific feature_value (including None for unlimited)
+            # We need to store None explicitly to distinguish "unlimited" from "no entry"
+            features[feature_key]["plan_values"][plan_id] = feature_value
 
-        # Convert plans set to access list and determine status
+            # Store plan-specific ai_description (e.g., free says "upgrade to unlock", premium says actual feature)
+            if row.get("ai_description"):
+                features[feature_key]["plan_ai_descriptions"][plan_id] = row[
+                    "ai_description"
+                ]
+
+        # Determine overall status and access for each feature
         for feature_key, feature_data in features.items():
-            plans = feature_data["plans"]
+            plan_access = feature_data["plan_access"]
 
-            # Determine access based on which plans have this feature (2-tier system)
-            if "free" in plans:
-                # If free plan has it, check if premium also has it
-                if "premium" in plans:
-                    feature_data["access"] = [FeatureAccess.ALL]
-                else:
-                    feature_data["access"] = [FeatureAccess.FREE]
+            # Feature is implemented if ANY plan has it enabled
+            is_implemented = any(plan_access.values())
+            feature_data["status"] = (
+                FeatureStatus.IMPLEMENTED if is_implemented else FeatureStatus.PLANNED
+            )
+
+            # Determine access levels based on which plans have it enabled
+            free_enabled = plan_access.get("free", False)
+            premium_enabled = plan_access.get("premium", False)
+
+            if free_enabled and premium_enabled:
+                feature_data["access"] = [FeatureAccess.ALL]
+            elif free_enabled:
+                feature_data["access"] = [FeatureAccess.FREE]
+            elif premium_enabled:
+                feature_data["access"] = [FeatureAccess.PREMIUM]
             else:
-                # Only premium has access
-                feature_data["access"] = []
-                if "premium" in plans:
-                    feature_data["access"].append(FeatureAccess.PREMIUM)
-
-            # Determine status based on is_enabled
-            if feature_data["is_enabled"]:
-                feature_data["status"] = FeatureStatus.IMPLEMENTED
-            else:
-                feature_data["status"] = FeatureStatus.PLANNED
-
-            # Clean up temporary fields
-            del feature_data["plans"]
-            del feature_data["is_enabled"]
+                feature_data["access"] = []  # Not available to any plan
 
         logger.info(f"Loaded {len(features)} features from database")
         return features
@@ -216,8 +212,7 @@ def get_features_for_plan(plan: str) -> List[Dict[str, Any]]:
         List of feature definitions available to this plan
     """
     features = _get_cached_features()
-    plan_access = _plan_to_access(plan)
-    plan_tier = PLAN_TIERS.get(plan.lower(), 0)
+    plan_lower = plan.lower()
 
     available_features = []
 
@@ -226,33 +221,47 @@ def get_features_for_plan(plan: str) -> List[Dict[str, Any]]:
         if feature_data.get("status") != FeatureStatus.IMPLEMENTED:
             continue
 
+        # V2: Check plan-specific access from plan_access dict
+        plan_access = feature_data.get("plan_access", {})
+        is_enabled_for_plan = plan_access.get(plan_lower, False)
+
+        if not is_enabled_for_plan:
+            continue
+
+        # Get plan-specific feature_value (None = unlimited)
+        plan_values = feature_data.get("plan_values", {})
+        # Use the plan-specific value if the plan has an entry, otherwise fallback
+        if plan_lower in plan_values:
+            feature_value = plan_values[plan_lower]
+        elif "free" in plan_values:
+            feature_value = plan_values["free"]
+        elif "premium" in plan_values:
+            feature_value = plan_values["premium"]
+        else:
+            feature_value = None  # No limit defined = unlimited
+
+        # Get plan-specific ai_description (e.g., free says "upgrade to unlock", premium says actual feature)
+        plan_ai_descriptions = feature_data.get("plan_ai_descriptions", {})
+        if plan_lower in plan_ai_descriptions:
+            ai_description = plan_ai_descriptions[plan_lower]
+        elif "free" in plan_ai_descriptions:
+            ai_description = plan_ai_descriptions["free"]
+        elif "premium" in plan_ai_descriptions:
+            ai_description = plan_ai_descriptions["premium"]
+        else:
+            ai_description = feature_data.get("name", feature_key)
+
         access_levels = feature_data.get("access", [])
-        minimum_tier = feature_data.get("minimum_tier", 0)
-
-        # Check if plan has access
-        has_access = False
-
-        # ALL means everyone has access
-        if FeatureAccess.ALL in access_levels:
-            has_access = True
-        # Check if plan is in access list
-        elif plan_access in access_levels:
-            has_access = True
-        # Check tier-based access (higher tiers inherit lower tier features)
-        elif plan_tier >= minimum_tier and minimum_tier > 0:
-            has_access = True
-
-        if has_access:
-            available_features.append(
-                {
-                    "key": feature_key,
-                    "name": feature_data.get("name", feature_key),
-                    "description": feature_data.get("description", ""),
-                    "ai_description": feature_data.get("ai_description", ""),
-                    "feature_value": feature_data.get("feature_value"),
-                    "access": [a.value for a in access_levels],
-                }
-            )
+        available_features.append(
+            {
+                "key": feature_key,
+                "name": feature_data.get("name", feature_key),
+                "description": feature_data.get("description", ""),
+                "ai_description": ai_description,
+                "feature_value": feature_value,
+                "access": [a.value for a in access_levels],
+            }
+        )
 
     return available_features
 
@@ -275,29 +284,30 @@ def get_implemented_feature_names(plan: str) -> List[str]:
 def get_available_features_summary(plan: str) -> str:
     """
     Get a human-readable summary of available features for AI prompts.
+    Uses feature names (generic) - not plan-specific ai_descriptions.
+    The AI can reference the features array for plan-specific limits.
 
     Args:
         plan: User's subscription plan
 
     Returns:
-        Formatted string describing available features
+        Formatted string describing available features (generic names)
     """
     features = get_features_for_plan(plan)
-    feature_descriptions = [
-        f["ai_description"] for f in features if f.get("ai_description")
-    ]
 
-    if not feature_descriptions:
+    # Use feature names (generic) - AI will look at feature_value for limits
+    feature_names = [f["name"] for f in features if f.get("name")]
+
+    if not feature_names:
         return "Basic check-in and progress tracking."
 
-    # Build summary
-    summary = "Available features: "
-    summary += ", ".join(feature_descriptions[:-1])
-    if len(feature_descriptions) > 1:
-        summary += f", and {feature_descriptions[-1]}"
+    # Build summary with generic feature names
+    if len(feature_names) > 1:
+        summary = "Available features: "
+        summary += ", ".join(feature_names[:-1])
+        summary += f", and {feature_names[-1]}."
     else:
-        summary += feature_descriptions[0]
-    summary += "."
+        summary = f"Available features: {feature_names[0]}."
 
     return summary
 
@@ -317,11 +327,14 @@ def get_plan_restrictions(plan: str) -> List[str]:
     # Get goal limit from database
     goal_limit = _get_goal_limit_for_plan(plan)
 
-    if goal_limit == 1:
+    if goal_limit is None:
+        # Unlimited goals (premium)
+        pass
+    elif goal_limit == 1:
         restrictions.append("Free users can only have 1 active goal at a time.")
     elif goal_limit:
         restrictions.append(
-            f"{plan.capitalize()} users can have up to {goal_limit} goals."
+            f"{plan.capitalize()} users can have up to {goal_limit} active goals at a time."
         )
 
     # Feature restrictions based on plan
@@ -366,67 +379,148 @@ def can_mention_feature(feature_key: str, plan: str) -> bool:
     if not feature.get("ai_description"):
         return False
 
-    # Check access
-    plan_access = _plan_to_access(plan)
-    plan_tier = PLAN_TIERS.get(plan.lower(), 0)
-    access_levels = feature.get("access", [])
-    minimum_tier = feature.get("minimum_tier", 0)
+    # V2: Check plan-specific access from plan_access dict
+    plan_access = feature.get("plan_access", {})
+    plan_lower = plan.lower()
+    is_enabled_for_plan = plan_access.get(plan_lower, False)
 
-    # Check if plan has access
-    if FeatureAccess.ALL in access_levels:
-        return True
-    if plan_access in access_levels:
-        return True
-    if plan_tier >= minimum_tier and minimum_tier > 0:
-        return True
-
-    return False
+    return is_enabled_for_plan
 
 
-def get_feature_context_for_ai(plan: str) -> Dict[str, Any]:
+def get_premium_only_features(plan: str) -> List[Dict[str, Any]]:
     """
-    Get complete feature context for AI prompt generation.
+    Get features that are available to premium users but NOT to the current plan.
+    Useful for AI to know what to upsell.
 
     Args:
         plan: User's subscription plan
 
     Returns:
-        Dictionary with feature context for AI
+        List of premium-only feature definitions
     """
-    return {
-        "available_features": get_implemented_feature_names(plan),
-        "features_summary": get_available_features_summary(plan),
-        "restrictions": get_plan_restrictions(plan),
+    if plan.lower() == "premium":
+        return []  # Premium has everything
+
+    features = _get_cached_features()
+    premium_only = []
+
+    for feature_key, feature_data in features.items():
+        # Skip non-implemented features
+        if feature_data.get("status") != FeatureStatus.IMPLEMENTED:
+            continue
+
+        plan_access = feature_data.get("plan_access", {})
+        is_enabled_for_user = plan_access.get(plan.lower(), False)
+        is_enabled_for_premium = plan_access.get("premium", False)
+
+        # Feature is premium-only if premium has it but user doesn't
+        if is_enabled_for_premium and not is_enabled_for_user:
+            plan_values = feature_data.get("plan_values", {})
+            # Use premium's ai_description for upselling (not the "upgrade to unlock" text from free)
+            plan_ai_descriptions = feature_data.get("plan_ai_descriptions", {})
+            ai_description = plan_ai_descriptions.get(
+                "premium", feature_data.get("name", feature_key)
+            )
+            premium_only.append(
+                {
+                    "key": feature_key,
+                    "name": feature_data.get("name", feature_key),
+                    "description": feature_data.get("description", ""),
+                    "ai_description": ai_description,
+                    "premium_value": plan_values.get("premium"),
+                }
+            )
+
+    return premium_only
+
+
+def get_feature_limits(plan: str) -> Dict[str, Any]:
+    """
+    Get all feature limits/values for a plan as a dictionary.
+    Useful for AI to understand specific limits.
+
+    Args:
+        plan: User's subscription plan
+
+    Returns:
+        Dictionary of feature_key -> feature_value
+    """
+    features = get_features_for_plan(plan)
+    limits = {}
+
+    for feature in features:
+        if feature.get("feature_value") is not None:
+            limits[feature["key"]] = feature["feature_value"]
+
+    return limits
+
+
+def get_feature_context_for_ai(plan: str) -> Dict[str, Any]:
+    """
+    Get complete feature context for AI prompt generation.
+    Includes full feature data with values from database (no hardcoding).
+
+    Args:
+        plan: User's subscription plan
+
+    Returns:
+        Dictionary with feature context for AI including:
+        - features: Full list of available features with feature_value (null = unlimited)
+        - premium_only_features: Features user doesn't have (only for non-premium)
+        - restrictions: Human-readable restriction messages
+        - features_summary: Generic product feature list (not plan-specific)
+    """
+    available_features = get_features_for_plan(plan)
+    premium_only = get_premium_only_features(plan)
+
+    context = {
         "plan": plan,
-        "goal_limit": _get_goal_limit_for_plan(plan),
+        # Full feature data - each feature has feature_value (number = limit, null = unlimited)
+        "features": available_features,
+        # Human-readable restrictions
+        "restrictions": get_plan_restrictions(plan),
+        # Generic product summary (feature names only, AI uses features array for limits)
+        "features_summary": get_available_features_summary(plan),
     }
+
+    # Only include premium_only_features for non-premium users (for upselling)
+    if premium_only:
+        context["premium_only_features"] = premium_only
+
+    return context
 
 
 def _get_goal_limit_for_plan(plan: str) -> Optional[int]:
     """
     Get goal limit for a plan from database (None means unlimited).
 
-    Looks for the "goals" feature and its feature_value.
+    Looks for the "active_goal_limit" feature and its plan-specific feature_value.
     """
     features = _get_cached_features()
     plan_lower = plan.lower()
 
-    # Premium has unlimited goals
-    if plan_lower == "premium":
-        return None
+    # Look for "active_goal_limit" feature
+    goal_limit_feature = features.get("active_goal_limit", {})
 
-    # Look for "goals" feature with feature_value for this plan's tier
-    goals_feature = features.get("goals", {})
-    if goals_feature.get("feature_value"):
-        return goals_feature["feature_value"]
+    # Get plan-specific feature_value (None = unlimited)
+    plan_values = goal_limit_feature.get("plan_values", {})
 
-    # Fallback: Check based on plan tier (2-tier system)
-    # Free = 1, Premium = unlimited
+    # Check if plan has an entry in plan_values
+    if plan_lower in plan_values:
+        return plan_values[plan_lower]  # Can be None (unlimited) or a number
+
+    # Fallback: Check other plans
+    if "free" in plan_values:
+        return plan_values["free"]
+    if "premium" in plan_values:
+        return plan_values["premium"]
+
+    # Final fallback: Default limits
     defaults = {
-        "free": 1,
-        "premium": None,
+        "free": 2,  # V2: Free tier has 2 goals
+        "premium": 10,  # Premium is 10 goals
     }
-    return defaults.get(plan_lower, 1)
+    return defaults.get(plan_lower, 2)
 
 
 def get_feature_info(feature_key: str) -> Optional[Dict[str, Any]]:

@@ -52,25 +52,25 @@ DATABASE_POOL_MAX_SIZE: int = 10
 **Before (N+1 Query Pattern):**
 
 ```python
-# ❌ BAD: 100 challenges = 100 DB calls
-for challenge in challenges:
-    supabase.table("challenges").update(...).eq("id", challenge["id"]).execute()
+# ❌ BAD: 100 goals = 100 DB calls
+for goal in goals:
+    supabase.table("goals").update(...).eq("id", goal["id"]).execute()
 ```
 
 **After (Batch Update):**
 
 ```python
-# ✅ GOOD: 100 challenges = 1 DB call
-challenge_ids = [c["id"] for c in challenges]
-supabase.table("challenges").update(...).in_("id", challenge_ids).execute()
+# ✅ GOOD: 100 goals = 1 DB call
+goal_ids = [g["id"] for g in goals]
+supabase.table("goals").update(...).in_("id", goal_ids).execute()
 ```
 
 **Files updated:**
 
-- `subscription_service.py` - Batch challenge cancellation
-- `subscription_tasks.py` - Batch participant updates
+- `subscription_service.py` - Batch subscription updates
 - `cleanup_service.py` - Batch notification cleanup
 - `expo_push_service.py` - Batch token deactivation
+- `notification_tasks.py` - Batch check-in prefetch
 
 ### 1.3 N+1 Query Patterns Fixed
 
@@ -78,9 +78,9 @@ supabase.table("challenges").update(...).in_("id", challenge_ids).execute()
 
 | Task/Service                            | Before                                | After                                         |
 | --------------------------------------- | ------------------------------------- | --------------------------------------------- |
-| `goal_tasks.py` - Check-in creation     | 1 query per goal to check if exists   | Batch `.in_()` prefetch all check-ins         |
-| `goal_tasks.py` - Challenge check-ins   | 1 query per participant               | Batch `.in_()` prefetch all check-ins         |
+| `notification_tasks.py` - Check-in prompts | 1 query per goal to check if exists | Batch `.in_()` prefetch all check-ins       |
 | `notification_tasks.py` - Re-engagement | 2 queries per user (checkins + prefs) | Batch `.in_()` prefetch both                  |
+| `adaptive_nudging_tasks.py` - Crushing it | 1 query per goal                    | Batch `.in_()` prefetch all check-ins         |
 | `achievement_service.py` - Unlock check | 1 query per achievement type          | Batch `.in_()` prefetch all user achievements |
 
 **Example Fix (goal_tasks.py):**
@@ -172,10 +172,10 @@ def dispatch_chunked_tasks(task, items, chunk_size=100, **kwargs):
 from app.services.tasks.task_utils import dispatch_chunked_tasks
 
 dispatch_chunked_tasks(
-    task=notify_challenge_cancelled_chunk_task,
+    task=send_bulk_notification_chunk_task,
     items=user_ids,
     chunk_size=50,
-    challenge_id=challenge_id,
+    notification_type="weekly_recap",
 )
 ```
 
@@ -183,10 +183,43 @@ dispatch_chunked_tasks(
 
 | Task                                      | Chunk Size | Trigger                                   |
 | ----------------------------------------- | ---------- | ----------------------------------------- |
-| `notify_challenge_cancelled_chunk_task`   | 50         | Challenge cancelled with 10+ participants |
-| `send_challenge_reminder_chunk_task`      | 50         | Challenge reminder with 10+ participants  |
+| `send_bulk_notification_chunk_task`       | 50         | Bulk notifications with 10+ recipients    |
 | `cleanup_expired_partner_requests_task`   | 500        | Daily cleanup task                        |
-| `cleanup_expired_creator_challenges_task` | 500        | Daily cleanup task                        |
+| `prewarm_analytics_cache_task`            | 100        | Analytics cache refresh                   |
+| `precreate_daily_checkins_task`           | N/A        | Hourly - uses PostgreSQL batch function   |
+| `mark_missed_checkins_task`               | N/A        | Hourly - uses PostgreSQL batch function   |
+
+### 3.4 Check-in Pre-creation Tasks (V2.1)
+
+Check-ins are pre-created daily for accurate "missed" tracking:
+
+```python
+@celery_app.task(name="precreate_daily_checkins")
+def precreate_daily_checkins_task():
+    """
+    Pre-creates check-ins with status='pending' for all active goals.
+    Runs HOURLY to catch all timezones.
+    Uses PostgreSQL batch function - O(1) performance.
+    """
+    supabase.rpc("precreate_checkins_for_date", {
+        "p_target_date": datetime.utcnow().date().isoformat(),
+    }).execute()
+
+@celery_app.task(name="mark_missed_checkins")
+def mark_missed_checkins_task():
+    """
+    Marks pending check-ins as 'missed' when their day has passed.
+    Runs HOURLY to catch all timezones.
+    Uses PostgreSQL batch function - O(1) performance.
+    """
+    supabase.rpc("mark_missed_checkins_batch").execute()
+```
+
+**Scalability Notes:**
+- Both tasks use PostgreSQL batch functions (single SQL statement)
+- No loops, no N+1 queries - handles 100K+ goals efficiently
+- Uses `ON CONFLICT DO NOTHING` to avoid duplicates
+- Trigger on `goals` INSERT creates check-ins for new goals automatically
 
 ### 3.4 Inline vs Dispatch Threshold
 
@@ -239,7 +272,6 @@ while True:
 | Task                                      | Batch Size | Runs   |
 | ----------------------------------------- | ---------- | ------ |
 | `cleanup_expired_partner_requests_task`   | 500        | Daily  |
-| `cleanup_expired_creator_challenges_task` | 500        | Daily  |
 | `cleanup_orphaned_notifications_task`     | 500        | Weekly |
 
 ---
@@ -277,8 +309,8 @@ All notifications store `entity_type` and `entity_id` for efficient cleanup:
 
 ```python
 notification_record = {
-    "entity_type": "challenge",      # goal, challenge, partner_request, etc.
-    "entity_id": challenge_id,       # UUID of the entity
+    "entity_type": "goal",           # goal, partner_request, achievement, etc.
+    "entity_id": goal_id,            # UUID of the entity
 }
 ```
 
@@ -286,19 +318,13 @@ notification_record = {
 
 ```python
 # cleanup_service.py
-def cleanup_challenges_batch_sync(supabase, challenge_ids, reason):
-    # Delete invites
-    supabase.table("challenge_invites")
-        .delete()
-        .in_("challenge_id", challenge_ids)
-        .eq("status", "pending")
-        .execute()
-
-    # Delete notifications
+def cleanup_notifications_batch_sync(supabase, user_id, entity_type, entity_ids):
+    # Clear related notifications
     supabase.table("notification_history")
         .delete()
-        .eq("entity_type", "challenge")
-        .in_("entity_id", challenge_ids)
+        .eq("user_id", user_id)
+        .eq("entity_type", entity_type)
+        .in_("entity_id", entity_ids)
         .execute()
 ```
 
@@ -330,8 +356,7 @@ async def remove_partner(...):
 | Function                                        | Purpose                               |
 | ----------------------------------------------- | ------------------------------------- |
 | `fire_and_forget_partner_cleanup()`             | Partner notification cleanup          |
-| `fire_and_forget_challenge_cleanup()`           | Challenge invite/notification cleanup |
-| `fire_and_forget_invite_notification_cleanup()` | Individual invite cleanup             |
+| `fire_and_forget_notification_cleanup()`        | General notification cleanup          |
 
 ---
 
@@ -413,14 +438,13 @@ POSTHOG_HOST: str = os.getenv("POSTHOG_HOST", "https://us.i.posthog.com")
 
 | Category                   | Before                  | After                   | Improvement         |
 | -------------------------- | ----------------------- | ----------------------- | ------------------- |
-| **Challenge Updates**      | O(n) loops              | `.in_()` batch          | 100x faster         |
-| **Participant Updates**    | O(n) loops              | `.in_()` batch          | 100x faster         |
+| **Goal Updates**           | O(n) loops              | `.in_()` batch          | 100x faster         |
+| **Partner Updates**        | O(n) loops              | `.in_()` batch          | 100x faster         |
 | **Push Notifications**     | 1 call per token        | `publish_multiple()`    | 100x faster         |
 | **Cleanup Tasks**          | Load all                | Paginated (500)         | Unbounded → bounded |
 | **Large Notifications**    | Sequential              | Chunked Celery          | Parallel processing |
 | **Token Deactivation**     | O(n) loops              | `.in_()` batch          | 100x faster         |
 | **Goal Check-ins (daily)** | 1 query per goal        | Batch `.in_()` prefetch | 100x faster         |
-| **Challenge Check-ins**    | 1 query per participant | Batch `.in_()` prefetch | 100x faster         |
 | **Re-engagement Prefs**    | 2 queries per user      | Batch `.in_()` prefetch | 100x faster         |
 | **Achievement Unlocking**  | 1 query per badge       | Batch `.in_()` prefetch | 100x faster         |
 
@@ -431,8 +455,8 @@ POSTHOG_HOST: str = os.getenv("POSTHOG_HOST", "https://us.i.posthog.com")
 | File                           | Changes                                    |
 | ------------------------------ | ------------------------------------------ |
 | `subscription_service.py`      | Batch updates, chunked notifications       |
-| `subscription_tasks.py`        | Batch updates, paginated cleanup           |
-| `challenge_tasks.py`           | Chunked reminder notifications             |
+| `notification_tasks.py`        | Batch prefetch, send_push_to_user_sync     |
+| `adaptive_nudging_tasks.py`    | Batch prefetch, chunked processing         |
 | `cleanup_service.py`           | Batch cleanup functions, pagination        |
 | `expo_push_service.py`         | `publish_multiple()`, batch token updates  |
 | `task_utils.py`                | `chunk_list()`, `dispatch_chunked_tasks()` |
@@ -456,7 +480,6 @@ These patterns have N+1 potential but are acceptable due to low volume or per-us
 | Weekly recap per user        | `analytics_tasks.py`     | Runs once/week, low volume                               |
 | AI motivation generation     | `notification_tasks.py`  | Already has `already_sent` check (could batch in future) |
 | Check-in prompts             | `notification_tasks.py`  | Time-filtered, most goals skip early                     |
-| Leaderboard rank updates     | `challenge_service.py`   | Most challenges < 100 participants                       |
 | Achievement condition checks | `achievement_service.py` | Per-user, async background                               |
 
 ### 13.2 Future Optimizations (500K+ Users)
@@ -492,6 +515,6 @@ With these optimizations, FitNudge can handle:
 - ✅ **100K+ Daily Active Users**
 - ✅ **2M+ Push Notifications/day**
 - ✅ **1M+ Background Tasks/day**
-- ✅ **100K+ Partner/Challenge Operations/day**
+- ✅ **100K+ Partner Operations/day**
 
 The architecture is designed for **horizontal scaling** - add more Celery workers and the system scales linearly.

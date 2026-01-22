@@ -9,19 +9,20 @@ import { useTranslation } from "@/lib/i18n";
 import { MOBILE_ROUTES } from "@/lib/routes";
 import { toRN } from "@/lib/units";
 import { useStyles, useTheme } from "@/themes";
-import { useSubscriptionStore } from "@/stores/subscriptionStore";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { useCallback, useState } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useCallback, useState, useEffect } from "react";
 import {
+  ActivityIndicator,
   FlatList,
   Image,
   RefreshControl,
   Text,
   TouchableOpacity,
-  View,
-  ActivityIndicator
+  View
 } from "react-native";
+import { SkeletonBox } from "@/components/ui/SkeletonBox";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 
 // Hooks
 import {
@@ -43,8 +44,25 @@ export default function PartnersScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const { showAlert, showConfirm, showToast } = useAlertModal();
+  const { tab } = useLocalSearchParams<{ tab?: string }>();
 
-  const [activeTab, setActiveTab] = useState<PartnerSubTab>("partners");
+  // Determine initial tab from URL param (e.g., ?tab=received)
+  const getInitialTab = (): PartnerSubTab => {
+    if (tab === "received" || tab === "sent") {
+      return tab;
+    }
+    return "partners";
+  };
+
+  const [activeTab, setActiveTab] = useState<PartnerSubTab>(getInitialTab);
+
+  // Update tab when URL param changes (e.g., navigating from different notifications)
+  useEffect(() => {
+    if (tab === "received" || tab === "sent") {
+      setActiveTab(tab);
+    }
+  }, [tab]);
+
   const [refreshing, setRefreshing] = useState(false);
   const [nudgeTarget, setNudgeTarget] = useState<Partner | null>(null);
 
@@ -57,8 +75,12 @@ export default function PartnersScreen() {
   const { data: pendingData, refetch: refetchPending } = usePendingPartnerRequests();
   const { data: sentData, refetch: refetchSent } = useSentPartnerRequests();
 
-  // Access check
-  const { hasFeature: hasPartnerFeature, canSendRequest } = usePartnerAccess();
+  // Access check - use unified hook for consistency
+  const {
+    hasFeature: hasPartnerFeature,
+    canSendRequest,
+    openSubscriptionModal
+  } = usePartnerAccess();
 
   // Mutations
   const cancelRequestMutation = useCancelPartnerRequest();
@@ -72,9 +94,7 @@ export default function PartnersScreen() {
   // Premium access check - user has access if:
   // 1. They have the feature, OR
   // 2. They have active partners or pending requests (someone with feature invited them)
-  const { hasFeature } = useSubscriptionStore();
-  const userHasFeature = hasFeature("social_accountability");
-  const hasAccess = userHasFeature || partners.length > 0 || pendingRequests.length > 0;
+  const hasAccess = hasPartnerFeature || partners.length > 0 || pendingRequests.length > 0;
 
   // Refresh all data
   const handleRefresh = useCallback(async () => {
@@ -94,7 +114,7 @@ export default function PartnersScreen() {
         title: t("partners.accept_request_title") || "Accept Partner Request",
         message:
           t("partners.accept_request_message") ||
-          "By accepting, you and this person will become accountability partners. You'll be able to see each other's active goals and challenges, and send nudges to keep each other on track.",
+          "By accepting, you and this person will become accountability partners. You'll be able to see each other's active goals, and send nudges to keep each other on track.",
         variant: "info",
         confirmLabel: t("common.accept") || "Accept",
         cancelLabel: t("common.cancel"),
@@ -201,14 +221,7 @@ export default function PartnersScreen() {
 
   const handleNudgeSuccess = useCallback(() => {
     if (!nudgeTarget) return;
-    showToast({
-      title: t("partners.nudge_sent") || "Nudge Sent",
-      message:
-        t("partners.nudge_sent_message", {
-          name: nudgeTarget.partner?.name
-        }) || `You nudged ${nudgeTarget.partner?.name}!`,
-      variant: "success"
-    });
+
     setNudgeTarget(null);
   }, [nudgeTarget, showToast, t]);
 
@@ -233,8 +246,13 @@ export default function PartnersScreen() {
       });
       return;
     }
+    // Check if user has reached their partner limit
+    if (!canSendRequest) {
+      openSubscriptionModal();
+      return;
+    }
     router.push(MOBILE_ROUTES.PROFILE.FIND_PARTNER);
-  }, [hasPartnerFeature, router, showAlert, t]);
+  }, [hasPartnerFeature, canSendRequest, router, showAlert, openSubscriptionModal, t]);
 
   // Render partner card
   const renderPartnerCard = ({ item }: { item: Partner }) => (
@@ -254,17 +272,19 @@ export default function PartnersScreen() {
 
           {/* Info */}
           <View style={styles.partnerInfo}>
+            {item.partner?.name && (
+              <Text style={styles.partnerName} numberOfLines={1}>
+                {item.partner?.name || t("common.user")}
+              </Text>
+            )}
             {item.partner?.username && (
               <Text style={styles.partnerUsername} numberOfLines={1}>
                 @{item.partner.username}
               </Text>
             )}
-            <Text style={styles.partnerName} numberOfLines={1}>
-              {item.partner?.name || t("common.user")}
-            </Text>
           </View>
 
-          {/* Nudge Button - only show if partner has active goals/challenges */}
+          {/* Nudge Button - only show if partner has active goals */}
           {item.has_active_items && (
             <TouchableOpacity style={styles.nudgeButton} onPress={() => handleNudge(item)}>
               <Ionicons name="hand-right" size={14} color={brandColors.primary} />
@@ -301,14 +321,16 @@ export default function PartnersScreen() {
 
         {/* Info */}
         <View style={styles.requestInfo}>
+          {item.partner?.name && (
+            <Text style={styles.partnerName} numberOfLines={1}>
+              {item.partner?.name || t("common.user")}
+            </Text>
+          )}
           {item.partner?.username && (
             <Text style={styles.partnerUsername} numberOfLines={1}>
               @{item.partner.username}
             </Text>
           )}
-          <Text style={styles.partnerName} numberOfLines={1}>
-            {item.partner?.name || t("common.user")}
-          </Text>
           <Text style={styles.requestMessage}>
             {t("partners.wants_to_connect") || "wants to be your partner"}
           </Text>
@@ -364,14 +386,16 @@ export default function PartnersScreen() {
 
         {/* Info */}
         <View style={styles.requestInfo}>
+          {item.partner?.name && (
+            <Text style={styles.partnerName} numberOfLines={1}>
+              {item.partner?.name || t("common.user")}
+            </Text>
+          )}
           {item.partner?.username && (
             <Text style={styles.partnerUsername} numberOfLines={1}>
               @{item.partner.username}
             </Text>
           )}
-          <Text style={styles.partnerName} numberOfLines={1}>
-            {item.partner?.name || t("common.user")}
-          </Text>
         </View>
 
         {/* Cancel Button */}
@@ -449,30 +473,25 @@ export default function PartnersScreen() {
       </Text>
       <Button
         title={t("common.upgrade") || "Upgrade to Unlock"}
-        onPress={() => router.push(MOBILE_ROUTES.ONBOARDING.SUBSCRIPTION)}
+        onPress={openSubscriptionModal}
         style={styles.upgradeButton}
       />
     </View>
   );
 
-  // Tab data
-  const tabs = [
-    {
-      id: "partners",
-      label: t("partners.tab_partners") || "Partners",
-      count: partners.length
-    },
-    {
-      id: "received",
-      label: t("partners.tab_received") || "Received",
-      count: pendingRequests.length
-    },
-    {
-      id: "sent",
-      label: t("partners.tab_sent") || "Sent",
-      count: sentRequests.length
-    }
+  // Tab options for SegmentedControl
+  const tabOptions = [
+    `${t("partners.tab_partners") || "Partners"}${partners.length > 0 ? ` (${partners.length})` : ""}`,
+    `${t("partners.tab_received") || "Received"}${pendingRequests.length > 0 ? ` (${pendingRequests.length})` : ""}`,
+    `${t("partners.tab_sent") || "Sent"}${sentRequests.length > 0 ? ` (${sentRequests.length})` : ""}`
   ];
+
+  const tabKeys: PartnerSubTab[] = ["partners", "received", "sent"];
+  const selectedTabIndex = tabKeys.indexOf(activeTab);
+
+  const handleTabChange = (index: number) => {
+    setActiveTab(tabKeys[index]);
+  };
 
   // Current data based on tab
   const currentData =
@@ -501,36 +520,28 @@ export default function PartnersScreen() {
       ) : (
         <>
           {/* Sub-tabs */}
-          <View style={styles.tabBar}>
-            {tabs.map((tab) => (
-              <TouchableOpacity
-                key={tab.id}
-                style={[styles.tab, activeTab === tab.id && styles.tabActive]}
-                onPress={() => setActiveTab(tab.id as PartnerSubTab)}
-              >
-                <Text style={[styles.tabText, activeTab === tab.id && styles.tabTextActive]}>
-                  {tab.label}
-                </Text>
-                {tab.count > 0 && (
-                  <View style={[styles.tabBadge, activeTab === tab.id && styles.tabBadgeActive]}>
-                    <Text
-                      style={[
-                        styles.tabBadgeText,
-                        activeTab === tab.id && styles.tabBadgeTextActive
-                      ]}
-                    >
-                      {tab.count}
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            ))}
+          <View style={styles.tabBarContainer}>
+            <SegmentedControl
+              options={tabOptions}
+              selectedIndex={selectedTabIndex}
+              onChange={handleTabChange}
+            />
           </View>
 
           {/* Content */}
           {isLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={brandColors.primary} />
+            <View style={styles.listContent}>
+              {[1, 2, 3].map((i) => (
+                <Card key={i} style={styles.cardSkeleton}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                    <SkeletonBox width={48} height={48} borderRadius={24} />
+                    <View style={{ flex: 1, gap: 8 }}>
+                      <SkeletonBox width="60%" height={16} borderRadius={4} />
+                      <SkeletonBox width="40%" height={12} borderRadius={4} />
+                    </View>
+                  </View>
+                </Card>
+              ))}
             </View>
           ) : (
             <FlatList
@@ -592,60 +603,16 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     justifyContent: "center" as const,
     alignItems: "center" as const
   },
-  // Tab Bar
-  tabBar: {
-    flexDirection: "row" as const,
-    backgroundColor: colors.bg.card,
+  // Tab Bar Container
+  tabBarContainer: {
     paddingHorizontal: toRN(tokens.spacing[4]),
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.subtle
-  },
-  tab: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
     paddingVertical: toRN(tokens.spacing[3]),
-    paddingHorizontal: toRN(tokens.spacing[3]),
-    marginRight: toRN(tokens.spacing[2]),
-    gap: toRN(tokens.spacing[1.5])
+    backgroundColor: colors.bg.canvas
   },
-  tabActive: {
-    borderBottomWidth: 2,
-    borderBottomColor: brand.primary
-  },
-  tabText: {
-    fontSize: toRN(tokens.typography.fontSize.sm),
-    fontFamily: fontFamily.medium,
-    color: colors.text.tertiary
-  },
-  tabTextActive: {
-    fontFamily: fontFamily.semiBold,
-    color: colors.text.primary
-  },
-  tabBadge: {
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: colors.bg.muted,
-    justifyContent: "center" as const,
-    alignItems: "center" as const,
-    paddingHorizontal: toRN(tokens.spacing[1.5])
-  },
-  tabBadgeActive: {
-    backgroundColor: brand.primary
-  },
-  tabBadgeText: {
-    fontSize: toRN(tokens.typography.fontSize.xs),
-    fontFamily: fontFamily.semiBold,
-    color: colors.text.secondary
-  },
-  tabBadgeTextActive: {
-    color: "#FFFFFF"
-  },
-  // Loading
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center" as const,
-    alignItems: "center" as const
+  // Skeleton Card
+  cardSkeleton: {
+    marginBottom: toRN(tokens.spacing[3]),
+    padding: toRN(tokens.spacing[4])
   },
   // List
   listContent: {
@@ -688,11 +655,11 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
   partnerUsername: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
-    color: colors.text.secondary
+    color: colors.text.tertiary
   },
   partnerName: {
-    fontSize: toRN(tokens.typography.fontSize.base),
-    fontFamily: fontFamily.semiBold,
+    fontSize: toRN(tokens.typography.fontSize.lg),
+    fontFamily: fontFamily.groteskSemiBold,
     color: colors.text.primary
   },
   nudgeButton: {

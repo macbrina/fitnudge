@@ -2,7 +2,8 @@
  * Localization constants for language, country, and timezone selection
  */
 
-// Common languages (ISO 639-1 codes)
+// Common languages for AI Coach voice/text (ISO 639-1 codes)
+// These are the most commonly supported languages in major apps
 export const LANGUAGES = [
   { code: "en", name: "English" },
   { code: "es", name: "Español" },
@@ -10,34 +11,7 @@ export const LANGUAGES = [
   { code: "de", name: "Deutsch" },
   { code: "pt", name: "Português" },
   { code: "it", name: "Italiano" },
-  { code: "ja", name: "日本語" },
-  { code: "ko", name: "한국어" },
-  { code: "zh", name: "中文" },
-  { code: "ar", name: "العربية" },
-  { code: "hi", name: "हिन्दी" },
-  { code: "ru", name: "Русский" },
-  { code: "nl", name: "Nederlands" },
-  { code: "pl", name: "Polski" },
-  { code: "tr", name: "Türkçe" },
-  { code: "vi", name: "Tiếng Việt" },
-  { code: "th", name: "ไทย" },
-  { code: "id", name: "Bahasa Indonesia" },
-  { code: "ms", name: "Bahasa Melayu" },
-  { code: "sv", name: "Svenska" },
-  { code: "da", name: "Dansk" },
-  { code: "fi", name: "Suomi" },
-  { code: "no", name: "Norsk" },
-  { code: "cs", name: "Čeština" },
-  { code: "el", name: "Ελληνικά" },
-  { code: "he", name: "עברית" },
-  { code: "uk", name: "Українська" },
-  { code: "ro", name: "Română" },
-  { code: "hu", name: "Magyar" },
-  { code: "bn", name: "বাংলা" },
-  { code: "ta", name: "தமிழ்" },
-  { code: "te", name: "తెలుగు" },
-  { code: "mr", name: "मराठी" },
-  { code: "sw", name: "Kiswahili" }
+  { code: "nl", name: "Nederlands" }
 ];
 
 // All countries (ISO 3166-1 alpha-2)

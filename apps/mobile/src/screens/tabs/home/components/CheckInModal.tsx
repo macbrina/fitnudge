@@ -1,4 +1,15 @@
-import React, { useEffect, useMemo, useState } from "react";
+/**
+ * V2 Check-In Modal
+ *
+ * Simple check-in flow following the V2 spec:
+ * - Yes / No / Rest Day response
+ * - Optional mood (for Yes): tough / good / amazing
+ * - Optional skip reason (for No): work / tired / sick / schedule / other
+ * - Optional note (max 140 chars)
+ */
+
+import React, { useEffect, useState, useRef, useCallback } from "react";
+import * as Haptics from "expo-haptics";
 import {
   Modal as RNModal,
   View,
@@ -7,905 +18,755 @@ import {
   Animated,
   Dimensions,
   Easing,
-  StatusBar,
   ScrollView,
-  TextInput,
   KeyboardAvoidingView,
   Platform,
-  Image,
-  ActivityIndicator
+  StyleSheet,
+  Keyboard
 } from "react-native";
-import * as ImagePicker from "expo-image-picker";
-import { useStyles } from "@/themes";
-import { useTheme } from "@/themes";
-import { tokens } from "@/themes/tokens";
+import { useStyles, useTheme } from "@/themes";
+import { tokens, lineHeight } from "@/themes/tokens";
 import { toRN } from "@/lib/units";
 import { fontFamily } from "@/lib/fonts";
 import { useTranslation } from "@/lib/i18n";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import { CheckIn, CheckInMood } from "@/services/api/checkins";
-import { ChallengeCheckIn } from "@/services/api/challenges";
-import { useUpdateCheckIn } from "@/hooks/api/useCheckIns";
-import { useChallengeCheckIn, useUpdateChallengeCheckIn } from "@/hooks/api/useChallenges";
-import { getApiErrorDetails } from "@/services/api/errors";
-import { Card } from "@/components/ui/Card";
-import { ActionSheet } from "@/components/ui/ActionSheet";
-import { SkeletonBox } from "@/components/ui/SkeletonBox";
-import { useMediaPermissions } from "@/hooks/media/useMediaPermissions";
-import { useUploadMedia, useDeleteMediaByUrl } from "@/hooks/api/useMedia";
+import { useCreateCheckIn } from "@/hooks/api/useCheckIns";
 import { useAlertModal } from "@/contexts/AlertModalContext";
-import { MoodIcon, MOODS, type MoodType } from "@/components/icons/MoodIcons";
+import { CheckInMood, MOODS, SKIP_REASONS, SkipReason } from "@/services/api/checkins";
+import Button from "@/components/ui/Button";
+import { TextInput } from "@/components/ui/TextInput";
+import { X, CheckCircle, XCircle, Moon, Mic, Crown } from "lucide-react-native";
+import { MoodIcons, SkipIcons } from "@/components/icons/CheckinIcons";
+import { VoiceNoteRecorder } from "@/components/ui/VoiceNoteRecorder";
+import { useSubscriptionStore } from "@/stores/subscriptionStore";
 
-// Unified check-in data that works for both goals and challenges
-type UnifiedCheckIn = {
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
+
+// V2 Check-in types
+type CheckInResponse = "yes" | "no" | "rest_day";
+
+interface Goal {
   id: string;
-  notes?: string | null;
-  mood?: string | null; // Text: great, good, okay, bad, terrible
-  photo_url?: string | null;
-  check_in_date?: string;
-  goal?: { title?: string } | null;
-  challenge?: { title?: string } | null;
-};
-
-interface CheckInModalProps {
-  visible: boolean;
-  // For goal check-ins
-  goalId?: string;
-  checkIn?: CheckIn | null;
-  // For challenge check-ins
-  challengeId?: string;
-  challengeCheckIn?: ChallengeCheckIn | null;
-  // Common props
-  onClose: () => void;
-  onComplete?: () => void;
-  isLoading?: boolean;
+  title: string;
+  why_statement?: string;
 }
 
-// Mood values for iteration - using imported MOODS from MoodIcons
+interface CheckInModalProps {
+  isVisible: boolean;
+  goal: Goal;
+  onClose: () => void;
+  onSuccess?: () => void;
+}
 
-export function CheckInModal({
-  visible,
-  goalId,
-  checkIn,
-  challengeId,
-  challengeCheckIn,
-  onClose,
-  onComplete,
-  isLoading = false
-}: CheckInModalProps) {
-  const styles = useStyles(makeCheckInModalStyles);
+export function CheckInModal({ isVisible, goal, onClose, onSuccess }: CheckInModalProps) {
+  const styles = useStyles(makeStyles);
   const { colors, brandColors } = useTheme();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
-  const screenHeight = Dimensions.get("window").height;
-  const { showAlert, showConfirm, showToast } = useAlertModal();
+  const { showToast } = useAlertModal();
 
-  // Determine if this is a goal or challenge check-in
-  const isChallenge = !!challengeId;
-  const entityId = challengeId || goalId;
+  // Animation
+  const [slideAnim] = useState(new Animated.Value(SCREEN_HEIGHT));
+  const [fadeAnim] = useState(new Animated.Value(0));
 
-  // Normalize the check-in data to a unified format
-  const normalizedCheckIn: UnifiedCheckIn | null = useMemo(() => {
-    if (isChallenge && challengeCheckIn) {
-      return {
-        id: challengeCheckIn.id,
-        notes: challengeCheckIn.notes,
-        mood: challengeCheckIn.mood,
-        photo_url: challengeCheckIn.photo_url,
-        check_in_date: challengeCheckIn.check_in_date,
-        challenge: challengeCheckIn.challenge
-      };
-    } else if (!isChallenge && checkIn) {
-      return {
-        id: checkIn.id,
-        notes: checkIn.notes,
-        mood: checkIn.mood,
-        photo_url: checkIn.photo_url,
-        check_in_date: checkIn.check_in_date,
-        goal: checkIn.goal
-      };
-    }
-    return null;
-  }, [isChallenge, checkIn, challengeCheckIn]);
+  // Form state
+  const [response, setResponse] = useState<CheckInResponse | null>(null);
+  const [mood, setMood] = useState<CheckInMood | null>(null);
+  const [skipReason, setSkipReason] = useState<SkipReason | null>(null);
+  const [note, setNote] = useState("");
+  const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
+  const [voiceNoteUri, setVoiceNoteUri] = useState<string | null>(null);
+  const [voiceNoteDuration, setVoiceNoteDuration] = useState<number>(0);
 
-  // API hooks for goal check-ins
-  const { mutate: updateGoalCheckIn, isPending: isUpdatingGoal } = useUpdateCheckIn();
+  // Premium check for voice notes
+  const { hasFeature, openModal } = useSubscriptionStore();
+  const hasVoiceNotes = hasFeature("voice_notes");
 
-  // API hooks for challenge check-ins
-  const { mutate: createChallengeCheckIn, isPending: isCreatingChallenge } = useChallengeCheckIn();
-  const { mutate: updateChallengeCheckIn, isPending: isUpdatingChallenge } =
-    useUpdateChallengeCheckIn();
+  // Mutations
+  const createCheckIn = useCreateCheckIn();
 
-  const { mutate: uploadMedia, isPending: isUploading } = useUploadMedia();
-  const { mutate: deleteMediaByUrl } = useDeleteMediaByUrl();
+  // Scroll ref for auto-scrolling to note input
+  const scrollViewRef = useRef<ScrollView>(null);
 
-  const isEditing = !!normalizedCheckIn;
-  const isSaving = isUpdatingGoal || isCreatingChallenge || isUpdatingChallenge;
-
-  // Media permissions hook
-  const {
-    hasLibraryPermission,
-    hasCameraPermission,
-    requestLibraryPermission,
-    requestCameraPermission
-  } = useMediaPermissions();
-
-  // Local state
-  const [notes, setNotes] = useState("");
-  const [selectedMood, setSelectedMood] = useState<string | null>(null);
-  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [showPhotoOptions, setShowPhotoOptions] = useState(false);
-
-  // Reset state when modal opens/closes or checkIn changes
+  // Animation effects
   useEffect(() => {
-    if (visible) {
-      if (normalizedCheckIn) {
-        setNotes(normalizedCheckIn.notes || "");
-        setSelectedMood(normalizedCheckIn.mood || null);
-        setSelectedPhoto(normalizedCheckIn.photo_url || null);
-      } else {
-        // Creating new check-in - reset to empty state
-        setNotes("");
-        setSelectedMood(null);
-        setSelectedPhoto(null);
-      }
-      setUploadingPhoto(false);
+    if (isVisible) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 300,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true
+        })
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true
+        }),
+        Animated.timing(slideAnim, {
+          toValue: SCREEN_HEIGHT,
+          duration: 250,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true
+        })
+      ]).start();
     }
-  }, [visible, normalizedCheckIn]);
+  }, [isVisible, fadeAnim, slideAnim]);
 
-  // Animation values - starts off-screen at the bottom
-  const translateY = useMemo(() => new Animated.Value(screenHeight), []);
-
-  // Internal visibility state to allow close animation to complete
-  const [internalVisible, setInternalVisible] = useState(visible);
-
-  // Handle modal visibility animation - slide from bottom to top
+  // Reset form when modal opens
   useEffect(() => {
-    if (visible) {
-      setInternalVisible(true);
-      Animated.spring(translateY, {
-        toValue: 0,
-        damping: 20,
-        mass: 1,
-        stiffness: 120,
-        useNativeDriver: true
-      }).start();
-    } else if (internalVisible) {
-      Animated.timing(translateY, {
-        toValue: screenHeight,
-        duration: 300,
-        easing: Easing.in(Easing.ease),
-        useNativeDriver: true
-      }).start(() => {
-        setInternalVisible(false);
-      });
+    if (isVisible) {
+      setResponse(null);
+      setMood(null);
+      setSkipReason(null);
+      setNote("");
+      setShowVoiceRecorder(false);
+      setVoiceNoteUri(null);
+      setVoiceNoteDuration(0);
     }
-  }, [visible, translateY, screenHeight, internalVisible]);
+  }, [isVisible]);
 
-  const title =
-    normalizedCheckIn?.goal?.title ||
-    normalizedCheckIn?.challenge?.title ||
-    (isChallenge ? t("common.challenge") : t("common.goal"));
-
-  // Handle photo selection from library
-  const handlePickPhoto = async () => {
-    setShowPhotoOptions(false);
-    try {
-      let hasPermission = hasLibraryPermission;
-      if (!hasPermission) {
-        hasPermission = await requestLibraryPermission();
-        if (!hasPermission) {
-          await showConfirm({
-            title: t("checkin.photo_permission_title"),
-            message: t("checkin.photo_permission_message"),
-            variant: "warning",
-            confirmLabel: t("checkin.grant_access"),
-            cancelLabel: t("common.cancel")
-          });
-          return;
-        }
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ["images"],
-        allowsEditing: false,
-        quality: 0.8
-      });
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        handleUploadPhoto(result.assets[0].uri);
-      }
-    } catch (error) {
-      console.error("Error picking photo:", error);
-      await showAlert({
-        title: t("common.error"),
-        message: t("checkin.photo_upload_error") || "Failed to select photo",
-        variant: "error",
-        confirmLabel: t("common.ok")
-      });
-    }
-  };
-
-  // Handle taking a photo with camera
-  const handleTakePhoto = async () => {
-    setShowPhotoOptions(false);
-    try {
-      let hasPermission = hasCameraPermission;
-      if (!hasPermission) {
-        hasPermission = await requestCameraPermission();
-        if (!hasPermission) {
-          await showConfirm({
-            title: t("checkin.photo_permission_title"),
-            message: t("checkin.photo_permission_message"),
-            variant: "warning",
-            confirmLabel: t("checkin.grant_access"),
-            cancelLabel: t("common.cancel")
-          });
-          return;
-        }
-      }
-
-      const result = await ImagePicker.launchCameraAsync({
-        allowsEditing: false,
-        quality: 0.8
-      });
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        handleUploadPhoto(result.assets[0].uri);
-      }
-    } catch (error) {
-      console.error("Error taking photo:", error);
-      await showAlert({
-        title: t("common.error"),
-        message: t("checkin.photo_upload_error") || "Failed to take photo",
-        variant: "error",
-        confirmLabel: t("common.ok")
-      });
-    }
-  };
-
-  // Handle photo upload
-  const handleUploadPhoto = (fileUri: string) => {
-    setUploadingPhoto(true);
-
-    uploadMedia(
-      { fileUri, options: { mediaType: "checkin" } },
-      {
-        onSuccess: (response) => {
-          const uploadedUrl = response.data?.url;
-          if (uploadedUrl) {
-            setSelectedPhoto(uploadedUrl);
-            // No toast needed - the visible photo is confirmation enough
-          } else {
-            showAlert({
-              title: t("common.error"),
-              message: t("checkin.photo_upload_error") || "Failed to upload photo",
-              variant: "error",
-              confirmLabel: t("common.ok")
-            });
-          }
-        },
-        onError: (error) => {
-          console.error("Error uploading photo:", error);
-          showAlert({
-            title: t("common.error"),
-            message: t("checkin.photo_upload_error") || "Failed to upload photo",
-            variant: "error",
-            confirmLabel: t("common.ok")
-          });
-        },
-        onSettled: () => {
-          setUploadingPhoto(false);
-        }
-      }
-    );
-  };
-
-  // Handle removing a photo
-  const handleRemovePhoto = () => {
-    if (selectedPhoto) {
-      deleteMediaByUrl(selectedPhoto);
-      setSelectedPhoto(null);
-    }
-  };
-
-  const handleSave = () => {
-    const checkInData = {
-      notes: notes.trim() || undefined,
-      mood: selectedMood || undefined,
-      photo_url: selectedPhoto || undefined
-    };
-
-    if (isChallenge && challengeId) {
-      // Challenge check-in
-      if (isEditing && normalizedCheckIn) {
-        updateChallengeCheckIn(
-          {
-            challengeId,
-            checkInId: normalizedCheckIn.id,
-            data: checkInData
-          },
-          {
-            onSuccess: () => {
-              showToast({
-                title: t("common.success"),
-                message: t("checkin.updated") || "Check-in updated!",
-                variant: "success"
-              });
-              onComplete?.();
-              onClose();
-            },
-            onError: (error) => {
-              const errorDetails = getApiErrorDetails(error);
-              showAlert({
-                title: t("common.error"),
-                message:
-                  errorDetails.backendMessage ||
-                  t("checkin.update_error") ||
-                  "Failed to update check-in",
-                variant: "error"
-              });
+  // Fire-and-forget submit with silent retry (Instagram pattern)
+  const submitCheckIn = useCallback(
+    (checkInData: {
+      goal_id: string;
+      check_in_date: string;
+      completed: boolean;
+      is_rest_day: boolean;
+      mood?: CheckInMood;
+      skip_reason?: SkipReason;
+      notes?: string;
+    }) => {
+      const attemptSubmit = (retryCount: number) => {
+        createCheckIn.mutate(checkInData, {
+          onError: () => {
+            // Silent retry once
+            if (retryCount < 1) {
+              setTimeout(() => attemptSubmit(retryCount + 1), 1000);
             }
+            // After retry, silently fail - user already moved on
+            // Optimistic update will be rolled back by React Query
           }
-        );
-      } else {
-        createChallengeCheckIn(
-          {
-            challengeId,
-            data: checkInData
-          },
-          {
-            onSuccess: () => {
-              showToast({
-                title: t("common.success"),
-                message: t("checkin.created") || "Check-in complete!",
-                variant: "success"
-              });
-              onComplete?.();
-              onClose();
-            },
-            onError: (error) => {
-              const errorDetails = getApiErrorDetails(error);
-              showAlert({
-                title: t("common.error"),
-                message:
-                  errorDetails.backendMessage || t("checkin.create_error") || "Failed to check in",
-                variant: "error"
-              });
-            }
-          }
-        );
-      }
-    } else if (goalId && normalizedCheckIn) {
-      // Goal check-in (update only - goals create check-ins via scheduled tasks)
-      updateGoalCheckIn(
-        {
-          checkInId: normalizedCheckIn.id,
-          updates: {
-            completed: true,
-            notes: checkInData.notes,
-            mood: checkInData.mood as CheckInMood | undefined,
-            photo_url: checkInData.photo_url
-          }
-        },
-        {
-          onSuccess: () => {
-            showToast({
-              title: t("common.success"),
-              message: t("checkin.saved") || "Check-in saved!",
-              variant: "success"
-            });
-            onComplete?.();
-            onClose();
-          },
-          onError: (error) => {
-            console.error("Error updating check-in:", error);
-            showAlert({
-              title: t("common.error"),
-              message: t("checkin.update_error") || "Failed to save check-in",
-              variant: "error",
-              confirmLabel: t("common.ok")
-            });
-          }
-        }
-      );
-    }
-  };
+        });
+      };
+      attemptSubmit(0);
+    },
+    [createCheckIn]
+  );
 
-  const canSave = !isSaving && !isUploading && !uploadingPhoto;
+  // Submit handler - fire-and-forget pattern
+  const handleSubmit = useCallback(() => {
+    if (!response) return;
 
-  // Don't render anything if not visible
-  if (!internalVisible && !visible) {
-    return null;
-  }
+    // Immediate haptic feedback + close (Instagram pattern)
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+    // Close modal immediately
+    onClose();
+    onSuccess?.();
+
+    // Fire-and-forget API call with silent retry
+    submitCheckIn({
+      goal_id: goal.id,
+      check_in_date: new Date().toISOString().split("T")[0],
+      completed: response === "yes",
+      is_rest_day: response === "rest_day",
+      mood: mood || undefined,
+      skip_reason: skipReason || undefined,
+      notes: note.trim() || undefined
+    });
+  }, [response, goal.id, mood, skipReason, note, showToast, t, onClose, onSuccess, submitCheckIn]);
+
+  // Can submit?
+  const canSubmit = response !== null;
+
+  if (!isVisible) return null;
 
   return (
-    <RNModal
-      visible={internalVisible}
-      transparent
-      statusBarTranslucent
-      animationType="none"
-      onRequestClose={onClose}
-    >
-      <StatusBar barStyle="dark-content" />
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.keyboardView}
-      >
-        <Animated.View
-          style={[
-            styles.modalContainer,
-            {
-              transform: [{ translateY }]
-            }
-          ]}
+    <RNModal transparent visible={isVisible} animationType="none" onRequestClose={onClose}>
+      <View style={styles.modalWrapper}>
+        {/* Backdrop */}
+        <Animated.View style={[styles.backdrop, { opacity: fadeAnim }]}>
+          <TouchableOpacity style={{ flex: 1 }} onPress={onClose} activeOpacity={1} />
+        </Animated.View>
+
+        {/* Modal Content */}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "position" : "height"}
+          style={styles.keyboardAvoidingContainer}
+          contentContainerStyle={styles.keyboardAvoidingContent}
         >
-          <View
+          <Animated.View
             style={[
-              styles.contentContainer,
-              {
-                paddingTop: insets.top + toRN(tokens.spacing[4]),
-                paddingBottom: insets.bottom + toRN(tokens.spacing[4])
-              }
+              styles.container,
+              { paddingBottom: insets.bottom + 16 },
+              { transform: [{ translateY: slideAnim }] }
             ]}
           >
             {/* Header */}
             <View style={styles.header}>
-              <TouchableOpacity
-                style={styles.closeButton}
-                onPress={onClose}
-                accessibilityLabel={t("common.close")}
-                accessibilityRole="button"
-              >
-                <Ionicons
-                  name="close"
-                  size={toRN(tokens.typography.fontSize["2xl"])}
-                  color={colors.text.primary}
-                />
+              <View style={styles.headerLeft}>
+                <Text style={styles.title} numberOfLines={1}>
+                  {goal.title}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+                <X size={24} color={colors.text.secondary} />
               </TouchableOpacity>
             </View>
 
             <ScrollView
+              ref={scrollViewRef}
               style={styles.scrollView}
               contentContainerStyle={styles.scrollContent}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="interactive"
             >
-              {/* Loading Skeleton */}
-              {isLoading ? (
-                <View style={styles.loadingContainer}>
-                  <SkeletonBox
-                    width={60}
-                    height={60}
-                    borderRadius={30}
-                    style={{
-                      alignSelf: "center",
-                      marginBottom: toRN(tokens.spacing[4])
-                    }}
+              {/* Response Buttons */}
+              <Text style={styles.sectionTitle}>{t("checkin.did_you_complete")}</Text>
+              <View style={styles.responseButtons}>
+                {/* Yes */}
+                <TouchableOpacity
+                  style={[
+                    styles.responseButton,
+                    response === "yes" && {
+                      borderColor: colors.feedback.success,
+                      backgroundColor: colors.feedback.success + "10"
+                    }
+                  ]}
+                  onPress={() => {
+                    setResponse("yes");
+                    setSkipReason(null);
+                  }}
+                >
+                  <CheckCircle
+                    size={28}
+                    color={response === "yes" ? colors.feedback.success : colors.text.tertiary}
                   />
-                  <SkeletonBox
-                    width="60%"
-                    height={28}
-                    borderRadius={toRN(tokens.borderRadius.md)}
-                    style={{
-                      alignSelf: "center",
-                      marginBottom: toRN(tokens.spacing[2])
-                    }}
-                  />
-                  <SkeletonBox
-                    width="40%"
-                    height={20}
-                    borderRadius={toRN(tokens.borderRadius.md)}
-                    style={{ alignSelf: "center" }}
-                  />
-                  <View
-                    style={{
-                      alignItems: "center",
-                      marginTop: toRN(tokens.spacing[8])
-                    }}
+                  <Text
+                    style={[
+                      styles.responseLabel,
+                      response === "yes" && { color: colors.feedback.success }
+                    ]}
                   >
-                    <ActivityIndicator size="large" color={brandColors.primary} />
-                    <Text style={[styles.loadingText, { marginTop: toRN(tokens.spacing[3]) }]}>
-                      {t("common.loading") || "Loading..."}
-                    </Text>
+                    {t("checkin.yes")}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* No */}
+                <TouchableOpacity
+                  style={[
+                    styles.responseButton,
+                    response === "no" && {
+                      borderColor: colors.feedback.error,
+                      backgroundColor: colors.feedback.error + "10"
+                    }
+                  ]}
+                  onPress={() => {
+                    setResponse("no");
+                    setMood(null);
+                  }}
+                >
+                  <XCircle
+                    size={28}
+                    color={response === "no" ? colors.feedback.error : colors.text.tertiary}
+                  />
+                  <Text
+                    style={[
+                      styles.responseLabel,
+                      response === "no" && { color: colors.feedback.error }
+                    ]}
+                  >
+                    {t("checkin.no")}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Rest Day */}
+                <TouchableOpacity
+                  style={[
+                    styles.responseButton,
+                    response === "rest_day" && {
+                      borderColor: brandColors.primary,
+                      backgroundColor: brandColors.primary + "10"
+                    }
+                  ]}
+                  onPress={() => {
+                    setResponse("rest_day");
+                    setMood(null);
+                    setSkipReason(null);
+                  }}
+                >
+                  <Moon
+                    size={28}
+                    color={response === "rest_day" ? brandColors.primary : colors.text.tertiary}
+                  />
+                  <Text
+                    style={[
+                      styles.responseLabel,
+                      response === "rest_day" && { color: brandColors.primary }
+                    ]}
+                  >
+                    {t("checkin.rest_day")}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Mood (only for Yes) */}
+              {response === "yes" && (
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>
+                    {t("checkin.how_was_it")}{" "}
+                    <Text style={styles.optional}>({t("common.optional")})</Text>
+                  </Text>
+                  <View style={styles.optionRow}>
+                    {MOODS.map((item) => (
+                      <TouchableOpacity
+                        key={item.value}
+                        style={[
+                          styles.optionButton,
+                          mood === item.value && {
+                            borderColor: brandColors.primary,
+                            backgroundColor: brandColors.primary + "10"
+                          }
+                        ]}
+                        onPress={() => setMood(item.value)}
+                      >
+                        <MoodIcons mood={item.value} size={36} />
+                        <Text
+                          style={[
+                            styles.optionLabel,
+                            mood === item.value && { color: brandColors.primary }
+                          ]}
+                        >
+                          {t(item.labelKey)}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
                   </View>
                 </View>
-              ) : (
-                <>
-                  {/* Header Section */}
-                  <View style={styles.headerSection}>
-                    <View style={styles.checkInIcon}>
-                      <Ionicons
-                        name="checkmark-circle"
-                        size={toRN(tokens.typography.fontSize["3xl"])}
-                        color={brandColors.primary}
-                      />
-                    </View>
-                    <Text style={styles.title}>{title}</Text>
-                    <Text style={styles.subtitle}>
-                      {normalizedCheckIn?.check_in_date || new Date().toLocaleDateString()}
-                    </Text>
+              )}
+
+              {/* Miss Screen (only for No) - Per V2 Spec */}
+              {response === "no" && (
+                <View style={styles.section}>
+                  {/* Supportive message */}
+                  <View style={styles.missIntro}>
+                    <Text style={styles.missMessage}>{t("checkin.miss_message")}</Text>
                   </View>
 
-                  {/* Mood Section */}
-                  <View style={styles.moodSection}>
-                    <Text style={styles.sectionLabel}>
-                      {t("checkin.how_feeling") || "How are you feeling?"}
-                    </Text>
-                    <View style={styles.moodContainer}>
-                      {MOODS.map((mood) => {
-                        const isSelected = selectedMood === mood.value;
-                        return (
-                          <TouchableOpacity
-                            key={mood.value}
-                            style={[styles.moodButton, isSelected && styles.moodButtonActive]}
-                            onPress={() => setSelectedMood(isSelected ? null : mood.value)}
-                            activeOpacity={0.7}
-                          >
-                            <MoodIcon
-                              mood={mood.value as MoodType}
-                              size={toRN(tokens.typography.fontSize["2xl"])}
-                              selected={isSelected}
-                            />
-                            {isSelected && (
-                              <View style={styles.moodCheck}>
-                                <Ionicons
-                                  name="checkmark"
-                                  size={12}
-                                  color={brandColors.onPrimary}
-                                />
-                              </View>
-                            )}
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                    {selectedMood && (
-                      <Text style={styles.moodLabel}>
-                        {MOODS.find((m) => m.value === selectedMood)?.label || selectedMood}
-                      </Text>
-                    )}
-                  </View>
-
-                  {/* Notes Section */}
-                  <Card shadow="sm" style={styles.notesCard}>
-                    <Text style={styles.sectionLabel}>
-                      {t("checkin.notes") || "Notes"}
-                      <Text style={styles.optionalText}> ({t("common.optional")})</Text>
-                    </Text>
-                    <TextInput
-                      style={styles.notesInput}
-                      placeholder={t("checkin.notes_placeholder") || "How did it go?"}
-                      placeholderTextColor={colors.text.tertiary}
-                      value={notes}
-                      onChangeText={setNotes}
-                      multiline
-                      numberOfLines={4}
-                      textAlignVertical="top"
-                    />
-                  </Card>
-
-                  {/* Photo Section */}
-                  <View style={styles.photoSection}>
-                    <Text style={styles.sectionLabel}>
-                      {t("checkin.photo") || "Progress Photo"}
-                      <Text style={styles.optionalText}> ({t("common.optional")})</Text>
-                    </Text>
-
-                    {/* Selected Photo */}
-                    {selectedPhoto && (
-                      <View style={styles.photoContainer}>
-                        <Image
-                          source={{ uri: selectedPhoto }}
-                          style={styles.photoPreview}
-                          resizeMode="cover"
-                        />
-                        <TouchableOpacity
-                          style={styles.removePhotoButton}
-                          onPress={handleRemovePhoto}
+                  {/* What got in the way? */}
+                  <Text style={styles.sectionTitle}>
+                    {t("checkin.what_happened")}{" "}
+                    <Text style={styles.optional}>({t("common.optional")})</Text>
+                  </Text>
+                  <View style={styles.reasonGrid}>
+                    {SKIP_REASONS.map((item) => (
+                      <TouchableOpacity
+                        key={item.value}
+                        style={[
+                          styles.reasonButton,
+                          skipReason === item.value && {
+                            borderColor: brandColors.primary,
+                            backgroundColor: brandColors.primary + "10"
+                          }
+                        ]}
+                        onPress={() => setSkipReason(item.value)}
+                      >
+                        <SkipIcons mood={item.value} size={32} />
+                        <Text
+                          style={[
+                            styles.reasonLabel,
+                            skipReason === item.value && { color: brandColors.primary }
+                          ]}
                         >
-                          <Ionicons name="close-circle" size={24} color={colors.feedback.error} />
+                          {t(item.labelKey)}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  {/* Closing encouragement */}
+                  <Text style={styles.tomorrowMessage}>{t("checkin.tomorrow_new_chance")}</Text>
+                </View>
+              )}
+
+              {/* Rest Day Message */}
+              {response === "rest_day" && (
+                <View style={styles.restMessage}>
+                  <Text style={styles.restEmoji}>💤</Text>
+                  <Text style={styles.restText}>{t("checkin.rest_message")}</Text>
+                </View>
+              )}
+
+              {/* Note (for Yes and No) */}
+              {(response === "yes" || response === "no") && (
+                <View style={styles.section}>
+                  <TextInput
+                    label={`${t("checkin.add_note")} (${t("common.optional")})`}
+                    placeholder={t("checkin.note_placeholder")}
+                    value={note}
+                    onChangeText={(text) => setNote(text.slice(0, 140))}
+                    multiline
+                    numberOfLines={3}
+                    maxLength={140}
+                    containerStyle={styles.noteInputContainer}
+                    onFocus={() => {
+                      // Scroll to bottom when note input is focused
+                      setTimeout(() => {
+                        scrollViewRef.current?.scrollToEnd({ animated: true });
+                      }, 100);
+                    }}
+                  />
+                  <Text style={styles.charCount}>{note.length}/140</Text>
+
+                  {/* Voice Note Section (Yes/No, Premium feature) */}
+                  {(response === "yes" || response === "no") &&
+                    !showVoiceRecorder &&
+                    !voiceNoteUri && (
+                      <TouchableOpacity
+                        style={[
+                          styles.voiceNoteButton,
+                          !hasVoiceNotes && styles.voiceNoteButtonPro
+                        ]}
+                        onPress={() => {
+                          if (hasVoiceNotes) {
+                            setShowVoiceRecorder(true);
+                          } else {
+                            openModal();
+                          }
+                        }}
+                      >
+                        <Mic
+                          size={18}
+                          color={hasVoiceNotes ? brandColors.primary : colors.text.tertiary}
+                        />
+                        <Text
+                          style={[
+                            styles.voiceNoteButtonText,
+                            { color: hasVoiceNotes ? brandColors.primary : colors.text.tertiary }
+                          ]}
+                        >
+                          {t("voice_notes.title")}
+                        </Text>
+                        {!hasVoiceNotes && <Crown size={18} color={colors.feedback.warning} />}
+                      </TouchableOpacity>
+                    )}
+
+                  {/* Voice Recorder */}
+                  {(response === "yes" || response === "no") && showVoiceRecorder && (
+                    <VoiceNoteRecorder
+                      onRecordingComplete={(uri, duration) => {
+                        setVoiceNoteUri(uri);
+                        setVoiceNoteDuration(duration);
+                        setShowVoiceRecorder(false);
+                      }}
+                      onCancel={() => setShowVoiceRecorder(false)}
+                    />
+                  )}
+
+                  {/* Voice Note Preview (after recording) */}
+                  {(response === "yes" || response === "no") &&
+                    voiceNoteUri &&
+                    !showVoiceRecorder && (
+                      <View style={styles.voiceNotePreview}>
+                        <Mic size={16} color={brandColors.primary} />
+                        <Text style={[styles.voiceNotePreviewText, { color: colors.text.primary }]}>
+                          {t("voice_notes.title")} ({voiceNoteDuration}s)
+                        </Text>
+                        <TouchableOpacity
+                          onPress={() => {
+                            setVoiceNoteUri(null);
+                            setVoiceNoteDuration(0);
+                          }}
+                        >
+                          <X size={16} color={colors.text.tertiary} />
                         </TouchableOpacity>
                       </View>
                     )}
-
-                    {/* Uploading Photo */}
-                    {uploadingPhoto && (
-                      <View style={styles.uploadingContainer}>
-                        <ActivityIndicator size="small" color={brandColors.primary} />
-                        <Text style={styles.uploadingText}>
-                          {t("checkin.uploading") || "Uploading photo..."}
-                        </Text>
-                      </View>
-                    )}
-
-                    {/* Add Photo Button */}
-                    {!selectedPhoto && !uploadingPhoto && (
-                      <TouchableOpacity
-                        style={styles.addPhotoButton}
-                        onPress={() => setShowPhotoOptions(true)}
-                        disabled={isUploading || uploadingPhoto}
-                      >
-                        <Ionicons
-                          name="camera-outline"
-                          size={toRN(tokens.typography.fontSize.xl)}
-                          color={brandColors.primary}
-                        />
-                        <Text style={styles.addPhotoText}>
-                          {t("checkin.add_photo") || "Add Photo"}
-                        </Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-
-                  {/* Save Button */}
-                  <TouchableOpacity
-                    style={[styles.saveButton, !canSave && styles.saveButtonDisabled]}
-                    onPress={handleSave}
-                    disabled={!canSave}
-                    activeOpacity={0.8}
-                  >
-                    <Text
-                      style={[styles.saveButtonText, !canSave && styles.saveButtonTextDisabled]}
-                    >
-                      {isSaving
-                        ? t("checkin.saving") || "Saving..."
-                        : isEditing
-                          ? t("common.save") || "Save"
-                          : t("checkin.submit") || "Submit Check-in"}
-                    </Text>
-                  </TouchableOpacity>
-                </>
+                </View>
               )}
             </ScrollView>
-          </View>
 
-          {/* Photo Selection Action Sheet */}
-          <ActionSheet
-            visible={showPhotoOptions}
-            title={t("checkin.add_photo") || "Add Photo"}
-            options={[
-              {
-                id: "camera",
-                label: t("checkin.take_photo") || "Take Photo",
-                icon: "camera-outline",
-                onPress: handleTakePhoto
-              },
-              {
-                id: "library",
-                label: t("checkin.choose_from_library") || "Choose from Library",
-                icon: "image-outline",
-                onPress: handlePickPhoto
-              }
-            ]}
-            onClose={() => setShowPhotoOptions(false)}
-            cancelLabel={t("common.cancel")}
-          />
-        </Animated.View>
-      </KeyboardAvoidingView>
+            {/* Submit Button */}
+            <View style={styles.footer}>
+              <Button
+                onPress={handleSubmit}
+                title={
+                  response === "yes"
+                    ? t("checkin.submit_yes")
+                    : response === "rest_day"
+                      ? t("checkin.submit_rest")
+                      : t("checkin.submit")
+                }
+                variant="primary"
+                size="md"
+                fullWidth
+                disabled={!canSubmit}
+              />
+            </View>
+          </Animated.View>
+        </KeyboardAvoidingView>
+      </View>
     </RNModal>
   );
 }
 
-const makeCheckInModalStyles = (tokens: any, colors: any, brand: any) => ({
-  keyboardView: {
-    flex: 1
-  },
-  modalContainer: {
+const makeStyles = (tokens: any, colors: any, brand: any) => ({
+  modalWrapper: {
     flex: 1,
-    width: "100%",
-    height: "100%",
-    position: "absolute" as const,
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: colors.bg.canvas
+    justifyContent: "flex-end" as const
   },
-  contentContainer: {
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.5)"
+  },
+  keyboardAvoidingContainer: {
     flex: 1,
-    width: "100%"
+    justifyContent: "flex-end" as const
   },
-  loadingContainer: {
-    flex: 1,
-    paddingHorizontal: toRN(tokens.spacing[4])
+  keyboardAvoidingContent: {
+    justifyContent: "flex-end" as const
   },
-  loadingText: {
-    fontSize: toRN(tokens.typography.fontSize.base),
-    fontFamily: fontFamily.medium,
-    color: colors.text.secondary,
-    textAlign: "center" as const
+  container: {
+    backgroundColor: colors.bg.canvas,
+    borderTopLeftRadius: toRN(tokens.borderRadius["2xl"]),
+    borderTopRightRadius: toRN(tokens.borderRadius["2xl"]),
+    maxHeight: SCREEN_HEIGHT * 0.85
   },
   header: {
     flexDirection: "row" as const,
-    justifyContent: "flex-end" as const,
     alignItems: "center" as const,
+    justifyContent: "space-between" as const,
     paddingHorizontal: toRN(tokens.spacing[4]),
-    marginBottom: toRN(tokens.spacing[2])
+    paddingVertical: toRN(tokens.spacing[4]),
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.subtle
+  },
+  headerLeft: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    flex: 1,
+    gap: toRN(tokens.spacing[2])
+  },
+  title: {
+    fontSize: toRN(tokens.typography.fontSize.lg),
+    fontWeight: tokens.typography.fontWeight.semibold,
+    fontFamily: fontFamily.groteskSemiBold,
+    color: colors.text.primary,
+    flex: 1
   },
   closeButton: {
-    width: toRN(tokens.spacing[10]),
-    height: toRN(tokens.spacing[10]),
-    borderRadius: toRN(tokens.borderRadius.full),
-    backgroundColor: colors.bg.muted,
-    justifyContent: "center" as const,
-    alignItems: "center" as const
+    padding: toRN(tokens.spacing[2])
   },
   scrollView: {
-    flex: 1
+    flexShrink: 1
   },
   scrollContent: {
     paddingHorizontal: toRN(tokens.spacing[4]),
-    paddingBottom: toRN(tokens.spacing[6])
+    paddingVertical: toRN(tokens.spacing[4])
   },
-  headerSection: {
-    alignItems: "center" as const,
-    marginBottom: toRN(tokens.spacing[6])
+  section: {
+    marginTop: toRN(tokens.spacing[5])
   },
-  checkInIcon: {
-    width: toRN(tokens.spacing[16]),
-    height: toRN(tokens.spacing[16]),
-    borderRadius: toRN(tokens.borderRadius.full),
-    backgroundColor: colors.bg.muted,
-    justifyContent: "center" as const,
-    alignItems: "center" as const,
-    marginBottom: toRN(tokens.spacing[3])
-  },
-  title: {
-    fontSize: toRN(tokens.typography.fontSize["2xl"]),
-    fontFamily: fontFamily.bold,
+  sectionTitle: {
+    fontSize: toRN(tokens.typography.fontSize.lg),
+    fontWeight: tokens.typography.fontWeight.semibold,
+    fontFamily: fontFamily.groteskSemiBold,
     color: colors.text.primary,
-    textAlign: "center" as const,
-    marginBottom: toRN(tokens.spacing[1])
+    marginBottom: toRN(tokens.spacing[4])
   },
-  subtitle: {
+  optional: {
+    fontSize: toRN(tokens.typography.fontSize.sm),
+    fontWeight: tokens.typography.fontWeight.normal,
+    fontFamily: fontFamily.groteskRegular,
+    color: colors.text.tertiary
+  },
+  responseButtons: {
+    flexDirection: "row" as const,
+    gap: toRN(tokens.spacing[3]),
+    marginTop: toRN(tokens.spacing[2])
+  },
+  responseButton: {
+    flex: 1,
+    backgroundColor: colors.bg.muted,
+    borderRadius: toRN(tokens.borderRadius.xl),
+    paddingVertical: toRN(tokens.spacing[4]),
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    gap: toRN(tokens.spacing[2]),
+    borderWidth: 2,
+    borderColor: "transparent",
+    minHeight: 90
+  },
+  responseLabel: {
     fontSize: toRN(tokens.typography.fontSize.base),
-    fontFamily: fontFamily.regular,
+    fontWeight: tokens.typography.fontWeight.semibold,
+    fontFamily: fontFamily.groteskSemiBold,
+    color: colors.text.secondary
+  },
+  optionRow: {
+    flexDirection: "row" as const,
+    gap: toRN(tokens.spacing[3])
+  },
+  optionButton: {
+    flex: 1,
+    backgroundColor: colors.bg.muted,
+    borderRadius: toRN(tokens.borderRadius.xl),
+    paddingVertical: toRN(tokens.spacing[4]),
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    gap: toRN(tokens.spacing[2]),
+    borderWidth: 2,
+    borderColor: "transparent",
+    minHeight: 80
+  },
+  optionLabel: {
+    fontSize: toRN(tokens.typography.fontSize.sm),
+    fontWeight: tokens.typography.fontWeight.medium,
+    fontFamily: fontFamily.groteskMedium,
+    color: colors.text.secondary
+  },
+  reasonGrid: {
+    flexDirection: "row" as const,
+    flexWrap: "wrap" as const,
+    gap: toRN(tokens.spacing[3]),
+    justifyContent: "flex-start" as const
+  },
+  reasonButton: {
+    width: "30%" as any,
+    backgroundColor: colors.bg.muted,
+    borderRadius: toRN(tokens.borderRadius.xl),
+    paddingVertical: toRN(tokens.spacing[4]),
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    gap: toRN(tokens.spacing[2]),
+    borderWidth: 2,
+    borderColor: "transparent",
+    minHeight: 80
+  },
+  reasonLabel: {
+    fontSize: toRN(tokens.typography.fontSize.sm),
+    fontWeight: tokens.typography.fontWeight.medium,
+    fontFamily: fontFamily.groteskMedium,
     color: colors.text.secondary,
     textAlign: "center" as const
   },
-  sectionLabel: {
-    fontSize: toRN(tokens.typography.fontSize.base),
-    fontFamily: fontFamily.semiBold,
-    color: colors.text.primary,
-    marginBottom: toRN(tokens.spacing[3])
-  },
-  optionalText: {
-    fontFamily: fontFamily.regular,
-    color: colors.text.secondary
-  },
-  moodSection: {
-    marginBottom: toRN(tokens.spacing[6])
-  },
-  moodContainer: {
-    flexDirection: "row" as const,
-    justifyContent: "space-between" as const,
-    gap: toRN(tokens.spacing[2])
-  },
-  moodButton: {
-    flex: 1,
-    aspectRatio: 1,
-    borderRadius: toRN(tokens.borderRadius.xl),
-    backgroundColor: colors.bg.muted,
-    justifyContent: "center" as const,
+  // Miss screen (No response) styles
+  missIntro: {
     alignItems: "center" as const,
-    borderWidth: 2,
-    borderColor: "transparent",
-    position: "relative" as const
+    paddingVertical: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[2])
   },
-  moodButtonActive: {
-    borderColor: brand.primary,
-    backgroundColor: brand.primary + "10"
+  missMessage: {
+    fontSize: toRN(tokens.typography.fontSize.lg),
+    fontFamily: fontFamily.mediumItalic,
+    color: colors.text.primary,
+    textAlign: "center" as const,
+    lineHeight: lineHeight(tokens.typography.fontSize.lg, tokens.typography.lineHeight.relaxed)
   },
-  moodCheck: {
-    position: "absolute" as const,
-    top: toRN(tokens.spacing[1]),
-    right: toRN(tokens.spacing[1]),
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: brand.primary,
-    justifyContent: "center" as const,
-    alignItems: "center" as const
-  },
-  moodLabel: {
-    fontSize: toRN(tokens.typography.fontSize.sm),
-    fontFamily: fontFamily.medium,
+  tomorrowMessage: {
+    fontSize: toRN(tokens.typography.fontSize.base),
+    fontFamily: fontFamily.groteskMedium,
     color: brand.primary,
     textAlign: "center" as const,
-    marginTop: toRN(tokens.spacing[2])
+    marginTop: toRN(tokens.spacing[5]),
+    paddingVertical: toRN(tokens.spacing[3]),
+    paddingHorizontal: toRN(tokens.spacing[4]),
+    backgroundColor: brand.primary + "10",
+    borderRadius: toRN(tokens.borderRadius.lg),
+    overflow: "hidden" as const
   },
-  notesCard: {
-    padding: toRN(tokens.spacing[4]),
-    marginBottom: toRN(tokens.spacing[6])
-  },
-  notesInput: {
-    fontSize: toRN(tokens.typography.fontSize.base),
-    fontFamily: fontFamily.regular,
-    color: colors.text.primary,
-    minHeight: toRN(tokens.spacing[20]),
-    padding: toRN(tokens.spacing[3]),
-    backgroundColor: colors.bg.muted,
-    borderRadius: toRN(tokens.borderRadius.lg)
-  },
-  photoSection: {
-    marginBottom: toRN(tokens.spacing[6])
-  },
-  photoContainer: {
-    width: "100%",
-    aspectRatio: 4 / 3,
-    borderRadius: toRN(tokens.borderRadius.xl),
-    overflow: "hidden" as const,
-    position: "relative" as const,
-    marginTop: toRN(tokens.spacing[3])
-  },
-  photoPreview: {
-    width: "100%",
-    height: "100%",
-    backgroundColor: colors.bg.muted
-  },
-  removePhotoButton: {
-    position: "absolute" as const,
-    top: toRN(tokens.spacing[2]),
-    right: toRN(tokens.spacing[2]),
-    backgroundColor: colors.bg.canvas,
-    borderRadius: toRN(tokens.borderRadius.full),
-    padding: toRN(tokens.spacing[1])
-  },
-  uploadingContainer: {
-    flexDirection: "row" as const,
+  restMessage: {
+    marginTop: toRN(tokens.spacing[5]),
     alignItems: "center" as const,
-    justifyContent: "center" as const,
-    gap: toRN(tokens.spacing[2]),
-    marginTop: toRN(tokens.spacing[3]),
-    padding: toRN(tokens.spacing[4]),
+    paddingVertical: toRN(tokens.spacing[6]),
     backgroundColor: colors.bg.muted,
     borderRadius: toRN(tokens.borderRadius.xl)
   },
-  uploadingText: {
-    fontSize: toRN(tokens.typography.fontSize.sm),
-    fontFamily: fontFamily.regular,
-    color: colors.text.secondary
+  restEmoji: {
+    fontSize: 56,
+    marginBottom: toRN(tokens.spacing[3])
   },
-  addPhotoButton: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    justifyContent: "center" as const,
-    gap: toRN(tokens.spacing[2]),
-    paddingVertical: toRN(tokens.spacing[4]),
+  restText: {
+    fontSize: toRN(tokens.typography.fontSize.lg),
+    fontFamily: fontFamily.groteskMedium,
+    color: colors.text.secondary,
+    textAlign: "center" as const,
     paddingHorizontal: toRN(tokens.spacing[4]),
-    borderWidth: 2,
-    borderColor: brand.primary,
-    borderStyle: "dashed" as const,
+    lineHeight: lineHeight(tokens.typography.fontSize.lg, tokens.typography.lineHeight.relaxed)
+  },
+  noteInput: {
+    backgroundColor: colors.bg.muted,
     borderRadius: toRN(tokens.borderRadius.xl),
-    backgroundColor: "transparent",
+    paddingHorizontal: toRN(tokens.spacing[4]),
+    paddingVertical: toRN(tokens.spacing[4]),
+    fontSize: toRN(tokens.typography.fontSize.base),
+    fontFamily: fontFamily.groteskRegular,
+    color: colors.text.primary,
+    minHeight: 100,
+    borderWidth: 1,
+    borderColor: colors.border.subtle
+  },
+  noteInputContainer: {
+    marginBottom: 0
+  },
+  charCount: {
+    fontSize: toRN(tokens.typography.fontSize.xs),
+    fontFamily: fontFamily.groteskRegular,
+    color: colors.text.tertiary,
+    textAlign: "right" as const,
     marginTop: toRN(tokens.spacing[2])
   },
-  addPhotoText: {
-    fontSize: toRN(tokens.typography.fontSize.base),
-    fontFamily: fontFamily.semiBold,
-    color: brand.primary
-  },
-  saveButton: {
-    backgroundColor: brand.primary,
-    paddingVertical: toRN(tokens.spacing[4]),
-    borderRadius: toRN(tokens.borderRadius.xl),
-    justifyContent: "center" as const,
+  voiceNoteButton: {
+    flexDirection: "row" as const,
     alignItems: "center" as const,
-    marginTop: toRN(tokens.spacing[4])
+    gap: toRN(tokens.spacing[2]),
+    marginTop: toRN(tokens.spacing[3]),
+    paddingVertical: toRN(tokens.spacing[3]),
+    paddingHorizontal: toRN(tokens.spacing[4]),
+    backgroundColor: brand.primary + "10",
+    borderRadius: toRN(tokens.borderRadius.lg),
+    borderWidth: 1,
+    borderColor: brand.primary + "30"
   },
-  saveButtonDisabled: {
+  voiceNoteButtonPro: {
     backgroundColor: colors.bg.muted,
-    opacity: 0.5
+    borderColor: colors.border.subtle
   },
-  saveButtonText: {
-    fontSize: toRN(tokens.typography.fontSize.base),
-    fontFamily: fontFamily.bold,
-    color: brand.onPrimary
+  voiceNoteButtonText: {
+    fontSize: toRN(tokens.typography.fontSize.sm),
+    fontFamily: fontFamily.groteskMedium,
+    flex: 1
   },
-  saveButtonTextDisabled: {
-    color: colors.text.tertiary
+  voiceNotePreview: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: toRN(tokens.spacing[2]),
+    marginTop: toRN(tokens.spacing[3]),
+    paddingVertical: toRN(tokens.spacing[3]),
+    paddingHorizontal: toRN(tokens.spacing[4]),
+    backgroundColor: brand.primary + "10",
+    borderRadius: toRN(tokens.borderRadius.lg)
+  },
+  voiceNotePreviewText: {
+    fontSize: toRN(tokens.typography.fontSize.sm),
+    fontFamily: fontFamily.groteskMedium,
+    flex: 1
+  },
+  footer: {
+    paddingHorizontal: toRN(tokens.spacing[5]),
+    paddingTop: toRN(tokens.spacing[4]),
+    paddingBottom: toRN(tokens.spacing[2]),
+    borderTopWidth: 1,
+    borderTopColor: colors.border.subtle
   }
 });

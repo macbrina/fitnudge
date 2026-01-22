@@ -19,7 +19,7 @@ Events handled:
 Features:
 - Idempotency: Each event is processed only once
 - Async processing: Heavy operations don't block webhook response
-- Deactivation handling: Automatic goal/challenge cleanup on expiry
+- Deactivation handling: Automatic goal cleanup on expiry
 - Audit logging: All subscription changes are logged
 
 Setup in RevenueCat Dashboard:
@@ -524,8 +524,6 @@ async def handle_subscription_expired(supabase, event: RevenueCatEvent, user_id:
     1. Updates subscription status to 'expired'
     2. Downgrades user to free plan
     3. Deactivates excess goals beyond free tier limit
-    4. Cancels challenges created by the user
-    5. Removes user from group goals
     """
     from app.services.subscription_service import (
         handle_subscription_expiry_deactivation,
@@ -564,12 +562,8 @@ async def handle_subscription_expired(supabase, event: RevenueCatEvent, user_id:
             from app.services.expo_push_service import send_push_to_user
 
             goals_msg = ""
-            if summary["goals_deactivated"] > 0:
+            if summary.get("goals_deactivated", 0) > 0:
                 goals_msg = f"{summary['goals_deactivated']} goal(s) paused"
-            if summary["challenges_cancelled"] > 0:
-                if goals_msg:
-                    goals_msg += ", "
-                goals_msg += f"{summary['challenges_cancelled']} challenge(s) ended"
 
             body = "Your premium features are no longer active."
             if goals_msg:
@@ -582,10 +576,10 @@ async def handle_subscription_expired(supabase, event: RevenueCatEvent, user_id:
                 data={
                     "type": "subscription_expired",
                     "previous_plan": previous_plan,
-                    "goals_deactivated": summary["goals_deactivated"],
-                    "challenges_cancelled": summary["challenges_cancelled"],
+                    "goals_deactivated": summary.get("goals_deactivated", 0),
                 },
                 notification_type="subscription",
+                skip_preference_check=True,  # Critical - always send
             )
         except Exception as notify_error:
             logger.error(
@@ -652,6 +646,7 @@ async def handle_billing_issue(supabase, event: RevenueCatEvent, user_id: str):
                 "grace_period_ends_at": grace_period_ends_at,
             },
             notification_type="subscription",
+            skip_preference_check=True,  # Critical - always send
         )
     except Exception as notify_error:
         logger.error(

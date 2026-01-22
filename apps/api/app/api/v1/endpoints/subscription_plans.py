@@ -31,7 +31,7 @@ class SubscriptionPlan(BaseModel):
     description: str
     monthly_price: float
     annual_price: float
-    goal_limit: int | None  # None means unlimited
+    active_goal_limit: int | None  # None means unlimited
     features: List[PlanFeature]
     is_popular: bool
     has_trial: bool

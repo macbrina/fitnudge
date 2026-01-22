@@ -1,551 +1,459 @@
-import React, { useState } from "react";
-import { View, Text, TouchableOpacity } from "react-native";
+import React, { useState, useCallback } from "react";
+import { View, Text, TouchableOpacity, ViewStyle, Pressable } from "react-native";
 import { useRouter } from "expo-router";
 import { Card } from "@/components/ui/Card";
-import {
-  BottomMenuSheet,
-  BottomMenuOption,
-  BottomMenuSection
-} from "@/components/ui/BottomMenuSheet";
+import { SkeletonBox } from "@/components/ui/SkeletonBox";
 import { useStyles } from "@/themes";
 import { useTheme } from "@/themes";
-import { tokens } from "@/themes/tokens";
 import { toRN } from "@/lib/units";
 import { fontFamily } from "@/lib/fonts";
 import { useTranslation } from "@/lib/i18n";
-import { usePlanStatus, useRetryPlanGeneration } from "@/hooks/api/useActionablePlans";
-import { useActivateGoal, useDeactivateGoal } from "@/hooks/api/useGoals";
-import { useAlertModal } from "@/contexts/AlertModalContext";
-import { useSubscriptionStore } from "@/stores/subscriptionStore";
-import { PlanStatusBadge } from "@/screens/tabs/goals/components/PlanStatusBadge";
-import { EditGoalForm } from "@/screens/tabs/goals/components/EditGoalForm";
-import { Ionicons } from "@expo/vector-icons";
 import { MOBILE_ROUTES } from "@/lib/routes";
-import { PlanStatus } from "@/services/api/actionablePlans";
-import { Goal } from "@/services/api/goals";
-
-interface PlanStatusData {
-  status: PlanStatus;
-  [key: string]: any;
-}
+import {
+  Flame,
+  CheckCircle,
+  Clock,
+  Circle,
+  MessageCircle,
+  ChevronDown,
+  Moon,
+  XCircle
+} from "lucide-react-native";
+import { TodayCheckinStatus } from "@/services/api/goals";
+import { tokens } from "@/themes/tokens";
+import { formatReminderTime } from "@/utils/helper";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+  FadeIn,
+  LinearTransition
+} from "react-native-reanimated";
 
 interface GoalCardProps {
   goal: {
     id: string;
     title: string;
-    description?: string;
-    category: string;
-    frequency?: string;
-    days_of_week?: number[];
-    reminder_times?: string[];
+    frequency_type?: string;
+    frequency_count?: number;
     current_streak?: number;
+    longest_streak?: number;
+    total_completions?: number;
     status?: string;
-    archived_reason?: string | null;
-    completed_at?: string;
-    // Progress data (populated externally)
-    completed_checkins?: number;
+    // V2 additions
+    today_checkin_status?: TodayCheckinStatus;
+    progress_this_week?: { completed: number; target: number } | null;
+    reminder_times?: string[] | null;
   };
-  planStatus?: PlanStatusData; // Optional: pass from parent to avoid individual fetching
+  /** Compact mode for horizontal scroll on home screen */
+  compact?: boolean;
   onPress?: () => void;
-  showMenu?: boolean; // Only show menu in GoalsScreen, not HomeScreen
-  activeGoalsCount?: number; // Current number of active goals (for limit checking)
-  style?: any;
+  /** Callback to open AI coach for this specific goal */
+  onTalkToBuddy?: (goalId: string) => void;
+  style?: ViewStyle;
 }
 
-export function GoalCard({
-  goal,
-  planStatus: planStatusProp,
-  onPress,
-  showMenu = false,
-  activeGoalsCount = 0,
-  style
-}: GoalCardProps) {
-  const styles = useStyles(makeGoalCardStyles);
+export function GoalCard({ goal, compact = false, onPress, onTalkToBuddy, style }: GoalCardProps) {
+  const styles = useStyles(makeStyles);
   const { colors, brandColors } = useTheme();
   const { t } = useTranslation();
-  const { showConfirm, showAlert } = useAlertModal();
-  const [showActionSheet, setShowActionSheet] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
   const router = useRouter();
 
-  // Hooks
-  // Use passed planStatus if available, otherwise fetch (for backward compatibility with HomeScreen)
-  const { data: fetchedPlanStatus } = usePlanStatus(
-    goal.id,
-    !planStatusProp // Only fetch if not passed from parent
-  );
-  const planStatus = planStatusProp || fetchedPlanStatus;
-
-  const activateGoal = useActivateGoal();
-  const deactivateGoal = useDeactivateGoal();
-  const retryPlan = useRetryPlanGeneration();
-
-  // Check if goal failed (plan generation failed)
-  const isGoalFailed = goal.archived_reason === "failed";
-
-  // Card should be disabled if plan not ready
-  // Active status check happens inside detail screen for actions
-  const isCardDisabled = planStatus?.status !== "completed";
-
-  // Get active goal limit and feature access from subscription
-  const activeGoalLimit = useSubscriptionStore((state) => state.getActiveGoalLimit?.() ?? 1);
-  const hasFeature = useSubscriptionStore((state) => state.hasFeature);
-
-  // Category info with icon, label, and color
-  const CATEGORY_INFO: Record<
-    string,
-    { icon: keyof typeof Ionicons.glyphMap; label: string; color: string }
-  > = {
-    fitness: { icon: "fitness-outline", label: "Fitness", color: "#EF4444" },
-    nutrition: {
-      icon: "nutrition-outline",
-      label: "Nutrition",
-      color: "#22C55E"
-    },
-    wellness: { icon: "leaf-outline", label: "Wellness", color: "#8B5CF6" },
-    mindfulness: {
-      icon: "flower-outline",
-      label: "Mindfulness",
-      color: "#3B82F6"
-    },
-    sleep: { icon: "moon-outline", label: "Sleep", color: "#6366F1" }
-  };
-
-  // Goal type info
-  const categoryInfo = CATEGORY_INFO[goal.category] || CATEGORY_INFO.wellness;
-
-  // Goals are now habits only - show streak
-  const progressDisplay = {
-    type: "habit" as const,
-    streak: goal.current_streak || 0
-  };
-
-  const handleResume = async () => {
-    // Check active goal limit
-    if (activeGoalsCount >= activeGoalLimit) {
-      await showAlert({
-        title: t("goals.active_limit_reached_title"),
-        message: t("goals.active_limit_reached_message", {
-          limit: activeGoalLimit
-        }),
-        variant: "warning",
-        confirmLabel: t("common.ok")
-      });
-      return;
-    }
-
-    // Check if plan is ready
-    if (planStatus?.status !== "completed") {
-      await showAlert({
-        title: t("goals.plan_not_ready_title") || "Plan Not Ready",
-        message:
-          t("goals.plan_not_ready_message") ||
-          "Your goal plan is still being generated. Please wait until it's ready.",
-        variant: "warning",
-        confirmLabel: t("common.ok")
-      });
-      return;
-    }
-
-    try {
-      await activateGoal.mutateAsync(goal.id);
-    } catch (error: any) {
-      const errorMessage =
-        error?.response?.data?.detail || t("goals.resume_goal_error") || "Failed to resume goal";
-      await showAlert({
-        title: t("common.error"),
-        message: errorMessage,
-        variant: "error",
-        confirmLabel: t("common.ok")
+  const handlePress = () => {
+    if (onPress) {
+      onPress();
+    } else {
+      router.push({
+        pathname: MOBILE_ROUTES.GOALS.DETAILS,
+        params: { id: goal.id }
       });
     }
   };
 
-  const handlePause = async () => {
-    try {
-      await deactivateGoal.mutateAsync(goal.id);
-    } catch (error: any) {
-      const errorMessage =
-        error?.response?.data?.detail || t("goals.pause_goal_error") || "Failed to pause goal";
-      await showAlert({
-        title: t("common.error"),
-        message: errorMessage,
-        variant: "error",
-        confirmLabel: t("common.ok")
-      });
+  const handleTalkToBuddy = () => {
+    if (onTalkToBuddy) {
+      onTalkToBuddy(goal.id);
     }
   };
 
-  const handleRetryPlan = async () => {
-    try {
-      await retryPlan.mutateAsync(goal.id);
-    } catch (error: any) {
-      const errorMessage =
-        error?.response?.data?.detail ||
-        t("goals.retry_plan_error") ||
-        "Failed to retry plan generation";
-      await showAlert({
-        title: t("common.error"),
-        message: errorMessage,
-        variant: "error",
-        confirmLabel: t("common.ok")
-      });
+  const currentStreak = goal.current_streak || 0;
+  const isArchived = goal.status === "archived";
+  const todayStatus = goal.today_checkin_status;
+  const hasCheckedInToday = todayStatus != null;
+
+  // Render status icon based on today's check-in status
+  const renderStatusIcon = (size: number = 20) => {
+    switch (todayStatus) {
+      case "completed":
+        return <CheckCircle size={size} color={colors.feedback.success} />;
+      case "rest_day":
+        return <Moon size={size} color={brandColors.primary} />;
+      case "skipped":
+        return <XCircle size={size} color={colors.feedback.error} />;
+      default:
+        return <Circle size={size} color={colors.text.tertiary} />;
     }
   };
 
-  // Handle edit goal
-  const handleEdit = () => {
-    setShowActionSheet(false);
-    setShowEditModal(true);
-  };
+  // Format frequency text
+  const frequencyText =
+    goal.frequency_type === "daily"
+      ? t("goals.frequency.daily")
+      : `${goal.frequency_count || 3}x/${t("goals.frequency.week")}`;
 
-  // Build menu sections dynamically based on goal state
-  const buildMenuSections = (): BottomMenuSection[] => {
-    const sections: BottomMenuSection[] = [];
+  const nextReminder = goal.reminder_times?.[0];
 
-    // === Section 1: Edit Action (always available) ===
-    const editOptions: BottomMenuOption[] = [
-      {
-        id: "edit",
-        label: t("goals.edit_goal") || "Edit Goal",
-        description: t("goals.edit_goal_desc") || "Edit title, description, days, or reminders",
-        icon: "create-outline",
-        onPress: handleEdit
-      }
-    ];
-    sections.push({ id: "edit", options: editOptions });
+  // Weekly progress text
+  const weeklyProgressText =
+    goal.frequency_type === "weekly" && goal.progress_this_week
+      ? `${goal.progress_this_week.completed}/${goal.progress_this_week.target} ${t("goals.this_week")}`
+      : null;
 
-    // === Section 2: Primary Actions (Pause/Resume) ===
-    const primaryOptions: BottomMenuOption[] = [];
+  // Collapsible compact card state and animation
+  const [isExpanded, setIsExpanded] = useState(false);
+  const rotation = useSharedValue(0);
 
-    // Active goals can be paused
-    if (goal.status === "active") {
-      primaryOptions.push({
-        id: "pause",
-        label: t("goals.pause_goal") || "Pause Goal",
-        description: t("goals.pause_goal_desc") || "Temporarily stop tracking this goal",
-        icon: "pause-circle-outline",
-        onPress: handlePause
-      });
-    }
+  const toggleExpand = useCallback(() => {
+    rotation.value = withTiming(isExpanded ? 0 : 180, { duration: 300 });
+    setIsExpanded((prev) => !prev);
+  }, [isExpanded, rotation]);
 
-    // Archived goals can be resumed (not completed goals)
-    if (goal.status === "archived") {
-      primaryOptions.push({
-        id: "resume",
-        label: t("goals.resume_goal") || "Resume Goal",
-        description: t("goals.resume_goal_desc") || "Continue tracking this goal",
-        icon: "play-circle-outline",
-        onPress: handleResume
-      });
-    }
+  const chevronStyle = useAnimatedStyle(() => {
+    "worklet";
+    return {
+      transform: [{ rotate: `${rotation.value}deg` }]
+    };
+  });
 
-    if (primaryOptions.length > 0) {
-      sections.push({ id: "primary", options: primaryOptions });
-    }
+  // Check if there's expandable content
+  const hasExpandableContent =
+    weeklyProgressText || currentStreak > 0 || (!hasCheckedInToday && nextReminder);
 
-    // No delete option - we preserve data for limits/history
+  if (compact) {
+    // Collapsible compact card for home screen list
+    return (
+      <Animated.View layout={LinearTransition.duration(400)}>
+        <Card style={[styles.compactContainer, isArchived && styles.archived, style]}>
+          {/* Always visible row: Status + Title + Actions */}
+          <View style={styles.compactMainRow}>
+            {/* Status indicator */}
+            {renderStatusIcon(20)}
 
-    return sections;
-  };
+            {/* Title + Frequency - tappable to go to details */}
+            <Pressable style={styles.compactTitleSection} onPress={handlePress}>
+              <Text style={styles.compactTitle} numberOfLines={1} ellipsizeMode="tail">
+                {goal.title}
+              </Text>
+              <Text style={styles.compactFrequency}>{frequencyText}</Text>
+            </Pressable>
 
-  const menuSections = buildMenuSections();
+            {/* Action buttons */}
+            <View style={styles.compactActions}>
+              {/* Talk to buddy button */}
+              {onTalkToBuddy && (
+                <TouchableOpacity
+                  style={styles.compactActionButton}
+                  onPress={handleTalkToBuddy}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <MessageCircle size={18} color={brandColors.primary} />
+                </TouchableOpacity>
+              )}
 
-  // Render progress section - habits show streak
-  const renderProgress = () => {
-    if (!progressDisplay) return null;
-
-    // Show streak for habits
-    if (progressDisplay.streak > 0 && planStatus?.status === "completed") {
-      return (
-        <View style={styles.streakContainer}>
-          <Ionicons name="flame" size={toRN(tokens.typography.fontSize.sm)} color="#F59E0B" />
-          <Text style={styles.streakText}>
-            {progressDisplay.streak}{" "}
-            {progressDisplay.streak === 1 ? t("home.streak_day") : t("home.streak_days")}
-          </Text>
-        </View>
-      );
-    }
-
-    return null;
-  };
-
-  // Note: We no longer show a skeleton here while loading actionable plans.
-  // The main screen skeleton handles initial loading. Plan status badge
-  // will appear when data loads, avoiding double-loading visual effect.
-
-  return (
-    <TouchableOpacity onPress={!isCardDisabled ? onPress : undefined} activeOpacity={0.7}>
-      <Card shadow="sm" style={[styles.card, style]} disabled={isCardDisabled}>
-        {/* Header Row */}
-        <View style={styles.header}>
-          {/* Icon */}
-          <View style={[styles.iconContainer, { backgroundColor: `${categoryInfo.color}12` }]}>
-            <Ionicons
-              name={categoryInfo.icon}
-              size={toRN(tokens.typography.fontSize.xl)}
-              color={categoryInfo.color}
-            />
+              {/* Expand toggle (only if there's content to show) */}
+              {hasExpandableContent && (
+                <TouchableOpacity
+                  style={styles.compactActionButton}
+                  onPress={toggleExpand}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Animated.View style={chevronStyle}>
+                    <ChevronDown size={18} color={colors.text.tertiary} />
+                  </Animated.View>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
 
-          {/* Title & Meta */}
-          <View style={styles.titleContainer}>
-            <Text style={styles.title} numberOfLines={2} ellipsizeMode="tail">
-              {goal.title}
-            </Text>
-            <View style={styles.metaRow}>
-              <View style={[styles.categoryPill, { backgroundColor: `${categoryInfo.color}15` }]}>
-                <Text style={[styles.categoryText, { color: categoryInfo.color }]}>
-                  {categoryInfo.label}
+          {/* Expandable content - fades in when expanded */}
+          {isExpanded && hasExpandableContent && (
+            <Animated.View entering={FadeIn.duration(400)} style={styles.compactExpandedContent}>
+              {/* Weekly Progress */}
+              {weeklyProgressText && (
+                <View style={styles.compactDetailRow}>
+                  <Text style={styles.compactDetailText}>{weeklyProgressText}</Text>
+                </View>
+              )}
+
+              {/* Streak */}
+              <View style={styles.compactDetailRow}>
+                <Flame size={14} color={brandColors.primary} />
+                <Text style={[styles.compactDetailText, { color: brandColors.primary }]}>
+                  {currentStreak} {t("goals.day_streak")}
                 </Text>
               </View>
-              <View style={styles.typePill}>
-                <Ionicons name="refresh-outline" size={10} color={colors.text.tertiary} />
-                <Text style={styles.typeText}>{t("goals.habit") || "Habit"}</Text>
-              </View>
-            </View>
+
+              {/* Reminder Time - show if no check-in today */}
+              {!hasCheckedInToday && nextReminder && (
+                <View style={styles.compactDetailRow}>
+                  <Clock size={14} color={colors.text.tertiary} />
+                  <Text style={styles.compactDetailText}>
+                    {t("goals.check_in_at")} {formatReminderTime(nextReminder)}
+                  </Text>
+                </View>
+              )}
+            </Animated.View>
+          )}
+        </Card>
+      </Animated.View>
+    );
+  }
+
+  // Full card (original layout for goals list)
+  const totalCompletions = goal.total_completions || 0;
+
+  return (
+    <TouchableOpacity onPress={handlePress} activeOpacity={0.7}>
+      <Card style={[styles.container, isArchived && styles.archived, style]}>
+        <View style={styles.header}>
+          <View style={styles.titleContainer}>
+            <Text style={styles.title} numberOfLines={1} ellipsizeMode="tail">
+              {goal.title}
+            </Text>
+            <Text style={styles.frequency}>{frequencyText}</Text>
           </View>
 
-          {/* Menu Button */}
-          {showMenu && (
-            <TouchableOpacity
-              onPress={() => setShowActionSheet(true)}
-              style={styles.menuButton}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Ionicons
-                name="ellipsis-horizontal"
-                size={toRN(tokens.typography.fontSize.xl)}
-                color={colors.text.secondary}
-              />
-            </TouchableOpacity>
-          )}
+          {/* Today's status indicator */}
+          {renderStatusIcon(24)}
         </View>
 
-        {/* Progress Section */}
-        {renderProgress()}
+        <View style={styles.statsRow}>
+          {/* Streak */}
+          <View style={styles.statItem}>
+            <Flame
+              size={16}
+              color={currentStreak > 0 ? brandColors.primary : colors.text.tertiary}
+            />
+            <Text style={[styles.statValue, currentStreak > 0 && { color: brandColors.primary }]}>
+              {currentStreak}
+            </Text>
+            <Text style={styles.statLabel}>{t("goals.stats.streak")}</Text>
+          </View>
 
-        {/* Plan Status - show for pending, generating, completed, or failed */}
-        {planStatus &&
-          (planStatus.status === "pending" ||
-            planStatus.status === "generating" ||
-            planStatus.status === "completed" ||
-            planStatus.status === "failed" ||
-            isGoalFailed) && (
-            <View
-              style={[
-                styles.planStatusRow,
-                {
-                  justifyContent: planStatus.status === "completed" ? "flex-end" : "space-between"
-                }
-              ]}
-            >
-              {planStatus.status !== "completed" && (
-                <PlanStatusBadge status={isGoalFailed ? "failed" : planStatus.status} size="sm" />
-              )}
-              {planStatus.status === "completed" && !isGoalFailed && (
-                <TouchableOpacity onPress={onPress} style={styles.viewPlanButton}>
-                  <Text style={styles.viewPlanText}>{t("goals.view_plan")}</Text>
-                  <Ionicons
-                    name="chevron-forward"
-                    size={toRN(tokens.typography.fontSize.xs)}
-                    color={brandColors.primary}
-                  />
-                </TouchableOpacity>
-              )}
-              {(planStatus.status === "failed" || isGoalFailed) && (
-                <TouchableOpacity
-                  onPress={handleRetryPlan}
-                  style={styles.retryButton}
-                  disabled={retryPlan.isPending}
-                >
-                  <Ionicons
-                    name="refresh-outline"
-                    size={toRN(tokens.typography.fontSize.sm)}
-                    color={brandColors.primary}
-                  />
-                  <Text style={styles.retryButtonText}>
-                    {retryPlan.isPending
-                      ? t("common.loading") || "..."
-                      : t("goals.retry") || "Retry"}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
+          {/* Completions */}
+          <View style={styles.statItem}>
+            <CheckCircle size={16} color={colors.feedback.success} />
+            <Text style={styles.statValue}>{totalCompletions}</Text>
+            <Text style={styles.statLabel}>{t("goals.stats.done")}</Text>
+          </View>
+
+          {/* Longest Streak */}
+          <View style={styles.statItem}>
+            <Flame size={16} color={colors.text.secondary} />
+            <Text style={styles.statValue}>{goal.longest_streak || 0}</Text>
+            <Text style={styles.statLabel}>{t("goals.stats.best")}</Text>
+          </View>
+        </View>
+
+        {/* Talk to buddy button */}
+        {onTalkToBuddy && !isArchived && (
+          <TouchableOpacity
+            style={styles.fullCardTalkButton}
+            onPress={handleTalkToBuddy}
+            activeOpacity={0.7}
+          >
+            <MessageCircle size={16} color={brandColors.primary} />
+            <Text style={styles.fullCardTalkButtonText}>{t("home.talk_to_buddy")}</Text>
+          </TouchableOpacity>
+        )}
+
+        {isArchived && (
+          <View style={styles.archivedBadge}>
+            <Text style={styles.archivedText}>{t("goals.archived")}</Text>
+          </View>
+        )}
       </Card>
-
-      {/* Bottom Menu Sheet */}
-      <BottomMenuSheet
-        visible={showActionSheet}
-        title={goal.title}
-        sections={menuSections}
-        onClose={() => setShowActionSheet(false)}
-      />
-
-      {/* Edit Goal Modal */}
-      <EditGoalForm
-        visible={showEditModal}
-        goal={goal as Goal}
-        onSuccess={() => setShowEditModal(false)}
-        onClose={() => setShowEditModal(false)}
-      />
     </TouchableOpacity>
   );
 }
 
-const makeGoalCardStyles = (tokens: any, colors: any, brand: any) => ({
-  card: {
-    minWidth: 220,
-    marginRight: toRN(tokens.spacing[3])
+/**
+ * Skeleton loading state for GoalCard (compact mode)
+ * Matches the collapsible compact card layout
+ */
+interface GoalCardSkeletonProps {
+  style?: ViewStyle;
+}
+
+export function GoalCardSkeleton({ style }: GoalCardSkeletonProps) {
+  const styles = useStyles(makeStyles);
+
+  return (
+    <Card style={[styles.compactContainer, style]}>
+      <View style={styles.compactMainRow}>
+        {/* Status icon skeleton */}
+        <SkeletonBox width={20} height={20} borderRadius={10} />
+
+        {/* Title section skeleton */}
+        <View style={styles.compactTitleSection}>
+          <SkeletonBox
+            width={160}
+            height={toRN(tokens.typography.fontSize.base)}
+            borderRadius={toRN(tokens.borderRadius.base)}
+          />
+          <SkeletonBox
+            width={60}
+            height={toRN(tokens.typography.fontSize.xs)}
+            borderRadius={toRN(tokens.borderRadius.base)}
+          />
+        </View>
+
+        {/* Action buttons skeleton */}
+        <View style={styles.compactActions}>
+          <SkeletonBox width={34} height={34} borderRadius={17} />
+          <SkeletonBox width={34} height={34} borderRadius={17} />
+        </View>
+      </View>
+    </Card>
+  );
+}
+
+const makeStyles = (tokens: any, colors: any, brand: any) => ({
+  // Full card styles
+  container: {
+    padding: toRN(tokens.spacing[4]),
+    marginBottom: toRN(tokens.spacing[4])
+  },
+  archived: {
+    opacity: 0.8
   },
   header: {
     flexDirection: "row" as const,
-    alignItems: "flex-start" as const
-  },
-  menuButton: {
-    padding: toRN(tokens.spacing[1]),
-    marginLeft: toRN(tokens.spacing[1])
-  },
-  iconContainer: {
-    width: toRN(44),
-    height: toRN(44),
-    borderRadius: toRN(tokens.borderRadius.lg),
     alignItems: "center" as const,
-    justifyContent: "center" as const,
-    marginRight: toRN(tokens.spacing[3])
+    marginBottom: toRN(tokens.spacing[3]),
+    gap: toRN(tokens.spacing[3])
   },
   titleContainer: {
-    flex: 1,
-    paddingRight: toRN(tokens.spacing[2])
+    flex: 1
   },
   title: {
-    fontSize: toRN(tokens.typography.fontSize.base),
-    fontFamily: fontFamily.semiBold,
+    fontSize: toRN(tokens.typography.fontSize.lg),
+    fontWeight: tokens.typography.fontWeight.semibold,
+    fontFamily: fontFamily.groteskSemiBold,
     color: colors.text.primary,
-    lineHeight: toRN(tokens.typography.fontSize.base) * 1.3,
-    marginBottom: toRN(tokens.spacing[1.5] || 6)
+    marginBottom: toRN(tokens.spacing[0.5])
   },
-  metaRow: {
+  frequency: {
+    fontSize: toRN(tokens.typography.fontSize.sm),
+    color: colors.text.tertiary,
+    fontFamily: fontFamily.groteskRegular
+  },
+  statsRow: {
     flexDirection: "row" as const,
+    justifyContent: "space-around" as const,
+    paddingTop: toRN(tokens.spacing[3]),
+    borderTopWidth: 1,
+    borderTopColor: colors.border.subtle
+  },
+  statItem: {
     alignItems: "center" as const,
-    flexWrap: "wrap" as const,
-    gap: toRN(tokens.spacing[1.5] || 6)
+    gap: toRN(tokens.spacing[0.5])
   },
-  categoryPill: {
-    paddingHorizontal: toRN(tokens.spacing[2]),
-    paddingVertical: 3,
-    borderRadius: toRN(tokens.borderRadius.full)
+  statValue: {
+    fontSize: toRN(tokens.typography.fontSize.lg),
+    fontWeight: tokens.typography.fontWeight.bold,
+    fontFamily: fontFamily.groteskBold,
+    color: colors.text.primary
   },
-  categoryText: {
+  statLabel: {
     fontSize: toRN(tokens.typography.fontSize.xs),
-    fontFamily: fontFamily.medium
+    color: colors.text.tertiary,
+    fontFamily: fontFamily.groteskRegular
   },
-  typePill: {
+  archivedBadge: {
+    position: "absolute" as const,
+    top: toRN(tokens.spacing[2]),
+    right: toRN(tokens.spacing[8]),
+    backgroundColor: colors.bg.muted,
+    paddingHorizontal: toRN(tokens.spacing[2]),
+    paddingVertical: toRN(tokens.spacing[1]),
+    borderRadius: toRN(tokens.borderRadius.sm)
+  },
+  archivedText: {
+    fontSize: toRN(tokens.typography.fontSize.xs),
+    color: colors.text.tertiary,
+    fontFamily: fontFamily.groteskMedium
+  },
+
+  // Compact card styles (collapsible list item for home screen)
+  compactContainer: {
+    padding: toRN(tokens.spacing[4])
+  },
+  compactMainRow: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    gap: 3,
-    paddingHorizontal: toRN(tokens.spacing[2]),
-    paddingVertical: 3,
+    gap: toRN(tokens.spacing[3])
+  },
+  compactTitleSection: {
+    flex: 1,
+    gap: toRN(tokens.spacing[0.5])
+  },
+  compactTitle: {
+    fontSize: toRN(tokens.typography.fontSize.base),
+    fontWeight: tokens.typography.fontWeight.semibold,
+    fontFamily: fontFamily.groteskSemiBold,
+    color: colors.text.primary
+  },
+  compactFrequency: {
+    fontSize: toRN(tokens.typography.fontSize.xs),
+    color: colors.text.tertiary,
+    fontFamily: fontFamily.groteskRegular
+  },
+  compactActions: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: toRN(tokens.spacing[1])
+  },
+  compactActionButton: {
+    padding: toRN(tokens.spacing[2]),
     borderRadius: toRN(tokens.borderRadius.full),
     backgroundColor: colors.bg.muted
   },
-  typeText: {
-    fontSize: toRN(tokens.typography.fontSize.xs),
-    fontFamily: fontFamily.regular,
-    color: colors.text.tertiary
-  },
-  // Progress section
-  progressSection: {
+  compactExpandedContent: {
     marginTop: toRN(tokens.spacing[3]),
     paddingTop: toRN(tokens.spacing[3]),
     borderTopWidth: 1,
-    borderTopColor: colors.border.default + "40"
-  },
-  progressRow: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    justifyContent: "space-between" as const,
-    marginBottom: toRN(tokens.spacing[2])
-  },
-  progressStats: {
-    flexDirection: "row" as const,
-    alignItems: "baseline" as const,
+    borderTopColor: colors.border.subtle,
     gap: toRN(tokens.spacing[2])
   },
-  progressValue: {
-    fontSize: toRN(tokens.typography.fontSize.lg),
-    fontFamily: fontFamily.bold,
-    color: colors.text.primary
-  },
-  progressTotal: {
-    fontSize: toRN(tokens.typography.fontSize.sm),
-    fontFamily: fontFamily.regular,
-    color: colors.text.tertiary
-  },
-  progressSubtext: {
-    fontSize: toRN(tokens.typography.fontSize.sm),
-    fontFamily: fontFamily.regular,
-    color: colors.text.tertiary
-  },
-  progressBarContainer: {
-    height: 6,
-    backgroundColor: colors.bg.muted,
-    borderRadius: 3,
-    overflow: "hidden" as const
-  },
-  progressBar: {
-    height: "100%" as const,
-    borderRadius: 3
-  },
-  // Streak (habit)
-  streakContainer: {
+  compactDetailRow: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    gap: toRN(tokens.spacing[1]),
+    gap: toRN(tokens.spacing[2])
+  },
+  compactDetailText: {
+    fontSize: toRN(tokens.typography.fontSize.sm),
+    color: colors.text.secondary,
+    fontFamily: fontFamily.groteskRegular
+  },
+
+  // Full card talk button styles
+  fullCardTalkButton: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    gap: toRN(tokens.spacing[2]),
     marginTop: toRN(tokens.spacing[3]),
-    paddingTop: toRN(tokens.spacing[3]),
-    borderTopWidth: 1,
-    borderTopColor: colors.border.default + "40"
-  },
-  streakText: {
-    fontSize: toRN(tokens.typography.fontSize.sm),
-    fontFamily: fontFamily.medium,
-    color: colors.text.secondary
-  },
-  // Plan status
-  planStatusRow: {
-    marginTop: toRN(tokens.spacing[3]),
-    paddingTop: toRN(tokens.spacing[3]),
-    borderTopWidth: 1,
-    borderTopColor: colors.border.default + "40",
-    flexDirection: "row" as const,
-    justifyContent: "space-between" as const,
-    alignItems: "center" as const
-  },
-  viewPlanButton: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 2
-  },
-  viewPlanText: {
-    fontSize: toRN(tokens.typography.fontSize.xs),
-    fontFamily: fontFamily.medium,
-    color: brand.primary
-  },
-  retryButton: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 4,
-    paddingHorizontal: toRN(tokens.spacing[2]),
-    paddingVertical: toRN(tokens.spacing[1]),
+    paddingVertical: toRN(tokens.spacing[2]),
+    paddingHorizontal: toRN(tokens.spacing[3]),
     borderRadius: toRN(tokens.borderRadius.md),
-    backgroundColor: `${brand.primary}15`
+    backgroundColor: colors.bg.muted
   },
-  retryButtonText: {
-    fontSize: toRN(tokens.typography.fontSize.xs),
-    fontFamily: fontFamily.medium,
+  fullCardTalkButtonText: {
+    fontSize: toRN(tokens.typography.fontSize.sm),
+    fontFamily: fontFamily.groteskMedium,
     color: brand.primary
   }
 });

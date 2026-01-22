@@ -1,8 +1,8 @@
 """
-Cleanup Service for Notifications and Related Records
+FitNudge V2 - Cleanup Service for Notifications
 
 Provides fire-and-forget cleanup functions that don't block the main request.
-Used when challenges are cancelled/completed or partner requests are deleted.
+Used when entities (goals, partner requests) are deleted.
 
 SCALABILITY NOTES:
 - All functions use batch operations where possible
@@ -18,131 +18,39 @@ from app.services.logger import logger
 CLEANUP_BATCH_SIZE = 500
 
 
-def cleanup_challenge_invites_and_notifications_sync(
-    supabase, challenge_id: str, reason: str = "challenge_status_change"
-) -> dict:
-    """
-    Synchronous version: Clean up pending challenge invites and related notifications.
-
-    Args:
-        supabase: Supabase client
-        challenge_id: ID of the challenge
-        reason: Reason for cleanup (for logging)
-
-    Returns:
-        dict with counts of deleted items
-    """
-    stats = {"invites_deleted": 0, "notifications_deleted": 0}
-
-    try:
-        # 1. Delete pending challenge_invites
-        pending_invites = (
-            supabase.table("challenge_invites")
-            .delete()
-            .eq("challenge_id", challenge_id)
-            .eq("status", "pending")
-            .execute()
-        )
-        stats["invites_deleted"] = len(pending_invites.data or [])
-
-        # 2. Delete challenge_invite notifications from notification_history
-        # These have entity_type='challenge', entity_id=challenge_id, notification_type='challenge_invite'
-        notifications = (
-            supabase.table("notification_history")
-            .delete()
-            .eq("entity_type", "challenge")
-            .eq("entity_id", challenge_id)
-            .eq("notification_type", "challenge_invite")
-            .execute()
-        )
-        stats["notifications_deleted"] = len(notifications.data or [])
-
-        if stats["invites_deleted"] > 0 or stats["notifications_deleted"] > 0:
-            logger.info(
-                f"Challenge cleanup ({reason})",
-                {
-                    "challenge_id": challenge_id,
-                    "reason": reason,
-                    "invites_deleted": stats["invites_deleted"],
-                    "notifications_deleted": stats["notifications_deleted"],
-                },
-            )
-
-    except Exception as e:
-        logger.error(
-            f"Failed to cleanup challenge invites/notifications: {e}",
-            {"challenge_id": challenge_id, "error": str(e)},
-        )
-
-    return stats
+# =====================================================
+# GOAL NOTIFICATION CLEANUP
+# =====================================================
 
 
-async def cleanup_challenge_invites_and_notifications(
-    challenge_id: str, reason: str = "challenge_status_change"
-) -> dict:
-    """
-    Async version: Clean up pending challenge invites and related notifications.
-    Gets its own supabase client to avoid connection issues.
-
-    Args:
-        challenge_id: ID of the challenge
-        reason: Reason for cleanup (for logging)
-
-    Returns:
-        dict with counts of deleted items
-    """
-    from app.core.database import get_supabase_client
-
-    supabase = get_supabase_client()
-    return cleanup_challenge_invites_and_notifications_sync(
-        supabase, challenge_id, reason
-    )
-
-
-def fire_and_forget_challenge_cleanup(challenge_id: str, reason: str = "cancelled"):
-    """
-    Fire-and-forget wrapper for challenge cleanup.
-    Schedules the cleanup as a background task that won't block the response.
-
-    Usage:
-        fire_and_forget_challenge_cleanup(challenge_id, reason="cancelled")
-    """
-    asyncio.create_task(_safe_challenge_cleanup(challenge_id, reason))
-
-
-async def _safe_challenge_cleanup(challenge_id: str, reason: str):
-    """Wrapper that catches all exceptions to prevent unhandled errors."""
-    try:
-        await cleanup_challenge_invites_and_notifications(challenge_id, reason)
-    except Exception as e:
-        logger.error(
-            f"Fire-and-forget challenge cleanup failed: {e}",
-            {"challenge_id": challenge_id, "reason": reason, "error": str(e)},
-        )
-
-
-def cleanup_partner_notifications_sync(
-    supabase, partnership_id: str, reason: str = "partner_request_deleted"
+def cleanup_goal_notifications_sync(
+    supabase, goal_id: str, reason: str = "goal_deleted"
 ) -> int:
     """
-    Synchronous version: Clean up partner_request and partner_accepted notifications.
+    Synchronous version: Clean up all notifications referencing a goal.
+
+    This covers:
+    - reminder notifications
+    - ai_motivation notifications
+    - check-in prompts
+    - streak milestone notifications
+    - Any notification with entity_type='goal' and entity_id=goal_id
 
     Args:
         supabase: Supabase client
-        partnership_id: ID of the accountability_partners record
+        goal_id: ID of the goal being deleted
         reason: Reason for cleanup (for logging)
 
     Returns:
         Number of notifications deleted
     """
     try:
-        # Delete notifications where entity_type='partner_request' and entity_id=partnership_id
-        # This covers both partner_request and partner_accepted notification types
+        # Delete notifications where entity_type='goal' and entity_id=goal_id
         result = (
             supabase.table("notification_history")
             .delete()
-            .eq("entity_type", "partner_request")
-            .eq("entity_id", partnership_id)
+            .eq("entity_type", "goal")
+            .eq("entity_id", goal_id)
             .execute()
         )
 
@@ -150,15 +58,162 @@ def cleanup_partner_notifications_sync(
 
         if deleted_count > 0:
             logger.info(
-                f"Partner notification cleanup ({reason})",
+                f"Goal notification cleanup ({reason})",
                 {
-                    "partnership_id": partnership_id,
+                    "goal_id": goal_id,
                     "reason": reason,
                     "notifications_deleted": deleted_count,
                 },
             )
 
         return deleted_count
+
+    except Exception as e:
+        logger.error(
+            f"Failed to cleanup goal notifications: {e}",
+            {"goal_id": goal_id, "error": str(e)},
+        )
+        return 0
+
+
+async def cleanup_goal_notifications(goal_id: str, reason: str = "goal_deleted") -> int:
+    """
+    Async version: Clean up goal notifications.
+    Gets its own supabase client to avoid connection issues.
+
+    Args:
+        goal_id: ID of the goal being deleted
+        reason: Reason for cleanup (for logging)
+
+    Returns:
+        Number of notifications deleted
+    """
+    from app.core.database import get_supabase_client
+
+    supabase = get_supabase_client()
+    return cleanup_goal_notifications_sync(supabase, goal_id, reason)
+
+
+def fire_and_forget_goal_cleanup(goal_id: str, reason: str = "deleted"):
+    """
+    Fire-and-forget wrapper for goal notification cleanup.
+    Schedules the cleanup as a background task that won't block the response.
+
+    Usage:
+        fire_and_forget_goal_cleanup(goal_id, reason="deleted")
+    """
+    asyncio.create_task(_safe_goal_cleanup(goal_id, reason))
+
+
+async def _safe_goal_cleanup(goal_id: str, reason: str):
+    """Wrapper that catches all exceptions to prevent unhandled errors."""
+    try:
+        await cleanup_goal_notifications(goal_id, reason)
+    except Exception as e:
+        logger.error(
+            f"Fire-and-forget goal cleanup failed: {e}",
+            {"goal_id": goal_id, "reason": reason, "error": str(e)},
+        )
+
+
+# =====================================================
+# PARTNER NOTIFICATION CLEANUP
+# =====================================================
+
+
+def cleanup_partner_notifications_sync(
+    supabase,
+    partnership_id: str,
+    reason: str = "partner_request_deleted",
+    nudge_ids: List[str] = None,
+) -> int:
+    """
+    Synchronous version: Clean up all partner-related notifications.
+
+    This covers all entity types related to partnerships:
+    - partner_request
+    - partner_accepted
+    - nudge (via nudge_ids)
+
+    Args:
+        supabase: Supabase client
+        partnership_id: ID of the accountability_partners record
+        reason: Reason for cleanup (for logging)
+        nudge_ids: Optional list of nudge IDs to clean up (required for "removed"
+                   since cascade delete removes nudges before this runs)
+
+    Returns:
+        Number of notifications deleted
+    """
+    total_deleted = 0
+    nudges_deleted = 0
+
+    try:
+        # Always delete partner_request and partner_accepted notifications
+        partner_notif_result = (
+            supabase.table("notification_history")
+            .delete()
+            .in_("entity_type", ["partner_request", "partner_accepted"])
+            .eq("entity_id", partnership_id)
+            .execute()
+        )
+        total_deleted = len(partner_notif_result.data or [])
+
+        # For blocked: fetch nudge IDs and delete nudges + their notifications
+        if reason == "blocked":
+            # Get nudge IDs if not provided
+            if nudge_ids is None:
+                nudges_query = (
+                    supabase.table("social_nudges")
+                    .select("id")
+                    .eq("partnership_id", partnership_id)
+                    .execute()
+                )
+                nudge_ids = [n["id"] for n in (nudges_query.data or [])]
+
+            # Delete notifications for these nudges
+            if nudge_ids:
+                notif_result = (
+                    supabase.table("notification_history")
+                    .delete()
+                    .eq("entity_type", "nudge")
+                    .in_("entity_id", nudge_ids)
+                    .execute()
+                )
+                total_deleted += len(notif_result.data or [])
+
+            # Delete the nudges
+            nudges_result = (
+                supabase.table("social_nudges")
+                .delete()
+                .eq("partnership_id", partnership_id)
+                .execute()
+            )
+            nudges_deleted = len(nudges_result.data or [])
+
+        # For removed: nudges are already cascade-deleted, just clean up their notifications
+        elif reason == "removed" and nudge_ids:
+            notif_result = (
+                supabase.table("notification_history")
+                .delete()
+                .eq("entity_type", "nudge")
+                .in_("entity_id", nudge_ids)
+                .execute()
+            )
+            total_deleted += len(notif_result.data or [])
+
+        if total_deleted > 0 or nudges_deleted > 0:
+            logger.info(
+                f"Partner notification cleanup ({reason})",
+                {
+                    "partnership_id": partnership_id,
+                    "reason": reason,
+                    "notifications_deleted": total_deleted,
+                    "nudges_deleted": nudges_deleted,
+                },
+            )
+
+        return total_deleted + nudges_deleted
 
     except Exception as e:
         logger.error(
@@ -169,7 +224,9 @@ def cleanup_partner_notifications_sync(
 
 
 async def cleanup_partner_notifications(
-    partnership_id: str, reason: str = "partner_request_deleted"
+    partnership_id: str,
+    reason: str = "partner_request_deleted",
+    nudge_ids: List[str] = None,
 ) -> int:
     """
     Async version: Clean up partner notifications.
@@ -178,6 +235,7 @@ async def cleanup_partner_notifications(
     Args:
         partnership_id: ID of the accountability_partners record
         reason: Reason for cleanup (for logging)
+        nudge_ids: Optional list of nudge IDs to clean up
 
     Returns:
         Number of notifications deleted
@@ -185,24 +243,31 @@ async def cleanup_partner_notifications(
     from app.core.database import get_supabase_client
 
     supabase = get_supabase_client()
-    return cleanup_partner_notifications_sync(supabase, partnership_id, reason)
+    return cleanup_partner_notifications_sync(
+        supabase, partnership_id, reason, nudge_ids
+    )
 
 
-def fire_and_forget_partner_cleanup(partnership_id: str, reason: str = "deleted"):
+def fire_and_forget_partner_cleanup(
+    partnership_id: str, reason: str = "deleted", nudge_ids: List[str] = None
+):
     """
     Fire-and-forget wrapper for partner notification cleanup.
     Schedules the cleanup as a background task that won't block the response.
 
     Usage:
         fire_and_forget_partner_cleanup(partnership_id, reason="rejected")
+        fire_and_forget_partner_cleanup(partnership_id, reason="removed", nudge_ids=["id1", "id2"])
     """
-    asyncio.create_task(_safe_partner_cleanup(partnership_id, reason))
+    asyncio.create_task(_safe_partner_cleanup(partnership_id, reason, nudge_ids))
 
 
-async def _safe_partner_cleanup(partnership_id: str, reason: str):
+async def _safe_partner_cleanup(
+    partnership_id: str, reason: str, nudge_ids: List[str] = None
+):
     """Wrapper that catches all exceptions to prevent unhandled errors."""
     try:
-        await cleanup_partner_notifications(partnership_id, reason)
+        await cleanup_partner_notifications(partnership_id, reason, nudge_ids)
     except Exception as e:
         logger.error(
             f"Fire-and-forget partner cleanup failed: {e}",
@@ -210,190 +275,9 @@ async def _safe_partner_cleanup(partnership_id: str, reason: str):
         )
 
 
-def cleanup_challenge_invite_notification_sync(
-    supabase,
-    challenge_id: str,
-    invited_user_id: str,
-    reason: str = "invite_cancelled",
-) -> int:
-    """
-    Synchronous version: Clean up a specific challenge invite notification.
-    Used when an individual invite is cancelled or declined.
-
-    Args:
-        supabase: Supabase client
-        challenge_id: ID of the challenge
-        invited_user_id: ID of the user who was invited
-        reason: Reason for cleanup (for logging)
-
-    Returns:
-        Number of notifications deleted
-    """
-    try:
-        # Delete the specific notification for this invite
-        result = (
-            supabase.table("notification_history")
-            .delete()
-            .eq("entity_type", "challenge")
-            .eq("entity_id", challenge_id)
-            .eq("notification_type", "challenge_invite")
-            .eq("user_id", invited_user_id)
-            .execute()
-        )
-
-        deleted_count = len(result.data or [])
-
-        if deleted_count > 0:
-            logger.info(
-                f"Challenge invite notification cleanup ({reason})",
-                {
-                    "challenge_id": challenge_id,
-                    "invited_user_id": invited_user_id,
-                    "reason": reason,
-                    "notifications_deleted": deleted_count,
-                },
-            )
-
-        return deleted_count
-
-    except Exception as e:
-        logger.error(
-            f"Failed to cleanup challenge invite notification: {e}",
-            {
-                "challenge_id": challenge_id,
-                "invited_user_id": invited_user_id,
-                "error": str(e),
-            },
-        )
-        return 0
-
-
-async def cleanup_challenge_invite_notification(
-    challenge_id: str,
-    invited_user_id: str,
-    reason: str = "invite_cancelled",
-) -> int:
-    """
-    Async version: Clean up a specific challenge invite notification.
-    Gets its own supabase client to avoid connection issues.
-
-    Args:
-        challenge_id: ID of the challenge
-        invited_user_id: ID of the user who was invited
-        reason: Reason for cleanup (for logging)
-
-    Returns:
-        Number of notifications deleted
-    """
-    from app.core.database import get_supabase_client
-
-    supabase = get_supabase_client()
-    return cleanup_challenge_invite_notification_sync(
-        supabase, challenge_id, invited_user_id, reason
-    )
-
-
-def fire_and_forget_invite_notification_cleanup(
-    challenge_id: str, invited_user_id: str, reason: str = "cancelled"
-):
-    """
-    Fire-and-forget wrapper for individual invite notification cleanup.
-    Schedules the cleanup as a background task that won't block the response.
-
-    Usage:
-        fire_and_forget_invite_notification_cleanup(challenge_id, invited_user_id, reason="declined")
-    """
-    asyncio.create_task(
-        _safe_invite_notification_cleanup(challenge_id, invited_user_id, reason)
-    )
-
-
-async def _safe_invite_notification_cleanup(
-    challenge_id: str, invited_user_id: str, reason: str
-):
-    """Wrapper that catches all exceptions to prevent unhandled errors."""
-    try:
-        await cleanup_challenge_invite_notification(
-            challenge_id, invited_user_id, reason
-        )
-    except Exception as e:
-        logger.error(
-            f"Fire-and-forget invite notification cleanup failed: {e}",
-            {
-                "challenge_id": challenge_id,
-                "invited_user_id": invited_user_id,
-                "reason": reason,
-                "error": str(e),
-            },
-        )
-
-
 # =====================================================
 # BATCH OPERATIONS - For scalability at 100K+ users
 # =====================================================
-
-
-def cleanup_challenges_batch_sync(
-    supabase,
-    challenge_ids: List[str],
-    reason: str = "batch_cleanup",
-) -> Dict[str, int]:
-    """
-    Batch cleanup for multiple challenges at once.
-    Uses .in_() for O(1) database operations instead of O(n) loops.
-
-    Args:
-        supabase: Supabase client
-        challenge_ids: List of challenge IDs to cleanup
-        reason: Reason for cleanup (for logging)
-
-    Returns:
-        dict with counts of deleted items
-    """
-    if not challenge_ids:
-        return {"invites_deleted": 0, "notifications_deleted": 0}
-
-    stats = {"invites_deleted": 0, "notifications_deleted": 0}
-
-    try:
-        # Batch delete pending challenge_invites for ALL challenges at once
-        pending_invites = (
-            supabase.table("challenge_invites")
-            .delete()
-            .in_("challenge_id", challenge_ids)
-            .eq("status", "pending")
-            .execute()
-        )
-        stats["invites_deleted"] = len(pending_invites.data or [])
-
-        # Batch delete notifications for ALL challenges at once
-        notifications = (
-            supabase.table("notification_history")
-            .delete()
-            .eq("entity_type", "challenge")
-            .in_("entity_id", challenge_ids)
-            .eq("notification_type", "challenge_invite")
-            .execute()
-        )
-        stats["notifications_deleted"] = len(notifications.data or [])
-
-        if stats["invites_deleted"] > 0 or stats["notifications_deleted"] > 0:
-            logger.info(
-                f"Batch challenge cleanup ({reason})",
-                {
-                    "challenge_count": len(challenge_ids),
-                    "reason": reason,
-                    **stats,
-                },
-            )
-
-    except Exception as e:
-        logger.error(
-            f"Failed batch challenge cleanup: {e}",
-            {"challenge_count": len(challenge_ids), "error": str(e)},
-        )
-
-    return stats
 
 
 def cleanup_partner_requests_batch_sync(
@@ -456,6 +340,8 @@ def paginated_cleanup_partner_requests_sync(
     """
     Paginated cleanup of pending partner requests for a user.
     Handles large numbers of requests without memory issues.
+
+    Used when a user's subscription expires and they lose social features.
 
     Args:
         supabase: Supabase client

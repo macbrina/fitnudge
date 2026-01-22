@@ -1,6 +1,6 @@
 import { checkInsService, CreateCheckInRequest, UpdateCheckInRequest } from "@/services/api";
 import { useAuthStore } from "@/stores/authStore";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import {
   cancelProgressQueries,
   optimisticallyUpdateProgress,
@@ -9,9 +9,9 @@ import {
   snapshotProgressData
 } from "./progressOptimisticUpdates";
 import { homeDashboardQueryKeys } from "./useHomeDashboard";
-import { trackingStatsQueryKeys } from "./useTrackingStats";
+// trackingStatsQueryKeys removed in V2
 // Import from shared queryKeys to avoid circular dependency
-import { checkInsQueryKeys } from "./queryKeys";
+import { checkInsQueryKeys, goalsQueryKeys } from "./queryKeys";
 
 // Re-export for backward compatibility
 export { checkInsQueryKeys };
@@ -20,12 +20,14 @@ export { checkInsQueryKeys };
 const EMPTY_CHECKINS_RESPONSE = { data: [], status: 200 };
 
 // Check-ins Hooks
-export const useCheckIns = (goalId?: string) => {
+export const useCheckIns = (goalId?: string, options?: { limit?: number; enabled?: boolean }) => {
   return useQuery({
     queryKey: checkInsQueryKeys.list(goalId),
-    queryFn: () => checkInsService.getCheckIns(goalId),
+    queryFn: () => checkInsService.getCheckIns(goalId, { limit: options?.limit ?? 30 }),
+    // Enabled: if goalId provided, always enabled; if no goalId, check options.enabled (defaults to false)
+    enabled: goalId ? true : (options?.enabled ?? false),
     staleTime: 0, // Refetch immediately when invalidated (realtime updates)
-    refetchOnMount: false,
+    refetchOnMount: true, // Always check for fresh data on mount
     placeholderData: EMPTY_CHECKINS_RESPONSE
   });
 };
@@ -62,7 +64,7 @@ export const useCreateCheckIn = () => {
 
       // Cancel progress queries for optimistic updates
       if (newCheckIn.goal_id) {
-        await cancelProgressQueries(queryClient, newCheckIn.goal_id, "goal");
+        await cancelProgressQueries(queryClient, newCheckIn.goal_id);
       }
 
       // Snapshot previous data
@@ -75,16 +77,16 @@ export const useCreateCheckIn = () => {
       // Snapshot progress data for rollback
       let previousProgressData: ProgressOptimisticContext | undefined;
       if (newCheckIn.goal_id) {
-        previousProgressData = snapshotProgressData(queryClient, newCheckIn.goal_id, today, "goal");
+        previousProgressData = snapshotProgressData(queryClient, newCheckIn.goal_id, today);
       }
 
       // Create optimistic check-in
       const optimisticCheckIn = {
         id: `temp-${Date.now()}`,
         ...newCheckIn,
+        check_in_date: newCheckIn.check_in_date || today,
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        is_checked_in: false
+        updated_at: new Date().toISOString()
       };
 
       // Add to today's check-ins
@@ -99,28 +101,26 @@ export const useCreateCheckIn = () => {
         return { ...old, data: [...old.data, optimisticCheckIn] };
       });
 
-      // Optimistically update home dashboard
+      // Optimistically update home dashboard - remove from pending check-ins
       queryClient.setQueryData(homeDashboardQueryKeys.dashboard(), (old: any) => {
         if (!old) return old;
         return {
           ...old,
-          // Remove this goal from pending check-ins
           today_pending_checkins: (old.today_pending_checkins || []).filter(
             (c: any) => !(c.type === "goal" && c.data?.goal_id === newCheckIn.goal_id)
-          ),
-          // Optimistically update stats
-          stats: old.stats
-            ? {
-                ...old.stats,
-                total_check_ins: (old.stats.total_check_ins || 0) + 1
-              }
-            : old.stats
+          )
         };
       });
 
       // Optimistically update progress data (streak, week, chain)
       if (newCheckIn.goal_id) {
-        optimisticallyUpdateProgress(queryClient, newCheckIn.goal_id, today);
+        optimisticallyUpdateProgress(
+          queryClient,
+          newCheckIn.goal_id,
+          today,
+          newCheckIn.completed,
+          newCheckIn.is_rest_day
+        );
       }
 
       return {
@@ -156,21 +156,38 @@ export const useCreateCheckIn = () => {
       if (realCheckIn) {
         queryClient.setQueryData(checkInsQueryKeys.today(), (old: any) => {
           if (!old?.data) return old;
-          const filtered = old.data.filter((c: any) => !c.id?.startsWith?.("temp-"));
+          // Filter out temp IDs AND the real ID (in case realtime already added it)
+          const filtered = old.data.filter(
+            (c: any) => !c.id?.startsWith?.("temp-") && c.id !== realCheckIn.id
+          );
           return { ...old, data: [...filtered, realCheckIn] };
         });
 
         queryClient.setQueryData(checkInsQueryKeys.list(variables.goal_id), (old: any) => {
           if (!old?.data) return old;
-          const filtered = old.data.filter((c: any) => !c.id?.startsWith?.("temp-"));
+          // Filter out temp IDs AND the real ID (in case realtime already added it)
+          const filtered = old.data.filter(
+            (c: any) => !c.id?.startsWith?.("temp-") && c.id !== realCheckIn.id
+          );
           return { ...old, data: [...filtered, realCheckIn] };
         });
+
+        // Note: No need to update insights checkins_count here.
+        // With pre-created pending check-ins, the count already includes today's check-in.
+        // User responding updates the existing check-in, not creating a new one.
       }
 
-      // Invalidate home dashboard (shows both goals and challenges)
-      queryClient.invalidateQueries({
-        queryKey: homeDashboardQueryKeys.dashboard()
-      });
+      // Invalidate home dashboard
+      queryClient.invalidateQueries({ queryKey: homeDashboardQueryKeys.dashboard() });
+      // Invalidate goals lists (GoalCard shows today_checkin_status, streaks)
+      queryClient.invalidateQueries({ queryKey: goalsQueryKeys.list() });
+      queryClient.invalidateQueries({ queryKey: goalsQueryKeys.active() });
+      // Note: Partner invalidation is handled by DB trigger → Realtime → handleAccountabilityPartnersChange
+      // Goal-specific invalidations
+      if (variables.goal_id) {
+        queryClient.invalidateQueries({ queryKey: checkInsQueryKeys.streak(variables.goal_id) });
+        queryClient.invalidateQueries({ queryKey: goalsQueryKeys.detail(variables.goal_id) });
+      }
     }
   });
 };
@@ -201,8 +218,8 @@ export const useUpdateCheckIn = () => {
       // Cancel and snapshot progress queries for optimistic updates
       let previousProgressData: ProgressOptimisticContext | undefined;
       if (goalId) {
-        await cancelProgressQueries(queryClient, goalId, "goal");
-        previousProgressData = snapshotProgressData(queryClient, goalId, today, "goal");
+        await cancelProgressQueries(queryClient, goalId);
+        previousProgressData = snapshotProgressData(queryClient, goalId, today);
       }
 
       // Optimistically update today's check-ins
@@ -238,8 +255,14 @@ export const useUpdateCheckIn = () => {
       });
 
       // Optimistically update progress data (streak, week, chain)
-      if (goalId) {
-        optimisticallyUpdateProgress(queryClient, goalId, today);
+      if (goalId && updates.completed !== undefined) {
+        optimisticallyUpdateProgress(
+          queryClient,
+          goalId,
+          today,
+          updates.completed,
+          updates.is_rest_day
+        );
       }
 
       return {
@@ -263,7 +286,9 @@ export const useUpdateCheckIn = () => {
         rollbackProgressData(queryClient, context.previousProgressData);
       }
     },
-    onSuccess: (response, { checkInId }) => {
+    onSuccess: (response, { checkInId }, context) => {
+      const goalId = context?.goalId;
+
       // Update with real server response
       const updatedCheckIn = response?.data;
       if (updatedCheckIn) {
@@ -285,14 +310,18 @@ export const useUpdateCheckIn = () => {
       queryClient.invalidateQueries({ queryKey: checkInsQueryKeys.stats() });
       queryClient.invalidateQueries({ queryKey: ["progress"] });
       queryClient.invalidateQueries({ queryKey: ["user", "stats"] });
-      // Invalidate home dashboard (shows both goals and challenges)
-      queryClient.invalidateQueries({
-        queryKey: homeDashboardQueryKeys.dashboard()
-      });
-      // Invalidate tracking stats for checkin progress display
-      queryClient.invalidateQueries({
-        queryKey: trackingStatsQueryKeys.all
-      });
+      // Invalidate home dashboard
+      queryClient.invalidateQueries({ queryKey: homeDashboardQueryKeys.dashboard() });
+      // Invalidate goals lists (GoalCard shows today_checkin_status, streaks)
+      queryClient.invalidateQueries({ queryKey: goalsQueryKeys.list() });
+      queryClient.invalidateQueries({ queryKey: goalsQueryKeys.active() });
+      // Note: Partner invalidation is handled by DB trigger → Realtime → handleAccountabilityPartnersChange
+      // Goal-specific invalidations
+      if (goalId) {
+        queryClient.invalidateQueries({ queryKey: checkInsQueryKeys.streak(goalId) });
+        queryClient.invalidateQueries({ queryKey: checkInsQueryKeys.list(goalId) });
+        queryClient.invalidateQueries({ queryKey: goalsQueryKeys.detail(goalId) });
+      }
     }
   });
 };
@@ -308,8 +337,31 @@ export const useDeleteCheckIn = () => {
       await queryClient.cancelQueries({ queryKey: checkInsQueryKeys.all });
       await queryClient.cancelQueries({ queryKey: checkInsQueryKeys.today() });
 
-      // Snapshot previous data
-      const previousTodayCheckIns = queryClient.getQueryData(checkInsQueryKeys.today());
+      // Snapshot previous data and find the goal_id before removal
+      const previousTodayCheckIns = queryClient.getQueryData(checkInsQueryKeys.today()) as any;
+      let deletedCheckIn = previousTodayCheckIns?.data?.find((c: any) => c.id === checkInId);
+      let goalId = deletedCheckIn?.goal_id;
+
+      // If not in today's cache, search all check-in caches (e.g., SingleGoalScreen history)
+      if (!goalId) {
+        const allQueries = queryClient.getQueriesData({ queryKey: checkInsQueryKeys.all });
+        for (const [, data] of allQueries) {
+          const queryData = data as any;
+          const found = queryData?.data?.find?.((c: any) => c.id === checkInId);
+          if (found?.goal_id) {
+            deletedCheckIn = found;
+            goalId = found.goal_id;
+            break;
+          }
+        }
+      }
+
+      // Cancel goal-specific queries if we have goalId
+      if (goalId) {
+        await queryClient.cancelQueries({ queryKey: checkInsQueryKeys.list(goalId) });
+        await queryClient.cancelQueries({ queryKey: checkInsQueryKeys.streak(goalId) });
+        await queryClient.cancelQueries({ queryKey: goalsQueryKeys.detail(goalId) });
+      }
 
       // Optimistically remove from today's check-ins
       queryClient.setQueryData(checkInsQueryKeys.today(), (old: any) => {
@@ -320,7 +372,18 @@ export const useDeleteCheckIn = () => {
         };
       });
 
-      return { previousTodayCheckIns };
+      // Optimistically remove from goal-specific check-ins
+      if (goalId) {
+        queryClient.setQueryData(checkInsQueryKeys.list(goalId), (old: any) => {
+          if (!old?.data) return old;
+          return {
+            ...old,
+            data: old.data.filter((c: any) => c.id !== checkInId)
+          };
+        });
+      }
+
+      return { previousTodayCheckIns, goalId };
     },
     onError: (err, checkInId, context) => {
       // Rollback on error
@@ -328,15 +391,27 @@ export const useDeleteCheckIn = () => {
         queryClient.setQueryData(checkInsQueryKeys.today(), context.previousTodayCheckIns);
       }
     },
-    onSuccess: () => {
+    onSuccess: (_, __, context) => {
+      const goalId = context?.goalId;
+
       // Invalidate stats for recalculation
+      queryClient.invalidateQueries({ queryKey: checkInsQueryKeys.all });
       queryClient.invalidateQueries({ queryKey: checkInsQueryKeys.stats() });
       queryClient.invalidateQueries({ queryKey: ["progress"] });
       queryClient.invalidateQueries({ queryKey: ["user", "stats"] });
-      // Invalidate home dashboard (shows both goals and challenges)
-      queryClient.invalidateQueries({
-        queryKey: homeDashboardQueryKeys.dashboard()
-      });
+      // Invalidate goals lists (GoalCard shows today_checkin_status, streaks)
+      queryClient.invalidateQueries({ queryKey: goalsQueryKeys.list() });
+      queryClient.invalidateQueries({ queryKey: goalsQueryKeys.active() });
+      // Invalidate home dashboard
+      queryClient.invalidateQueries({ queryKey: homeDashboardQueryKeys.dashboard() });
+      // Note: Partner invalidation is handled by DB trigger → Realtime → handleAccountabilityPartnersChange
+
+      // Goal-specific invalidations
+      if (goalId) {
+        queryClient.invalidateQueries({ queryKey: checkInsQueryKeys.streak(goalId) });
+        queryClient.invalidateQueries({ queryKey: checkInsQueryKeys.list(goalId) });
+        queryClient.invalidateQueries({ queryKey: goalsQueryKeys.detail(goalId) });
+      }
     }
   });
 };
@@ -349,7 +424,7 @@ export const useCheckInStats = (goalId?: string) => {
     queryFn: () => checkInsService.getCheckInStats(goalId),
     enabled: isAuthenticated,
     staleTime: 0, // Refetch immediately when invalidated (realtime updates)
-    refetchOnMount: false,
+    refetchOnMount: true, // Always check for fresh data on mount
     placeholderData: {
       data: {
         total_check_ins: 0,
@@ -391,7 +466,7 @@ export const useTodayCheckIns = () => {
     enabled: isAuthenticated,
     staleTime: 0, // Refetch immediately when invalidated (realtime updates)
     refetchInterval: isAuthenticated ? 60 * 1000 : false,
-    refetchOnMount: false,
+    refetchOnMount: true, // Always check for fresh data on mount
     placeholderData: EMPTY_CHECKINS_RESPONSE
   });
 };
@@ -411,7 +486,7 @@ export const useBulkCreateCheckIns = () => {
     mutationFn: (checkIns: CreateCheckInRequest[]) => checkInsService.bulkCreateCheckIns(checkIns),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: checkInsQueryKeys.all });
-      // Invalidate home dashboard (shows both goals and challenges)
+      // Invalidate home dashboard
       queryClient.invalidateQueries({
         queryKey: homeDashboardQueryKeys.dashboard()
       });
@@ -424,5 +499,39 @@ export const useMoodTrends = (goalId?: string, days: number = 30) => {
     queryKey: checkInsQueryKeys.moodTrends(goalId, days),
     queryFn: () => checkInsService.getMoodTrends(goalId, days),
     staleTime: 0 // refetch immediately when invalidated (realtime updates)
+  });
+};
+
+/**
+ * Infinite scroll hook for check-ins history
+ * Supports pagination with offset-based loading
+ */
+export const useInfiniteCheckIns = (
+  goalId: string,
+  pageSize: number = 20,
+  excludePending: boolean = true
+) => {
+  return useInfiniteQuery({
+    queryKey: [...checkInsQueryKeys.list(goalId), "infinite", excludePending],
+    queryFn: async ({ pageParam = 0 }) => {
+      const response = await checkInsService.getCheckIns(goalId, {
+        limit: pageSize,
+        offset: pageParam,
+        excludePending // Exclude pending by default for history views
+      });
+      return response;
+    },
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => {
+      // If we got fewer items than pageSize, we've reached the end
+      const items = lastPage.data || [];
+      if (items.length < pageSize) {
+        return undefined;
+      }
+      // Calculate next offset
+      return allPages.reduce((acc, page) => acc + (page.data?.length || 0), 0);
+    },
+    enabled: !!goalId,
+    staleTime: 0
   });
 };

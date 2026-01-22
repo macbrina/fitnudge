@@ -1,298 +1,623 @@
 "use client";
 
+import { LandingLayout } from "@/components/layout/LandingLayout";
+import { fetchBlogPosts, fetchCategories } from "@/lib/blog/api";
+import type { BlogCategory, BlogPost } from "@/lib/blog/types";
+import { useTranslation } from "@/lib/i18n";
+import { Button } from "@fitnudge/ui";
+import { format } from "date-fns";
+import { motion } from "framer-motion";
+import Lottie from "lottie-react";
+import {
+  ArrowRight,
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Folder,
+  User,
+} from "lucide-react";
 import Link from "next/link";
-import { Calendar, Clock, User } from "lucide-react";
-import { useTranslation } from "react-i18next";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 
-// Mock blog posts data
-const blogPosts = [
-  {
-    id: "1",
-    title: "How AI is Revolutionizing Fitness Motivation",
-    slug: "ai-revolutionizing-fitness-motivation",
-    excerpt:
-      "Discover how artificial intelligence is transforming the way we approach fitness and motivation.",
-    author: "FitNudge Team",
-    publishedAt: "2024-01-15",
-    readTime: "5 min",
-    category: "AI Motivation",
-    featured: true,
-  },
-  {
-    id: "2",
-    title: "The Science Behind Habit Formation",
-    slug: "science-behind-habit-formation",
-    excerpt:
-      "Learn the psychological principles that make habits stick and how to apply them to your fitness journey.",
-    author: "Dr. Sarah Johnson",
-    publishedAt: "2024-01-10",
-    readTime: "7 min",
-    category: "Wellness",
-    featured: false,
-  },
-  {
-    id: "3",
-    title: "Building a Supportive Fitness Community",
-    slug: "building-supportive-fitness-community",
-    excerpt:
-      "Why community matters in fitness and how to find your tribe for long-term success.",
-    author: "Mike Chen",
-    publishedAt: "2024-01-05",
-    readTime: "6 min",
-    category: "Community",
-    featured: false,
-  },
-];
+// Empty state animation - cute illustration for no content
+const EMPTY_STATE_ANIMATION_URL =
+  "https://assets2.lottiefiles.com/packages/lf20_ysrn2iwp.json";
 
-export default function BlogPage() {
-  const { t } = useTranslation();
+const POSTS_PER_PAGE = 6;
+
+function formatDate(dateString: string): string {
+  return format(new Date(dateString), "MMM d, yyyy");
+}
+
+function BlogCard({
+  post,
+  index,
+  t,
+}: {
+  post: BlogPost;
+  index: number;
+  t: (key: string, options?: Record<string, unknown>) => string;
+}) {
   return (
-    <div className="min-h-screen bg-white">
-      {/* Header */}
-      <header className="border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <Link href="/" className="text-2xl font-bold text-gray-900">
-              FitNudge
-            </Link>
-            <nav className="hidden md:flex space-x-8">
-              <Link href="/" className="text-gray-500 hover:text-gray-900">
-                Home
-              </Link>
-              <Link href="/blog" className="text-blue-600 font-medium">
-                Blog
-              </Link>
-              <Link
-                href="#contact"
-                className="text-gray-500 hover:text-gray-900"
-              >
-                Contact
-              </Link>
-            </nav>
+    <motion.article
+      initial={{ opacity: 0, y: 30 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, delay: index * 0.1 }}
+      viewport={{ once: true }}
+      className="group bg-background rounded-2xl border border-border overflow-hidden hover:shadow-xl transition-all duration-300"
+    >
+      {/* Image placeholder */}
+      <div className="relative h-48 bg-linear-to-br from-primary/20 to-primary/5 overflow-hidden">
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="text-center p-4">
+            <Folder className="h-10 w-10 text-primary/40 mx-auto mb-2" />
+            <span className="text-sm text-primary/60 font-medium">
+              {post.categories[0]?.name || t("web.blog.article")}
+            </span>
           </div>
         </div>
-      </header>
+        <div className="absolute inset-0 bg-linear-to-t from-background/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+      </div>
 
-      {/* Hero Section */}
-      <section className="py-16 bg-linear-to-br from-blue-50 to-indigo-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="p-6">
+        {/* Categories */}
+        <div className="flex flex-wrap gap-2 mb-3">
+          {post.categories.slice(0, 2).map((category) => (
+            <Link
+              key={category.id}
+              href={`/blog?category=${category.slug}`}
+              className="inline-flex items-center gap-1 text-xs font-medium text-primary bg-primary/10 px-2.5 py-1 rounded-full hover:bg-primary/20 transition-colors"
+            >
+              {category.name}
+            </Link>
+          ))}
+        </div>
+
+        {/* Title */}
+        <h3 className="text-lg font-bold text-foreground mb-3 line-clamp-2 group-hover:text-primary transition-colors">
+          <Link href={`/blog/${post.slug}`}>{post.title}</Link>
+        </h3>
+
+        {/* Excerpt */}
+        <p className="text-muted-foreground text-sm mb-4 line-clamp-2">
+          {post.excerpt}
+        </p>
+
+        {/* Meta */}
+        <div className="flex items-center gap-4 text-xs text-muted-foreground mb-4">
+          <div className="flex items-center gap-1">
+            <User className="h-3.5 w-3.5" />
+            <span>{post.author.name}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Calendar className="h-3.5 w-3.5" />
+            <span>{formatDate(post.published_at || post.created_at)}</span>
+          </div>
+          {post.read_time && (
+            <div className="flex items-center gap-1">
+              <Clock className="h-3.5 w-3.5" />
+              <span>{t("web.blog.min_read", { minutes: post.read_time })}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Read More Link */}
+        <Link
+          href={`/blog/${post.slug}`}
+          className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:gap-3 transition-all"
+        >
+          {t("web.blog.read_article")}
+          <ArrowRight className="h-4 w-4" />
+        </Link>
+      </div>
+    </motion.article>
+  );
+}
+
+function FeaturedPost({
+  post,
+  t,
+}: {
+  post: BlogPost;
+  t: (key: string, options?: Record<string, unknown>) => string;
+}) {
+  return (
+    <motion.article
+      initial={{ opacity: 0, y: 30 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6 }}
+      viewport={{ once: true }}
+      className="relative bg-linear-to-br from-primary to-primary/80 rounded-3xl overflow-hidden"
+    >
+      <div className="grid lg:grid-cols-2 gap-0">
+        {/* Content */}
+        <div className="p-8 sm:p-10 lg:p-12 flex flex-col justify-center">
+          <div className="flex flex-wrap gap-2 mb-4">
+            {post.categories.map((category) => (
+              <span
+                key={category.id}
+                className="inline-flex items-center gap-1 text-xs font-medium text-white/90 bg-white/20 px-3 py-1 rounded-full"
+              >
+                {category.name}
+              </span>
+            ))}
+            <span className="inline-flex items-center gap-1 text-xs font-medium text-white bg-white/30 px-3 py-1 rounded-full">
+              {t("web.blog.featured")}
+            </span>
+          </div>
+
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-4 leading-tight">
+            {post.title}
+          </h2>
+
+          <p className="text-white/80 text-base sm:text-lg mb-6 line-clamp-3">
+            {post.excerpt}
+          </p>
+
+          <div className="flex items-center gap-4 text-sm text-white/70 mb-8">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+                <User className="h-4 w-4 text-white" />
+              </div>
+              <span>{post.author.name}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Calendar className="h-4 w-4" />
+              <span>{formatDate(post.published_at || post.created_at)}</span>
+            </div>
+            {post.read_time && (
+              <div className="flex items-center gap-1">
+                <Clock className="h-4 w-4" />
+                <span>{t("web.blog.min", { minutes: post.read_time })}</span>
+              </div>
+            )}
+          </div>
+
+          <Link href={`/blog/${post.slug}`}>
+            <Button
+              size="lg"
+              className="bg-white text-primary hover:bg-white/90 rounded-full px-8"
+            >
+              {t("web.blog.read_full_article")}
+              <ArrowRight className="h-5 w-5 ml-2" />
+            </Button>
+          </Link>
+        </div>
+
+        {/* Image placeholder */}
+        <div className="hidden lg:flex items-center justify-center p-12 bg-white/5">
           <div className="text-center">
-            <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
-              {t("web.blog.title")}
-            </h1>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              {t("web.blog.subtitle")}
+            <div className="w-32 h-32 rounded-full bg-white/10 flex items-center justify-center mx-auto mb-4">
+              <Folder className="h-16 w-16 text-white/40" />
+            </div>
+            <p className="text-white/50 text-sm">
+              {t("web.blog.featured_article")}
             </p>
           </div>
         </div>
-      </section>
+      </div>
+    </motion.article>
+  );
+}
 
-      {/* Featured Post */}
-      <section className="py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="mb-12">
-            <h2 className="text-2xl font-bold text-gray-900 mb-8">
-              Featured Article
-            </h2>
-            <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-              <div className="md:flex">
-                <div className="md:w-1/2">
-                  <div className="h-64 md:h-full bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                    <div className="text-center text-white">
-                      <h3 className="text-2xl font-bold mb-2">AI & Fitness</h3>
-                      <p className="text-blue-100">The future is here</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="md:w-1/2 p-8">
-                  <div className="flex items-center mb-4">
-                    <span className="bg-blue-100 text-blue-800 text-sm font-medium px-3 py-1 rounded-full">
-                      {blogPosts[0].category}
-                    </span>
-                  </div>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-4">
-                    {blogPosts[0].title}
-                  </h3>
-                  <p className="text-gray-600 mb-6">{blogPosts[0].excerpt}</p>
-                  <div className="flex items-center text-sm text-gray-500 mb-6">
-                    <User className="h-4 w-4 mr-2" />
-                    <span className="mr-4">{blogPosts[0].author}</span>
-                    <Calendar className="h-4 w-4 mr-2" />
-                    <span className="mr-4">{blogPosts[0].publishedAt}</span>
-                    <Clock className="h-4 w-4 mr-2" />
-                    <span>{blogPosts[0].readTime}</span>
-                  </div>
-                  <Link
-                    href={`/blog/${blogPosts[0].slug}`}
-                    className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors inline-flex items-center"
-                  >
-                    Read More
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* All Posts */}
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-8">
-              All Articles
-            </h2>
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {blogPosts.slice(1).map((post) => (
-                <article
-                  key={post.id}
-                  className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow"
-                >
-                  <div className="h-48 bg-linear-to-br from-green-500 to-blue-600 flex items-center justify-center">
-                    <div className="text-center text-white">
-                      <h4 className="text-lg font-bold">{post.category}</h4>
-                    </div>
-                  </div>
-                  <div className="p-6">
-                    <div className="flex items-center mb-3">
-                      <span className="bg-gray-100 text-gray-800 text-xs font-medium px-2 py-1 rounded-full">
-                        {post.category}
-                      </span>
-                    </div>
-                    <h3 className="text-lg font-bold text-gray-900 mb-3">
-                      {post.title}
-                    </h3>
-                    <p className="text-gray-600 text-sm mb-4">{post.excerpt}</p>
-                    <div className="flex items-center text-xs text-gray-500 mb-4">
-                      <User className="h-3 w-3 mr-1" />
-                      <span className="mr-3">{post.author}</span>
-                      <Calendar className="h-3 w-3 mr-1" />
-                      <span className="mr-3">{post.publishedAt}</span>
-                      <Clock className="h-3 w-3 mr-1" />
-                      <span>{post.readTime}</span>
-                    </div>
-                    <Link
-                      href={`/blog/${post.slug}`}
-                      className="text-blue-600 font-medium hover:text-blue-700"
-                    >
-                      Read More →
-                    </Link>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Newsletter Signup */}
-      <section className="py-16 bg-gray-50">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">
-            Stay Updated
-          </h2>
-          <p className="text-xl text-gray-600 mb-8">
-            Get the latest fitness tips, AI insights, and community stories
-            delivered to your inbox.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 max-w-md mx-auto">
-            <input
-              type="email"
-              placeholder="Enter your email"
-              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-            <button className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
-              Subscribe
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="bg-gray-900 text-white py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-4 gap-8">
-            <div>
-              <h3 className="text-lg font-semibold mb-4">FitNudge</h3>
-              <p className="text-gray-400">
-                Your AI-powered fitness coach for a healthier, happier you.
-              </p>
-            </div>
-            <div>
-              <h4 className="text-sm font-semibold mb-4">Product</h4>
-              <ul className="space-y-2">
-                <li>
-                  <Link
-                    href="/#features"
-                    className="text-gray-400 hover:text-white"
-                  >
-                    Features
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/#pricing"
-                    className="text-gray-400 hover:text-white"
-                  >
-                    Pricing
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/#download"
-                    className="text-gray-400 hover:text-white"
-                  >
-                    Download
-                  </Link>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="text-sm font-semibold mb-4">Company</h4>
-              <ul className="space-y-2">
-                <li>
-                  <Link href="/blog" className="text-gray-400 hover:text-white">
-                    Blog
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="#contact"
-                    className="text-gray-400 hover:text-white"
-                  >
-                    Contact
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/privacy"
-                    className="text-gray-400 hover:text-white"
-                  >
-                    Privacy
-                  </Link>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="text-sm font-semibold mb-4">Support</h4>
-              <ul className="space-y-2">
-                <li>
-                  <Link href="#help" className="text-gray-400 hover:text-white">
-                    Help Center
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="#terms"
-                    className="text-gray-400 hover:text-white"
-                  >
-                    Terms
-                  </Link>
-                </li>
-              </ul>
-            </div>
-          </div>
-          <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-            <p>&copy; 2024 FitNudge. All rights reserved.</p>
-          </div>
-        </div>
-      </footer>
+function CategoryFilter({
+  categories,
+  activeCategory,
+  onCategoryChange,
+  t,
+}: {
+  categories: BlogCategory[];
+  activeCategory: string | null;
+  onCategoryChange: (slug: string | null) => void;
+  t: (key: string) => string;
+}) {
+  return (
+    <div className="flex flex-wrap gap-2 justify-center">
+      <button
+        onClick={() => onCategoryChange(null)}
+        className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+          activeCategory === null
+            ? "bg-primary text-white"
+            : "bg-secondary text-foreground hover:bg-secondary/80"
+        }`}
+      >
+        {t("web.blog.all_posts")}
+      </button>
+      {categories.map((category) => (
+        <button
+          key={category.id}
+          onClick={() => onCategoryChange(category.slug)}
+          className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+            activeCategory === category.slug
+              ? "bg-primary text-white"
+              : "bg-secondary text-foreground hover:bg-secondary/80"
+          }`}
+        >
+          {category.name}
+        </button>
+      ))}
     </div>
+  );
+}
+
+function Pagination({
+  currentPage,
+  totalPages,
+  onPageChange,
+  t,
+}: {
+  currentPage: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+  t: (key: string) => string;
+}) {
+  if (totalPages <= 1) return null;
+
+  return (
+    <div className="flex items-center justify-center gap-4 mt-12">
+      <Button
+        variant="outline"
+        size="lg"
+        onClick={() => onPageChange(currentPage - 1)}
+        disabled={currentPage === 1}
+        className="rounded-full px-6"
+      >
+        <ChevronLeft className="h-4 w-4 mr-2" />
+        {t("web.blog.pagination.previous")}
+      </Button>
+
+      <div className="flex items-center gap-2">
+        {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+          <button
+            key={page}
+            onClick={() => onPageChange(page)}
+            className={`w-10 h-10 rounded-full text-sm font-medium transition-colors ${
+              currentPage === page
+                ? "bg-primary text-white"
+                : "bg-secondary text-foreground hover:bg-secondary/80"
+            }`}
+          >
+            {page}
+          </button>
+        ))}
+      </div>
+
+      <Button
+        variant="outline"
+        size="lg"
+        onClick={() => onPageChange(currentPage + 1)}
+        disabled={currentPage === totalPages}
+        className="rounded-full px-6"
+      >
+        {t("web.blog.pagination.next")}
+        <ChevronRight className="h-4 w-4 ml-2" />
+      </Button>
+    </div>
+  );
+}
+
+export default function BlogPage() {
+  const { t } = useTranslation();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Read category from URL on initial load
+  const urlCategory = searchParams.get("category");
+
+  const [posts, setPosts] = useState<BlogPost[]>([]);
+  const [categories, setCategories] = useState<BlogCategory[]>([]);
+  const [activeCategory, setActiveCategory] = useState<string | null>(
+    urlCategory
+  );
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(true);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [emptyAnimationData, setEmptyAnimationData] = useState<any>(null);
+
+  // Load empty state animation
+  useEffect(() => {
+    fetch(EMPTY_STATE_ANIMATION_URL)
+      .then((res) => res.json())
+      .then((data) => setEmptyAnimationData(data))
+      .catch(() => {
+        // Animation failed to load, will show fallback
+      });
+  }, []);
+
+  // Sync activeCategory with URL changes
+  useEffect(() => {
+    setActiveCategory(urlCategory);
+    setCurrentPage(1);
+  }, [urlCategory]);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        setLoading(true);
+
+        // Calculate offset and limit based on page and category
+        // Without category filter:
+        //   - Page 1: offset=0, limit=7 (1 featured + 6 in grid)
+        //   - Page 2: offset=7, limit=6
+        //   - Page 3: offset=13, limit=6
+        // With category filter:
+        //   - Page N: offset=(N-1)*6, limit=6
+
+        let offset: number;
+        let limit: number;
+
+        if (!activeCategory) {
+          // No category filter - include featured post on page 1
+          if (currentPage === 1) {
+            offset = 0;
+            limit = POSTS_PER_PAGE + 1; // 7 posts (1 featured + 6 grid)
+          } else {
+            offset = POSTS_PER_PAGE + 1 + (currentPage - 2) * POSTS_PER_PAGE; // 7 + (page-2)*6
+            limit = POSTS_PER_PAGE;
+          }
+        } else {
+          // With category filter - standard pagination
+          offset = (currentPage - 1) * POSTS_PER_PAGE;
+          limit = POSTS_PER_PAGE;
+        }
+
+        const [postsData, categoriesData] = await Promise.all([
+          fetchBlogPosts({
+            category: activeCategory || undefined,
+            limit,
+            offset,
+          }),
+          fetchCategories(),
+        ]);
+        setPosts(postsData.posts);
+
+        // Calculate total pages
+        // Without category: page 1 shows 7 (1+6), subsequent pages show 6
+        // With category: all pages show 6
+        let calculatedTotalPages: number;
+        if (!activeCategory) {
+          // First page has 7, rest have 6
+          // If total <= 7, only 1 page needed
+          // Otherwise: 1 + ceil((total - 7) / 6)
+          if (postsData.total <= POSTS_PER_PAGE + 1) {
+            calculatedTotalPages = 1;
+          } else {
+            calculatedTotalPages =
+              1 +
+              Math.ceil(
+                (postsData.total - (POSTS_PER_PAGE + 1)) / POSTS_PER_PAGE
+              );
+          }
+        } else {
+          calculatedTotalPages = Math.ceil(postsData.total / POSTS_PER_PAGE);
+        }
+
+        setTotalPages(calculatedTotalPages > 0 ? calculatedTotalPages : 1);
+        setCategories(categoriesData);
+      } catch {
+        // Failed to load blog data
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, [activeCategory, currentPage]);
+
+  // Update URL when category changes
+  const handleCategoryChange = (slug: string | null) => {
+    setActiveCategory(slug);
+    setCurrentPage(1);
+
+    // Update URL without full page reload
+    if (slug) {
+      router.push(`/blog?category=${slug}`, { scroll: false });
+    } else {
+      router.push("/blog", { scroll: false });
+    }
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    // Scroll to top of posts section
+    window.scrollTo({ top: 400, behavior: "smooth" });
+  };
+
+  const featuredPost = posts[0];
+  const otherPosts =
+    currentPage === 1 && !activeCategory ? posts.slice(1) : posts;
+
+  return (
+    <LandingLayout>
+      {/* Hero Section */}
+      <section className="relative w-full py-4 sm:py-6 lg:py-8">
+        <div className="mx-2 sm:mx-4 bg-primary rounded-2xl sm:rounded-3xl overflow-hidden">
+          <div className="relative z-10 w-full px-4 sm:px-6 lg:px-8 py-12 sm:py-16 lg:py-20 text-white">
+            <div className="text-center max-w-4xl mx-auto">
+              <motion.h1
+                className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-4 sm:mb-6 leading-tight"
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8 }}
+              >
+                {t("web.blog.title")}
+              </motion.h1>
+              <motion.p
+                className="text-base sm:text-lg md:text-xl lg:text-2xl text-blue-100 leading-relaxed max-w-2xl mx-auto"
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: 0.2 }}
+              >
+                {t("web.blog.subtitle")}
+              </motion.p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Category Filter */}
+      <section className="relative w-full py-2 sm:py-4">
+        <div className="w-full px-4 sm:px-6 lg:px-8">
+          <div className="max-w-7xl mx-auto">
+            <CategoryFilter
+              categories={categories}
+              activeCategory={activeCategory}
+              onCategoryChange={handleCategoryChange}
+              t={t}
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* Featured Post - only show on first page when no category filter */}
+      {featuredPost && !activeCategory && currentPage === 1 && (
+        <section className="relative w-full py-2 sm:py-4">
+          <div className="mx-2 sm:mx-4">
+            <div className="max-w-7xl mx-auto">
+              <FeaturedPost post={featuredPost} t={t} />
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Blog Posts Grid */}
+      <section className="relative w-full py-2 sm:py-4">
+        <div className="mx-2 sm:mx-4 bg-card rounded-2xl sm:rounded-3xl">
+          <div className="relative z-10 w-full px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
+            <div className="max-w-7xl mx-auto">
+              <motion.div
+                className="text-center mb-10 sm:mb-12"
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8 }}
+                viewport={{ once: true }}
+              >
+                <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-4">
+                  {activeCategory
+                    ? categories.find((c) => c.slug === activeCategory)?.name ||
+                      t("web.blog.articles")
+                    : t("web.blog.latest_articles")}
+                </h2>
+                <p className="text-muted-foreground max-w-2xl mx-auto">
+                  {t("web.blog.articles_description")}
+                </p>
+              </motion.div>
+
+              {loading ? (
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
+                  {[1, 2, 3, 4, 5, 6].map((i) => (
+                    <div
+                      key={i}
+                      className="bg-background rounded-2xl border border-border overflow-hidden animate-pulse"
+                    >
+                      <div className="h-48 bg-muted" />
+                      <div className="p-6 space-y-4">
+                        <div className="h-4 bg-muted rounded w-1/3" />
+                        <div className="h-6 bg-muted rounded w-full" />
+                        <div className="h-4 bg-muted rounded w-2/3" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <>
+                  <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
+                    {otherPosts.map((post, index) => (
+                      <BlogCard t={t} key={post.id} post={post} index={index} />
+                    ))}
+                  </div>
+
+                  {/* Pagination */}
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={handlePageChange}
+                    t={t}
+                  />
+                </>
+              )}
+
+              {!loading && posts.length === 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5 }}
+                  className="text-center py-12"
+                >
+                  {/* Lottie Animation or Fallback */}
+                  <div className="w-40 h-40 sm:w-48 sm:h-48 mx-auto mb-2">
+                    {emptyAnimationData ? (
+                      <Lottie
+                        animationData={emptyAnimationData}
+                        loop={true}
+                        className="w-full h-full"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Folder className="h-10 w-10 text-primary/50" />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <h3 className="text-xl sm:text-2xl font-semibold text-foreground mb-2">
+                    {t("web.blog.no_articles_found")}
+                  </h3>
+                  <p className="text-muted-foreground max-w-md mx-auto mb-6">
+                    {activeCategory
+                      ? t("web.blog.no_articles_category")
+                      : t("web.blog.no_articles_empty")}
+                  </p>
+                  {activeCategory && (
+                    <Button
+                      variant="outline"
+                      onClick={() => handleCategoryChange(null)}
+                      className="rounded-full"
+                    >
+                      {t("web.blog.view_all_posts")}
+                    </Button>
+                  )}
+                </motion.div>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Newsletter CTA */}
+      <section className="relative w-full py-4 sm:py-6 lg:py-8">
+        <div className="mx-2 sm:mx-4 bg-secondary rounded-2xl sm:rounded-3xl">
+          <div className="relative z-10 w-full px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
+            <div className="max-w-3xl mx-auto text-center">
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6 }}
+                viewport={{ once: true }}
+              >
+                <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-4">
+                  {t("web.blog.newsletter.title")}
+                </h2>
+                <p className="text-muted-foreground mb-8 text-base sm:text-lg">
+                  {t("web.blog.newsletter.description")}
+                </p>
+                <div className="flex flex-col sm:flex-row gap-4 max-w-md mx-auto">
+                  <input
+                    type="email"
+                    placeholder={t("web.blog.newsletter.placeholder")}
+                    className="flex-1 px-4 py-3 rounded-full border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                  <Button className="rounded-full px-8" size="lg">
+                    {t("web.blog.newsletter.subscribe")}
+                  </Button>
+                </div>
+              </motion.div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </LandingLayout>
   );
 }

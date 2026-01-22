@@ -1,17 +1,15 @@
-import React, { useEffect, useState, useCallback } from "react";
-import { View, Text, Modal, Pressable, Image, Linking, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
+import { useCallback, useEffect, useState } from "react";
+import { Image, Linking, Modal, Pressable, Text, View } from "react-native";
 
 import Button from "@/components/ui/Button";
-import { useTranslation } from "@/lib/i18n";
-import { useStyles, useTheme } from "@/themes";
-import { tokens } from "@/themes/tokens";
-import { toRN } from "@/lib/units";
+import { useAppStoreUrls } from "@/hooks/api/useAppConfig";
 import { fontFamily } from "@/lib/fonts";
-import { APP_STORE_URLS } from "@/constants/general";
-import { isIOS } from "@/utils/platform";
-import { storageUtil, STORAGE_KEYS } from "@/utils/storageUtil";
+import { useTranslation } from "@/lib/i18n";
+import { toRN } from "@/lib/units";
+import { useStyles, useTheme } from "@/themes";
+import { STORAGE_KEYS, storageUtil } from "@/utils/storageUtil";
 
 // Update check image
 const UpdateImage = require("@assetsimages/images/app_update.png");
@@ -89,6 +87,7 @@ export function AppUpdateModal({
   const styles = useStyles(makeStyles);
   const { colors, brandColors } = useTheme();
   const { t } = useTranslation();
+  const appStoreUrls = useAppStoreUrls();
 
   const [internalVisible, setInternalVisible] = useState(false);
   const currentVersion = Constants.expoConfig?.version || "1.0.0";
@@ -133,8 +132,7 @@ export function AppUpdateModal({
     onUpdate?.();
 
     // Then redirect to store
-    const storeUrl = isIOS ? APP_STORE_URLS.IOS : APP_STORE_URLS.ANDROID;
-    Linking.openURL(storeUrl);
+    Linking.openURL(appStoreUrls.current);
   }, [onUpdate]);
 
   // Handle dismiss button press

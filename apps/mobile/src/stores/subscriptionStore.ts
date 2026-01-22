@@ -6,11 +6,10 @@ import {
   SubscriptionHistoryResponse
 } from "@/services/api/subscriptions";
 import { usePricingStore } from "@/stores/pricingStore";
-import type { PlanFeature } from "@/services/api/subscriptionPlans";
 import { logger } from "@/services/logger";
 
 // 2-tier system: free + premium
-type SubscriptionPlan = "free" | "premium";
+type SubscriptionTier = "free" | "premium";
 
 interface SubscriptionState {
   // User's subscription info
@@ -19,7 +18,12 @@ interface SubscriptionState {
   history: SubscriptionHistoryResponse | null;
 
   // Optimistic plan override (used after purchase before API confirms)
-  optimisticPlan: SubscriptionPlan | null;
+  optimisticPlan: SubscriptionTier | null;
+
+  // Modal state (centralized subscription modal)
+  isModalVisible: boolean;
+  openModal: () => void;
+  closeModal: () => void;
 
   // Loading & error states (separate for parallel fetching)
   isLoadingSubscription: boolean;
@@ -39,7 +43,7 @@ interface SubscriptionState {
   refresh: () => Promise<void>; // Fetch subscription, features, and history
 
   // Optimistic update for immediate UI feedback after purchase
-  setOptimisticPlan: (plan: SubscriptionPlan) => void;
+  setOptimisticPlan: (plan: SubscriptionTier) => void;
   clearOptimisticPlan: () => void;
 
   // Helper methods
@@ -51,12 +55,8 @@ interface SubscriptionState {
   getGoalLimit: () => number | null; // null means unlimited (goals user can CREATE)
   getActiveGoalLimit: () => number | null; // number of goals that can be ACTIVE simultaneously (null = unlimited)
 
-  // Challenge limits
-  getChallengeLimit: () => number | null; // null = unlimited, 0 = disabled
-  canParticipateInChallenge: (currentCount: number) => boolean;
-
   // Partner / accountability limits
-  hasPartnerFeature: () => boolean; // has social_accountability
+  hasPartnerFeature: () => boolean; // has accountability_partner_limit
   getPartnerLimit: () => number | null; // accountability_partner_limit (null = unlimited, 0 = disabled)
   canSendPartnerRequest: (acceptedCount: number, pendingSentCount: number) => boolean;
 
@@ -70,103 +70,88 @@ interface SubscriptionState {
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 // Tier mapping for optimistic updates (2-tier system)
-const PLAN_TIERS: Record<SubscriptionPlan, number> = {
+const PLAN_TIERS: Record<SubscriptionTier, number> = {
   free: 0,
   premium: 1
 };
 
 /**
- * Helper to get feature value from pricingStore with TIER INHERITANCE.
+ * Helper to get feature value from pricingStore (V2 - Direct Plan Matching).
  *
- * This mirrors the backend logic: users have access to all features
- * where minimum_tier <= user_tier.
+ * V2 Simplified: Features are tied directly to plan_id (free/premium).
+ * No tier inheritance - just direct plan matching.
  *
- * Logic is data-driven (no hardcoded feature lists):
- * - feature_value is a number → that's the limit
- * - feature_value is null → unlimited (for limits) or enabled (for boolean)
- * - is_enabled tells us if feature is active
- *
- * 1. First, try to find feature directly on the user's plan
- * 2. If not found, search ALL plans for the feature and check minimum_tier
- * 3. If still not found, return null (no access)
+ * Logic:
+ * - Look for feature directly on the user's plan
+ * - If found and enabled: return feature_value (number for limits, null for unlimited)
+ * - If not found or disabled: return false (no access)
  */
 const getOptimisticFeatureValue = (
-  planId: SubscriptionPlan,
+  planId: SubscriptionTier,
   featureKey: string
 ): number | boolean | null => {
   const pricingStore = usePricingStore.getState();
-  const userTier = PLAN_TIERS[planId];
 
-  // If plans aren't loaded yet, be optimistic for paid plans
+  // If plans aren't loaded yet, use conservative defaults
   if (pricingStore.plans.length === 0) {
     if (planId === "free") {
-      // Conservative defaults for free plan
+      // V2 free tier defaults (from 005_seed_data.sql)
       switch (featureKey) {
-        case "goals":
-        case "challenge_limit":
         case "active_goal_limit":
-          return 1;
+          return 2; // V2: Free users get 2 active goals
         case "accountability_partner_limit":
-          return 0;
+          return 1; // V2: Free users get 1 accountability partner
+        case "ai_coach_chat":
+          return 3; // V2: Free users get 3 AI coach messages per day
+        case "pattern_detection":
+        case "weekly_recap":
+        case "advanced_analytics":
+        case "adaptive_nudging":
+        case "voice_notes":
+        case "ai_checkin_response":
+          return false; // Premium-only features
+        case "daily_checkins":
+        case "streak_tracking":
+        case "daily_motivation":
+        case "basic_stats":
+          return true; // Free features enabled
         default:
-          return null; // Unknown feature - no access
+          return false; // Unknown feature - no access
       }
     }
-    // For paid plans, be optimistic
+    // For premium, be optimistic
     return null; // null = unlimited/enabled
   }
 
-  // 1. Try to find feature directly on the user's plan
+  // V2: Direct plan matching - look for feature on user's plan only
   const userPlan = pricingStore.plans.find((p) => p.id.toLowerCase() === planId.toLowerCase());
 
-  if (userPlan) {
-    const directFeature = userPlan.features.find((f) => f.feature_key === featureKey);
-    if (directFeature) {
-      // Found directly on user's plan - return value based on is_enabled
-      if (!directFeature.is_enabled) {
-        return false; // Feature is disabled
-      }
-      // Return feature_value (number for limits, null for unlimited/boolean)
-      return directFeature.feature_value;
-    }
+  if (!userPlan) {
+    // Plan not found - be conservative for free, optimistic for premium
+    return planId === "free" ? false : null;
   }
 
-  // 2. Feature not on user's plan - check if inherited via minimum_tier
-  // Search ALL plans for this feature, find the one with highest tier that user qualifies for
-  let bestMatch: PlanFeature | null = null;
-  let bestMatchTier = -1;
+  const feature = userPlan.features.find((f) => f.feature_key === featureKey);
 
-  for (const plan of pricingStore.plans) {
-    for (const feature of plan.features) {
-      if (feature.feature_key === featureKey) {
-        const featureMinTier = feature.minimum_tier ?? 0;
-        // User qualifies if their tier >= feature's minimum_tier
-        if (userTier >= featureMinTier && featureMinTier > bestMatchTier) {
-          // Keep the highest tier version the user qualifies for
-          bestMatch = feature;
-          bestMatchTier = featureMinTier;
-        }
-      }
-    }
+  if (!feature) {
+    // Feature not on this plan - no access
+    return false;
   }
 
-  if (bestMatch) {
-    if (!bestMatch.is_enabled) {
-      return false; // Feature is disabled
-    }
-    return bestMatch.feature_value; // number or null (unlimited/enabled)
+  if (!feature.is_enabled) {
+    // Feature is disabled
+    return false;
   }
 
-  // 3. Feature not found anywhere OR user doesn't qualify
-  // Return false for "no access" - caller can interpret as needed
-  return false;
+  // Return feature_value (number for limits, null for unlimited/enabled)
+  return feature.feature_value;
 };
 
 /**
  * Check if user has access to a feature (for optimistic updates).
  * Returns true if user has the feature, false otherwise.
  */
-const hasOptimisticFeature = (planId: SubscriptionPlan, featureKey: string): boolean => {
+const hasOptimisticFeature = (planId: SubscriptionTier, featureKey: string): boolean => {
   const value = getOptimisticFeatureValue(planId, featureKey);
 
   // false = no access or disabled
@@ -195,6 +180,7 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   features: null,
   history: null,
   optimisticPlan: null,
+  isModalVisible: false,
   isLoadingSubscription: false,
   isLoadingFeatures: false,
   isLoadingHistory: false,
@@ -204,6 +190,10 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   lastFetchedFeatures: null,
   lastFetchedHistory: null,
   lastFetched: null,
+
+  // Modal actions
+  openModal: () => set({ isModalVisible: true }),
+  closeModal: () => set({ isModalVisible: false }),
 
   // Actions
   fetchSubscription: async () => {
@@ -258,10 +248,12 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   },
 
   fetchFeatures: async () => {
-    const { lastFetchedFeatures, isLoadingFeatures } = get();
+    const { lastFetchedFeatures, isLoadingFeatures, features } = get();
 
-    // Check if we have recent data
-    if (lastFetchedFeatures && Date.now() - lastFetchedFeatures < CACHE_DURATION) {
+    // Check if we have recent data AND features_list is not empty
+    // If features is null or features_list is empty, we should refetch
+    const hasValidData = features && features.features_list && features.features_list.length > 0;
+    if (hasValidData && lastFetchedFeatures && Date.now() - lastFetchedFeatures < CACHE_DURATION) {
       return;
     }
 
@@ -285,16 +277,19 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
           lastFetchedFeatures: now,
           lastFetched: now
         }));
+        console.log("[SubscriptionStore] Features stored successfully");
       } else {
         const errorMessage =
           response.error ||
           response.message ||
           `Failed to fetch features${response.status ? ` (status: ${response.status})` : ""}`;
+        console.error("[SubscriptionStore] No data in response:", errorMessage);
         throw new Error(errorMessage);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
 
+      console.error("[SubscriptionStore] Failed to fetch features:", errorMessage);
       logger.error("Failed to fetch features", {
         error: errorMessage
       });
@@ -438,7 +433,7 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   },
 
   // Optimistic update for immediate UI feedback after purchase
-  setOptimisticPlan: (plan: SubscriptionPlan) => {
+  setOptimisticPlan: (plan: SubscriptionTier) => {
     set({ optimisticPlan: plan });
     // Clear cache so next refresh() fetches fresh data
     set({
@@ -526,6 +521,7 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
 
   canCreateGoal: (currentGoalCount: number) => {
     const goalLimit = get().getGoalLimit();
+    console.log("goalLimit", goalLimit);
 
     // If goal_limit is null, it means unlimited
     if (goalLimit === null) {
@@ -540,23 +536,23 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
 
     // Use optimistic plan limits if set (from pricingStore if available)
     if (optimisticPlan) {
-      const value = getOptimisticFeatureValue(optimisticPlan, "goals");
+      const value = getOptimisticFeatureValue(optimisticPlan, "active_goal_limit");
       return typeof value === "number" ? value : (value as number | null);
     }
 
-    if (!features) return 1; // Features not loaded yet, default to most restrictive
+    if (!features) return 2; // V2: Default to free tier limit (2 goals)
 
-    // Find the "goals" feature in features_list
+    // Find the "active_goal_limit" feature in features_list
     // feature_value = null means unlimited, otherwise it's the limit number
-    const goalsFeature = features.features_list.find((f) => f.feature_key === "goals");
+    const goalsFeature = features.features_list.find((f) => f.feature_key === "active_goal_limit");
 
     if (goalsFeature) {
       // null = unlimited, number = that's the limit
       return goalsFeature.feature_value;
     }
 
-    // Fallback if "goals" feature not found (shouldn't happen with proper DB setup)
-    return 1;
+    // Fallback if "active_goal_limit" feature not found
+    return 2; // V2: Free tier default
   },
 
   // Get the limit for how many goals can be ACTIVE simultaneously
@@ -569,7 +565,7 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
       return typeof value === "number" ? value : (value as number | null);
     }
 
-    if (!features) return 1; // Features not loaded yet, default to most restrictive
+    if (!features) return 2; // V2: Default to free tier limit (2 active goals)
 
     // Find the "active_goal_limit" feature in features_list
     const activeGoalFeature = features.features_list.find(
@@ -577,52 +573,17 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
     );
 
     if (activeGoalFeature) {
-      // null = unlimited, number = that's the limit
+      // V2: Free=2, Premium=10 (no more unlimited for AI context limits)
       return activeGoalFeature.feature_value;
     }
 
     // Fallback if feature not found
-    return 1;
-  },
-
-  // Get the limit for challenges (created + joined)
-  getChallengeLimit: () => {
-    const { features, optimisticPlan } = get();
-
-    // Use optimistic plan limits if set (from pricingStore if available)
-    if (optimisticPlan) {
-      const value = getOptimisticFeatureValue(optimisticPlan, "challenge_limit");
-      return typeof value === "number" ? value : (value as number | null);
-    }
-
-    if (!features) return 1; // Default to most restrictive
-
-    const challengeFeature = features.features_list.find(
-      (f) => f.feature_key === "challenge_limit"
-    );
-
-    if (challengeFeature) {
-      // null = unlimited, 0 = disabled, number = limit
-      return challengeFeature.feature_value;
-    }
-
-    return 1;
-  },
-
-  canParticipateInChallenge: (currentCount: number) => {
-    const limit = get().getChallengeLimit();
-
-    // null = unlimited
-    if (limit === null) return true;
-    // 0 = feature disabled
-    if (limit === 0) return false;
-
-    return currentCount < limit;
+    return 2; // V2: Free tier default
   },
 
   // Partner / accountability methods
   hasPartnerFeature: () => {
-    return get().hasFeature("social_accountability");
+    return get().hasFeature("accountability_partner_limit");
   },
 
   getPartnerLimit: () => {
@@ -634,7 +595,7 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
       return typeof value === "number" ? value : (value as number | null);
     }
 
-    if (!features) return 0; // Default to disabled
+    if (!features) return 1; // V2: Free tier gets 1 partner
 
     const partnerFeature = features.features_list.find(
       (f) => f.feature_key === "accountability_partner_limit"
@@ -645,11 +606,11 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
       return partnerFeature.feature_value;
     }
 
-    return 0; // Feature not found = disabled
+    return 1; // V2: Free tier default
   },
 
   canSendPartnerRequest: (acceptedCount: number, pendingSentCount: number) => {
-    // First check if user has the social_accountability feature
+    // First check if user has the accountability_partner_limit feature
     if (!get().hasPartnerFeature()) return false;
 
     const limit = get().getPartnerLimit();
@@ -682,6 +643,7 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
       features: null,
       history: null,
       optimisticPlan: null,
+      isModalVisible: false,
       isLoading: false,
       isLoadingSubscription: false,
       isLoadingFeatures: false,

@@ -1,0 +1,31 @@
+[tool.poetry]
+name = "fitnudge-admin-api"
+version = "1.0.0"
+description = "FitNudge Admin API - Administrative Dashboard Backend"
+authors = ["FitNudge Team"]
+readme = "README.md"
+packages = [{include = "app"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.120.0"
+uvicorn = {extras = ["standard"], version = "^0.38.0"}
+supabase = "^2.22.2"
+python-jose = {extras = ["cryptography"], version = "^3.5.0"}
+passlib = {extras = ["bcrypt"], version = "^1.7.4"}
+python-multipart = "^0.0.20"
+pydantic = {extras = ["email"], version = "^2.12.3"}
+pydantic-settings = "^2.11.0"
+httpx = "^0.28.1"
+celery = "^5.5.3"
+redis = "^7.0.0"
+python-dotenv = "^1.2.1"
+pytz = "^2024.1"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.4.2"
+pytest-asyncio = "^1.2.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

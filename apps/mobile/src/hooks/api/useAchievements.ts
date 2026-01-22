@@ -21,18 +21,21 @@ const EMPTY_ACHIEVEMENT_TYPES: AchievementType[] = [];
 const EMPTY_STATS: AchievementStats = {
   total_achievements: 0,
   total_points: 0,
-  by_rarity: { common: 0, rare: 0, epic: 0, legendary: 0 }
+  rarity_breakdown: { common: 0, rare: 0, epic: 0, legendary: 0 }
 };
 
 /**
  * Hook to get all available achievement types
  */
 export const useAchievementTypes = () => {
+  const { isAuthenticated } = useAuthStore();
+
   return useQuery({
     queryKey: achievementsQueryKeys.types(),
     queryFn: () => achievementsService.getAchievementTypes(),
-    staleTime: 30 * 60 * 1000, // 30 minutes - achievement types rarely change
-    refetchOnMount: false,
+    enabled: isAuthenticated,
+    staleTime: 5 * 60 * 1000, // 5 minutes - achievement types rarely change
+    refetchOnMount: true, // Check for fresh data on mount
     placeholderData: EMPTY_ACHIEVEMENT_TYPES
   });
 };
@@ -47,8 +50,8 @@ export const useMyAchievements = () => {
     queryKey: achievementsQueryKeys.myAchievements(),
     queryFn: () => achievementsService.getMyAchievements(),
     enabled: isAuthenticated,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    refetchOnMount: false,
+    staleTime: 30 * 1000, // 30 seconds
+    refetchOnMount: true, // Always check for fresh data on mount
     placeholderData: EMPTY_ACHIEVEMENTS
   });
 };
@@ -63,8 +66,8 @@ export const useAchievementStats = () => {
     queryKey: achievementsQueryKeys.stats(),
     queryFn: () => achievementsService.getAchievementStats(),
     enabled: isAuthenticated,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    refetchOnMount: false,
+    staleTime: 30 * 1000, // 30 seconds
+    refetchOnMount: true, // Always check for fresh data on mount
     placeholderData: EMPTY_STATS
   });
 };

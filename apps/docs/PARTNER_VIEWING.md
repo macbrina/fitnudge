@@ -1,32 +1,32 @@
 # Partner Viewing & Social Accountability
 
-This document describes how accountability partners can view each other's goals and challenges, including privacy controls, real-time updates, and subscription gating.
+This document describes how accountability partners can view each other's goals, including privacy controls, real-time updates, and subscription gating.
 
 ## Overview
 
 Accountability partners are users who have connected to help motivate each other. Once connected, partners can:
 
-- View each other's active goals and challenges
+- View each other's active goals
 - See progress, streaks, and check-in status
-- Send nudges to encourage activity
+- Send nudges and cheers to encourage activity
 - Get notified about milestones
 
 ## Partner View Mode
 
-When a partner views their accountability partner's goals or challenges, they enter a **read-only "Partner View"** mode.
+When a partner views their accountability partner's goals, they enter a **read-only "Partner View"** mode.
 
 ### Navigation Flow
 
 ```
 PartnerDetailScreen (shows partner's dashboard)
         ↓
-Partner taps on a goal or challenge card
+Partner taps on a goal card
         ↓
 Navigation with query params:
   - viewMode=partner
   - partnerId=<partner_user_id>
         ↓
-GoalDetailScreen or ChallengeDetailScreen loads in partner view
+GoalDetailScreen loads in partner view
 ```
 
 ### What Partners Can See
@@ -43,37 +43,30 @@ GoalDetailScreen or ChallengeDetailScreen loads in partner view
 
 ### What Partners Cannot See/Do
 
-| Element                | Hidden | Reason                  |
-| ---------------------- | ------ | ----------------------- |
-| Check-in button        | ❌     | Only owner can check in |
-| Log Meal/Water buttons | ❌     | Only owner can track    |
-| Edit goal/challenge    | ❌     | Only owner can modify   |
-| Leave challenge        | ❌     | Only owner can leave    |
-| Rest day indicators    | ❌     | Not relevant to partner |
-| No check-in message    | ❌     | Not relevant to partner |
-| Tracking modals        | ❌     | Cannot interact         |
+| Element             | Hidden | Reason                  |
+| ------------------- | ------ | ----------------------- |
+| Check-in button     | ❌     | Only owner can check in |
+| Edit goal           | ❌     | Only owner can modify   |
+| Rest day indicators | ❌     | Not relevant to partner |
+| No check-in message | ❌     | Not relevant to partner |
+| Tracking modals     | ❌     | Cannot interact         |
 
 ## Implementation Details
 
 ### Query Parameters
 
-When navigating to goal/challenge detail screens in partner view:
+When navigating to goal detail screens in partner view:
 
 ```typescript
 // Goal navigation
 router.push(
   `${MOBILE_ROUTES.GOALS.DETAILS}?id=${goalId}&viewMode=partner&partnerId=${partnerUserId}`
 );
-
-// Challenge navigation
-router.push(
-  `${MOBILE_ROUTES.CHALLENGES.DETAILS(challengeId)}?viewMode=partner&partnerId=${partnerUserId}`
-);
 ```
 
 ### Partner View Detection
 
-In `GoalDetailScreen.tsx` and `ChallengeDetailScreen.tsx`:
+In `GoalDetailScreen.tsx`:
 
 ```typescript
 const params = useLocalSearchParams<{
@@ -211,36 +204,92 @@ useEffect(() => {
 
 ### Feature Access Logic
 
-Social accountability features require premium subscription. The access logic is:
+Accountability partner features use `accountability_partner_limit` for access control:
 
-| Screen                | Access Condition                                   |
-| --------------------- | -------------------------------------------------- |
-| `PartnersScreen`      | User has feature OR has existing partners/requests |
-| `PartnerDetailScreen` | User has feature OR partner has feature            |
-| `ActivityScreen`      | User has feature OR has existing nudges            |
-| `FindPartnerScreen`   | User has feature                                   |
+| Limit Value | Meaning                                 |
+| ----------- | --------------------------------------- |
+| `null`      | Unlimited partners (premium)            |
+| `0`         | Feature disabled (no access)            |
+| `> 0`       | Has access with that many partner slots |
+
+| Screen                | Access Condition                                       |
+| --------------------- | ------------------------------------------------------ |
+| `PartnersScreen`      | User has limit > 0 OR has existing partners/requests   |
+| `PartnerDetailScreen` | User has limit > 0 OR partner has limit > 0            |
+| `ActivityScreen`      | User has limit > 0 OR has existing nudges              |
+| `FindPartnerScreen`   | User has limit > 0 AND can send request (not at limit) |
 
 ### Implementation
 
+All screens use the unified `usePartnerAccess` hook for consistent access checks:
+
 ```typescript
+// usePartnerAccess hook (from usePartners.ts)
+export const usePartnerAccess = () => {
+  const { hasPartnerFeature, getPartnerLimit, openModal } = useSubscriptionStore();
+  const { data: limits } = usePartnerLimits();
+
+  // hasPartnerFeature checks if accountability_partner_limit > 0 or null (unlimited)
+  const hasFeature = hasPartnerFeature();
+  const limit = getPartnerLimit();
+
+  // Use cached limits for counts (from backend)
+  const acceptedCount = limits?.accepted_count ?? 0;
+  const pendingSentCount = limits?.pending_sent_count ?? 0;
+
+  // Can send if: has feature AND (unlimited OR under limit)
+  const canSendRequest = (): boolean => {
+    if (!hasFeature) return false;
+    if (limit === null) return true; // Unlimited
+    if (limit === 0) return false;   // Disabled
+    return acceptedCount + pendingSentCount < limit;
+  };
+
+  return { hasFeature, limit, canSendRequest, ... };
+};
+
 // PartnersScreen
-const { hasFeature } = useSubscriptionStore();
-const hasPartnerFeature = hasFeature("social_accountability");
-const partners = partnersData?.data || [];
-const pendingRequests = pendingData?.data || [];
-const hasAccess =
-  hasPartnerFeature || partners.length > 0 || pendingRequests.length > 0;
+const { hasFeature: hasPartnerFeature, canSendRequest } = usePartnerAccess();
+const hasAccess = hasPartnerFeature || partners.length > 0 || pendingRequests.length > 0;
 
 // PartnerDetailScreen
-const userHasFeature = hasFeature("social_accountability");
-const partnerHasFeature =
-  dashboard?.partner?.has_social_accountability ?? false;
+const { hasFeature: userHasFeature } = usePartnerAccess();
+const partnerHasFeature = dashboard?.partner?.has_partner_feature ?? false;
 const hasAccess = userHasFeature || partnerHasFeature;
 
 // ActivityScreen
-const hasPartnerFeature = hasFeature("social_accountability");
-const nudges = nudgesData?.data || [];
+const { hasFeature: hasPartnerFeature } = usePartnerAccess();
 const hasAccess = hasPartnerFeature || nudges.length > 0;
+
+// FindPartnerScreen
+const { hasFeature, canSendRequest } = usePartnerAccess();
+// hasFeature controls screen access, canSendRequest controls the button
+```
+
+### Subscription Store Methods
+
+```typescript
+// subscriptionStore.ts
+hasPartnerFeature: () => {
+  // Returns true if accountability_partner_limit is null (unlimited) or > 0
+  return get().hasFeature("accountability_partner_limit");
+},
+
+getPartnerLimit: () => {
+  // Returns: null (unlimited), 0 (disabled), or number (limit)
+  const partnerFeature = features.features_list.find(
+    (f) => f.feature_key === "accountability_partner_limit"
+  );
+  return partnerFeature?.feature_value ?? 1; // Free tier default: 1
+},
+
+canSendPartnerRequest: (acceptedCount, pendingSentCount) => {
+  if (!get().hasPartnerFeature()) return false;
+  const limit = get().getPartnerLimit();
+  if (limit === null) return true;  // Unlimited
+  if (limit === 0) return false;    // Disabled
+  return acceptedCount + pendingSentCount < limit;
+}
 ```
 
 ### Premium Gate UI
@@ -259,7 +308,7 @@ const renderPremiumGate = () => (
     </Text>
     <Button
       title={t("common.upgrade")}
-      onPress={() => router.push(MOBILE_ROUTES.ONBOARDING.SUBSCRIPTION)}
+      onPress={() => openSubscriptionModal())}
     />
   </View>
 );
@@ -274,8 +323,6 @@ The `ActivityScreen` shows nudges and cheers that partners send to each other.
 - **Nudges** - Reminders to stay on track
 - **Cheers** - Encouragement messages
 - **Milestones** - Celebrations when partner hits goals
-- **Competitive** - Challenge-related nudges
-- **Custom** - Custom messages
 
 ### Access Logic
 
@@ -302,13 +349,11 @@ If a user previously had partners and received nudges, but their subscription ex
 
 ### Nudge Types
 
-| Type          | Icon         | Color  | Description           |
-| ------------- | ------------ | ------ | --------------------- |
-| `nudge`       | `hand-left`  | Blue   | General reminder      |
-| `cheer`       | `heart`      | Amber  | Encouragement         |
-| `milestone`   | `trophy`     | Green  | Achievement congrats  |
-| `competitive` | `flame`      | Red    | Challenge competition |
-| `custom`      | `chatbubble` | Purple | Custom message        |
+| Type        | Icon        | Color | Description          |
+| ----------- | ----------- | ----- | -------------------- |
+| `nudge`     | `hand-left` | Blue  | General reminder     |
+| `cheer`     | `heart`     | Amber | Encouragement        |
+| `celebrate` | `trophy`    | Green | Achievement congrats |
 
 ### Navigation on Tap
 
@@ -322,9 +367,7 @@ const handleNudgePress = async (nudge: Nudge) => {
   }
 
   // Navigate based on context
-  if (nudge.challenge_id) {
-    router.push(MOBILE_ROUTES.CHALLENGES.DETAILS(nudge.challenge_id));
-  } else if (nudge.goal_id) {
+  if (nudge.goal_id) {
     router.push(`${MOBILE_ROUTES.GOALS.DETAILS}?id=${nudge.goal_id}`);
   } else if (nudge.partnership_id) {
     router.push(MOBILE_ROUTES.PROFILE.PARTNERS);
@@ -341,14 +384,18 @@ The backend returns partner data with feature status:
 ```python
 # GET /partners/{partner_user_id}/dashboard
 class PartnerDashboard(BaseModel):
-    partner: PartnerUserInfo  # Includes has_social_accountability
+    partner: PartnerUserInfo  # Includes has_partner_feature
     partnership_id: str
     goals: List[PartnerGoalSummary]
-    challenges: List[PartnerChallengeSummary]
     total_active_goals: int
-    total_active_challenges: int
     overall_streak: int
     logged_today: bool
+
+# Partner feature check (in partners.py)
+partner_limit = await get_user_feature_value(
+    supabase, partner_user_id, "accountability_partner_limit"
+)
+partner_has_feature = partner_limit is None or partner_limit > 0
 ```
 
 ### Partnership Verification
@@ -377,12 +424,19 @@ if not partnership.data:
 
 ### When Subscription Expires
 
-When a user's subscription expires and they lose `social_accountability`:
+When a user's subscription expires and `accountability_partner_limit` changes:
 
 1. **Pending requests deleted** - Any partner requests they sent are removed
 2. **Accepted partnerships kept** - Existing partnerships remain (graceful degradation)
-3. **Feature access revoked** - They can't send new requests or access partner features
+3. **Limit enforced** - They can't send new requests if at or over their new limit
 4. **Partner still works** - If the OTHER partner has the feature, access continues
+
+### Limit Values by Plan
+
+| Plan    | `accountability_partner_limit` |
+| ------- | ------------------------------ |
+| Free    | `1` (1 partner)                |
+| Premium | `null` (unlimited)             |
 
 ### Cleanup Tasks
 
@@ -391,23 +445,46 @@ When a user's subscription expires and they lose `social_accountability`:
 @celery_app.task(name="subscription.cleanup_expired_partner_requests")
 def cleanup_expired_partner_requests_task():
     """Delete pending partner requests from users who lost subscription."""
-    # Only deletes PENDING requests where sender lost feature
+    # Only deletes PENDING requests where sender's limit is now 0
     # Accepted partnerships are kept for graceful degradation
+```
+
+### Request Validation (Backend)
+
+```python
+# In send_partner_request (partners.py)
+partner_limit = await get_user_feature_value(
+    supabase, user_id, "accountability_partner_limit"
+)
+
+# If limit is 0, user doesn't have the feature
+if partner_limit is not None and partner_limit == 0:
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Accountability partner feature requires a subscription",
+    )
+
+# Count accepted + pending sent against limit
+if partner_limit is not None and total_count >= partner_limit:
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail=f"Partner limit reached ({partner_limit}). Upgrade for more.",
+    )
 ```
 
 ## Files Modified
 
-| File                        | Changes                                         |
-| --------------------------- | ----------------------------------------------- |
-| `PartnerDetailScreen.tsx`   | Navigation with viewMode, partnership guard     |
-| `GoalDetailScreen.tsx`      | Partner view mode, validation, hidden actions   |
-| `ChallengeDetailScreen.tsx` | Partner view mode, validation, hidden actions   |
-| `ActivityScreen.tsx`        | Subscription gate for nudges/activity           |
-| `realtimeService.ts`        | Dashboard cache invalidation on DELETE          |
-| `en.json`                   | Partner view translations                       |
-| `partners.py`               | has_social_accountability in dashboard response |
-| `subscription_tasks.py`     | Partner request cleanup task                    |
-| `celery_app.py`             | Scheduled cleanup task                          |
+| File                      | Changes                                             |
+| ------------------------- | --------------------------------------------------- |
+| `PartnerDetailScreen.tsx` | Navigation with viewMode, partnership guard         |
+| `GoalDetailScreen.tsx`    | Partner view mode, validation, hidden actions       |
+| `realtimeService.ts`      | Dashboard cache invalidation on DELETE              |
+| `en.json`                 | Partner view translations                           |
+| `partners.py`             | `accountability_partner_limit` checks, limit gating |
+| `subscription_tasks.py`   | Partner request cleanup task                        |
+| `celery_app.py`           | Scheduled cleanup task                              |
+| `subscriptionStore.ts`    | `hasPartnerFeature`, `getPartnerLimit` methods      |
+| `usePartners.ts`          | `usePartnerAccess` unified hook                     |
 
 ## Translation Keys
 
@@ -415,7 +492,6 @@ def cleanup_expired_partner_requests_task():
 {
   "partners": {
     "viewing_partner_goal": "Viewing partner's goal (read-only)",
-    "viewing_partner_challenge": "Viewing partner's challenge (read-only)",
     "access_denied": "Access Denied",
     "not_partners_anymore": "You are no longer accountability partners",
     "no_longer_partners": "Partnership Ended",
@@ -452,11 +528,18 @@ def cleanup_expired_partner_requests_task():
 
 ### Subscription Expiry
 
-1. User A (premium) and User B (free) are partners
-2. User A's subscription expires
-3. Pending requests from A are deleted
-4. A can still view B's dashboard (graceful degradation)
-5. If B was also free, neither can use partner features
+1. User A (premium, unlimited partners) and User B (free, 1 partner) are partners
+2. User A's subscription expires → limit changes from `null` to `1`
+3. Pending requests from A are deleted (if A was over the new limit)
+4. A can still view B's dashboard (graceful degradation - existing partnerships kept)
+5. Both A and B now have limit of 1, so they can keep their partnership but can't add more
+
+### Partner Limit Enforcement
+
+1. User A (free, limit=1) has 1 accepted partner
+2. User A tries to send a new partner request
+3. Backend returns 403: "Partner limit reached (1). Upgrade for more."
+4. Frontend shows upgrade prompt via `canSendRequest` check
 
 ### Access Denied
 

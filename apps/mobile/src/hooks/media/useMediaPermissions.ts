@@ -1,17 +1,20 @@
 import { useState, useEffect, useCallback } from "react";
 import * as ImagePicker from "expo-image-picker";
+import { getRecordingPermissionsAsync, requestRecordingPermissionsAsync } from "expo-audio";
 
 export type MediaPermissionStatus = "undetermined" | "granted" | "denied";
 
 export const useMediaPermissions = () => {
   const [cameraStatus, setCameraStatus] = useState<MediaPermissionStatus>("undetermined");
   const [libraryStatus, setLibraryStatus] = useState<MediaPermissionStatus>("undetermined");
+  const [microphoneStatus, setMicrophoneStatus] = useState<MediaPermissionStatus>("undetermined");
   const [isLoading, setIsLoading] = useState(false);
 
   const checkPermissions = useCallback(async () => {
     try {
       const cameraPermission = await ImagePicker.getCameraPermissionsAsync();
       const libraryPermission = await ImagePicker.getMediaLibraryPermissionsAsync();
+      const audioPermission = await getRecordingPermissionsAsync();
 
       setCameraStatus(
         cameraPermission.granted
@@ -25,6 +28,14 @@ export const useMediaPermissions = () => {
         libraryPermission.granted
           ? "granted"
           : libraryPermission.canAskAgain
+            ? "undetermined"
+            : "denied"
+      );
+
+      setMicrophoneStatus(
+        audioPermission.granted
+          ? "granted"
+          : audioPermission.canAskAgain
             ? "undetermined"
             : "denied"
       );
@@ -70,6 +81,21 @@ export const useMediaPermissions = () => {
     }
   }, []);
 
+  const requestMicrophonePermission = useCallback(async (): Promise<boolean> => {
+    setIsLoading(true);
+    try {
+      const { granted } = await requestRecordingPermissionsAsync();
+      setMicrophoneStatus(granted ? "granted" : "denied");
+      return granted;
+    } catch (error) {
+      console.error("Failed to request microphone permission:", error);
+      setMicrophoneStatus("denied");
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   const requestAllPermissions = useCallback(async (): Promise<boolean> => {
     setIsLoading(true);
     try {
@@ -88,21 +114,31 @@ export const useMediaPermissions = () => {
 
   const hasCameraPermission = cameraStatus === "granted";
   const hasLibraryPermission = libraryStatus === "granted";
+  const hasMicrophonePermission = microphoneStatus === "granted";
   const hasAnyPermission = hasCameraPermission || hasLibraryPermission;
   const canAskCamera = cameraStatus === "undetermined";
   const canAskLibrary = libraryStatus === "undetermined";
+  const canAskMicrophone = microphoneStatus === "undetermined";
 
   return {
+    // Status
     cameraStatus,
     libraryStatus,
+    microphoneStatus,
     isLoading,
+    // Permission checks
     hasCameraPermission,
     hasLibraryPermission,
+    hasMicrophonePermission,
     hasAnyPermission,
+    // Can ask again
     canAskCamera,
     canAskLibrary,
+    canAskMicrophone,
+    // Request functions
     requestCameraPermission,
     requestLibraryPermission,
+    requestMicrophonePermission,
     requestAllPermissions,
     checkPermissions
   };

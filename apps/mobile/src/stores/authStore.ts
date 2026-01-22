@@ -9,19 +9,42 @@ import { clearQueryCache } from "@/lib/queryClient";
 interface User {
   id: string;
   email: string;
-  name: string;
-  username: string;
-  plan: string;
-  timezone: string; // IANA timezone string (e.g., 'America/New_York')
+  auth_provider: "email" | "google" | "apple";
   email_verified: boolean;
-  auth_provider: string;
-  created_at: string;
-  linked_providers?: string[];
+
+  // Profile
+  username: string;
+  name: string;
   profile_picture_url?: string;
   bio?: string;
+  timezone: string;
+  language: string;
   country?: string;
-  language?: string;
-  has_password?: boolean; // Whether user has a password set (OAuth users may not)
+
+  // Status
+  status: "active" | "disabled" | "suspended";
+
+  // V2 Preferences
+  motivation_style?: "supportive" | "tough_love" | "calm";
+  morning_motivation_enabled?: boolean;
+  morning_motivation_time?: string; // HH:MM format
+
+  // Subscription
+  plan: "free" | "premium";
+
+  // Referral
+  referral_code?: string;
+
+  // Onboarding
+  onboarding_completed_at?: string | null;
+
+  // Metadata
+  created_at: string;
+  last_login_at?: string;
+
+  // Computed
+  linked_providers?: string[];
+  has_password?: boolean;
 }
 
 export type LogoutReason = "not_found" | "disabled" | "suspended" | null;
@@ -94,6 +117,32 @@ export const useAuthStore = create<AuthState & AuthActions>()(
 
         // Clear React Query cache to prevent data leakage between users
         clearQueryCache();
+
+        // Clear all user-specific stores to prevent data leakage
+        try {
+          // Dynamic imports to avoid circular dependencies
+          const [
+            { useOnboardingStore },
+            { useAICoachStore },
+            { useSubscriptionStore },
+            { storageUtil }
+          ] = await Promise.all([
+            import("@/stores/onboardingStore"),
+            import("@/stores/aiCoachStore"),
+            import("@/stores/subscriptionStore"),
+            import("@/utils/storageUtil")
+          ]);
+
+          // Reset Zustand stores (in-memory + persisted)
+          useOnboardingStore.getState().reset();
+          useAICoachStore.getState().resetState();
+          useSubscriptionStore.getState().reset();
+
+          // Clear user-specific AsyncStorage data (personalization, exit offers, etc.)
+          await storageUtil.clearUserSpecificData();
+        } catch (storeError) {
+          console.warn("[AuthStore] Failed to reset user stores during logout:", storeError);
+        }
 
         let success = false;
 

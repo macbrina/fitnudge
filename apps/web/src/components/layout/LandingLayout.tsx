@@ -10,12 +10,12 @@ interface LandingLayoutProps {
 
 export function LandingLayout({ children }: LandingLayoutProps) {
   return (
-    <div className="min-h-screen bg-background w-full flex flex-col">
+    <div className="min-h-screen bg-background w-full flex flex-col overflow-x-hidden">
       <Header />
-      <main className="flex-1 min-h-screen h-screen pt-12 sm:pt-16 lg:pt-20">
+      <main className="flex-1 pt-16 sm:pt-20 lg:pt-24">
         {children}
       </main>
-        <Footer />
+      <Footer />
       <CookieConsent />
     </div>
   );

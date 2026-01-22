@@ -1,41 +1,28 @@
-import React, { useState, useCallback } from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  Image,
-  Modal,
-  Pressable,
-  Linking,
-  ActivityIndicator
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import Button from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import CheckmarkCircle from "@/components/ui/CheckmarkCircle";
+import LinkText from "@/components/ui/LinkText";
+import { PROFILE_AVATARS } from "@/constants/general";
+import { useAppStoreUrls, useExternalUrls } from "@/hooks/api/useAppConfig";
 import { useAlertModal } from "@/contexts/AlertModalContext";
-import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useNudges } from "@/hooks/api/useNudges";
+import { usePartners, usePendingPartnerRequests } from "@/hooks/api/usePartners";
+import { fontFamily } from "@/lib/fonts";
+import { useTranslation } from "@/lib/i18n";
+import { MOBILE_ROUTES } from "@/lib/routes";
+import { toRN } from "@/lib/units";
+import { ApiError } from "@/services/api/base";
+import { userService } from "@/services/api/user";
 import { useAuthStore } from "@/stores/authStore";
 import { useSubscriptionStore } from "@/stores/subscriptionStore";
-import { useTranslation } from "@/lib/i18n";
 import { useStyles, useTheme } from "@/themes";
-import { tokens } from "@/themes/tokens";
-import { toRN } from "@/lib/units";
-import { fontFamily } from "@/lib/fonts";
-import { MOBILE_ROUTES } from "@/lib/routes";
-import { Card } from "@/components/ui/Card";
-import Button from "@/components/ui/Button";
-import LinkText from "@/components/ui/LinkText";
-import SubscriptionScreen from "@/screens/onboarding/SubscriptionScreen";
-import { usePartners, usePendingPartnerRequests } from "@/hooks/api/usePartners";
 import { isIOS } from "@/utils/platform";
-import { useNudges } from "@/hooks/api/useNudges";
-import { APP_STORE_URLS, EXTERNAL_URLS, PROFILE_AVATARS } from "@/constants/general";
+import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
-import { userService } from "@/services/api/user";
-import { ApiError } from "@/services/api/base";
-
-// Rate app image
-const RateAppImage = require("@assetsimages/images/rate_app.png");
+import { useRouter } from "expo-router";
+import * as StoreReview from "expo-store-review";
+import React, { useCallback, useState } from "react";
+import { Linking, Modal, Pressable, ScrollView, Text, TouchableOpacity, View } from "react-native";
 
 type ThemeOption = "system" | "light" | "dark";
 
@@ -55,7 +42,7 @@ export default function ProfileScreen() {
   const styles = useStyles(makeStyles);
   const { colors, brandColors, isSystem, preference, setPreference, setIsSystem } = useTheme();
   const { user, logout, isLoggingOut } = useAuthStore();
-  const { getPlan, hasFeature } = useSubscriptionStore();
+  const { getPlan, hasFeature, openModal: openSubscriptionModal } = useSubscriptionStore();
   const { t } = useTranslation();
   const router = useRouter();
 
@@ -64,16 +51,17 @@ export default function ProfileScreen() {
   const { data: pendingData } = usePendingPartnerRequests();
   const { data: nudgesData } = useNudges();
 
+  // Dynamic config URLs
+  const appStoreUrls = useAppStoreUrls();
+  const externalUrls = useExternalUrls();
+
   const partnersCount = partnersData?.data?.length || 0;
   const pendingRequestsCount = pendingData?.data?.length || 0;
   const unreadNudgesCount = nudgesData?.data?.filter((n) => !n.is_read).length || 0;
 
   const plan = getPlan();
   const isOnHighestPlan = plan === "premium";
-  const [showSubscription, setShowSubscription] = useState(false);
   const [showThemeModal, setShowThemeModal] = useState(false);
-  const [showRateAppModal, setShowRateAppModal] = useState(false);
-  const [selectedRating, setSelectedRating] = useState(0);
   const [showExportModal, setShowExportModal] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
@@ -126,13 +114,27 @@ export default function ProfileScreen() {
     [setIsSystem, setPreference]
   );
 
-  // Handle star rating selection
-  const handleStarPress = useCallback((rating: number) => {
-    setSelectedRating(rating);
-    // Open the appropriate store URL
-    const storeUrl = isIOS ? APP_STORE_URLS.IOS : APP_STORE_URLS.ANDROID;
-    Linking.openURL(storeUrl);
-    setShowRateAppModal(false);
+  // Handle rate app - uses native in-app review dialog
+  const handleRateApp = useCallback(async () => {
+    try {
+      const isAvailable = await StoreReview.isAvailableAsync();
+      if (isAvailable) {
+        await StoreReview.requestReview();
+        return;
+      }
+    } catch (error) {
+      console.log("Native review unavailable, falling back to store URL");
+    }
+    // Fallback to store URL if native review unavailable
+    Linking.openURL(appStoreUrls.current);
+  }, []);
+
+  // Handle manage subscription - opens native subscription settings
+  const handleManageSubscription = useCallback(() => {
+    const subscriptionUrl = isIOS
+      ? "https://apps.apple.com/account/subscriptions"
+      : "https://play.google.com/store/account/subscriptions";
+    Linking.openURL(subscriptionUrl);
   }, []);
 
   const { showAlert, showConfirm } = useAlertModal();
@@ -208,6 +210,13 @@ export default function ProfileScreen() {
       description: t("profile.nudges_and_cheers") || "Nudges and cheers from partners",
       route: MOBILE_ROUTES.PROFILE.ACTIVITY,
       badge: unreadNudgesCount
+    },
+    {
+      id: "blocked",
+      icon: "ban-outline",
+      label: t("profile.blocked_users") || "Blocked Users",
+      description: t("profile.manage_blocked") || "Manage blocked users",
+      route: MOBILE_ROUTES.PROFILE.BLOCKED_PARTNERS
     }
   ];
 
@@ -237,24 +246,10 @@ export default function ProfileScreen() {
       route: MOBILE_ROUTES.PROFILE.ACCOUNT_SETTINGS
     },
     {
-      id: "personalization",
-      icon: "options-outline",
-      label: t("profile.personalization") || "Personalization",
-      description: t("profile.personalization_desc") || "Fitness preferences & goals",
-      route: MOBILE_ROUTES.PROFILE.PERSONALIZATION
-    },
-    {
       id: "notifications",
       icon: "notifications-outline",
       label: t("profile.notifications"),
       route: MOBILE_ROUTES.PROFILE.NOTIFICATION_SETTINGS
-    },
-    {
-      id: "audio_settings",
-      icon: "volume-high-outline",
-      label: t("profile.audio_settings") || "Audio Settings",
-      description: t("profile.audio_settings_desc") || "Music, voice & sound effects",
-      route: MOBILE_ROUTES.PROFILE.AUDIO_SETTINGS
     },
     {
       id: "theme",
@@ -266,6 +261,13 @@ export default function ProfileScreen() {
   ];
 
   const supportMenuItems: MenuItem[] = [
+    {
+      id: "blog",
+      icon: "newspaper-outline",
+      label: t("profile.blog") || "Blog",
+      description: t("profile.blog_description") || "Tips, guides & inspiration",
+      route: MOBILE_ROUTES.PROFILE.BLOG
+    },
     {
       id: "help",
       icon: "help-circle-outline",
@@ -285,10 +287,7 @@ export default function ProfileScreen() {
       icon: "star-outline",
       label: t("profile.rate_app") || "Rate the App",
       value: `V ${Constants.expoConfig?.version || "1.0.0"}`,
-      action: () => {
-        setSelectedRating(0);
-        setShowRateAppModal(true);
-      }
+      action: handleRateApp
     },
     {
       id: "referral",
@@ -437,7 +436,7 @@ export default function ProfileScreen() {
           <View style={styles.upgradeSection}>
             <TouchableOpacity
               activeOpacity={0.8}
-              onPress={() => setShowSubscription(true)}
+              onPress={openSubscriptionModal}
               style={styles.upgradeBanner}
             >
               <View style={styles.upgradeIconContainer}>
@@ -447,6 +446,26 @@ export default function ProfileScreen() {
                 <Text style={styles.upgradeTitle}>{t("profile.upgrade_to_premium")}</Text>
                 <Text style={styles.upgradeSubtitle}>{t("profile.upgrade_subtitle")}</Text>
               </View>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Manage Subscription - show for premium users */}
+        {isOnHighestPlan && (
+          <View style={styles.upgradeSection}>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={handleManageSubscription}
+              style={styles.manageBanner}
+            >
+              <View style={styles.manageIconContainer}>
+                <Ionicons name="card-outline" size={22} color={brandColors.primary} />
+              </View>
+              <View style={styles.upgradeTextContainer}>
+                <Text style={styles.upgradeTitle}>{t("profile.manage_subscription")}</Text>
+                <Text style={styles.upgradeSubtitle}>{t("profile.manage_subscription_desc")}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
             </TouchableOpacity>
           </View>
         )}
@@ -469,7 +488,7 @@ export default function ProfileScreen() {
           <Card style={styles.menuCard}>
             {/* Privacy Policy */}
             <LinkText
-              url={EXTERNAL_URLS.PRIVACY_POLICY}
+              url={externalUrls.privacyPolicy}
               title={t("profile.privacy_policy") || "Privacy Policy"}
               style={styles.linkMenuItem}
               underline={false}
@@ -493,7 +512,7 @@ export default function ProfileScreen() {
 
             {/* Terms of Service */}
             <LinkText
-              url={EXTERNAL_URLS.TERMS_OF_SERVICE}
+              url={externalUrls.termsOfService}
               title={t("profile.terms_of_service") || "Terms of Service"}
               style={styles.linkMenuItem}
               underline={false}
@@ -531,9 +550,6 @@ export default function ProfileScreen() {
           style={styles.logoutButton}
         />
       </ScrollView>
-
-      {/* Subscription Modal */}
-      <SubscriptionScreen visible={showSubscription} onClose={() => setShowSubscription(false)} />
 
       {/* Theme Selection Modal */}
       <Modal
@@ -578,9 +594,7 @@ export default function ProfileScreen() {
                     >
                       {getThemeLabel(theme)}
                     </Text>
-                    {isSelected && (
-                      <Ionicons name="checkmark-circle" size={18} color={brandColors.primary} />
-                    )}
+                    {isSelected && <CheckmarkCircle size={18} />}
                   </TouchableOpacity>
                 );
               })}
@@ -593,56 +607,6 @@ export default function ProfileScreen() {
               onPress={() => setShowThemeModal(false)}
               fullWidth
               style={styles.themeModalCloseButton}
-            />
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      {/* Rate App Modal */}
-      <Modal
-        visible={showRateAppModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowRateAppModal(false)}
-      >
-        <Pressable style={styles.modalOverlay} onPress={() => setShowRateAppModal(false)}>
-          <Pressable style={styles.rateAppModalContainer} onPress={(e) => e.stopPropagation()}>
-            {/* Rate App Image */}
-            <Image source={RateAppImage} style={styles.rateAppImage} resizeMode="contain" />
-
-            {/* Title & Description */}
-            <Text style={styles.rateAppTitle}>
-              {t("profile.rate_app_title") || "Enjoying FitNudge?"}
-            </Text>
-            <Text style={styles.rateAppDescription}>
-              {t("profile.rate_app_description") || "Please tap on the stars to rate"}
-            </Text>
-
-            {/* Star Rating */}
-            <View style={styles.starsContainer}>
-              {[1, 2, 3, 4, 5].map((star) => (
-                <TouchableOpacity
-                  key={star}
-                  onPress={() => handleStarPress(star)}
-                  activeOpacity={0.7}
-                  style={styles.starButton}
-                >
-                  <Ionicons
-                    name={selectedRating >= star ? "star" : "star-outline"}
-                    size={36}
-                    color={selectedRating >= star ? "#F59E0B" : colors.text.tertiary}
-                  />
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {/* Not Now Button */}
-            <Button
-              title={t("common.not_now") || "Not now"}
-              variant="ghost"
-              size="sm"
-              onPress={() => setShowRateAppModal(false)}
-              style={styles.rateAppCloseButton}
             />
           </Pressable>
         </Pressable>
@@ -798,6 +762,25 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.regular,
     color: colors.text.secondary
+  },
+  manageBanner: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    backgroundColor: colors.bg.card,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+    borderRadius: toRN(tokens.borderRadius.full),
+    paddingVertical: toRN(tokens.spacing[2]),
+    paddingHorizontal: toRN(tokens.spacing[4])
+  },
+  manageIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: `${brand.primary}15`,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    marginRight: toRN(tokens.spacing[3])
   },
   editButton: {
     width: 36,
@@ -982,52 +965,6 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
   },
   themeModalCloseButton: {
     marginTop: toRN(tokens.spacing[3])
-  },
-  // Rate App Modal
-  rateAppModalContainer: {
-    backgroundColor: colors.bg.card,
-    borderRadius: toRN(tokens.borderRadius["2xl"]),
-    padding: toRN(tokens.spacing[6]),
-    width: "100%" as const,
-    maxWidth: 320,
-    alignItems: "center" as const,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8
-  },
-  rateAppImage: {
-    width: 120,
-    height: 120,
-    marginBottom: toRN(tokens.spacing[4])
-  },
-  rateAppTitle: {
-    fontSize: toRN(tokens.typography.fontSize.xl),
-    fontFamily: fontFamily.bold,
-    color: colors.text.primary,
-    textAlign: "center" as const,
-    marginBottom: toRN(tokens.spacing[2])
-  },
-  rateAppDescription: {
-    fontSize: toRN(tokens.typography.fontSize.sm),
-    fontFamily: fontFamily.regular,
-    color: colors.text.secondary,
-    textAlign: "center" as const,
-    marginBottom: toRN(tokens.spacing[4])
-  },
-  starsContainer: {
-    flexDirection: "row" as const,
-    justifyContent: "center" as const,
-    alignItems: "center" as const,
-    gap: toRN(tokens.spacing[2]),
-    marginBottom: toRN(tokens.spacing[4])
-  },
-  starButton: {
-    padding: toRN(tokens.spacing[1])
-  },
-  rateAppCloseButton: {
-    marginTop: toRN(tokens.spacing[2])
   },
   // Export Data Modal
   exportModalContainer: {

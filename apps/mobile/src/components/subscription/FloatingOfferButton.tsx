@@ -37,6 +37,8 @@ export function FloatingOfferButton({ onPress, discountPercent = 50 }: FloatingO
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const giftRotateAnim = useRef(new Animated.Value(0)).current;
   const giftBounceAnim = useRef(new Animated.Value(0)).current;
+  const timerPulseAnim = useRef(new Animated.Value(1)).current;
+  const timerOpacityAnim = useRef(new Animated.Value(1)).current;
 
   // Pulse animation for container
   useEffect(() => {
@@ -45,14 +47,14 @@ export function FloatingOfferButton({ onPress, discountPercent = 50 }: FloatingO
     const pulse = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
-          toValue: 1.03,
-          duration: 1200,
+          toValue: 1.02,
+          duration: 1500,
           easing: Easing.inOut(Easing.ease),
           useNativeDriver: true
         }),
         Animated.timing(pulseAnim, {
           toValue: 1,
-          duration: 1200,
+          duration: 1500,
           easing: Easing.inOut(Easing.ease),
           useNativeDriver: true
         })
@@ -62,6 +64,54 @@ export function FloatingOfferButton({ onPress, discountPercent = 50 }: FloatingO
 
     return () => pulse.stop();
   }, [isActive, pulseAnim]);
+
+  // Timer urgency pulse - faster, more noticeable
+  useEffect(() => {
+    if (!isActive) return;
+
+    const timerPulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(timerPulseAnim, {
+          toValue: 1.08,
+          duration: 500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true
+        }),
+        Animated.timing(timerPulseAnim, {
+          toValue: 1,
+          duration: 500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true
+        })
+      ])
+    );
+
+    // Subtle opacity pulse for the clock icon
+    const opacityPulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(timerOpacityAnim, {
+          toValue: 0.6,
+          duration: 500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true
+        }),
+        Animated.timing(timerOpacityAnim, {
+          toValue: 1,
+          duration: 500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true
+        })
+      ])
+    );
+
+    timerPulse.start();
+    opacityPulse.start();
+
+    return () => {
+      timerPulse.stop();
+      opacityPulse.stop();
+    };
+  }, [isActive, timerPulseAnim, timerOpacityAnim]);
 
   // Gift icon wiggle + bounce animation
   useEffect(() => {
@@ -188,11 +238,20 @@ export function FloatingOfferButton({ onPress, discountPercent = 50 }: FloatingO
         {/* Divider */}
         <View style={styles.divider} />
 
-        {/* Timer */}
-        <View style={styles.timerContainer}>
-          <Ionicons name="time" size={16} color="rgba(255,255,255,0.9)" />
+        {/* Timer with subtle pulse */}
+        <Animated.View
+          style={[
+            styles.timerContainer,
+            {
+              transform: [{ scale: timerPulseAnim }]
+            }
+          ]}
+        >
+          <Animated.View style={{ opacity: timerOpacityAnim }}>
+            <Ionicons name="time" size={16} color="rgba(255,255,255,0.9)" />
+          </Animated.View>
           <Text style={styles.timerText}>{formatTimeRemaining(timeRemaining)}</Text>
-        </View>
+        </Animated.View>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -201,7 +260,7 @@ export function FloatingOfferButton({ onPress, discountPercent = 50 }: FloatingO
 const makeFloatingOfferButtonStyles = (tokens: any, colors: any, brand: any) => ({
   container: {
     position: "absolute" as const,
-    bottom: toRN(tokens.spacing[28]),
+    bottom: toRN(tokens.spacing[22]), // Just above the tab bar edge
     right: 0, // Clipped to right edge
     zIndex: 100
   },
@@ -220,7 +279,7 @@ const makeFloatingOfferButtonStyles = (tokens: any, colors: any, brand: any) => 
     // Shadow
     shadowColor: "#000",
     shadowOffset: { width: -4, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.25,
     shadowRadius: 10,
     elevation: 12
   },

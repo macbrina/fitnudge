@@ -10,12 +10,13 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import CheckmarkCircle from "@/components/ui/CheckmarkCircle";
 import { useQueryClient } from "@tanstack/react-query";
 import { BackButton } from "@/components/ui/BackButton";
 import Button from "@/components/ui/Button";
 import { SearchBar } from "@/components/ui/SearchBar";
 import { MOBILE_ROUTES } from "@/lib/routes";
-import { Tabs, TabItem } from "@/components/ui/Tabs";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { Card } from "@/components/ui/Card";
 import { SkeletonBox } from "@/components/ui/SkeletonBox";
 import { useAlertModal } from "@/contexts/AlertModalContext";
@@ -37,6 +38,32 @@ import { SearchUserResult, RequestStatus } from "@/services/api/partners";
 
 type PartnerTab = "search" | "suggested";
 
+// Activity status based on last_active_at
+type ActivityStatus = "active" | "recent" | "inactive";
+
+const getActivityStatus = (lastActiveAt?: string): ActivityStatus => {
+  if (!lastActiveAt) return "inactive";
+
+  const lastActive = new Date(lastActiveAt);
+  const now = new Date();
+  const diffHours = (now.getTime() - lastActive.getTime()) / (1000 * 60 * 60);
+
+  if (diffHours <= 24) return "active"; // Active today
+  if (diffHours <= 168) return "recent"; // Active this week (7 days)
+  return "inactive"; // Inactive
+};
+
+const getActivityColor = (status: ActivityStatus): string => {
+  switch (status) {
+    case "active":
+      return "#22C55E"; // Green
+    case "recent":
+      return "#F59E0B"; // Amber
+    case "inactive":
+      return "#9CA3AF"; // Gray
+  }
+};
+
 export const FindPartnerScreen: React.FC = () => {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -45,18 +72,15 @@ export const FindPartnerScreen: React.FC = () => {
   const { t } = useTranslation();
   const { showAlert, showConfirm } = useAlertModal();
 
-  const [activeTab, setActiveTab] = useState<PartnerTab>("search");
+  const [activeTabIndex, setActiveTabIndex] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
 
-  // Build tabs with translations
-  const tabs: TabItem[] = useMemo(
-    () => [
-      { id: "search", label: t("social.tabs.search") },
-      { id: "suggested", label: t("social.tabs.suggested") }
-    ],
-    [t]
-  );
+  // Tab options for SegmentedControl
+  const tabOptions = useMemo(() => [t("social.tabs.search"), t("social.tabs.suggested")], [t]);
+
+  // Map index to tab type
+  const activeTab: PartnerTab = activeTabIndex === 0 ? "search" : "suggested";
 
   // Debounce search query
   const debounceTimeout = React.useRef<NodeJS.Timeout | null>(null);
@@ -102,8 +126,12 @@ export const FindPartnerScreen: React.FC = () => {
     limit: partnerLimit
   } = usePartnerAccess();
 
-  // Track which users are currently being processed (for showing loading on specific buttons)
-  const [processingUsers, setProcessingUsers] = useState<Set<string>>(new Set());
+  // Redirect back if user can't send requests (at limit)
+  React.useEffect(() => {
+    if (!canSendRequest) {
+      router.back();
+    }
+  }, [canSendRequest, router]);
 
   // Track manual refresh state (don't show RefreshControl for background refetches)
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
@@ -155,23 +183,8 @@ export const FindPartnerScreen: React.FC = () => {
     }
   }, [activeTab, debouncedQuery, queryClient]);
 
-  // Helper to add/remove user from processing set
-  const addProcessingUser = useCallback((userId: string) => {
-    setProcessingUsers((prev) => new Set(prev).add(userId));
-  }, []);
-
-  const removeProcessingUser = useCallback((userId: string) => {
-    setProcessingUsers((prev) => {
-      const next = new Set(prev);
-      next.delete(userId);
-      return next;
-    });
-  }, []);
-
   const handleSendRequest = useCallback(
     async (user: SearchUserResult) => {
-      const userName = user.name || user.username || t("partners.unknown_user");
-
       // Check if user has the feature (from subscription store - updates immediately after purchase)
       if (!hasPartnerFeature) {
         showAlert({
@@ -207,7 +220,7 @@ export const FindPartnerScreen: React.FC = () => {
         title: t("partners.send_request_title") || "Send Partner Request",
         message:
           t("partners.send_request_message") ||
-          "By becoming accountability partners, you will both be able to:\n\n• See each other's active goals and challenges\n• View each other's progress and streaks\n• Send nudges to motivate each other\n\nThis helps you stay accountable together on your fitness journey.",
+          "By becoming accountability partners, you will both be able to:\n\n• See each other's active goals\n• View each other's progress and streaks\n• Send nudges to motivate each other\n\nThis helps you stay accountable together on your fitness journey.",
         confirmLabel: t("partners.send_request_confirm") || "Send Request",
         cancelLabel: t("partners.send_request_cancel") || "Cancel",
         variant: "info",
@@ -217,31 +230,37 @@ export const FindPartnerScreen: React.FC = () => {
 
       if (!confirmed) return;
 
-      addProcessingUser(user.id);
-      try {
-        await sendRequestMutation.mutateAsync({
-          partner_user_id: user.id
-        });
-        // No need to refresh - optimistic update handles button state
-      } catch (error: unknown) {
-        const errorMessage = error instanceof ApiError ? error.message : t("social.request_failed");
-        showAlert({
-          title: t("common.error"),
-          message: errorMessage,
-          variant: "error",
-          confirmLabel: t("common.ok")
-        });
-      } finally {
-        removeProcessingUser(user.id);
-      }
+      // Fire-and-forget: optimistic update already happened, send in background
+      const sendWithRetry = async (attempt = 0) => {
+        try {
+          await sendRequestMutation.mutateAsync({
+            partner_user_id: user.id
+          });
+        } catch (error: unknown) {
+          if (attempt === 0) {
+            // Silent retry once
+            sendWithRetry(1);
+          } else {
+            // Failed after retry - show error (rollback already handled by mutation)
+            const errorMessage =
+              error instanceof ApiError ? error.message : t("social.request_failed");
+            showAlert({
+              title: t("common.error"),
+              message: errorMessage,
+              variant: "error",
+              confirmLabel: t("common.ok")
+            });
+          }
+        }
+      };
+
+      sendWithRetry();
     },
     [
       sendRequestMutation,
       showAlert,
       showConfirm,
       t,
-      addProcessingUser,
-      removeProcessingUser,
       hasPartnerFeature,
       canSendRequest,
       partnerLimit,
@@ -251,61 +270,80 @@ export const FindPartnerScreen: React.FC = () => {
   );
 
   const handleCancelRequest = useCallback(
-    async (user: SearchUserResult) => {
+    (user: SearchUserResult) => {
       if (!user.partnership_id) return;
 
-      addProcessingUser(user.id);
-      try {
-        await cancelRequestMutation.mutateAsync({
-          partnershipId: user.partnership_id,
-          userId: user.id
-        });
-        // No need to refresh - optimistic update handles button state
-      } catch (error: unknown) {
-        const errorMessage = error instanceof ApiError ? error.message : t("social.cancel_failed");
-        showAlert({
-          title: t("common.error"),
-          message: errorMessage,
-          variant: "error",
-          confirmLabel: t("common.ok")
-        });
-      } finally {
-        removeProcessingUser(user.id);
-      }
+      const partnershipId = user.partnership_id;
+
+      // Fire-and-forget: optimistic update already happened, send in background
+      const cancelWithRetry = async (attempt = 0) => {
+        try {
+          await cancelRequestMutation.mutateAsync({
+            partnershipId,
+            userId: user.id
+          });
+        } catch (error: unknown) {
+          if (attempt === 0) {
+            // Silent retry once
+            cancelWithRetry(1);
+          } else {
+            // Failed after retry - show error (rollback already handled by mutation)
+            const errorMessage =
+              error instanceof ApiError ? error.message : t("social.cancel_failed");
+            showAlert({
+              title: t("common.error"),
+              message: errorMessage,
+              variant: "error",
+              confirmLabel: t("common.ok")
+            });
+          }
+        }
+      };
+
+      cancelWithRetry();
     },
-    [cancelRequestMutation, showAlert, t, addProcessingUser, removeProcessingUser]
+    [cancelRequestMutation, showAlert, t]
   );
 
   const handleAcceptRequest = useCallback(
-    async (user: SearchUserResult) => {
+    (user: SearchUserResult) => {
       if (!user.partnership_id) return;
 
-      addProcessingUser(user.id);
-      try {
-        await acceptRequestMutation.mutateAsync({
-          partnershipId: user.partnership_id,
-          userId: user.id
-        });
-        // No need to refresh - optimistic update handles button state
-      } catch (error: unknown) {
-        const errorMessage = error instanceof ApiError ? error.message : t("social.accept_failed");
-        showAlert({
-          title: t("common.error"),
-          message: errorMessage,
-          variant: "error",
-          confirmLabel: t("common.ok")
-        });
-      } finally {
-        removeProcessingUser(user.id);
-      }
+      const partnershipId = user.partnership_id;
+
+      // Fire-and-forget: optimistic update already happened, send in background
+      const acceptWithRetry = async (attempt = 0) => {
+        try {
+          await acceptRequestMutation.mutateAsync({
+            partnershipId,
+            userId: user.id
+          });
+        } catch (error: unknown) {
+          if (attempt === 0) {
+            // Silent retry once
+            acceptWithRetry(1);
+          } else {
+            // Failed after retry - show error (rollback already handled by mutation)
+            const errorMessage =
+              error instanceof ApiError ? error.message : t("social.accept_failed");
+            showAlert({
+              title: t("common.error"),
+              message: errorMessage,
+              variant: "error",
+              confirmLabel: t("common.ok")
+            });
+          }
+        }
+      };
+
+      acceptWithRetry();
     },
-    [acceptRequestMutation, showAlert, t, addProcessingUser, removeProcessingUser]
+    [acceptRequestMutation, showAlert, t]
   );
 
   const renderUserCard = useCallback(
     ({ item }: { item: SearchUserResult }) => {
       const requestStatus = item.request_status || "none";
-      const isProcessing = processingUsers.has(item.id);
 
       // Render action button based on request status
       const renderActionButton = () => {
@@ -314,7 +352,7 @@ export const FindPartnerScreen: React.FC = () => {
             // Already partners - show badge
             return (
               <View style={styles.partnerBadge}>
-                <Ionicons name="checkmark-circle" size={16} color={colors.feedback.success} />
+                <CheckmarkCircle size={16} color={colors.feedback.success} mr={1} />
                 <Text style={styles.partnerBadgeText}>{t("social.partner_badge")}</Text>
               </View>
             );
@@ -325,17 +363,10 @@ export const FindPartnerScreen: React.FC = () => {
               <TouchableOpacity
                 style={styles.requestedButton}
                 onPress={() => handleCancelRequest(item)}
-                disabled={isProcessing}
                 activeOpacity={0.7}
               >
-                {isProcessing ? (
-                  <ActivityIndicator size="small" color={colors.text.tertiary} />
-                ) : (
-                  <>
-                    <Ionicons name="time-outline" size={14} color={colors.text.tertiary} />
-                    <Text style={styles.requestedButtonText}>{t("social.requested_button")}</Text>
-                  </>
-                )}
+                <Ionicons name="time-outline" size={14} color={colors.text.tertiary} />
+                <Text style={styles.requestedButtonText}>{t("social.requested_button")}</Text>
               </TouchableOpacity>
             );
 
@@ -345,17 +376,10 @@ export const FindPartnerScreen: React.FC = () => {
               <TouchableOpacity
                 style={styles.acceptButton}
                 onPress={() => handleAcceptRequest(item)}
-                disabled={isProcessing}
                 activeOpacity={0.7}
               >
-                {isProcessing ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <>
-                    <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-                    <Text style={styles.acceptButtonText}>{t("social.accept_button")}</Text>
-                  </>
-                )}
+                <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                <Text style={styles.acceptButtonText}>{t("social.accept_button")}</Text>
               </TouchableOpacity>
             );
 
@@ -366,20 +390,26 @@ export const FindPartnerScreen: React.FC = () => {
               <TouchableOpacity
                 style={styles.addButton}
                 onPress={() => handleSendRequest(item)}
-                disabled={isProcessing}
                 activeOpacity={0.7}
               >
-                {isProcessing ? (
-                  <ActivityIndicator size="small" color={brandColors.primary} />
-                ) : (
-                  <>
-                    <Ionicons name="person-add" size={16} color={brandColors.primary} />
-                    <Text style={styles.addButtonText}>{t("social.request_button")}</Text>
-                  </>
-                )}
+                <Ionicons name="person-add" size={16} color={brandColors.primary} />
+                <Text style={styles.addButtonText}>{t("social.request_button")}</Text>
               </TouchableOpacity>
             );
         }
+      };
+
+      // Check if this is a suggested user with match data
+      const hasMatchData = activeTab === "suggested" && item.match_score !== undefined;
+      const matchScore = item.match_score ?? 0;
+      const matchReasons = item.match_reasons ?? [];
+      const matchedGoals = item.matched_goals ?? [];
+
+      // Get color for match score badge
+      const getMatchColor = () => {
+        if (matchScore >= 70) return colors.feedback.success;
+        if (matchScore >= 40) return "#F59E0B"; // Amber
+        return colors.text.tertiary;
       };
 
       return (
@@ -398,18 +428,68 @@ export const FindPartnerScreen: React.FC = () => {
                   </Text>
                 </View>
               )}
+              {/* Activity Indicator - top right of avatar */}
+              {item.last_active_at && (
+                <View
+                  style={[
+                    styles.activityIndicator,
+                    { backgroundColor: getActivityColor(getActivityStatus(item.last_active_at)) }
+                  ]}
+                />
+              )}
+              {/* Match Score Badge on Avatar */}
+              {hasMatchData && matchScore > 0 && (
+                <View style={[styles.matchScoreBadge, { backgroundColor: getMatchColor() }]}>
+                  <Text style={styles.matchScoreText}>{Math.round(matchScore)}%</Text>
+                </View>
+              )}
             </View>
 
             {/* User Info */}
             <View style={styles.userInfo}>
+              {item.name && (
+                <Text style={styles.partnerName} numberOfLines={1}>
+                  {item.name || t("common.user")}
+                </Text>
+              )}
               {item.username && (
-                <Text style={styles.userUsername} numberOfLines={1}>
+                <Text style={styles.partnerUsername} numberOfLines={1}>
                   @{item.username}
                 </Text>
               )}
-              <Text style={styles.userName} numberOfLines={1}>
-                {item.name || (item.username ? "" : t("social.unknown_user"))}
-              </Text>
+
+              {/* Match Reasons (for suggested tab) */}
+              {hasMatchData && matchReasons.length > 0 && (
+                <View style={styles.matchReasonsRow}>
+                  {matchReasons.slice(0, 2).map((reason, index) => (
+                    <View key={index} style={styles.matchReasonChip}>
+                      <Ionicons
+                        name={
+                          reason.toLowerCase().includes("goal")
+                            ? "flag-outline"
+                            : reason.toLowerCase().includes("timezone")
+                              ? "time-outline"
+                              : reason.toLowerCase().includes("schedule")
+                                ? "calendar-outline"
+                                : "checkmark-circle-outline"
+                        }
+                        size={10}
+                        color={brandColors.primary}
+                      />
+                      <Text style={styles.matchReasonText} numberOfLines={1}>
+                        {reason}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {/* Matched Goals Preview */}
+              {hasMatchData && matchedGoals.length > 0 && matchReasons.length === 0 && (
+                <Text style={styles.matchedGoalsText} numberOfLines={1}>
+                  {t("social.goals_in_common", { count: matchedGoals.length })}
+                </Text>
+              )}
             </View>
 
             {/* Action Button */}
@@ -419,12 +499,12 @@ export const FindPartnerScreen: React.FC = () => {
       );
     },
     [
+      activeTab,
       brandColors,
       colors,
       handleSendRequest,
       handleCancelRequest,
       handleAcceptRequest,
-      processingUsers,
       styles,
       t
     ]
@@ -502,12 +582,10 @@ export const FindPartnerScreen: React.FC = () => {
 
       {/* Tabs */}
       <View style={styles.tabsContainer}>
-        <Tabs
-          tabs={tabs}
-          selectedId={activeTab}
-          onChange={(id) => setActiveTab(id as PartnerTab)}
-          variant="underline"
-          fullWidth
+        <SegmentedControl
+          options={tabOptions}
+          selectedIndex={activeTabIndex}
+          onChange={setActiveTabIndex}
         />
       </View>
 
@@ -597,7 +675,8 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     alignItems: "center" as const
   },
   avatarContainer: {
-    marginRight: toRN(tokens.spacing[3])
+    marginRight: toRN(tokens.spacing[3]),
+    position: "relative" as const
   },
   avatar: {
     width: 48,
@@ -611,25 +690,77 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     justifyContent: "center" as const,
     alignItems: "center" as const
   },
+  activityIndicator: {
+    position: "absolute" as const,
+    top: 0,
+    right: 0,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: colors.bg.card
+  },
   avatarInitial: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.bold,
     color: "#fff"
   },
+  matchScoreBadge: {
+    position: "absolute" as const,
+    bottom: -2,
+    right: -2,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: colors.bg.card
+  },
+  matchScoreText: {
+    fontSize: 9,
+    fontFamily: fontFamily.bold,
+    color: "#FFFFFF"
+  },
   userInfo: {
     flex: 1,
     marginRight: toRN(tokens.spacing[3])
   },
-  userName: {
-    fontSize: toRN(tokens.typography.fontSize.base),
-    fontFamily: fontFamily.semiBold,
+  partnerName: {
+    fontSize: toRN(tokens.typography.fontSize.lg),
+    fontFamily: fontFamily.groteskSemiBold,
     color: colors.text.primary
   },
-  userUsername: {
+  partnerUsername: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
-    color: colors.text.secondary,
+    color: colors.text.tertiary,
     marginTop: toRN(tokens.spacing[0.5])
+  },
+  matchReasonsRow: {
+    flexDirection: "row" as const,
+    flexWrap: "wrap" as const,
+    gap: toRN(tokens.spacing[1]),
+    marginTop: toRN(tokens.spacing[1.5])
+  },
+  matchReasonChip: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    backgroundColor: `${brand.primary}12`,
+    paddingHorizontal: toRN(tokens.spacing[2]),
+    paddingVertical: toRN(tokens.spacing[0.5]),
+    borderRadius: toRN(tokens.borderRadius.sm),
+    gap: toRN(tokens.spacing[1])
+  },
+  matchReasonText: {
+    fontSize: toRN(tokens.typography.fontSize.xs),
+    fontFamily: fontFamily.medium,
+    color: brand.primary,
+    maxWidth: 100
+  },
+  matchedGoalsText: {
+    fontSize: toRN(tokens.typography.fontSize.xs),
+    fontFamily: fontFamily.regular,
+    color: colors.text.tertiary,
+    marginTop: toRN(tokens.spacing[1])
   },
   actionContainer: {
     minWidth: 80,

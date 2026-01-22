@@ -9,6 +9,7 @@ import { useTranslation } from "@/lib/i18n";
 import { toRN } from "@/lib/units";
 import { useStyles, useTheme } from "@/themes";
 import { Ionicons } from "@expo/vector-icons";
+import CheckmarkCircle from "@/components/ui/CheckmarkCircle";
 import { useRouter } from "expo-router";
 import React from "react";
 import {
@@ -266,7 +267,7 @@ export const ReferralScreen: React.FC = () => {
           onPress={handleShare}
           style={styles.shareButton}
           leftIcon="share-social"
-          size="lg"
+          size="md"
         />
 
         {/* How it Works - Card Style */}
@@ -385,11 +386,7 @@ export const ReferralScreen: React.FC = () => {
                     </View>
                     {referral.referral_bonus_granted_at ? (
                       <View style={styles.earnedBadge}>
-                        <Ionicons
-                          name="checkmark-circle"
-                          size={14}
-                          color={colors.feedback.success}
-                        />
+                        <CheckmarkCircle size={14} color={colors.feedback.success} mr={1} />
                         <Text style={styles.earnedBadgeText}>
                           {t("referral.earned") || "Earned"}
                         </Text>

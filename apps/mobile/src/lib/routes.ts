@@ -25,65 +25,28 @@ export const ROUTES = {
     SET_PASSWORD: "/auth/set-password"
   },
 
-  // Goals routes
+  // Goals routes (V2 - simplified habits)
   GOALS: {
     BASE: "/goals",
     LIST: "/goals/",
-    ARCHIVE: (id: string) => `/goals/${id}/archive`,
-    UNARCHIVE: (id: string) => `/goals/${id}/unarchive`,
-    ACTIVATE: (id: string) => `/goals/${id}/activate`,
-    DEACTIVATE: (id: string) => `/goals/${id}/deactivate`,
-    DUPLICATE_GOAL: (id: string) => `/goals/${id}/duplicate`,
-    SHARE_AS_CHALLENGE: (id: string) => `/goals/${id}/share-as-challenge`,
-    GET_GOALS_BY_CATEGORY: (category: string) => `/goals/?category=${category}`,
-    GET_ACTIVE_GOALS: "/goals/?is_active=true",
-    GET_COMPLETED_GOALS: "/goals/?is_active=false",
+    // Query params for filtering
+    ACTIVE: "/goals/?active_only=true",
+    ARCHIVED: "/goals/?active_only=false",
+    // CRUD
     CREATE: "/goals/",
     GET: (id: string) => `/goals/${id}`,
     UPDATE: (id: string) => `/goals/${id}`,
     DELETE: (id: string) => `/goals/${id}`,
-    CHECKIN: (id: string) => `/goals/${id}/checkin`,
-    CHECKINS: (id: string) => `/goals/${id}/checkins`,
-    TEMPLATES: "/goals/templates/",
+    // Status actions
+    ACTIVATE: (id: string) => `/goals/${id}/activate`,
+    DEACTIVATE: (id: string) => `/goals/${id}/deactivate`,
+    ARCHIVE: (id: string) => `/goals/${id}/archive`,
+    // Stats
     GET_STATS: (id: string) => `/goals/${id}/stats`,
-    STATS: "/goals/stats",
-    PLAN_STATUS: (id: string) => `/goals/${id}/plan-status`,
-    PLAN: (id: string) => `/goals/${id}/plan`,
-    PLAN_RETRY: (id: string) => `/goals/${id}/plan/retry`
-  },
-
-  // Challenges routes
-  CHALLENGES: {
-    BASE: "/challenges",
-    LIST: "/challenges",
-    MY: "/challenges/my", // All challenges user has access to (created or joined)
-    PUBLIC: "/challenges/public", // Public challenges for discovery
-    GET: (id: string) => `/challenges/${id}`,
-    CREATE: "/challenges/",
-    UPDATE: (id: string) => `/challenges/${id}`,
-    DELETE: (id: string) => `/challenges/${id}`,
-    CANCEL: (id: string) => `/challenges/${id}/cancel`,
-    JOIN: (id: string) => `/challenges/${id}/join`,
-    LEAVE: (id: string) => `/challenges/${id}/leave`,
-    CHECK_IN: (id: string) => `/challenges/${id}/check-in`,
-    CHECK_INS: (id: string) => `/challenges/${id}/check-ins`,
-    MY_CHECK_INS: (id: string) => `/challenges/${id}/my-check-ins`,
-    UPDATE_CHECK_IN: (challengeId: string, checkInId: string) =>
-      `/challenges/${challengeId}/check-ins/${checkInId}`,
-    DELETE_CHECK_IN: (challengeId: string, checkInId: string) =>
-      `/challenges/${challengeId}/check-ins/${checkInId}`,
-    LEADERBOARD: (id: string) => `/challenges/${id}/leaderboard`,
-    PARTICIPANTS: (id: string) => `/challenges/${id}/participants`,
-    // Invite management routes
-    INVITES_RECEIVED: "/challenges/invites/received",
-    INVITES_SENT: "/challenges/invites/sent",
-    INVITE_ACCEPT: (inviteId: string) => `/challenges/invites/${inviteId}/accept`,
-    INVITE_DECLINE: (inviteId: string) => `/challenges/invites/${inviteId}/decline`,
-    INVITE_CANCEL: (inviteId: string) => `/challenges/invites/${inviteId}`,
-    // Other invite routes
-    INVITE: (id: string) => `/challenges/${id}/invite`,
-    INVITE_LINK: (id: string) => `/challenges/${id}/invite-link`,
-    JOIN_VIA_INVITE: (inviteCode: string) => `/challenges/join/${inviteCode}`
+    STATS_SUMMARY: "/goals/stats/summary",
+    // Insights (Premium)
+    GET_INSIGHTS: (id: string) => `/goals/${id}/insights`,
+    REFRESH_INSIGHTS: (id: string) => `/goals/${id}/insights/refresh`
   },
 
   // Nudges routes (social motivation)
@@ -105,11 +68,15 @@ export const ROUTES = {
     LIMITS: "/partners/limits",
     PENDING: "/partners/pending",
     SENT: "/partners/sent",
+    BLOCKED: "/partners/blocked",
     REQUEST: "/partners/request",
     ACCEPT: (id: string) => `/partners/${id}/accept`,
     REJECT: (id: string) => `/partners/${id}/reject`,
     CANCEL: (id: string) => `/partners/${id}/cancel`,
     REMOVE: (id: string) => `/partners/${id}`,
+    BLOCK: (id: string) => `/partners/${id}/block`,
+    UNBLOCK: (id: string) => `/partners/${id}/unblock`,
+    REPORT: (userId: string) => `/partners/report/${userId}`,
     SEARCH_USERS: "/partners/search",
     SUGGESTED_USERS: "/partners/suggested",
     DASHBOARD: (partnerUserId: string) => `/partners/${partnerUserId}/dashboard`
@@ -133,6 +100,14 @@ export const ROUTES = {
     GET: (id: string) => `/daily-motivations/${id}`,
     SHARE: (id: string) => `/daily-motivations/${id}/share`,
     REGENERATE: "/daily-motivations/regenerate"
+  },
+
+  // Weekly Recaps routes
+  RECAPS: {
+    BASE: "/recaps",
+    LIST: "/recaps/list",
+    CURRENT: "/recaps/weekly",
+    GET: (id: string) => `/recaps/${id}`
   },
 
   // Social routes
@@ -222,6 +197,12 @@ export const ROUTES = {
     STATUS: (exportId: string) => `/data-export/status/${exportId}`
   },
 
+  // App Config routes (public, no auth required)
+  APP_CONFIG: {
+    PUBLIC: "/app-config/public",
+    BY_CATEGORY: (category: string) => `/app-config/public/${category}`
+  },
+
   // Check-ins routes
   CHECKINS: {
     LIST: "/check-ins",
@@ -247,6 +228,12 @@ export const ROUTES = {
     DELETE_BY_URL: "/media/delete-by-url"
   },
 
+  // Voice Notes routes (consolidated into media.py)
+  VOICE_NOTES: {
+    UPLOAD: "/media/upload", // Uses media.py with media_type=voice_note
+    DELETE: (checkinId: string) => `/media/voice-note/${checkinId}`
+  },
+
   // Analytics routes
   ANALYTICS: {
     DASHBOARD: "/analytics/dashboard",
@@ -267,8 +254,7 @@ export const ROUTES = {
 
   // Onboarding routes
   ONBOARDING: {
-    PROFILE: "/onboarding/profile",
-    SUGGESTED_GOALS: "/onboarding/suggested-goals"
+    COMPLETE: "/onboarding/complete"
   },
 
   // Achievements routes
@@ -279,25 +265,17 @@ export const ROUTES = {
     STATS: "/achievements/stats"
   },
 
-  // Meal tracking routes
-  MEALS: {
-    LIST: "/meals/",
-    CREATE: "/meals/",
-    GET: (id: string) => `/meals/${id}`,
-    UPDATE: (id: string) => `/meals/${id}`,
-    DELETE: (id: string) => `/meals/${id}`,
-    ESTIMATE_NUTRITION: "/meals/estimate-nutrition",
-    HISTORY: "/meals/history"
-  },
-
-  // Hydration tracking routes
-  HYDRATION: {
-    LIST: "/hydration/",
-    CREATE: "/hydration/",
-    GET: (id: string) => `/hydration/${id}`,
-    DELETE: (id: string) => `/hydration/${id}`,
-    SUMMARY: (date: string) => `/hydration/summary/${date}`,
-    PRESETS: "/hydration/presets"
+  // AI Coach routes
+  AI_COACH: {
+    ACCESS: "/ai-coach/access",
+    RATE_LIMIT: "/ai-coach/rate-limit",
+    CHAT: "/ai-coach/chat",
+    CHAT_ASYNC: "/ai-coach/chat/async",
+    CONVERSATIONS: "/ai-coach/conversations",
+    CONVERSATION: (id: string) => `/ai-coach/conversations/${id}`,
+    CURRENT_CONVERSATION: "/ai-coach/conversations/current",
+    NEW_CONVERSATION: "/ai-coach/conversations/new",
+    UNLOCK_MESSAGE: "/ai-coach/unlock-message"
   }
 } as const;
 
@@ -330,17 +308,16 @@ export const MOBILE_ROUTES = {
     SIGNUP: "/(auth)/signup",
     VERIFY_EMAIL: "/(auth)/verify-email",
     FORGOT_PASSWORD: "/(auth)/forgot-password",
-    RESET_PASSWORD: "/(auth)/reset-password",
-    CHANGE_PASSWORD: "/(auth)/change-password"
+    RESET_PASSWORD: "/(auth)/reset-password"
   },
 
   // Main tabs
   MAIN: {
     HOME: "/(user)/(tabs)",
     GOALS: "/(user)/(tabs)/goals",
-    SOCIAL: "/(user)/(tabs)/feed",
     NOTIFICATIONS: "/(user)/(tabs)/notifications",
-    PROFILE: "/(user)/(tabs)/profile"
+    PROFILE: "/(user)/(tabs)/profile",
+    PROGRESS: "/(user)/(tabs)/progress"
   },
 
   // Goal screens
@@ -350,23 +327,14 @@ export const MOBILE_ROUTES = {
     EDIT: "/(user)/(goals)/edit",
     DETAILS: "/(user)/(goals)/details",
     CHECKIN: "/(user)/(goals)/checkin",
-    MEAL_HISTORY: (goalId: string) => `/(user)/(goals)/meal-history?goalId=${goalId}`
-  },
-
-  // Social screens (Posts + Challenges discovery)
-  SOCIAL: {
-    FEED: "/(user)/(tabs)/feed",
-    CREATE_POST: "/(user)/social/create",
-    POST_DETAILS: "/(user)/social/post",
-    USER_PROFILE: "/(user)/social/profile",
-    FIND_PARTNER: "/(user)/profile/find-partner"
+    CHECKIN_HISTORY: "/(user)/(goals)/checkin-history",
+    MEAL_HISTORY: (goalId: string) => `/(user)/(goals)/meal-history?goalId=${goalId}`,
+    MEAL_DETAIL: (mealId: string) => `/(user)/(goals)/meal-detail?mealId=${mealId}`
   },
 
   // Notifications screens
   NOTIFICATIONS: {
-    TAB: "/(user)/(tabs)/notifications",
-    CHALLENGE_INVITE: (inviteId: string) =>
-      `/(user)/notifications/challenge-invite/${inviteId}` as const
+    TAB: "/(user)/(tabs)/notifications"
   },
 
   // Profile screens
@@ -375,7 +343,6 @@ export const MOBILE_ROUTES = {
     EDIT: "/(user)/profile/edit",
     SETTINGS: "/(user)/profile/settings",
     NOTIFICATION_SETTINGS: "/(user)/profile/notification-settings",
-    CHANGE_PASSWORD: "/(user)/profile/change-password",
     // Account Settings (new structure)
     ACCOUNT_SETTINGS: "/(user)/profile/account-settings",
     SECURITY_SETTINGS: "/(user)/profile/security-settings",
@@ -383,6 +350,7 @@ export const MOBILE_ROUTES = {
     // Partners (moved from Social)
     PARTNERS: "/(user)/profile/partners",
     FIND_PARTNER: "/(user)/profile/find-partner",
+    BLOCKED_PARTNERS: "/(user)/profile/blocked-partners",
     PARTNER_DETAIL: (partnerUserId: string, partnershipId: string) =>
       `/(user)/profile/partner/${partnerUserId}?partnershipId=${partnershipId}` as const,
     // Activity (nudges from partners)
@@ -405,7 +373,9 @@ export const MOBILE_ROUTES = {
     // Contact & Support
     CONTACT: "/(user)/profile/contact",
     LIVE_CHAT: "/(user)/profile/live-chat",
-    HELP_CENTER: "/(user)/profile/help-center"
+    HELP_CENTER: "/(user)/profile/help-center",
+    // Blog
+    BLOG: "/(user)/profile/blog"
   },
 
   // Achievements (deprecated - use PROFILE.ACHIEVEMENTS)
@@ -417,36 +387,7 @@ export const MOBILE_ROUTES = {
   ONBOARDING: {
     MAIN: "/(onboarding)",
     NOTIFICATION_PERMISSION: "/(user)/(onboarding)/notification-permission",
-    PERSONALIZATION: "/(user)/(onboarding)/personalization",
-    SUGGESTED_GOALS: "/(user)/(onboarding)/suggested-goals",
-    SUBSCRIPTION: "/(user)/(onboarding)/subscription"
-  },
-
-  // Challenges
-  CHALLENGES: {
-    LIST: "/(user)/challenges",
-    DETAILS: (id: string) => `/(user)/challenges/${id}` as const,
-    CREATE: "/(user)/challenges/create",
-    LEADERBOARD: (id: string) => `/(user)/challenges/${id}/leaderboard` as const,
-    INVITES: "/(user)/challenges/invites",
-    INVITE_USERS: (challengeId: string) =>
-      `/(user)/challenges/invites?challengeId=${challengeId}` as const,
-    MEAL_HISTORY: (challengeId: string) =>
-      `/(user)/(goals)/meal-history?challengeId=${challengeId}` as const
-  },
-
-  // Workout
-  WORKOUT: {
-    // Goal-based workout routes
-    PLAYER: (goalId: string) => `/workout/${goalId}` as const,
-    PLAYER_RESUME: (goalId: string) => `/workout/${goalId}?resume=true` as const,
-    PLAYER_RESTART: (goalId: string) => `/workout/${goalId}?restart=true` as const,
-    // Challenge-based workout routes (standalone challenges)
-    CHALLENGE_PLAYER: (challengeId: string) => `/workout/challenge/${challengeId}` as const,
-    CHALLENGE_PLAYER_RESUME: (challengeId: string) =>
-      `/workout/challenge/${challengeId}?resume=true` as const,
-    CHALLENGE_PLAYER_RESTART: (challengeId: string) =>
-      `/workout/challenge/${challengeId}?restart=true` as const
+    PERSONALIZATION: "/(user)/(onboarding)/personalization"
   }
 } as const;
 
@@ -480,15 +421,11 @@ export const navigation = {
     goToSignup: () => MOBILE_ROUTES.AUTH.SIGNUP,
     goToHome: () => MOBILE_ROUTES.MAIN.HOME,
     goToGoals: () => MOBILE_ROUTES.MAIN.GOALS,
-    goToFeed: () => MOBILE_ROUTES.MAIN.SOCIAL,
     goToProfile: () => MOBILE_ROUTES.MAIN.PROFILE,
     goToCreateGoal: () => MOBILE_ROUTES.GOALS.CREATE,
     goToEditGoal: (id: string) => MOBILE_ROUTES.GOALS.EDIT,
     goToGoalDetails: (id: string) => MOBILE_ROUTES.GOALS.DETAILS,
     goToCheckIn: (id: string) => MOBILE_ROUTES.GOALS.CHECKIN,
-    goToCreatePost: () => MOBILE_ROUTES.SOCIAL.CREATE_POST,
-    goToPostDetails: (id: string) => MOBILE_ROUTES.SOCIAL.POST_DETAILS,
-    goToUserProfile: (id: string) => MOBILE_ROUTES.SOCIAL.USER_PROFILE,
     goToEditProfile: () => MOBILE_ROUTES.PROFILE.EDIT,
     goToSettings: () => MOBILE_ROUTES.PROFILE.SETTINGS
   },

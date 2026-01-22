@@ -7,6 +7,7 @@ import { toRN } from "@/lib/units";
 import { fontFamily } from "@/lib/fonts";
 import { useTranslation } from "@/lib/i18n";
 import Button from "./Button";
+import { BackButton } from "./BackButton";
 
 export interface NotFoundStateProps {
   /** Main title - defaults to translation key "errors.not_found_title" */
@@ -62,46 +63,50 @@ export function NotFoundState({
   };
 
   return (
-    <View style={[styles.container, style]}>
-      {/* Illustration */}
-      <View style={styles.illustrationContainer}>
-        <View style={styles.iconRing}>
-          <View style={styles.iconInner}>
-            <Ionicons name={icon} size={40} color={brandColors.primary} />
+    <View style={styles.container}>
+      <BackButton title={displayTitle} onPress={handleBack} />
+
+      <View style={[styles.contentContainer, style]}>
+        {/* Illustration */}
+        <View style={styles.illustrationContainer}>
+          <View style={styles.iconRing}>
+            <View style={styles.iconInner}>
+              <Ionicons name={icon} size={40} color={brandColors.primary} />
+            </View>
           </View>
+          {/* Decorative dots */}
+          <View style={[styles.dot, styles.dotTopLeft]} />
+          <View style={[styles.dot, styles.dotTopRight]} />
+          <View style={[styles.dot, styles.dotBottomLeft]} />
+          <View style={[styles.dot, styles.dotBottomRight]} />
         </View>
-        {/* Decorative dots */}
-        <View style={[styles.dot, styles.dotTopLeft]} />
-        <View style={[styles.dot, styles.dotTopRight]} />
-        <View style={[styles.dot, styles.dotBottomLeft]} />
-        <View style={[styles.dot, styles.dotBottomRight]} />
-      </View>
 
-      {/* Content */}
-      <View style={styles.content}>
-        <Text style={styles.title}>{displayTitle}</Text>
-        <Text style={styles.description}>{displayDescription}</Text>
-      </View>
+        {/* Content */}
+        <View style={styles.content}>
+          <Text style={styles.title}>{displayTitle}</Text>
+          <Text style={styles.description}>{displayDescription}</Text>
+        </View>
 
-      {/* Actions */}
-      <View style={styles.actions}>
-        {actionButton && (
-          <Button
-            title={actionButton.label}
-            onPress={actionButton.onPress}
-            variant={actionButton.variant || "primary"}
-            style={styles.actionButton}
-          />
-        )}
-        {showBackButton && (
-          <Button
-            title={displayBackLabel}
-            onPress={handleBack}
-            variant={actionButton ? "outline" : "primary"}
-            leftIcon="arrow-back"
-            style={styles.actionButton}
-          />
-        )}
+        {/* Actions */}
+        <View style={styles.actions}>
+          {actionButton && (
+            <Button
+              title={actionButton.label}
+              onPress={actionButton.onPress}
+              variant={actionButton.variant || "primary"}
+              style={styles.actionButton}
+            />
+          )}
+          {showBackButton && (
+            <Button
+              title={displayBackLabel}
+              onPress={handleBack}
+              variant={actionButton ? "outline" : "primary"}
+              leftIcon="arrow-back"
+              style={styles.actionButton}
+            />
+          )}
+        </View>
       </View>
     </View>
   );
@@ -109,6 +114,10 @@ export function NotFoundState({
 
 const makeStyles = (tokens: any, colors: any, brand: any) => ({
   container: {
+    flex: 1,
+    backgroundColor: colors.bg.canvas
+  },
+  contentContainer: {
     flex: 1,
     justifyContent: "center" as const,
     alignItems: "center" as const,

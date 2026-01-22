@@ -6,7 +6,7 @@ import { toRN } from "@/lib/units";
 import { useTheme } from "@/themes";
 import { useStyles } from "@/themes/makeStyles";
 import React from "react";
-import { ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { Keyboard, Pressable, ScrollView, Text, TouchableOpacity, View } from "react-native";
 
 interface PersonalizationLayoutProps {
   children: React.ReactNode;
@@ -60,14 +60,16 @@ export default function PersonalizationLayout({
         </View>
       </View>
 
-      {/* Content */}
+      {/* Content - Pressable dismisses keyboard when tapping outside inputs */}
       <ScrollView
         style={styles.content}
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {children}
+        <Pressable onPress={Keyboard.dismiss} style={styles.pressableContent}>
+          {children}
+        </Pressable>
       </ScrollView>
 
       {/* Footer with back button and continue button */}
@@ -138,6 +140,9 @@ const makePersonalizationLayoutStyles = (tokens: any, colors: any, brand: any) =
     contentContainer: {
       flexGrow: 1,
       paddingHorizontal: toRN(tokens.spacing[6])
+    },
+    pressableContent: {
+      flex: 1
     },
     footer: {
       flexDirection: "row" as const,

@@ -1,8 +1,11 @@
 """
-Data Export API Endpoints
+FitNudge V2 - Data Export API Endpoints
 
 Handles user data export requests for GDPR compliance.
 Exports are processed asynchronously and sent via email.
+
+V2 Changes:
+- V2 exports: profile, goals, check_ins, achievements, partners, notifications, subscriptions, daily_motivations, weekly_recaps, ai_coach_conversations
 """
 
 from fastapi import APIRouter, HTTPException, status, Depends, BackgroundTasks
@@ -42,6 +45,19 @@ async def generate_user_data_export(user_id: str, email: str, export_id: str):
     """
     Background task to generate user data export.
     Collects all user data and sends via email.
+
+    V2 Tables exported:
+    - users (profile)
+    - goals
+    - check_ins
+    - user_achievements
+    - accountability_partners
+    - notification_preferences
+    - subscriptions
+    - daily_motivations
+    - weekly_recaps
+    - ai_coach_conversations (messages embedded in JSONB column)
+    - social_nudges
     """
     supabase = get_supabase_client()
 
@@ -76,33 +92,7 @@ async def generate_user_data_export(user_id: str, email: str, export_id: str):
         )
         user_data["check_ins"] = checkins_result.data or []
 
-        # 4. Fitness profile
-        fitness_result = (
-            supabase.table("user_fitness_profiles")
-            .select("*")
-            .eq("user_id", user_id)
-            .execute()
-        )
-        user_data["fitness_profile"] = (
-            fitness_result.data[0] if fitness_result.data else None
-        )
-
-        # 5. Challenges
-        challenges_result = (
-            supabase.table("challenges").select("*").eq("created_by", user_id).execute()
-        )
-        user_data["challenges"] = challenges_result.data or []
-
-        # 6. Challenge participations
-        participations_result = (
-            supabase.table("challenge_participants")
-            .select("*, challenges(*)")
-            .eq("user_id", user_id)
-            .execute()
-        )
-        user_data["challenge_participations"] = participations_result.data or []
-
-        # 7. Achievements
+        # 4. Achievements
         achievements_result = (
             supabase.table("user_achievements")
             .select("*, achievement_types(*)")
@@ -111,37 +101,7 @@ async def generate_user_data_export(user_id: str, email: str, export_id: str):
         )
         user_data["achievements"] = achievements_result.data or []
 
-        # 8. Posts
-        posts_result = (
-            supabase.table("posts").select("*").eq("user_id", user_id).execute()
-        )
-        user_data["posts"] = posts_result.data or []
-
-        # 9. Workout sessions
-        workouts_result = (
-            supabase.table("workout_sessions")
-            .select("*")
-            .eq("user_id", user_id)
-            .execute()
-        )
-        user_data["workout_sessions"] = workouts_result.data or []
-
-        # 10. Meal logs
-        meals_result = (
-            supabase.table("meal_logs").select("*").eq("user_id", user_id).execute()
-        )
-        user_data["meal_logs"] = meals_result.data or []
-
-        # 11. Hydration logs
-        hydration_result = (
-            supabase.table("hydration_logs")
-            .select("*")
-            .eq("user_id", user_id)
-            .execute()
-        )
-        user_data["hydration_logs"] = hydration_result.data or []
-
-        # 12. Partners
+        # 5. Partners
         partners_result = (
             supabase.table("accountability_partners")
             .select("*")
@@ -150,7 +110,7 @@ async def generate_user_data_export(user_id: str, email: str, export_id: str):
         )
         user_data["accountability_partners"] = partners_result.data or []
 
-        # 13. Notification preferences
+        # 6. Notification preferences
         notif_result = (
             supabase.table("notification_preferences")
             .select("*")
@@ -161,28 +121,69 @@ async def generate_user_data_export(user_id: str, email: str, export_id: str):
             notif_result.data[0] if notif_result.data else None
         )
 
-        # 14. Audio preferences
-        audio_result = (
-            supabase.table("user_audio_preferences")
-            .select("*")
-            .eq("user_id", user_id)
-            .execute()
-        )
-        user_data["audio_preferences"] = (
-            audio_result.data[0] if audio_result.data else None
-        )
-
-        # 15. Subscription history
+        # 7. Subscription history
         sub_result = (
             supabase.table("subscriptions").select("*").eq("user_id", user_id).execute()
         )
         user_data["subscriptions"] = sub_result.data or []
+
+        # 8. Daily motivations
+        motivations_result = (
+            supabase.table("daily_motivations")
+            .select("*")
+            .eq("user_id", user_id)
+            .execute()
+        )
+        user_data["daily_motivations"] = motivations_result.data or []
+
+        # 9. Weekly recaps
+        recaps_result = (
+            supabase.table("weekly_recaps").select("*").eq("user_id", user_id).execute()
+        )
+        user_data["weekly_recaps"] = recaps_result.data or []
+
+        # 10. AI Coach conversations (messages are embedded in the JSONB 'messages' column)
+        conversations_result = (
+            supabase.table("ai_coach_conversations")
+            .select("*")
+            .eq("user_id", user_id)
+            .execute()
+        )
+        user_data["ai_coach_conversations"] = conversations_result.data or []
+
+        # 11. Social nudges (sent and received)
+        nudges_sent_result = (
+            supabase.table("social_nudges")
+            .select("*")
+            .eq("sender_id", user_id)
+            .execute()
+        )
+        nudges_received_result = (
+            supabase.table("social_nudges")
+            .select("*")
+            .eq("recipient_id", user_id)
+            .execute()
+        )
+        user_data["social_nudges"] = {
+            "sent": nudges_sent_result.data or [],
+            "received": nudges_received_result.data or [],
+        }
+
+        # 12. Device tokens (for reference)
+        device_tokens_result = (
+            supabase.table("device_tokens")
+            .select("device_type, app_version, os_version, is_active, created_at")
+            .eq("user_id", user_id)
+            .execute()
+        )
+        user_data["device_tokens"] = device_tokens_result.data or []
 
         # Add metadata
         user_data["export_metadata"] = {
             "export_date": datetime.utcnow().isoformat(),
             "export_id": export_id,
             "user_id": user_id,
+            "version": "V2",
         }
 
         # Convert to JSON string

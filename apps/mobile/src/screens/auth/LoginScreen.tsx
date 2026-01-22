@@ -17,7 +17,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { Image, KeyboardAvoidingView, Platform, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { getRedirection } from "@/utils/getRedirection";
+import { getRedirection, hasCompletedV2Onboarding } from "@/utils/getRedirection";
 import { useAlertModal } from "@/contexts/AlertModalContext";
 import {
   performNativeGoogleSignIn,
@@ -53,41 +53,47 @@ export default function LoginScreen() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [isAppleLoading, setIsAppleLoading] = useState(false);
   const [appleAvailable, setAppleAvailable] = useState(false);
-  const [alertHandled, setAlertHandled] = useState(false);
   const [initialAlertShown, setInitialAlertShown] = useState(false);
   const [manualLoginAttempt, setManualLoginAttempt] = useState(false);
 
   const showGoogle = hasGoogleSignInConfiguration();
   const showApple = Platform.OS === "ios" && appleAvailable;
 
-  // Fetch subscription data after login (non-blocking)
-  const fetchSubscriptionData = async () => {
-    try {
-      const [{ useSubscriptionStore }, { usePricingStore }] = await Promise.all([
-        import("@/stores/subscriptionStore"),
-        import("@/stores/pricingStore")
-      ]);
+  // Prefetch all critical data after login (non-blocking)
+  // This runs in background while user navigates to home/onboarding
+  const prefetchAfterAuth = () => {
+    // 1. Subscription data (critical for paywall/feature gating)
+    Promise.all([import("@/stores/subscriptionStore"), import("@/stores/pricingStore")])
+      .then(([{ useSubscriptionStore }, { usePricingStore }]) => {
+        return Promise.all([
+          useSubscriptionStore.getState().fetchSubscription(),
+          useSubscriptionStore.getState().fetchFeatures(),
+          usePricingStore.getState().fetchPlans()
+        ]);
+      })
+      .catch((error) => {
+        console.warn("[Login] Failed to fetch subscription data:", error);
+      });
 
-      // Fetch subscription, features, and pricing plans in parallel
-      await Promise.all([
-        useSubscriptionStore.getState().fetchSubscription(),
-        useSubscriptionStore.getState().fetchFeatures(),
-        usePricingStore.getState().fetchPlans()
-      ]);
-    } catch (error) {
-      console.warn("[Login] Failed to fetch subscription data:", error);
-    }
-  };
+    // 2. Critical data (home dashboard, goals, motivation)
+    import("@/services/prefetch")
+      .then(({ prefetchCriticalData }) => {
+        import("@/lib/queryClient").then(({ queryClient }) => {
+          prefetchCriticalData(queryClient).catch((error) => {
+            console.warn("[Login] Failed to prefetch critical data:", error);
+          });
+        });
+      })
+      .catch(() => {});
 
-  // Check if user has fitness profile (for personalization skip)
-  const checkFitnessProfile = async (): Promise<boolean> => {
-    try {
-      const { useOnboardingStore } = await import("@/stores/onboardingStore");
-      return await useOnboardingStore.getState().checkHasFitnessProfile();
-    } catch (error) {
-      console.warn("[Login] Failed to check fitness profile:", error);
-      return false;
-    }
+    // 3. High priority data (achievements, partners) - runs after critical
+    import("@/services/prefetch")
+      .then(({ prefetchHighPriorityData }) => {
+        import("@/lib/queryClient").then(({ queryClient }) => {
+          prefetchHighPriorityData(queryClient).catch(() => {});
+        });
+      })
+      .catch(() => {});
   };
 
   useEffect(() => {
@@ -121,16 +127,23 @@ export default function LoginScreen() {
     });
 
     // Fetch subscription data immediately after login (non-blocking for navigation)
-    fetchSubscriptionData();
+    prefetchAfterAuth();
 
     try {
-      // Check if user has fitness profile (skip personalization if they do)
-      const hasFitnessProfile = await checkFitnessProfile();
-      const destination = await getRedirection({ hasFitnessProfile });
-      router.replace(destination);
+      // V2: Check if user has completed onboarding
+      const hasCompletedOnboarding = hasCompletedV2Onboarding(payload.user);
+      const destination = await getRedirection({ hasCompletedOnboarding });
+
+      // Defer navigation slightly to let auth state propagate through Stack.Protected guard
+      // This prevents double navigation when isAuthenticated changes
+      requestAnimationFrame(() => {
+        router.replace(destination);
+      });
     } catch (redirectError) {
       console.warn("[Login] Failed to compute redirection", redirectError);
-      router.replace(MOBILE_ROUTES.MAIN.HOME);
+      requestAnimationFrame(() => {
+        router.replace(MOBILE_ROUTES.MAIN.HOME);
+      });
     }
   };
 
@@ -143,6 +156,10 @@ export default function LoginScreen() {
   };
   // Use the login mutation hook
   const loginMutation = useLogin();
+
+  // Combined loading state - disable all inputs when any auth is in progress
+  const isAuthLoading =
+    loginMutation.isPending || isGoogleLoading || isAppleLoading || manualLoginAttempt;
 
   // Load remember me preferences on component mount
   useEffect(() => {
@@ -245,24 +262,23 @@ export default function LoginScreen() {
               await authService.setRememberMePreference(response.data.user.email, false);
             }
 
-            // Track successful login
-            capture("user_logged_in", {
-              method: "email",
-              remember_me: rememberMe,
-              user_id: response.data.user.id
-            });
-
             // Fetch subscription data immediately after login (non-blocking for navigation)
-            fetchSubscriptionData();
+            prefetchAfterAuth();
 
             try {
-              // Check if user has fitness profile (skip personalization if they do)
-              const hasFitnessProfile = await checkFitnessProfile();
-              const destination = await getRedirection({ hasFitnessProfile });
-              console.log("destination", destination);
-              router.replace(destination);
+              // V2: Check if user has completed onboarding
+              const hasCompletedOnboarding = hasCompletedV2Onboarding(response.data.user);
+              const destination = await getRedirection({ hasCompletedOnboarding });
+
+              // Defer navigation slightly to let auth state propagate through Stack.Protected guard
+              // This prevents double navigation when isAuthenticated changes
+              requestAnimationFrame(() => {
+                router.replace(destination);
+              });
             } catch (redirectError) {
-              router.replace(MOBILE_ROUTES.MAIN.HOME);
+              requestAnimationFrame(() => {
+                router.replace(MOBILE_ROUTES.MAIN.HOME);
+              });
             }
           }
         },
@@ -489,9 +505,9 @@ export default function LoginScreen() {
             showApple={showApple}
             onGooglePress={handleGoogleSignIn}
             onApplePress={handleAppleSignIn}
-            googleDisabled={!showGoogle || isGoogleLoading}
+            googleDisabled={!showGoogle || isAuthLoading}
             googleLoading={isGoogleLoading}
-            appleDisabled={!showApple || isAppleLoading}
+            appleDisabled={!showApple || isAuthLoading}
             appleLoading={isAppleLoading}
           />
 
@@ -511,6 +527,7 @@ export default function LoginScreen() {
               autoCapitalize="none"
               autoCorrect={false}
               error={errors.email}
+              disabled={isAuthLoading}
             />
 
             <TextInput
@@ -527,6 +544,7 @@ export default function LoginScreen() {
               showPasswordToggle
               autoCapitalize="none"
               error={errors.password}
+              disabled={isAuthLoading}
             />
 
             {/* Remember me and Forgot password */}
@@ -536,6 +554,7 @@ export default function LoginScreen() {
                   checked={rememberMe}
                   onPress={() => setRememberMe(!rememberMe)}
                   label={t("auth.login.remember_me")}
+                  disabled={isAuthLoading}
                 />
               </View>
               <Button
@@ -544,6 +563,7 @@ export default function LoginScreen() {
                 variant="text"
                 size="sm"
                 style={styles.forgotPasswordContainer}
+                disabled={isAuthLoading}
               />
             </View>
 
@@ -552,9 +572,8 @@ export default function LoginScreen() {
               title={loginMutation.isPending ? t("auth.login.signing_in") : t("auth.login.sign_in")}
               onPress={handleLogin}
               size="lg"
-              disabled={loginMutation.isPending || manualLoginAttempt}
+              disabled={isAuthLoading}
               loading={loginMutation.isPending || manualLoginAttempt}
-              // style={styles.signInButton}
             />
 
             {/* Sign Up Link */}
@@ -564,6 +583,7 @@ export default function LoginScreen() {
                 onPress={() => router.push(MOBILE_ROUTES.AUTH.SIGNUP)}
                 variant="text"
                 size="sm"
+                disabled={isAuthLoading}
               />
             </View>
           </View>

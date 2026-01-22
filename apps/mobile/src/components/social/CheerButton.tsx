@@ -11,7 +11,6 @@ import { Ionicons } from "@expo/vector-icons";
 interface CheerButtonProps {
   recipientId: string;
   goalId?: string;
-  challengeId?: string;
   partnershipId?: string;
   checkInId?: string;
   initialCheered?: boolean;
@@ -24,7 +23,6 @@ interface CheerButtonProps {
 export function CheerButton({
   recipientId,
   goalId,
-  challengeId,
   partnershipId,
   checkInId,
   initialCheered = false,
@@ -69,7 +67,6 @@ export function CheerButton({
       await sendCheerMutation.mutateAsync({
         recipientId,
         goalId,
-        challengeId,
         emoji: "🎉"
       });
 

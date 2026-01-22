@@ -22,12 +22,12 @@ export const CommunityIllustration: React.FC<CommunityIllustrationProps> = ({
 }) => {
   return (
     <Svg width={width} height={height} viewBox="0 0 280 280">
-      <Defs>
+      {/* <Defs>
         <LinearGradient id="purpleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
           <Stop offset="0%" stopColor="#b2adf9" />
           <Stop offset="100%" stopColor="#ada9f6" />
         </LinearGradient>
-      </Defs>
+      </Defs> */}
 
       {/* Purple rounded rectangle background */}
       <Rect x="40" y="40" width="200" height="200" fill="url(#purpleGradient)" rx="20" />

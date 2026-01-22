@@ -1,15 +1,8 @@
-import React, { useState, useMemo } from "react";
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  RefreshControl,
-  ActivityIndicator
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import React, { useState, useCallback, useMemo } from "react";
+import { View, Text, FlatList, TouchableOpacity, RefreshControl, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import Markdown from "react-native-markdown-display";
 import { useTranslation } from "@/lib/i18n";
 import { useStyles, useTheme } from "@/themes";
 import { tokens } from "@/themes/tokens";
@@ -19,110 +12,209 @@ import { MOBILE_ROUTES } from "@/lib/routes";
 import { Card } from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import { BackButton } from "@/components/ui/BackButton";
+import { SkeletonBox } from "@/components/ui/SkeletonBox";
 import { useSubscriptionStore } from "@/stores/subscriptionStore";
 import { formatWeekRange } from "@/utils/helper";
-
-// Mock hook - Replace with actual API hook
-const useWeeklyRecaps = () => {
-  // TODO: Implement actual API call
-  return {
-    data: { data: [] as WeeklyRecap[] },
-    isLoading: false,
-    refetch: async () => {}
-  };
-};
-
-interface WeeklyRecap {
-  id: string;
-  user_id: string;
-  week_start_date: string;
-  week_end_date: string;
-  goals_completed: number;
-  total_check_ins: number;
-  streak_maintained: boolean;
-  current_streak: number;
-  highlights: string[];
-  ai_summary: string;
-  created_at: string;
-}
+import { useWeeklyRecaps } from "@/hooks/api/useWeeklyRecaps";
+import type { WeeklyRecap } from "@/services/api/recaps";
 
 export default function WeeklyRecapsScreen() {
   const styles = useStyles(makeStyles);
   const { colors, brandColors } = useTheme();
   const { t } = useTranslation();
   const router = useRouter();
-  const { hasFeature } = useSubscriptionStore();
+  const { hasFeature, openModal: openSubscriptionModal } = useSubscriptionStore();
 
   const [refreshing, setRefreshing] = useState(false);
 
-  // Check if user has access to weekly recaps
+  // Markdown styles for summary preview
+  const markdownStyles = useMemo(
+    () => ({
+      body: {
+        fontSize: toRN(tokens.typography.fontSize.sm),
+        fontFamily: fontFamily.regular,
+        color: colors.text.secondary,
+        lineHeight: toRN(tokens.typography.fontSize.sm) * 1.5
+      },
+      paragraph: {
+        marginBottom: 0,
+        marginTop: 0
+      },
+      strong: {
+        fontFamily: fontFamily.semiBold,
+        color: colors.text.primary
+      },
+      em: {
+        fontFamily: fontFamily.regularItalic
+      },
+      bullet_list: {
+        marginBottom: 0,
+        marginTop: 0
+      },
+      ordered_list: {
+        marginBottom: 0,
+        marginTop: 0
+      },
+      list_item: {
+        marginBottom: 0
+      }
+    }),
+    [colors]
+  );
+
+  // Check if user has premium access to weekly recaps
   const hasWeeklyRecapFeature = hasFeature("weekly_recap");
 
-  // Fetch recaps
-  const { data: recapsData, isLoading, refetch } = useWeeklyRecaps();
+  // Only fetch recaps if user has premium access (enabled=hasWeeklyRecapFeature)
+  const { data: recapsData, isLoading, refetch } = useWeeklyRecaps(20, 0, hasWeeklyRecapFeature);
   const recaps = recapsData?.data || [];
 
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     await refetch();
     setRefreshing(false);
-  };
+  }, [refetch]);
 
-  const handleRecapPress = (recap: WeeklyRecap) => {
-    router.push(MOBILE_ROUTES.PROFILE.RECAP_DETAIL(recap.id));
-  };
+  const handleRecapPress = useCallback(
+    (recap: WeeklyRecap) => {
+      router.push(MOBILE_ROUTES.PROFILE.RECAP_DETAIL(recap.id));
+    },
+    [router]
+  );
 
   const formatRecapWeekRange = (startDate: string, endDate: string) => {
     return formatWeekRange(startDate, endDate, "short");
   };
 
-  const renderRecapCard = ({ item }: { item: WeeklyRecap }) => (
-    <TouchableOpacity onPress={() => handleRecapPress(item)} activeOpacity={0.7}>
-      <Card style={styles.recapCard}>
-        <View style={styles.recapHeader}>
-          <View style={styles.weekBadge}>
-            <Ionicons name="calendar-outline" size={14} color={brandColors.primary} />
-            <Text style={styles.weekBadgeText}>
-              {formatRecapWeekRange(item.week_start_date, item.week_end_date)}
-            </Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
-        </View>
+  const getCompletionRateColor = (rate: number) => {
+    if (rate >= 80) return "#22C55E";
+    if (rate >= 50) return "#F59E0B";
+    return "#EF4444";
+  };
 
-        {/* Stats Grid */}
-        <View style={styles.statsGrid}>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{item.total_check_ins}</Text>
-            <Text style={styles.statLabel}>{t("recaps.check_ins") || "Check-ins"}</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{item.goals_completed}</Text>
-            <Text style={styles.statLabel}>{t("recaps.goals_completed") || "Goals"}</Text>
-          </View>
-          <View style={styles.statItem}>
-            <View style={styles.streakValue}>
-              <Ionicons
-                name={item.streak_maintained ? "flame" : "flame-outline"}
-                size={16}
-                color={item.streak_maintained ? "#EF4444" : colors.text.tertiary}
-              />
-              <Text style={styles.statValue}>{item.current_streak}</Text>
+  const renderRecapCard = ({ item }: { item: WeeklyRecap }) => {
+    const stats = item.stats || {};
+    const completionRate = stats.completion_rate || 0;
+    const weekOverWeekChange = stats.week_over_week_change || 0;
+
+    return (
+      <TouchableOpacity onPress={() => handleRecapPress(item)} activeOpacity={0.7}>
+        <Card style={styles.recapCard}>
+          <View style={styles.recapHeader}>
+            <View style={styles.weekBadge}>
+              <Ionicons name="calendar-outline" size={14} color={brandColors.primary} />
+              <Text style={styles.weekBadgeText}>
+                {formatRecapWeekRange(item.week_start, item.week_end)}
+              </Text>
             </View>
-            <Text style={styles.statLabel}>{t("recaps.streak") || "Streak"}</Text>
+            <View style={styles.headerRight}>
+              {weekOverWeekChange !== 0 && (
+                <View
+                  style={[
+                    styles.changeBadge,
+                    { backgroundColor: weekOverWeekChange > 0 ? "#22C55E15" : "#EF444415" }
+                  ]}
+                >
+                  <Ionicons
+                    name={weekOverWeekChange > 0 ? "trending-up" : "trending-down"}
+                    size={12}
+                    color={weekOverWeekChange > 0 ? "#22C55E" : "#EF4444"}
+                  />
+                  <Text
+                    style={[
+                      styles.changeText,
+                      { color: weekOverWeekChange > 0 ? "#22C55E" : "#EF4444" }
+                    ]}
+                  >
+                    {weekOverWeekChange > 0 ? "+" : ""}
+                    {weekOverWeekChange}
+                  </Text>
+                </View>
+              )}
+              <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
+            </View>
           </View>
-        </View>
 
-        {/* AI Summary Preview */}
-        {item.ai_summary && (
-          <Text style={styles.summaryPreview} numberOfLines={2}>
-            {item.ai_summary}
-          </Text>
-        )}
-      </Card>
-    </TouchableOpacity>
-  );
+          {/* Stats Grid */}
+          <View style={styles.statsGrid}>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{stats.total_check_ins || 0}</Text>
+              <Text style={styles.statLabel}>{t("recaps.check_ins") || "Check-ins"}</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={[styles.statValue, { color: getCompletionRateColor(completionRate) }]}>
+                {Math.round(completionRate)}%
+              </Text>
+              <Text style={styles.statLabel}>{t("recaps.completion") || "Completion"}</Text>
+            </View>
+            <View style={styles.statItem}>
+              <View style={styles.streakValue}>
+                <Ionicons
+                  name={stats.current_streak > 0 ? "flame" : "flame-outline"}
+                  size={16}
+                  color={stats.current_streak > 0 ? "#EF4444" : colors.text.tertiary}
+                />
+                <Text style={styles.statValue}>{stats.current_streak || 0}</Text>
+              </View>
+              <Text style={styles.statLabel}>{t("recaps.streak") || "Streak"}</Text>
+            </View>
+          </View>
 
-  // Premium gate
+          {/* Goal Breakdown Preview */}
+          {item.goal_breakdown && item.goal_breakdown.length > 0 && (
+            <View style={styles.goalBreakdownPreview}>
+              {item.goal_breakdown.slice(0, 2).map((goal, index) => (
+                <View key={goal.goal_id || index} style={styles.goalPreviewItem}>
+                  <View
+                    style={[
+                      styles.goalStatusDot,
+                      {
+                        backgroundColor:
+                          goal.status === "excellent"
+                            ? "#22C55E"
+                            : goal.status === "good"
+                              ? "#F59E0B"
+                              : "#EF4444"
+                      }
+                    ]}
+                  />
+                  <Text style={styles.goalPreviewTitle} numberOfLines={1}>
+                    {goal.title}
+                  </Text>
+                  <Text style={styles.goalPreviewRate}>{goal.completion_rate}%</Text>
+                </View>
+              ))}
+              {item.goal_breakdown.length > 2 && (
+                <Text style={styles.moreGoals}>+{item.goal_breakdown.length - 2} more</Text>
+              )}
+            </View>
+          )}
+
+          {/* AI Summary Preview */}
+          {item.recap_text && (
+            <View style={styles.summaryPreviewContainer}>
+              <Markdown style={markdownStyles}>
+                {item.recap_text.split("\n").slice(0, 3).join("\n").substring(0, 200)}
+              </Markdown>
+            </View>
+          )}
+
+          {/* Achievements Badge */}
+          {item.achievements_unlocked && item.achievements_unlocked.length > 0 && (
+            <View style={styles.achievementsBadge}>
+              <Ionicons name="trophy" size={14} color="#F59E0B" />
+              <Text style={styles.achievementsText}>
+                {item.achievements_unlocked.length} achievement
+                {item.achievements_unlocked.length > 1 ? "s" : ""} unlocked
+              </Text>
+            </View>
+          )}
+        </Card>
+      </TouchableOpacity>
+    );
+  };
+
+  // Premium gate (shown only when free AND no historical recaps)
   const renderPremiumGate = () => (
     <View style={styles.premiumGate}>
       <View style={styles.premiumIconContainer}>
@@ -135,7 +227,7 @@ export default function WeeklyRecapsScreen() {
       </Text>
       <Button
         title={t("common.upgrade") || "Upgrade to Unlock"}
-        onPress={() => router.push(MOBILE_ROUTES.ONBOARDING.SUBSCRIPTION)}
+        onPress={openSubscriptionModal}
         style={styles.upgradeButton}
       />
     </View>
@@ -153,18 +245,64 @@ export default function WeeklyRecapsScreen() {
     </View>
   );
 
+  // Show premium gate if user doesn't have the feature
+  const showPremiumGate = !hasWeeklyRecapFeature;
+
   return (
     <View style={styles.container}>
       {/* Header */}
       <BackButton title={t("recaps.title") || "Weekly Recaps"} onPress={() => router.back()} />
 
       {/* Content */}
-      {!hasWeeklyRecapFeature ? (
+      {isLoading ? (
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Skeleton Recap Cards */}
+          {[1, 2, 3].map((i) => (
+            <Card key={i} style={styles.recapCard}>
+              {/* Header skeleton */}
+              <View style={styles.recapHeader}>
+                <SkeletonBox width={120} height={24} borderRadius={12} />
+                <SkeletonBox width={60} height={24} borderRadius={12} />
+              </View>
+              {/* Stats grid skeleton */}
+              <View style={styles.statsGrid}>
+                <View style={styles.statItem}>
+                  <SkeletonBox width={40} height={28} borderRadius={4} />
+                  <SkeletonBox width={60} height={12} borderRadius={4} style={{ marginTop: 8 }} />
+                </View>
+                <View style={styles.statItem}>
+                  <SkeletonBox width={40} height={28} borderRadius={4} />
+                  <SkeletonBox width={60} height={12} borderRadius={4} style={{ marginTop: 8 }} />
+                </View>
+                <View style={styles.statItem}>
+                  <SkeletonBox width={40} height={28} borderRadius={4} />
+                  <SkeletonBox width={60} height={12} borderRadius={4} style={{ marginTop: 8 }} />
+                </View>
+              </View>
+              {/* Goal breakdown skeleton */}
+              <View style={{ marginTop: 12, gap: 8 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <SkeletonBox width={8} height={8} borderRadius={4} />
+                  <SkeletonBox width="60%" height={14} borderRadius={4} />
+                  <SkeletonBox width={30} height={14} borderRadius={4} />
+                </View>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <SkeletonBox width={8} height={8} borderRadius={4} />
+                  <SkeletonBox width="50%" height={14} borderRadius={4} />
+                  <SkeletonBox width={30} height={14} borderRadius={4} />
+                </View>
+              </View>
+              {/* Summary skeleton */}
+              <SkeletonBox width="100%" height={36} borderRadius={4} style={{ marginTop: 12 }} />
+            </Card>
+          ))}
+        </ScrollView>
+      ) : showPremiumGate ? (
         renderPremiumGate()
-      ) : isLoading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={brandColors.primary} />
-        </View>
       ) : (
         <FlatList
           data={recaps}
@@ -191,10 +329,8 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     flex: 1,
     backgroundColor: colors.bg.canvas
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center" as const,
-    alignItems: "center" as const
+  scrollView: {
+    flex: 1
   },
   listContent: {
     padding: toRN(tokens.spacing[4]),
@@ -211,6 +347,11 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     alignItems: "center" as const,
     marginBottom: toRN(tokens.spacing[3])
   },
+  headerRight: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: toRN(tokens.spacing[2])
+  },
   weekBadge: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
@@ -224,6 +365,18 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.semiBold,
     color: brand.primary
+  },
+  changeBadge: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: toRN(tokens.spacing[1]),
+    paddingVertical: toRN(tokens.spacing[0.5]),
+    paddingHorizontal: toRN(tokens.spacing[1.5]),
+    borderRadius: toRN(tokens.borderRadius.full)
+  },
+  changeText: {
+    fontSize: toRN(tokens.typography.fontSize.xs),
+    fontFamily: fontFamily.semiBold
   },
   statsGrid: {
     flexDirection: "row" as const,
@@ -252,12 +405,57 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     alignItems: "center" as const,
     gap: toRN(tokens.spacing[1])
   },
-  summaryPreview: {
+  goalBreakdownPreview: {
+    marginTop: toRN(tokens.spacing[3]),
+    gap: toRN(tokens.spacing[1.5])
+  },
+  goalPreviewItem: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: toRN(tokens.spacing[2])
+  },
+  goalStatusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4
+  },
+  goalPreviewTitle: {
+    flex: 1,
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
-    color: colors.text.secondary,
+    color: colors.text.secondary
+  },
+  goalPreviewRate: {
+    fontSize: toRN(tokens.typography.fontSize.sm),
+    fontFamily: fontFamily.semiBold,
+    color: colors.text.primary
+  },
+  moreGoals: {
+    fontSize: toRN(tokens.typography.fontSize.xs),
+    fontFamily: fontFamily.regular,
+    color: colors.text.tertiary,
+    marginLeft: toRN(tokens.spacing[4])
+  },
+  summaryPreviewContainer: {
     marginTop: toRN(tokens.spacing[3]),
-    lineHeight: toRN(tokens.typography.fontSize.sm) * 1.5
+    maxHeight: 60,
+    overflow: "hidden" as const
+  },
+  achievementsBadge: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: toRN(tokens.spacing[1.5]),
+    marginTop: toRN(tokens.spacing[3]),
+    paddingVertical: toRN(tokens.spacing[1.5]),
+    paddingHorizontal: toRN(tokens.spacing[2]),
+    backgroundColor: "#F59E0B15",
+    borderRadius: toRN(tokens.borderRadius.md),
+    alignSelf: "flex-start" as const
+  },
+  achievementsText: {
+    fontSize: toRN(tokens.typography.fontSize.xs),
+    fontFamily: fontFamily.semiBold,
+    color: "#F59E0B"
   },
   // Premium Gate
   premiumGate: {

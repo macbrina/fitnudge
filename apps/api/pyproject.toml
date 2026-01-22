@@ -36,6 +36,7 @@ user-agents = "^2.2.0" # User agent parsing
 pytz = "^2024.1" # Timezone support for check-ins
 exponent-server-sdk = "^2.2.0"
 boto3 = "^1.42.4"
+rapidfuzz = "^3.14.3"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.4.2"

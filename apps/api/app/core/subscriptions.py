@@ -103,10 +103,10 @@ def get_user_features_by_tier(
     user_id: str, user_plan: Optional[str] = None, supabase=None
 ) -> Dict[str, Any]:
     """
-    Get all features available to user based on tier inheritance.
+    Get all features available to user based on their plan (V2 simplified).
 
-    Users have access to all features in their tier AND lower tiers.
-    This implements the tier-based feature access system.
+    V2: Features are tied directly to plan_id (free/premium), not tiers.
+    Simply query features for the user's plan.
 
     Args:
         user_id: User ID
@@ -122,67 +122,23 @@ def get_user_features_by_tier(
     # Get effective plan
     plan = get_user_effective_plan(user_id, user_plan, supabase)
 
-    # Get tier
+    # Get tier (for backward compatibility)
     tier = get_user_plan_tier(plan, supabase)
 
-    # Query features where minimum_tier <= user_tier (tier inheritance)
+    # V2: Query features directly by plan_id (no tier inheritance)
     features_result = (
         supabase.table("plan_features")
         .select("*")
-        .lte("minimum_tier", tier)  # User has access to this tier and below
+        .eq("plan_id", plan)  # V2: Direct plan matching
         .eq("is_enabled", True)
+        .order("sort_order", desc=False)  # Sort by sort_order
         .execute()
     )
 
-    # Deduplicate by feature_key, keeping the highest tier version
-    # (features in higher tiers override lower tier versions)
-    # Sort by minimum_tier DESC first so higher tier features come first
-    all_features = sorted(
-        (features_result.data or []),
-        key=lambda x: (x.get("minimum_tier", 0), x.get("sort_order", 0)),
-        reverse=True,  # Higher tiers first
-    )
-
-    features_dict = {}
-    for feature in all_features:
-        feature_key = feature.get("feature_key")
-        if feature_key and feature_key not in features_dict:
-            # First occurrence (highest tier) wins
-            features_dict[feature_key] = feature
-
-    # Convert back to list, sorted by minimum_tier (ascending) then sort_order
-    deduplicated_features = list(features_dict.values())
-    deduplicated_features.sort(
-        key=lambda x: (x.get("minimum_tier", 0), x.get("sort_order", 0))
-    )
+    features = features_result.data or []
 
     return {
         "plan": plan,
         "tier": tier,
-        "features": deduplicated_features,
+        "features": features,
     }
-
-
-def check_user_has_feature(
-    user_id: str, feature_key: str, user_plan: Optional[str] = None, supabase=None
-) -> bool:
-    """
-    Check if user has access to a specific feature.
-
-    Args:
-        user_id: User ID
-        feature_key: Feature key to check
-        user_plan: Optional users.plan value
-        supabase: Optional supabase client
-
-    Returns:
-        True if user has access to the feature, False otherwise
-    """
-    features_data = get_user_features_by_tier(user_id, user_plan, supabase)
-
-    # Check if feature exists in user's available features
-    for feature in features_data["features"]:
-        if feature.get("feature_key") == feature_key:
-            return feature.get("is_enabled", False)
-
-    return False

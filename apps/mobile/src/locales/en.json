@@ -1,7 +1,13 @@
 {
   "common": {
     "pro": "PRO",
+    "unblock": "Unblock",
+    "ago": "ago",
+    "all": "All",
+    "submit": "Submit",
+    "submitting": "Submitting...",
     "not_now": "Not now",
+    "open_settings": "Open Settings",
     "success": "Success",
     "error": "Error",
     "info": "Information",
@@ -15,10 +21,15 @@
     "cancel": "Cancel",
     "nevermind": "Nevermind",
     "save": "Save",
+    "update": "Update",
+    "updating": "Updating...",
     "delete": "Delete",
     "edit": "Edit",
     "done": "Done",
     "add": "Add",
+    "block": "Block",
+    "report": "Report",
+    "remove": "Remove",
     "and": "and",
     "ok": "OK",
     "back": "Back",
@@ -30,7 +41,6 @@
     "read_more": "Read more",
     "read_less": "Read less",
     "goal": "Goal",
-    "challenge": "Challenge",
     "yes": "Yes",
     "no": "No",
     "apply": "Apply",
@@ -54,8 +64,32 @@
     "days": "days",
     "day": "day",
     "weeks": "weeks",
+    "days_of_week": {
+      "sun": "Sun",
+      "mon": "Mon",
+      "tue": "Tue",
+      "wed": "Wed",
+      "thu": "Thu",
+      "fri": "Fri",
+      "sat": "Sat",
+      "sunday": "Sunday",
+      "monday": "Monday",
+      "tuesday": "Tuesday",
+      "wednesday": "Wednesday",
+      "thursday": "Thursday",
+      "friday": "Friday",
+      "saturday": "Saturday",
+      "short": {
+        "sun": "S",
+        "mon": "M",
+        "tue": "T",
+        "wed": "W",
+        "thu": "T",
+        "fri": "F",
+        "sat": "S"
+      }
+    },
     "reject": "Decline",
-    "remove": "Remove",
     "sharing": "Sharing...",
     "not_specified": "Not specified",
     "no_results": "No results found",
@@ -64,6 +98,13 @@
     "premium_feature": "Premium feature",
     "upgrade": "Upgrade to Unlock"
   },
+  "navigation": {
+    "home": "Home",
+    "goals": "Goals",
+    "progress": "Progress",
+    "inbox": "Inbox",
+    "profile": "Profile"
+  },
   "time": {
     "just_now": "Just now",
     "minutes_ago": "{{count}}m ago",
@@ -71,134 +112,319 @@
     "days_ago": "{{count}}d ago"
   },
   "progress": {
-    "last_days": "Last {{days}} days",
-    "workout_stats": "Workout Stats",
-    "meal_stats": "Meal Stats",
-    "hydration_stats": "Hydration Stats",
-    "workouts": "Workouts",
-    "calories_burned": "Calories",
-    "total_time": "Total Time",
+    "title": "Activity",
     "this_week": "This Week",
-    "avg_session": "Avg Session",
-    "exercises_completed": "exercises completed",
-    "meals_logged": "Meals Logged",
-    "avg_calories": "Avg Cal/Day",
-    "avg_protein": "Avg Protein/Day",
-    "healthy_meals": "healthy",
-    "healthy": "healthy",
-    "okay": "okay",
-    "unhealthy": "unhealthy",
-    "meal_quality": "Meal Quality",
+    "last_days": "Last {{days}} days",
+    "completed": "Completed",
+    "missed": "Missed",
+    "rest": "Rest",
+    "pending": "Pending",
+    "future": "Future",
+    "not_scheduled": "Off Day",
+    "heat_map_title": "Activity Calendar",
+    "monthly_consistency": "Monthly Consistency",
+    "total_time": "Total Time",
     "today": "Today",
     "avg_daily": "Avg/Day",
     "target_hit_days": "Days Target Hit",
     "target_success_rate": "target success rate"
   },
+  "analytics": {
+    "premium_feature": "Premium Feature",
+    "unlock_charts": "Unlock detailed analytics and insights",
+    "unlock_premium": "Unlock Premium Analytics",
+    "unlock_premium_desc": "Get detailed insights and charts",
+    "overview": "Overview",
+    "last_days": "Last {{days}} days",
+    "unlock_overview": "Get detailed insights on your progress",
+    "unlock_weekly_progress": "See your weekly progress",
+    "unlock_heatmap": "Visualize your activity patterns",
+    "completion_rate": "Completion Rate",
+    "current_streak": "Current Streak",
+    "longest_streak": "Longest Streak",
+    "completed": "Completed",
+    "weekly_consistency": "Weekly Consistency",
+    "weekly_consistency_desc": "Your best performing days",
+    "unlock_weekly": "See which days you perform best",
+    "streak_history": "Streak History",
+    "streak_history_desc": "Your streak growth over time",
+    "unlock_streak": "Track your streak progress",
+    "goal_comparison": "Goal Performance",
+    "goal_comparison_desc": "Completion rate by goal",
+    "unlock_goals": "Compare your goal performance",
+    "monthly_trend": "Monthly Trend",
+    "monthly_trend_desc": "Your consistency over months",
+    "unlock_monthly": "See your monthly progress",
+    "skip_reasons": "Skip Reasons",
+    "skip_reasons_desc": "Why you miss check-ins",
+    "unlock_skip": "Identify patterns in missed days",
+    "no_skips": "No skipped check-ins!",
+    "mood_trend": "Mood Trend",
+    "mood_trend_desc": "How you feel about this goal",
+    "unlock_mood": "Track your mood patterns",
+    "no_mood_data": "No mood data yet. Add mood to your check-ins!",
+    "need_more_mood_data": "Check in more days to see your mood trend!",
+    "select_goal": "Select Goal",
+    "viewing_goal": "Viewing analytics for:",
+    "no_goals_title": "No Active Goals",
+    "no_goals_desc": "Create a goal to start tracking your progress",
+    "no_data": "No data yet",
+    "no_weekly_data": "Complete check-ins to see your weekly patterns",
+    "no_streak_data": "Start a streak to see your progress",
+    "no_monthly_data": "Check in regularly to see monthly trends",
+    "cached_hint": "Showing cached data • Pull down to refresh"
+  },
   "achievements": {
     "title": "Achievements",
+    "badges": "Badges",
+    "earned": "Earned",
     "badges_earned": "Badges Earned",
+    "badges_unlocked": "Badges Unlocked",
     "total_points": "Total Points",
     "your_badges": "Your Badges",
+    "all_achievements": "All Achievements",
+    "points": "pts",
     "no_achievements": "No achievements yet",
-    "no_achievements_message": "Complete check-ins, workouts, and challenges to earn badges!"
+    "no_achievements_message": "Complete check-ins and maintain streaks to earn badges!",
+    "badge_list": {
+      "first_checkin": {
+        "name": "Getting Started",
+        "description": "Complete your first check-in"
+      },
+      "first_goal": {
+        "name": "Goal Setter",
+        "description": "Create your first goal"
+      },
+      "first_partner": {
+        "name": "First Ally",
+        "description": "Connect with your first accountability partner"
+      },
+      "streak_3": {
+        "name": "Three Day Streak",
+        "description": "Maintain a 3-day streak"
+      },
+      "streak_7": {
+        "name": "Week Warrior",
+        "description": "Complete a 7-day streak"
+      },
+      "streak_14": {
+        "name": "Two Week Triumph",
+        "description": "Complete a 14-day streak"
+      },
+      "streak_21": {
+        "name": "Habit Forming",
+        "description": "Complete a 21-day streak"
+      },
+      "streak_30": {
+        "name": "Month Master",
+        "description": "Complete a 30-day streak"
+      },
+      "streak_50": {
+        "name": "Fifty Strong",
+        "description": "Complete a 50-day streak"
+      },
+      "streak_100": {
+        "name": "Century Club",
+        "description": "Complete a 100-day streak"
+      },
+      "streak_200": {
+        "name": "Half Year Hero",
+        "description": "Complete a 200-day streak"
+      },
+      "streak_365": {
+        "name": "Year Long Legend",
+        "description": "Complete a 365-day streak"
+      },
+      "streak_500": {
+        "name": "Unstoppable",
+        "description": "Complete a 500-day streak"
+      },
+      "streak_730": {
+        "name": "Two Year Titan",
+        "description": "Complete a 730-day streak (2 years)"
+      },
+      "streak_1000": {
+        "name": "Thousand Day Legend",
+        "description": "Complete a 1000-day streak"
+      },
+      "checkins_10": {
+        "name": "Ten Strong",
+        "description": "Complete 10 check-ins"
+      },
+      "checkins_50": {
+        "name": "Consistency Champion",
+        "description": "Complete 50 check-ins"
+      },
+      "checkins_100": {
+        "name": "Hundred Hero",
+        "description": "Complete 100 check-ins"
+      },
+      "checkins_250": {
+        "name": "Quarter Thousand",
+        "description": "Complete 250 check-ins"
+      },
+      "checkins_500": {
+        "name": "Half Thousand",
+        "description": "Complete 500 check-ins"
+      },
+      "checkins_1000": {
+        "name": "Thousand Check-ins",
+        "description": "Complete 1000 check-ins"
+      },
+      "checkins_2000": {
+        "name": "Two Thousand Strong",
+        "description": "Complete 2000 check-ins"
+      },
+      "checkins_5000": {
+        "name": "Five Thousand",
+        "description": "Complete 5000 check-ins"
+      },
+      "perfect_week": {
+        "name": "Perfect Week",
+        "description": "Complete all check-ins in a week"
+      },
+      "perfect_month": {
+        "name": "Perfect Month",
+        "description": "Complete all check-ins in a month"
+      },
+      "perfect_quarter": {
+        "name": "Perfect Quarter",
+        "description": "Complete all check-ins for 90 days straight"
+      },
+      "perfect_half_year": {
+        "name": "Perfect Half Year",
+        "description": "Complete all check-ins for 180 days straight"
+      },
+      "perfect_year": {
+        "name": "Perfect Year",
+        "description": "Complete all check-ins for 365 days straight"
+      },
+      "goals_3": {
+        "name": "Triple Threat",
+        "description": "Create 3 goals"
+      },
+      "goals_5": {
+        "name": "Goal Getter",
+        "description": "Create 5 goals"
+      },
+      "goals_10": {
+        "name": "Ambitious",
+        "description": "Create 10 goals"
+      },
+      "first_nudge": {
+        "name": "First Nudge",
+        "description": "Send your first nudge to a partner"
+      },
+      "first_cheer": {
+        "name": "Cheerleader",
+        "description": "Send your first cheer to a partner"
+      },
+      "nudges_10": {
+        "name": "Supportive Friend",
+        "description": "Send 10 nudges to your partners"
+      },
+      "nudges_50": {
+        "name": "Encouragement Champion",
+        "description": "Send 50 nudges to your partners"
+      },
+      "nudges_100": {
+        "name": "Motivation Master",
+        "description": "Send 100 nudges to your partners"
+      },
+      "nudges_250": {
+        "name": "Cheerful Spirit",
+        "description": "Send 250 nudges to your partners"
+      },
+      "nudges_500": {
+        "name": "Support Legend",
+        "description": "Send 500 nudges to your partners"
+      },
+      "nudges_1000": {
+        "name": "Ultimate Supporter",
+        "description": "Send 1000 nudges to your partners"
+      },
+      "partners_3": {
+        "name": "Social Connector",
+        "description": "Have 3 active accountability partners"
+      },
+      "ai_chat_10": {
+        "name": "AI Buddy",
+        "description": "Have 10 conversations with AI coach"
+      },
+      "ai_chat_50": {
+        "name": "AI Confidant",
+        "description": "Have 50 conversations with AI coach"
+      },
+      "ai_chat_100": {
+        "name": "AI Partner",
+        "description": "Have 100 conversations with AI coach"
+      },
+      "ai_chat_250": {
+        "name": "AI Expert",
+        "description": "Have 250 conversations with AI coach"
+      },
+      "ai_chat_500": {
+        "name": "AI Best Friend",
+        "description": "Have 500 conversations with AI coach"
+      },
+      "ai_chat_1000": {
+        "name": "AI Soulmate",
+        "description": "Have 1000 conversations with AI coach"
+      },
+      "recaps_4": {
+        "name": "First Month Recap",
+        "description": "Review 4 weekly recaps"
+      },
+      "recaps_12": {
+        "name": "Quarter Reviewer",
+        "description": "Review 12 weekly recaps (3 months)"
+      },
+      "recaps_26": {
+        "name": "Half Year Reflector",
+        "description": "Review 26 weekly recaps (6 months)"
+      },
+      "recaps_52": {
+        "name": "Year of Insight",
+        "description": "Review 52 weekly recaps (1 year)"
+      },
+      "recaps_104": {
+        "name": "Two Year Sage",
+        "description": "Review 104 weekly recaps (2 years)"
+      },
+      "account_30": {
+        "name": "Month One",
+        "description": "Active member for 30 days"
+      },
+      "account_90": {
+        "name": "Quarter Member",
+        "description": "Active member for 90 days"
+      },
+      "account_180": {
+        "name": "Half Year Member",
+        "description": "Active member for 180 days"
+      },
+      "account_365": {
+        "name": "One Year Member",
+        "description": "Active member for 1 year"
+      },
+      "account_730": {
+        "name": "Two Year Veteran",
+        "description": "Active member for 2 years"
+      },
+      "account_1095": {
+        "name": "Three Year Legend",
+        "description": "Active member for 3 years"
+      },
+      "account_1825": {
+        "name": "Five Year Champion",
+        "description": "Active member for 5 years"
+      }
+    }
   },
-  "meals": {
-    "title": "Log Meal",
-    "meal_type": "Meal Type",
-    "meal_name": "What did you eat?",
-    "meal_name_placeholder": "e.g., Grilled chicken salad",
-    "meal_description": "Description (for AI nutrition estimate)",
-    "meal_description_placeholder": "Describe your meal for a more accurate estimate",
-    "photo": "Photo",
-    "add_photo": "Add Photo for Better AI Estimation",
-    "take_photo": "Take Photo",
-    "choose_from_library": "Choose from Library",
-    "photo_optional": "Optional - helps AI estimate better",
-    "photo_permission_title": "Photo Access Required",
-    "photo_permission_message": "Please grant access to your photo library",
-    "camera_permission_title": "Camera Access Required",
-    "camera_permission_message": "Please grant camera access to take photos",
-    "photo_error": "Failed to process photo",
-    "photo_uploaded": "Photo uploaded!",
-    "uploading_photo": "Uploading photo...",
-    "estimate_nutrition": "Estimate Nutrition with AI",
-    "estimate_hint": "Get AI-powered calorie, protein, and health estimates based on your description or photo",
-    "content_required_title": "Content Required",
-    "content_required_message": "Please enter a meal name, description, or add a photo",
-    "view_history": "View Meal History",
-    "meal_history": "Meal History",
-    "no_meals_yet": "No meals logged yet",
-    "no_meals_message": "Start logging your meals to see them here",
-    "failed_to_load": "Failed to load meal history",
-    "unnamed_meal": "Meal",
-    "ai_estimates": "AI Estimates",
-    "daily_progress": "Today's Nutrition",
-    "remaining": "remaining",
-    "over_target": "over target",
-    "target_reached": "Target reached!",
-    "meal_logged": "meal logged",
-    "meals_logged": "meals logged",
-    "after_logging": "After logging this meal",
-    "calories": "Calories",
-    "protein": "Protein",
-    "estimated_calories": "Estimated Calories",
-    "estimated_protein": "Estimated Protein",
-    "health_rating": "Health Rating",
-    "log_meal": "Log Meal",
-    "logging": "Logging...",
-    "logged_success": "Meal logged successfully!",
-    "log_error": "Failed to log meal. Please try again.",
-    "estimate_error": "Failed to estimate nutrition. Please try again.",
-    "description_required_title": "Description or Photo Required",
-    "description_required_message": "Please describe your meal or add a photo for AI estimation",
-    "name_required_title": "Name Required",
-    "name_required_message": "Please enter what you ate",
-    "types": {
-      "breakfast": "Breakfast",
-      "lunch": "Lunch",
-      "dinner": "Dinner",
-      "snack": "Snack",
-      "other": "Other"
-    },
-    "health_ratings": {
-      "healthy": "Healthy",
-      "okay": "Okay",
-      "unhealthy": "Unhealthy"
-    },
-    "success": "Meal logged successfully!",
-    "error": "Failed to log meal"
-  },
-  "hydration": {
-    "title": "Log Water",
-    "daily_progress": "Today's Progress",
-    "glasses_logged": "{{count}} glasses logged",
-    "target_reached": "Target reached! 🎉",
-    "quick_add": "Quick Add",
-    "glass": "1 Glass (8oz)",
-    "bottle": "1 Bottle (16oz)",
-    "large_bottle": "Large Bottle (25oz)",
-    "custom": "Custom Amount",
-    "custom_amount": "Custom Amount (ml)",
-    "log_water": "Log Water",
-    "logging": "Logging...",
-    "success": "Water logged successfully!",
-    "error": "Failed to log water",
-    "daily_target": "Daily Target",
-    "remaining": "{{amount}} ml remaining",
-    "logged_success": "Water logged!",
-    "log_error": "Failed to log water. Please try again.",
-    "invalid_amount_title": "Invalid Amount",
-    "invalid_amount_message": "Please enter a valid amount in ml"
-  },
-  "tracking_type": {
-    "workout": "Workout",
-    "meal": "Meal Logging",
-    "hydration": "Water Tracking",
-    "checkin": "Check-in"
-  },
+
   "auth": {
     "main": {
-      "tagline": "Your AI-Powered Fitness Coach",
+      "tagline": "Your AI Accountability Partner",
       "sign_in_now": "Sign in now",
       "sign_up_now": "Sign Up Now"
     },
@@ -217,7 +443,7 @@
     },
     "signup": {
       "title": "Create your Account",
-      "subtitle": "Join FitNudge and start your fitness journey with personalized AI coaching",
+      "subtitle": "Join FitNudge and build habits that stick with your AI accountability partner",
       "username_label": "Username",
       "username_placeholder": "Enter your username",
       "email_label": "Email",
@@ -316,7 +542,7 @@
   },
   "home": {
     "welcome_back": "Welcome back, {{name}}!",
-    "subtitle": "Ready to crush your fitness goals today?",
+    "subtitle": "Ready to crush your goals today?",
     "greeting_morning": "Good morning",
     "greeting_afternoon": "Good afternoon",
     "greeting_evening": "Good evening",
@@ -326,7 +552,7 @@
     "todays_motivation": "Today's Motivation",
     "motivation_quote": "Every step you take is a step closer to your goals. Keep pushing forward! 💪",
     "motivation_title": "Daily Motivation",
-    "motivation_start": "Start your fitness journey today! Every small step counts.",
+    "motivation_start": "Start your journey today! Every small step counts.",
     "motivation_early": "You're on a {{streak}}-day streak! Keep the momentum going!",
     "motivation_growing": "Incredible {{streak}}-day streak! You're building strong habits.",
     "motivation_strong": "Amazing {{streak}}-day streak! You're unstoppable!",
@@ -337,19 +563,17 @@
     "pending_checkins": "pending check-ins",
     "pending_checkin": "pending check-in",
     "complete_checkin": "Complete check-in",
-    "complete_challenge_checkin": "Check in to challenge",
     "no_checkins_today": "No check-ins today",
     "no_checkins_message": "You don't have any check-ins scheduled for today.",
     "all_done_title": "All done! 🎉",
     "all_done_message": "Great job! You've completed all check-ins today.",
     "and_more": "+{{count}} more",
-    "log_workout": "Log Workout",
     "set_goal": "Set Goal",
     "view_all_goals": "View All Goals",
     "view_all": "View All",
     "view_progress": "View Progress",
     "recent_activity": "Recent Activity",
-    "activity_message": "You've been consistent with your workouts this week! 🎉",
+    "activity_message": "You've been consistent this week! 🎉",
     "no_recent_activity": "No recent activity",
     "no_recent_activity_message": "Complete check-ins to see your activity here.",
     "achievements": "Achievements",
@@ -362,6 +586,13 @@
     "current_streak": "Overall Streak",
     "total_checkins": "Total Check-ins",
     "completion_rate": "Avg. Completion",
+    "todays_goals": "Today's Goals",
+    "talk_to_buddy": "Talk to your buddy",
+    "no_goals_title": "No Active Goals",
+    "no_goals_description": "Create your first goal to start tracking your habits and building consistency.",
+    "create_first_goal": "Create First Goal",
+    "rest_day_title": "No Goals Scheduled Today",
+    "rest_day_description": "Enjoy your rest day! Your scheduled goals will appear here on their active days.",
     "partners": {
       "title": "Partners",
       "empty_title": "Find Partners",
@@ -370,15 +601,15 @@
       "pending": "{{count}} pending"
     },
     "no_goals_title": "No Active Goals",
-    "no_goals_message": "Create your first goal to get started on your fitness journey!",
-    "no_items_title": "No Active Goals or Challenges",
-    "no_items_message": "Create a goal or join a challenge to start your fitness journey!",
+    "no_goals_message": "Create your first goal to get started on your journey!",
+    "no_items_title": "No Active Goals",
+    "no_items_message": "Create a goal to start your journey!",
     "create_first_goal": "Create Your First Goal",
     "create_goal": "Create Goal",
     "get_started": "Get Started",
     "motivation_view": "View",
     "daily_motivation_share_title": "Daily Motivation",
-    "daily_motivation_share_footer": "From FitNudge - Your AI Fitness Coach",
+    "daily_motivation_share_footer": "From FitNudge - Your AI Coach",
     "progress": {
       "title": "Your Progress",
       "current_streak": "Current Streak",
@@ -397,7 +628,7 @@
     }
   },
   "checkin": {
-    "did_you_complete": "Did you complete {{goal}} today?",
+    "did_you_complete": "Did you complete it today?",
     "reflection_label": "How did it feel?",
     "reflection_placeholder": "Share your thoughts... (optional)",
     "mood_label": "How was your mood?",
@@ -406,8 +637,34 @@
       "bad": "Bad",
       "okay": "Okay",
       "good": "Good",
-      "great": "Great"
+      "great": "Great",
+      "tough": "Tough",
+      "amazing": "Amazing"
     },
+    "yes": "Yes",
+    "no": "No",
+    "rest_day": "Rest Day",
+    "how_was_it": "How was it?",
+    "what_happened": "What happened?",
+    "reason": {
+      "work": "Work",
+      "tired": "Tired",
+      "sick": "Sick",
+      "schedule": "Schedule",
+      "other": "Other"
+    },
+    "add_note": "Add a note",
+    "note_placeholder": "How did it go? Any thoughts...",
+    "remember_why": "Remember why you started:",
+    "rest_message": "Rest is part of the journey. Come back stronger tomorrow!",
+    "miss_message": "No worries, everyone has off days. Just remember why you started.",
+    "tomorrow_new_chance": "Tomorrow's a new chance!",
+    "submit_yes": "Check In ✓",
+    "submit_rest": "Mark Rest Day",
+    "success_yes": "Great job! Keep it up! 🎉",
+    "success_no": "No worries, tomorrow is a new day!",
+    "success_rest": "Rest day logged. Recharge and come back strong!",
+    "error": "Failed to check in. Please try again.",
     "photo_options": "Add Photo",
     "save_checkin": "Save Check-In",
     "saving": "Saving...",
@@ -440,75 +697,140 @@
     "update_error": "Failed to update check-in",
     "how_feeling": "How are you feeling?",
     "notes": "Notes",
-    "notes_placeholder": "How did your workout go?",
+    "notes_placeholder": "How did it go?",
     "photo": "Add Photo",
-    "choose_library": "Choose from Library"
+    "choose_library": "Choose from Library",
+    "saved": "Check-in saved!",
+    "detail_title": "Check-in Details",
+    "ai_response": "AI Coach Response",
+    "ai_generating_title": "AI is crafting your response",
+    "ai_generating_subtitle": "Check back in a few minutes for personalized feedback on your check-in.",
+    "ai_upsell_title": "Unlock AI Coach Feedback",
+    "ai_upsell_subtitle": "Get personalized encouragement and insights after every check-in with Premium.",
+    "ai_upsell_cta": "Upgrade to Premium",
+    "history_title": "Check-in History",
+    "load_more": "Load More",
+    "no_more_checkins": "No more check-ins",
+    "see_all": "See All"
+  },
+  "voice_notes": {
+    "title": "Voice Note",
+    "permission_required": "Microphone permission is required to record voice notes.",
+    "tap_to_record": "Tap to record your reflection",
+    "tap_to_stop": "Tap to stop recording",
+    "tap_pause": "Tap to pause",
+    "tap_continue": "Tap mic to continue",
+    "done": "Done",
+    "recording": "Recording...",
+    "max_duration": "Max 30 seconds",
+    "save": "Save",
+    "delete": "Delete",
+    "play": "Play",
+    "pause": "Pause",
+    "transcript": "Transcript",
+    "no_transcript": "Transcription unavailable",
+    "uploading": "Uploading voice note...",
+    "upload_success": "Voice note saved!",
+    "upload_error": "Failed to save voice note",
+    "premium_required": "Voice notes are a premium feature",
+    "add_voice_note": "Add Voice Note",
+    "voice_reflection": "Voice Reflection"
   },
   "goals": {
-    "title": "Goals & Challenges",
+    "title": "Goals",
     "subtitle": "Track your progress and stay motivated",
     "active_goals": "Active Goals",
     "all": "All",
+    "goal": "Goal",
+    "pending": "Pending",
+    "details": "Goal Details",
     "create_goal": "Create Goal",
+    "update_goal": "Update Goal",
     "active": "Active",
     "completed": "Completed",
     "archived": "Archived",
+    "missed": "Missed",
+    "screen_title": "My Goals",
+    "tabs": {
+      "active": "Active",
+      "archived": "Archived"
+    },
+    "quick_select": "Quick Select",
+    "goal_title": "Goal Title",
+    "title_placeholder": "e.g., Work out regularly",
+    "how_often": "How often?",
+    "daily": "Daily",
+    "weekly": "Weekly",
+    "schedule_daily": "Daily",
+    "schedule_weekly": "Weekly",
+    "which_days": "Which days?",
+    "select_days_count": "Select {{count}} days ({{selected}}/{{count}})",
+    "frequency_locked": "Locked",
+    "frequency_locked_hint": "Schedule cannot be changed after completing check-ins. Archive this goal and create a new one to change the schedule.",
+    "reminder_time": "Reminder Time",
+    "reminder_times": "Reminder Times",
+    "reminder_times_free_limit": "Free plan allows 1 reminder. Upgrade for up to 5.",
+    "reminder_times_premium": "Add up to {{max}} reminder times",
+    "why_matters": "Why does this matter?",
+    "why_placeholder": "I want to feel stronger and more confident...",
     "my_goals": "My Goals",
     "current_streak": "Current Streak",
     "last_7_days": "Last 7 Days",
     "last_30_days": "Last 30 Days",
-    "habits": "Habits",
-    "challenges": "Challenges",
     "select_category": "Select Category",
     "sort_by": "Sort By",
     "category": "Category",
-    "habit": "Habit",
-    "challenge": "Challenge",
-    "types": {
-      "title": "Choose Goal Type",
-      "subtitle": "What kind of goal do you want to create?",
-      "recommended": "Recommended",
-      "shareable": "Shareable with friends",
-      "info": "Habits are free for everyone. Challenges require a premium plan and can be shared with friends.",
-      "mixed": {
-        "title": "Mixed (Recommended)",
-        "description": "Get a variety of habits and challenges to choose from"
-      },
-      "habit": {
-        "title": "Ongoing Habit",
-        "description": "Build a daily practice that becomes part of your routine. No end date.",
-        "badge": "Free"
-      },
-      "time_challenge": {
-        "title": "Time Challenge",
-        "description": "Complete this challenge within the selected duration",
-        "duration_label": "Challenge Duration (days)",
-        "custom_duration": "Enter custom duration (days)",
-        "achievability_hint": "With {{daysPerWeek}} days/week over {{weeks}} weeks = {{totalDays}} workout days",
-        "days_30": "30 Days",
-        "days_60": "60 Days",
-        "days_90": "90 Days"
-      },
-      "target_challenge": {
-        "title": "Target Challenge",
-        "description": "Complete when you reach this number of check-ins",
-        "target_label": "Target Check-ins",
-        "custom_target": "Enter custom target",
-        "achievability_hint": "With {{daysPerWeek}} days/week over {{weeks}} weeks, max achievable: {{maxCheckins}} check-ins",
-        "range_small": "Small (25-30)",
-        "range_medium": "Medium (50-75)",
-        "range_ambitious": "Ambitious (100+)"
-      }
-    },
     "view_plan": "View Plan",
     "delete_goal": "Delete Goal",
+    "delete_goal_confirm_title": "Delete Goal?",
     "delete_goal_confirm": "Are you sure you want to delete \"{{title}}\"? This action cannot be undone.",
+    "delete_goal_confirm_message": "This will permanently delete this goal and all associated check-ins, progress, and data. This action cannot be undone.",
     "delete_goal_confirm_with_progress": "\"{{title}}\" has check-in progress. Deleting will permanently remove all your data. Consider archiving instead.",
+    "delete_goal_success": "Goal deleted successfully",
     "delete_goal_error": "Failed to delete goal. Please try again.",
     "archive_instead": "Archive Instead",
+    "archive": {
+      "action": "Archive Goal",
+      "title": "Archive Goal?",
+      "message": "This goal will be moved to your archive. You can restore it later.",
+      "confirm": "Archive",
+      "success": "Goal archived",
+      "error": "Failed to archive goal"
+    },
+    "activate": {
+      "action": "Activate Goal",
+      "title": "Activate Goal?",
+      "message": "This goal will be moved back to your active goals.",
+      "confirm": "Activate",
+      "success": "Goal activated",
+      "error": "Failed to activate goal"
+    },
+    "delete": {
+      "title": "Delete Goal?",
+      "message": "This will permanently delete this goal and all check-in data. This cannot be undone.",
+      "confirm": "Delete",
+      "success": "Goal deleted",
+      "error": "Failed to delete goal"
+    },
+    "update": {
+      "success": "Goal updated successfully",
+      "error": "Failed to update goal"
+    },
+    "not_found": {
+      "title": "Goal Not Found",
+      "message": "This goal doesn't exist or has been deleted."
+    },
+    "empty": {
+      "active_title": "No Active Goals",
+      "active_description": "Create your first goal to start tracking your progress",
+      "archived_title": "No Archived Goals",
+      "archived_description": "Goals you archive will appear here",
+      "create_goal": "Create Goal"
+    },
     "delete_anyway": "Delete Anyway",
     "activate_goal": "Activate Goal",
     "activate_goal_error": "Failed to activate goal. Please try again.",
+    "approaching_limit": "You have {{remaining}} goal slot(s) remaining (max {{limit}})",
     "deactivate_goal": "Deactivate Goal",
     "deactivate_goal_error": "Failed to deactivate goal. Please try again.",
     "pause_goal": "Pause Goal",
@@ -529,7 +851,6 @@
       "error_title": "Update Failed",
       "error_message": "Failed to update goal."
     },
-    "start_workout_hint": "Go to the Plan tab to start your workout",
     "rest_day": "Rest day - no action scheduled for today",
     "goal_paused": "This goal is paused",
     "goal_completed": "This goal is completed",
@@ -547,15 +868,11 @@
     "permission_level": "Permission Level",
     "share_with_user": "Share",
     "archive_goal_option": "Archive goal (recommended)",
-    "archive_goal_option_description": "Only track progress in the challenge",
+    "archive_goal_option_description": "Only track progress in the goal",
     "keep_goal_active_option": "Keep goal active",
     "keep_goal_active_option_description": "Track both separately (counts as 2 toward your active limit)",
-    "create_challenge_button": "Create Challenge",
     "goal_has_progress_cannot_delete": "Goals with progress cannot be deleted. Archive this goal instead to preserve your history.",
     "goal_force_delete_required": "This archived goal has progress. Use force delete to permanently remove it.",
-    "active_limit_includes_challenges": "Your active limit includes both goals and challenges you've created.",
-    "challenge_join_limit_title": "Challenge Limit Reached",
-    "challenge_join_limit_message": "You can only join {{limit}} challenge(s) at a time. Complete or leave a challenge first to join a new one.",
     "no_goals_message": "You don't have any active goals yet. Create your first goal to get started!",
     "no_goals_title": "No Goals Yet",
     "no_results_title": "No Results",
@@ -565,17 +882,70 @@
     "sort": "Sort",
     "categories": "Goal Categories",
     "frequency_label": "Frequency",
-    "category_fitness": "Fitness",
-    "category_nutrition": "Nutrition",
-    "category_wellness": "Wellness",
-    "category_mindfulness": "Mindfulness",
-    "category_sleep": "Sleep",
     "frequency": {
       "daily": "Daily",
-      "weekly": "Weekly"
+      "weekly": "Weekly",
+      "per_week": "per week",
+      "week": "week"
     },
+    "stats": {
+      "streak": "Streak",
+      "done": "Done",
+      "best": "Best",
+      "rate": "Rate",
+      "completed": "Done"
+    },
+    "check_in_now": "Check In Now",
+    "recent_checkins": "Recent Check-ins",
+    "no_checkins_yet": "No check-ins yet. Start tracking your progress!",
+    "insights": "Pattern Insights",
+    "insights_empty": "Not enough data yet. Keep checking in to see patterns!",
+    "insights_upsell_title": "Unlock Pattern Insights",
+    "insights_upsell_subtitle": "Get AI-powered insights about your best days, skip patterns, and success trends.",
+    "insights_upsell_cta": "Upgrade to Premium",
+    "insights_loading": "Loading insights...",
+    "insights_generating_title": "Analyzing Your Patterns",
+    "insights_generating_subtitle": "AI is analyzing your check-in history...",
+    "insights_building_title": "Building Your Insights",
+    "insights_building_subtitle": "Keep checking in to unlock pattern insights",
+    "insights_building_progress": "{{current}} of {{needed}} check-ins completed",
+    "insights_hint_daily": "Keep checking in to unlock AI-powered pattern insights",
+    "insights_hint_weekly": "Weekly goals need ~8 weeks of data for trend insights",
+    "insights_no_patterns_title": "No Patterns Yet",
+    "insights_no_patterns_subtitle": "Keep checking in consistently and we'll find meaningful patterns in your data.",
+    "insights_failed_title": "Analysis Failed",
+    "insights_failed_subtitle": "We couldn't analyze your patterns. Please try again.",
+    "insights_retry": "Try Again",
+    "insights_metrics_title": "Your Stats",
+    "insights_completion_rate": "Completion Rate",
+    "insights_last_30_days": "Last 30 days",
+    "insights_current_streak": "Current Streak",
+    "insights_longest_streak": "Longest Streak",
+    "insights_best_day": "Best Day",
+    "insights_worst_day": "Needs Work",
+    "insights_completion_trend": "Trend",
+    "insights_vs_previous": "vs previous period",
+    "insights_no_change": "No change",
+    "insights_success_rate": "success rate",
+    "insights_data_analyzed": "Analyzed",
+    "insights_checkin_singular": "check-in",
+    "insights_checkin_plural": "check-ins",
+    "insights_improved": "improved",
+    "insights_declined": "declined",
+    "insights_days": "days",
+    "day_sun": "Sun",
+    "day_mon": "Mon",
+    "day_tue": "Tue",
+    "day_wed": "Wed",
+    "day_thu": "Thu",
+    "day_fri": "Fri",
+    "day_sat": "Sat",
+    "completed_today": "Completed today",
+    "not_checked_in": "Not checked in yet",
+    "check_in_at": "Check-in at",
+    "day_streak": "day streak",
+    "this_week": "this week",
     "scheduled_days": "Scheduled Days",
-    "reminder_times": "Workout Times",
     "target_days": "{{days}} days",
     "create": {
       "title": "Create Your Goal",
@@ -583,54 +953,13 @@
       "as_goal": "Personal Goal",
       "as_goal_desc": "Track your own progress privately",
       "goal_limit_reached": "Goal limit reached - upgrade to create more",
-      "as_challenge": "Social Challenge",
-      "as_challenge_desc": "Invite friends to compete together",
-      "challenge_limit_reached": "Challenge limit reached - upgrade for more",
       "what_to_create": "What would you like to create?",
       "tabs": {
         "suggestions": "AI Suggestions",
         "custom": "Create Custom"
       },
       "form": {
-        "goal_type": "What type of goal?",
-        "goal_type_habit": "Habit",
-        "goal_type_habit_desc": "Build lasting routines",
-        "goal_type_time_challenge": "Time Challenge",
-        "goal_type_time_challenge_desc": "30, 60, or 90 days",
-        "goal_type_target_challenge": "Target Challenge",
-        "goal_type_target_challenge_desc": "Hit your target",
-        "title": "Goal Title",
-        "title_placeholder": "e.g., Walk 10,000 steps daily",
-        "description": "Description (optional)",
-        "description_placeholder": "Add more details about your goal... This will help us create a personalized plan for you.",
-        "category": "Category",
-        "category_ai_hint": "Category selected by AI based on your goal",
-        "frequency": "Frequency",
-        "target_days": "Target Days",
-        "target_days_helper": "How many days per week (1-7)",
-        "target_days_daily_helper": "Daily habits automatically use all 7 days",
-        "days_of_week": "Select Days",
-        "days_of_week_helper": "Select which days of the week you want to work on this goal",
-        "days_of_week_weekly_helper": "Select the days you want to check in",
-        "reminder_times": "Reminder Times",
-        "reminder_times_description": "Set times when you want to be reminded.",
-        "reminder_times_fitness": "Workout Times",
-        "reminder_times_description_fitness": "Set your preferred workout times. We'll remind you when it's time to exercise.",
-        "reminder_times_nutrition": "Meal Times",
-        "reminder_times_description_nutrition": "Set times for your nutrition check-ins. We'll remind you to log your meals.",
-        "reminder_times_wellness": "Wellness Times",
-        "reminder_times_description_wellness": "Set times for your wellness routine. We'll remind you to take care of yourself.",
-        "reminder_times_mindfulness": "Mindfulness Times",
-        "reminder_times_description_mindfulness": "Set times for your mindfulness practice. We'll remind you to pause and reflect.",
-        "reminder_times_sleep": "Sleep Schedule",
-        "reminder_times_description_sleep": "Set your target bedtime and wake-up reminders for better sleep habits.",
-        "reminder_times_custom": "Reminder Times",
-        "reminder_times_description_custom": "Set times when you want to be reminded about this goal.",
-        "select_reminder_times": "Select Reminder Times",
-        "reminder_times_selected": "{{count}} time(s) selected",
-        "add_time": "Add Time",
-        "add_time_error_duplicate": "This time is already added",
-        "add_time_error_invalid": "Invalid time format. Use HH:MM (e.g., 09:00)"
+        "add_time": "Add Time"
       },
       "button_create": "Create Goal",
       "use_this_suggestion": "Use This",
@@ -653,7 +982,7 @@
         "error_title": "Unable to Generate",
         "error_message": "We couldn't generate suggestions right now. Please try again or create a custom goal.",
         "empty_title": "No Suggestions Yet",
-        "empty_message": "Get AI-powered goal suggestions tailored to your fitness profile.",
+        "empty_message": "Get AI-powered goal suggestions tailored to your profile.",
         "generate": "Generate Suggestions",
         "create_custom_fallback": "Create Custom Goal",
         "upgrade_title": "Upgrade for Unlimited Regenerations",
@@ -669,28 +998,15 @@
       "status_generating": "Generating...",
       "status_ready": "Plan Ready",
       "status_failed": "Failed",
-      "ready_tap_to_view": "Your plan is ready! Tap to view",
-      "your_ai_plan": "Your AI Plan",
-      "workout_title": "Your Workout Plan",
-      "meal_title": "Your Meal Plan",
-      "habit_title": "Your Habit Plan",
       "accountability_title": "Accountability Plan",
       "tips_guidance": "Tips & Guidance",
       "tips_title": "Helpful Tips",
-      "exercise_routine": "Exercise Routine",
       "daily_targets": "Daily Targets",
-      "meal_schedule": "Meal Schedule",
+      "todays_progress": "Today's Progress",
       "schedule": "Schedule",
       "progression": "Progression",
       "tracking_frequency": "Tracking Frequency",
       "optimal_times": "Optimal Times",
-      "warm_up": "Warm-up",
-      "cool_down": "Cool-down",
-      "protein": "Protein",
-      "calories": "Calories",
-      "breakfast": "Breakfast",
-      "lunch": "Lunch",
-      "dinner": "Dinner",
       "days_per_week": "days per week",
       "frequency": "Frequency",
       "target": "Target",
@@ -699,18 +1015,6 @@
       "weekly": "Weekly",
       "daily_checkins": "Daily Check-ins",
       "weekly_checkins": "Weekly Check-ins",
-      "generating_title": "Generating Your Plan",
-      "generating_message": "Our AI is creating a personalized plan for you...",
-      "loading_title": "Loading Your Plan",
-      "loading_message": "Retrieving your personalized plan...",
-      "failed_title": "Plan Generation Failed",
-      "failed_message": "We couldn't generate your plan right now.",
-      "failed_help": "Don't worry! You can still use check-ins to track your goal.",
-      "retry_generation": "Retry Generation",
-      "tap_to_view": "Tap to view plan",
-      "tap_to_retry": "Tap to retry",
-      "workout_tab": "Workout",
-      "exercises_tab": "Exercises",
       "tips_tab": "Tips",
       "progress_tab": "Progress",
       "weekly_focus": "Weekly Focus",
@@ -725,22 +1029,9 @@
       "milestones": "Milestones",
       "your_journey": "Your Journey",
       "habit_ongoing_message": "Build your streak! Check in daily to unlock milestones.",
-      "hydration_title": "Hydration Plan",
       "daily_target": "Daily Target",
-      "glasses": "glasses",
-      "per_glass": "per glass",
       "reminder_schedule": "Reminder Schedule",
-      "every_2_hours": "Every 2 hours",
-      "quick_tips": "Quick Tips",
-      "meals_day": "meals per day",
-      "snacks": "snacks",
-      "meal_ideas": "Meal Ideas",
-      "focus_portion_control": "Portion Control",
-      "focus_high_protein": "High Protein",
-      "focus_balanced": "Balanced Eating",
-      "focus_calorie_deficit": "Calorie Deficit",
-      "focus_calorie_surplus": "Calorie Surplus",
-      "focus_meal_timing": "Meal Timing"
+      "quick_tips": "Quick Tips"
     },
     "progress": {
       "your_progress": "Your Progress",
@@ -753,29 +1044,12 @@
       "until": "until",
       "days_completed": "days completed",
       "days_left": "days left",
-      "challenge_progress": "Challenge Progress",
-      "time_challenge_progress": "Time Challenge",
       "completed": "Completed",
-      "challenge_complete": "Challenge Complete!",
       "checkins": "check-ins",
       "complete": "complete",
       "last_days": "Last {{days}} days",
-      "workout_stats": "Workout Stats",
-      "meal_stats": "Meal Stats",
-      "hydration_stats": "Hydration Stats",
-      "workouts": "Workouts",
       "total_time": "Total Time",
       "this_week": "This Week",
-      "avg_session": "Avg Session",
-      "exercises_completed": "exercises completed",
-      "meals_logged": "Meals Logged",
-      "avg_calories": "Avg Cal/Day",
-      "avg_protein": "Avg Protein/Day",
-      "healthy_meals": "healthy",
-      "healthy": "healthy",
-      "okay": "okay",
-      "unhealthy": "unhealthy",
-      "meal_quality": "Meal Quality",
       "today": "Today",
       "avg_daily": "Avg/Day",
       "target_hit_days": "Days Target Hit",
@@ -786,6 +1060,8 @@
     "share_goal_desc": "Let friends view your progress",
     "delete_goal_desc": "Permanently remove this goal",
     "retry": "Retry",
+    "retry_plan": "Retry Plan Generation",
+    "retry_plan_desc": "Try generating the plan again",
     "retry_plan_error": "Failed to retry plan generation. Please try again.",
     "invite_members": "Invite Members",
     "invite_members_desc": "Invite friends to join",
@@ -800,8 +1076,6 @@
   "completion": {
     "streak": {
       "bravo": "BRAVO!",
-      "your": "YOUR",
-      "workout": "WORKOUT",
       "today": "TODAY!",
       "you_are_on_a": "YOU ARE ON A",
       "day_count": "{{count}}-DAY",
@@ -815,145 +1089,13 @@
       "awards": "AWARDS",
       "points": "+{{count}} points",
       "share_message": "🏆 I just unlocked \"{{name}}\" on FitNudge! {{description}}"
-    },
-    "summary": {
-      "workout": "WORKOUT",
-      "completed": "COMPLETED!",
-      "practice_session": "Practice Session",
-      "day": "DAY {{number}}",
-      "exercises": "Exercises",
-      "calories": "Calories",
-      "duration": "Duration",
-      "perfect_workout": "Perfect Workout - No exercises skipped!",
-      "exercises_skipped": "{{count}} exercise(s) skipped",
-      "how_do_you_feel": "How do you feel",
-      "finish": "FINISH"
-    },
-    "reflection": {
-      "title": "How was your workout?",
-      "subtitle": "Take a moment to reflect (optional)",
-      "mood_label": "How do you feel?",
-      "notes_label": "Any notes?",
-      "notes_placeholder": "How did the workout feel? Any observations...",
-      "photo_label": "Add a photo",
-      "add_photo": "Tap to add photo"
-    },
-    "feedback": {
-      "hard": "Hard",
-      "just_right": "Just right",
-      "easy": "Easy"
     }
-  },
-  "workout": {
-    "loading": "Loading workout...",
-    "completing_title": "WORKOUT COMPLETE!",
-    "calculating_stats": "Calculating your stats",
-    "overview": "Workout Overview",
-    "your_workout": "Your Workout",
-    "exercises": "Exercises",
-    "exercises_label": "Exercises",
-    "exercises_title": "Exercises",
-    "total_sets": "Total Sets",
-    "tips": "Tips",
-    "start_workout": "Start Workout",
-    "continue": "Continue ({{percent}}%)",
-    "restart": "Restart",
-    "entity_not_active": "This goal/challenge is not currently active",
-    "sets": "Sets",
-    "reps": "Reps",
-    "work": "Work",
-    "rest": "Rest",
-    "exercise_of": "Exercise {{current}} of {{total}}",
-    "exercise_count": "Exercise {{current}}/{{total}}",
-    "set_of": "Set {{current}} of {{total}}",
-    "round_of": "Round {{current}}/{{total}}",
-    "take_a_break": "Time to rest",
-    "catch_breath": "Catch your breath",
-    "up_next": "Up Next",
-    "next_label": "Next",
-    "next_exercise": "NEXT {{current}}/{{total}}",
-    "show_details": "Show Details",
-    "hide_details": "Hide Details",
-    "body_part": "Body Part",
-    "category": "Category",
-    "also_works": "Also Works",
-    "description": "Description",
-    "how_to": "How to Perform",
-    "ready_to_go": "READY TO GO",
-    "start_now": "Start!",
-    "get_ready": "Get Ready",
-    "skip": "SKIP",
-    "done": "Done",
-    "do_reps": "Do {{count}} reps",
-    "pause": "Pause",
-    "play": "Play",
-    "resume": "Resume",
-    "restart_exercise": "Restart this exercise",
-    "quit": "Quit",
-    "hold_on": "Hold on!",
-    "you_can_do_it": "You can do it!",
-    "you_have_finished": "You have finished",
-    "exercises_left": "Only {{count}} exercises left",
-    "exercises_progress": "Exercises {{current}}/{{total}}",
-    "why_give_up": "Why give up?",
-    "feedback_helps": "This helps us know you better and improve the workout to better suit you.",
-    "send_feedback": "Feedback",
-    "phase": {
-      "warm_up": "WARM UP",
-      "work": "WORKOUT",
-      "rest": "REST",
-      "rest_next": "Rest - Next Exercise",
-      "cool_down": "COOL DOWN"
-    },
-    "feedback": {
-      "dont_know_how": "Don't know how to do it",
-      "too_easy": "Too easy",
-      "too_hard": "Too hard",
-      "just_looking": "Just take a look"
-    },
-    "complete": {
-      "title": "Workout Complete!",
-      "perfect": "Absolutely perfect! You crushed every exercise!",
-      "great": "Amazing work! You gave it your all!",
-      "good": "Great effort! Every workout counts!",
-      "keep_going": "Keep going! Progress happens one workout at a time.",
-      "duration": "Duration",
-      "sets": "Sets Completed",
-      "exercises": "Exercises",
-      "completion": "Completion",
-      "perfect_badge": "Perfect Workout!",
-      "skipped": "{{count}} exercises skipped",
-      "done": "Done",
-      "total_time": "Total Time",
-      "calories": "Calories"
-    },
-    "music_voice_title": "Music & Voice",
-    "music": "Music",
-    "playlist": "Playlist",
-    "other_apps": "Other Apps",
-    "coach_voice": "Coach Voice",
-    "sound_effects": "Sound Effects",
-    "sound_effects_desc": "'Ding' sound after exercises, etc.",
-    "no_tracks": "No tracks available"
-  },
-  "exercises": {
-    "details": "Exercise Details",
-    "view_details": "View Details",
-    "body_part": "Body Part",
-    "category": "Category",
-    "description": "Description",
-    "how_to_perform": "How to Perform",
-    "also_works": "Also Works",
-    "focus_on": "Focus On",
-    "loading_demo": "Loading demo...",
-    "no_demo_available": "Demo not available",
-    "error_loading": "Failed to load exercise details"
   },
   "feed": {
     "title": "Motivation Feed",
     "subtitle": "AI-powered motivation and community posts",
     "ai_motivation": "AI Motivation",
-    "ai_quote_1": "You're doing amazing! Every workout counts and you're building unstoppable momentum! 🚀",
+    "ai_quote_1": "You're doing amazing! Every check-in counts and you're building unstoppable momentum! 🚀",
     "time_ago": "{{hours}} hours ago"
   },
   "profile": {
@@ -963,10 +1105,9 @@
     "privacy": "Privacy",
     "subscription": "Subscription",
     "manage_subscription": "Manage Subscription",
+    "manage_subscription_desc": "Change plan or cancel",
     "billing_history": "Billing History",
     "feature_locked_title": "Feature Locked",
-    "upgrade_to_join_challenges": "Upgrade your plan to join challenges.",
-    "upgrade_to_create_challenges": "Upgrade your plan to create challenges.",
     "upgrade": "Upgrade",
     "support": "Support",
     "help_center": "Help Center",
@@ -1001,10 +1142,14 @@
     "find_accountability_partners": "Find accountability partners",
     "partner_activity": "Partner Activity",
     "nudges_and_cheers": "Nudges and cheers from partners",
+    "blocked_users": "Blocked Users",
+    "manage_blocked": "Manage blocked users",
     "social_section": "Social",
     "insights_section": "Insights",
     "settings_section": "Settings",
     "support_section": "Support",
+    "blog": "Blog",
+    "blog_description": "Tips, guides & inspiration",
     "settings": "Settings",
     "invite_friends": "Invite Friends",
     "weekly_recaps": "Weekly Recaps",
@@ -1016,14 +1161,22 @@
     "no_recaps_title": "No Recaps Yet",
     "no_recaps_description": "Your weekly progress summaries will appear here after your first week of activity.",
     "recap_not_found": "Recap not found",
-    "ai_reflection": "AI Reflection",
     "achievements": "Achievements",
     "achievements_description": "Your milestones and badges",
+    "analytics": "Analytics",
+    "analytics_dashboard": "Analytics Dashboard",
+    "analytics_description": "Charts and detailed stats",
+    "ai_coach": "AI Coach",
+    "ai_coach_description": "Chat with your accountability partner",
+    "ai_coach_coming_soon_title": "AI Coach Coming Soon",
+    "ai_coach_coming_soon_desc": "Chat with your AI accountability partner anytime. Get motivation, analyze your patterns, and work through challenges together.",
+    "analytics_coming_soon_title": "Advanced Analytics Coming Soon",
+    "analytics_coming_soon_desc": "Unlock powerful insights with detailed charts and stats across all your goals to understand your patterns and consistency.",
     "achievements_error": "Failed to load achievements",
     "no_achievements_title": "No Achievements Yet",
-    "no_achievements_description": "Complete goals, challenges, and streaks to earn achievements!",
+    "no_achievements_description": "Complete goals and streaks to earn achievements!",
     "personalization": "Personalization",
-    "personalization_desc": "Fitness preferences & goals",
+    "personalization_desc": "AI coach style & preferences",
     "legal_section": "Legal",
     "privacy_policy": "Privacy Policy",
     "terms_of_service": "Terms of Service",
@@ -1035,31 +1188,12 @@
     "delete_account_desc": "Permanently delete your account and all associated data",
     "delete_account_warning": "This action is permanent and cannot be undone. All your data will be deleted. Are you sure?",
     "delete_confirm": "Delete Account",
-    "audio_settings": "Audio Settings",
-    "audio_settings_desc": "Music, voice & sound effects",
     "rate_app": "Rate the App",
     "rate_app_title": "Enjoying FitNudge?",
     "rate_app_description": "Please tap on the stars to rate",
     "rate_app_desc": "Love FitNudge? Leave a review!",
     "app_version": "Version",
     "build": "Build"
-  },
-  "audio": {
-    "music_section": "Music",
-    "music_enabled": "Background Music",
-    "music_enabled_desc": "Play music during workouts",
-    "volume": "Volume",
-    "shuffle": "Shuffle",
-    "preferred_app": "Preferred Music App",
-    "music_app_playlist": "Built-in Playlist",
-    "music_app_apple": "Apple Music",
-    "music_app_spotify": "Spotify",
-    "coach_section": "Coach Voice",
-    "coach_enabled": "Coach Voice",
-    "coach_enabled_desc": "Audio cues and instructions",
-    "effects_section": "Sound Effects",
-    "effects_enabled": "Sound Effects",
-    "effects_enabled_desc": "Completion sounds and alerts"
   },
   "account_settings": {
     "account": "Account",
@@ -1106,14 +1240,14 @@
   },
   "web": {
     "hero": {
-      "title": "Your AI-Powered Fitness Coach",
-      "subtitle": "Get personalized motivation, track your goals, and connect with a community that keeps you accountable. Powered by advanced AI technology.",
+      "title": "Your AI Accountability Partner",
+      "subtitle": "Build habits that stick with daily check-ins, personalized motivation, and an AI coach that won't let you quit.",
       "download_free": "Download for Free",
       "learn_more": "Learn More"
     },
     "blog": {
       "title": "FitNudge Blog",
-      "subtitle": "Insights, tips, and stories to help you on your fitness journey. From AI-powered motivation to community success stories."
+      "subtitle": "Insights, tips, and stories to help you build lasting habits. From accountability strategies to success stories."
     }
   },
   "errors": {
@@ -1134,8 +1268,6 @@
     "not_found_description": "The content you're looking for doesn't exist or has been removed.",
     "goal_not_found_title": "Goal Not Found",
     "goal_not_found_description": "This goal doesn't exist or you don't have access to view it.",
-    "challenge_not_found_title": "Challenge Not Found",
-    "challenge_not_found_description": "This challenge doesn't exist or you don't have access to view it.",
     "unlink_error": "Failed to unlink account. Please try again.",
     "export_failed": "Failed to export data. Please try again.",
     "delete_failed": "Failed to delete account. Please try again.",
@@ -1153,102 +1285,26 @@
   },
   "personalization": {
     "title": "Personalization",
-    "fitness_section": "Fitness",
-    "equipment_section": "Equipment",
-    "personal_section": "Personal",
-    "hydration_section": "Hydration",
-    "fitness_level": "Fitness Level",
-    "fitness_level_beginner": "Beginner",
-    "fitness_level_intermediate": "Intermediate",
-    "fitness_level_advanced": "Advanced",
-    "fitness_level_athlete": "Athlete",
-    "primary_goal": "Primary Goal",
-    "goal_lose_weight": "Lose Weight",
-    "goal_build_muscle": "Build Muscle",
-    "goal_stay_active": "Stay Active",
-    "goal_general_fitness": "General Fitness",
-    "goal_sport_specific": "Sport Specific",
-    "current_frequency": "Current Frequency",
-    "frequency_never": "Never",
-    "frequency_1_2x": "1-2x per week",
-    "frequency_3_4x": "3-4x per week",
-    "frequency_5_plus": "5+ per week",
-    "frequency_daily": "Daily",
-    "preferred_location": "Preferred Location",
-    "location_gym": "Gym",
-    "location_home": "Home",
-    "location_outdoor": "Outdoor",
-    "location_mix": "Mix",
-    "location_dont_know": "Not sure yet",
-    "available_time": "Available Time",
-    "time_less_30": "Less than 30 min",
-    "time_30_60": "30-60 minutes",
-    "time_1_2hrs": "1-2 hours",
-    "time_flexible": "Flexible",
+    "ai_buddy_section": "AI Buddy",
+    "morning_motivation_section": "Daily Motivation",
+    "morning_motivation_enabled": "Morning Motivation",
+    "morning_motivation_desc": "Receive a daily motivation message from your AI buddy",
+    "morning_motivation_time": "Motivation Time",
+    "info_text": "Your motivation style affects how your AI buddy talks to you during check-ins and when sending motivational messages.",
     "motivation_style": "Motivation Style",
-    "motivation_tough_love": "Tough Love",
-    "motivation_gentle": "Gentle Encouragement",
-    "motivation_data": "Data Driven",
-    "motivation_buddy": "Accountability Buddy",
-    "biggest_challenge": "Biggest Challenge",
-    "challenge_consistency": "Staying Consistent",
-    "challenge_getting_started": "Getting Started",
-    "challenge_time": "Time Management",
-    "challenge_knowledge": "Lack of Knowledge",
-    "challenge_motivation": "Lack of Motivation",
-    "challenge_not_knowing": "Not Knowing What to Do",
-    "challenge_consistency_alt": "Consistency",
-    "challenge_accountability": "Accountability",
-    "challenge_injury": "Injury Concerns",
-    "available_equipment": "Available Equipment",
-    "no_equipment": "None selected",
-    "equipment_count": "{{count}} items",
-    "equipment_dumbbell": "Dumbbells",
-    "equipment_barbell": "Barbell",
-    "equipment_kettlebell": "Kettlebells",
-    "equipment_resistance_band": "Resistance Bands",
-    "equipment_pull_up_bar": "Pull-up Bar",
-    "equipment_bench": "Bench",
-    "equipment_cable_machine": "Cable Machine",
-    "equipment_treadmill": "Treadmill",
-    "equipment_bike": "Stationary Bike",
-    "equipment_rowing": "Rowing Machine",
-    "equipment_yoga_mat": "Yoga Mat",
-    "equipment_foam_roller": "Foam Roller",
-    "equipment_jump_rope": "Jump Rope",
-    "equipment_medicine_ball": "Medicine Ball",
-    "equipment_none": "No Equipment",
-    "biological_sex": "Biological Sex",
-    "sex_male": "Male",
-    "sex_female": "Female",
-    "sex_prefer_not": "Prefer not to say",
-    "not_set": "Not set",
-    "hydration_unit": "Hydration Unit",
-    "hydration_ml": "Milliliters (ml)",
-    "hydration_oz": "Ounces (oz)",
-    "hydration_target": "Daily Hydration Target",
-    "daily_hydration_target": "Daily Hydration Target",
-    "custom_target": "Custom target",
-    "select_fitness_level": "Select Fitness Level",
-    "select_primary_goal": "Select Primary Goal",
-    "select_frequency": "Select Frequency",
-    "select_location": "Select Location",
-    "select_time": "Select Available Time",
-    "select_motivation": "Select Motivation Style",
-    "select_challenge": "Select Biggest Challenge",
-    "select_equipment": "Select Equipment",
-    "select_biological_sex": "Select Biological Sex",
-    "select_hydration_unit": "Select Unit"
+    "not_set": "Not set"
   },
   "notifications": {
     "title": "Notifications",
     "all": "All",
+    "activity": "Activity",
     "requests": "Requests",
     "system": "System",
     "empty_title": "No notifications",
     "empty_message": "When you receive notifications, they'll appear here.",
     "tabs": {
       "all": "All",
+      "activity": "Activity",
       "requests": "Requests",
       "system": "System"
     },
@@ -1256,8 +1312,10 @@
     "empty": {
       "all_title": "No Notifications",
       "all_description": "You're all caught up! Check back later for updates.",
+      "activity_title": "No Activity Yet",
+      "activity_description": "Partner cheers, nudges, and milestones will appear here.",
       "requests_title": "No Pending Requests",
-      "requests_description": "Partner requests and challenge invites will appear here.",
+      "requests_description": "Partner requests will appear here.",
       "system_title": "No System Notifications",
       "system_description": "Important updates and alerts will appear here."
     },
@@ -1277,27 +1335,26 @@
       "partner_cheer": "Partner Cheer",
       "partner_milestone": "Partner Milestone",
       "partner_inactive": "Partner Reminder",
-      "challenge": "Challenge",
-      "challenge_invite": "Challenge Invite",
-      "challenge_joined": "Joined Challenge",
-      "challenge_overtaken": "Leaderboard Update",
-      "challenge_lead": "You're in the Lead!",
-      "challenge_nudge": "Challenge Nudge",
-      "challenge_starting": "Challenge Starting",
-      "challenge_ending": "Challenge Ending",
-      "challenge_ended": "Challenge Ended",
       "streak_milestone": "Streak Milestone",
       "weekly_recap": "Weekly Recap",
       "plan_ready": "Plan Ready",
-      "goal_complete": "Goal Complete"
+      "goal_complete": "Goal Complete",
+      "adaptive_nudge": "Smart Reminder"
+    },
+    "checkin_response": {
+      "recorded_title": "Check-in Recorded",
+      "yes": "Great job! Check-in recorded.",
+      "no": "No worries! We'll try again tomorrow.",
+      "rest": "Rest day noted. Take care!",
+      "not_available_title": "Check-in Not Available",
+      "not_scheduled_day": "Cannot check in on {{today}}. This goal is scheduled for: {{scheduledDays}}"
     },
     "partner_request": "{{user}} wants to be your accountability partner",
     "partner_request_message": "Wants to be your accountability partner",
-    "challenge_invite": "Challenge Invitation",
     "invited_by": "Invited by {{name}}",
     "permission": {
       "title": "Stay Motivated with Notifications",
-      "subtitle": "Get personalized reminders and AI motivation to help you achieve your fitness goals",
+      "subtitle": "Get personalized reminders and AI motivation to help you stay accountable",
       "enable_button": "Enable Notifications",
       "maybe_later_button": "Maybe Later",
       "not_now_button": "Not Now",
@@ -1310,7 +1367,7 @@
       },
       "reminders": {
         "title": "Smart Reminders",
-        "description": "Never miss your workout reminders and check-ins"
+        "description": "Never miss your reminders and check-ins"
       },
       "achievements": {
         "title": "Celebrate Wins",
@@ -1318,7 +1375,7 @@
       },
       "community": {
         "title": "Stay Connected",
-        "description": "Get updates from your fitness community and friends"
+        "description": "Get updates from your community and friends"
       }
     },
     "settings": {
@@ -1333,30 +1390,23 @@
       "categories_title": "Categories",
       "categories": {
         "ai_motivation": "AI Motivation",
-        "ai_motivation_desc": "Daily motivation & workout tips",
+        "ai_motivation_desc": "Daily motivation & tips",
         "reminders": "Reminders",
-        "reminders_desc": "Workout & goal reminders",
-        "social": "Social Notifications",
+        "reminders_desc": "Goal reminders & check-ins",
+        "partners": "Partners",
+        "partners_desc": "Requests, nudges, cheers & milestones",
         "achievements": "Achievements",
         "achievements_desc": "Badges & milestone celebrations",
         "reengagement": "Re-engagement",
-        "reengagement_desc": "We miss you when you're away"
+        "reengagement_desc": "We miss you when you're away",
+        "weekly_recap": "Weekly Recaps",
+        "weekly_recap_desc": "Monday notifications when your recap is ready"
       },
-      "social_title": "Social",
-      "social_desc": "Partner & challenge updates",
-      "partners_section": "Partners",
-      "challenges_section": "Challenges",
-      "motivation_section": "Motivation",
-      "social": {
-        "partner_requests": "Partner Requests",
-        "partner_nudges": "Partner Nudges",
-        "partner_cheers": "Partner Cheers",
-        "partner_milestones": "Partner Milestones",
-        "challenge_invites": "Challenge Invites",
-        "challenge_leaderboard": "Leaderboard Updates",
-        "challenge_nudges": "Challenge Nudges",
-        "challenge_reminders": "Challenge Reminders",
-        "motivation_messages": "Motivation Messages"
+      "morning_motivation": {
+        "title": "Morning Motivation",
+        "enabled": "Daily Inspiration",
+        "enabled_desc": "Receive a motivational message each morning",
+        "time": "Delivery Time"
       },
       "quiet_hours": {
         "title": "Quiet Hours",
@@ -1376,11 +1426,11 @@
       },
       "reminder": {
         "title": "⏰ Time for your check-in!",
-        "body": "How did your workout go today?"
+        "body": "How did it go today?"
       },
       "achievement": {
         "title": "🎉 Achievement Unlocked!",
-        "body": "You're crushing your fitness goals!"
+        "body": "You're crushing your goals!"
       },
       "social": {
         "title": "👥 New Activity",
@@ -1388,7 +1438,7 @@
       },
       "reengagement": {
         "title": "We miss you! 💪",
-        "body": "Your fitness goals are waiting for you"
+        "body": "Your goals are waiting for you"
       }
     },
     "errors": {
@@ -1404,7 +1454,6 @@
     "add": "Add",
     "tabs": {
       "posts": "Posts",
-      "challenges": "Challenges",
       "partners": "Partners",
       "activity": "Activity",
       "search": "Search",
@@ -1415,27 +1464,12 @@
     "pending_requests_preview": "You have {{count}} pending request(s)",
     "your_partners": "Your Partners",
     "no_partners_title": "No Partners Yet",
-    "no_partners_desc": "Find accountability partners to stay motivated together on your fitness journey.",
+    "no_partners_desc": "Find accountability partners to stay motivated and consistent together.",
     "find_partners": "Find Partners",
     "manage_partners": "Manage Partners",
     "accountability_partners": "Accountability Partners",
-    "no_partners_description": "Find a friend to keep each other accountable on your fitness journey.",
+    "no_partners_description": "Find a friend to keep each other accountable and consistent.",
     "find_partner": "Find a Partner",
-    "my_challenges": "My Challenges",
-    "active_challenges": "Active",
-    "upcoming_challenges": "Upcoming",
-    "create_challenge_title": "Create a Challenge",
-    "create_challenge_desc": "Create public or private challenges for anyone to join and compete",
-    "create_challenge": "Create Challenge",
-    "discover_challenges": "Discover Challenges",
-    "challenges_available": "{{count}} available",
-    "starts": "Starts",
-    "join": "Join",
-    "challenge_joined_title": "Joined!",
-    "challenge_joined_message": "You've joined the challenge. Good luck!",
-    "join_challenge_error": "Failed to join challenge. Please try again.",
-    "no_challenges_title": "No Challenges Available",
-    "no_challenges_desc": "Check back later for new challenges to join, or create your own!",
     "unread_nudges": "{{count}} new notification(s)",
     "recent_activity": "Recent Activity",
     "no_activity_title": "No Activity Yet",
@@ -1467,6 +1501,9 @@
     "partner_singular": "partner",
     "partner_plural": "partners",
     "pending": "pending",
+    "today": "Today",
+    "send_cheer": "Send Cheer",
+    "no_goals_scheduled": "No goals scheduled today",
     "search_for_friends": "Search for Friends",
     "search_instructions": "Enter at least 2 characters to search by name or username.",
     "search_placeholder": "Search by name or username...",
@@ -1529,7 +1566,8 @@
     "no_sent_requests": "No sent requests",
     "cancel_request": "Cancel Request",
     "cancel_request_error": "Failed to cancel request",
-    "loading_more": "Loading more..."
+    "loading_more": "Loading more...",
+    "goals_in_common": "{{count}} goal(s) in common"
   },
   "partners": {
     "title": "Partners",
@@ -1561,12 +1599,10 @@
     "cancel_request_message": "Are you sure you want to cancel this partner request?",
     "detail_title": "Partner Details",
     "their_goals": "Their Goals",
-    "their_challenges": "Their Challenges",
     "no_goals": "No active goals",
-    "no_challenges": "No active challenges",
     "remove_partner": "Remove Partner",
     "remove_partner_title": "Remove Partner",
-    "remove_partner_message": "Are you sure you want to remove {{name}} as your accountability partner? You will no longer see each other's goals and challenges.",
+    "remove_partner_message": "Are you sure you want to remove {{name}} as your accountability partner? You will no longer see each other's goals and progress.",
     "remove_partner_confirm": "Remove",
     "remove_partner_cancel": "Cancel",
     "remove_success": "Partner removed successfully",
@@ -1574,7 +1610,7 @@
     "partner_since": "Partner since {{date}}",
     "view_profile": "View Profile",
     "send_request_title": "Send Partner Request",
-    "send_request_message": "By becoming accountability partners, you will both be able to:\n\n• See each other's active goals and challenges\n• View each other's progress and streaks\n• Send nudges to motivate each other\n\nThis helps you stay accountable together on your fitness journey.",
+    "send_request_message": "By becoming accountability partners, you will both be able to:\n\n• See each other's active goals\n• View each other's progress and streaks\n• Send nudges and cheers to motivate each other\n\nThis helps you both stay consistent and accountable.",
     "send_request_confirm": "Send Request",
     "send_request_cancel": "Cancel",
     "request_sent_title": "Request Sent!",
@@ -1588,6 +1624,25 @@
     "nudge_sent": "Nudge Sent! 👋",
     "nudge_sent_message": "Your partner will be notified to stay on track",
     "send_nudge": "Send Nudge",
+    "block": "Block",
+    "report": "Report",
+    "block_partner_title": "Block Partner",
+    "block_partner_message": "Are you sure you want to block this partner? They won't be able to see your activity and won't appear in your suggestions.",
+    "block_partner_error": "Failed to block partner",
+    "partner_blocked": "Partner Blocked",
+    "partner_blocked_message": "This user has been blocked",
+    "blocked_users": "Blocked Users",
+    "no_blocked": "No Blocked Users",
+    "no_blocked_description": "Users you block will appear here. You can unblock them at any time.",
+    "unblock_title": "Unblock Partner",
+    "unblock_message": "Are you sure you want to unblock {{name}}? They will be able to find you in search again.",
+    "unblock_success": "Partner unblocked",
+    "unblock_error": "Failed to unblock partner",
+    "report_user_title": "Report User",
+    "report_user_message": "Are you sure you want to report this user for inappropriate behavior?",
+    "report_user_error": "Failed to report user",
+    "user_reported": "User Reported",
+    "user_reported_message": "Thank you for your report. We'll review it shortly.",
     "yes": "Yes",
     "no": "No",
     "rest_day": "Rest Day",
@@ -1595,12 +1650,11 @@
     "not_logged_yet": "Not logged yet today",
     "logged": "Logged",
     "active_goals": "Active Goals",
-    "challenges": "Challenges",
     "streak": "Day Streak",
     "not_logged": "Not Yet",
     "unknown_user": "Unknown User",
-    "no_active_items": "No Active Goals or Challenges",
-    "no_active_items_desc": "Your partner hasn't set up any active goals or joined any challenges yet.",
+    "no_active_items": "No Active Goals",
+    "no_active_items_desc": "Your partner hasn't set up any active goals yet.",
     "accountability_info_title": "How Accountability Works",
     "info_see_progress": "You can see each other's goals and daily progress",
     "info_nudge": "Send nudges to encourage them to stay on track",
@@ -1608,7 +1662,7 @@
     "decline_request_title": "Decline Request",
     "decline_request_message": "Are you sure you want to decline this partner request?",
     "accept_request_title": "Accept Partner Request",
-    "accept_request_message": "By accepting, you and this person will become accountability partners. You'll be able to see each other's active goals and challenges, and send nudges to keep each other on track.",
+    "accept_request_message": "By accepting, you and this person will become accountability partners. You'll be able to see each other's active goals, and send nudges to keep each other on track.",
     "feature_required": "Accountability partners require a subscription. Upgrade to connect with others!",
     "limit_reached_title": "Partner Limit Reached",
     "limit_reached_message": "You have reached your partner limit ({{limit}}). You have {{accepted}} partners and {{pending}} pending requests.",
@@ -1617,7 +1671,6 @@
     "premium_required_title": "Premium Feature",
     "premium_required_description": "To access accountability partner features, either you or your partner needs a premium subscription.",
     "viewing_partner_goal": "Viewing partner's goal (read-only)",
-    "viewing_partner_challenge": "Viewing partner's challenge (read-only)",
     "plan_restricted_title": "Plan Details Restricted",
     "plan_restricted_message": "Your partner has an active plan for this goal. Plan details are private to protect their personal journey.",
     "plan_has_active": "Has an active plan",
@@ -1671,235 +1724,6 @@
       }
     }
   },
-  "challenges": {
-    "title": "Challenges",
-    "create_title": "Create Challenge",
-    "my_challenges": "My Challenges",
-    "active_challenges": "Active Challenges",
-    "completed_challenges": "Completed Challenges",
-    "cancelled_challenges": "Cancelled Challenges",
-    "upcoming": "Upcoming",
-    "active": "Active",
-    "completed": "Completed",
-    "cancelled": "Cancelled",
-    "challenge_cancelled": "This challenge has been cancelled",
-    "challenge_completed": "This challenge is completed",
-    "challenge_not_active": "This challenge is not active",
-    "creator": "Creator",
-    "public": "Public",
-    "private": "Private",
-    "public_desc": "Anyone can discover and join this challenge.",
-    "private_desc": "Only people you invite can join.",
-    "create_button": "Create Challenge",
-    "create_success": "Challenge created successfully!",
-    "create_error": "Failed to create challenge. Please try again.",
-    "form": {
-      "title": "Challenge Title",
-      "title_placeholder": "e.g., 30-Day Fitness Challenge",
-      "description": "Description",
-      "description_placeholder": "What is this challenge about?",
-      "challenge_type": "Challenge Type",
-      "category": "Category",
-      "duration": "Challenge Duration (days)",
-      "custom_duration": "Custom (days)",
-      "target_checkins": "Target Check-ins",
-      "custom_target": "Custom target",
-      "target_description": "Complete when you reach this number of check-ins",
-      "frequency": "Check-in Frequency",
-      "target_days": "Days per Week",
-      "days_of_week": "Select Days",
-      "schedule": "Challenge Schedule",
-      "join_deadline": "Join Deadline",
-      "join_deadline_desc": "Last day friends can join the challenge",
-      "start_date": "Start Date",
-      "start_date_desc": "When the challenge begins",
-      "end_date": "End Date",
-      "end_date_computed": "Calculated from start date + duration",
-      "reminder_times": "Reminder Times",
-      "reminder_times_helper": "Set times when participants should be reminded.",
-      "add_time": "Add Time",
-      "limit_participants": "Limit Participants",
-      "limited_spots": "Set maximum number of participants",
-      "unlimited": "Anyone can join (unlimited)",
-      "max_participants": "Maximum Participants",
-      "visibility": "Visibility"
-    },
-    "view_details": "View Details",
-    "view_leaderboard": "View Leaderboard",
-    "leave": "Leave Challenge",
-    "leave_title": "Leave Challenge?",
-    "leave_confirm": "Are you sure you want to leave this challenge?",
-    "leave_challenge": "Leave Challenge",
-    "leave_challenge_desc": "Remove yourself from this challenge",
-    "leave_success": "You have left the challenge",
-    "leave_error": "Failed to leave challenge. Please try again.",
-    "cancel": "Cancel Challenge",
-    "cancel_challenge": "Cancel Challenge",
-    "cancel_challenge_desc": "End the challenge for all participants",
-    "cancel_title": "Cancel Challenge?",
-    "cancel_desc": "End the challenge for all participants",
-    "cancel_confirm": "Are you sure you want to cancel this challenge? This action cannot be undone.",
-    "cancel_confirm_with_participants": "This will end the challenge for all {{count}} participant(s). This action cannot be undone.",
-    "cancel_confirm_button": "Cancel Challenge",
-    "cancel_success": "Challenge has been cancelled",
-    "cancel_error": "Failed to cancel challenge. Please try again.",
-    "edit_challenge": "Edit Challenge",
-    "edit_challenge_desc": "Edit title, description, deadline, or participants",
-    "edit": {
-      "plan_warning": "Your plan was generated based on your original challenge. Editing the title or description won't regenerate the plan.",
-      "title_too_short": "Title must be at least 3 characters",
-      "title_too_long": "Title must be 100 characters or less",
-      "max_participants_min": "Must be at least 2 participants",
-      "max_below_current": "Cannot be less than current participants ({{count}})",
-      "max_decrease_not_allowed": "Can only increase (original: {{original}})",
-      "deadline_past": "Deadline cannot be in the past",
-      "deadline_shorten_not_allowed": "Can only extend deadline, not shorten",
-      "deadline_after_start": "Deadline must be before start date",
-      "extend_only": "(Extend only)",
-      "increase_only": "(Increase only)",
-      "original": "Original",
-      "current_participants": "Current",
-      "success_title": "Challenge Updated",
-      "success_message": "Your challenge has been updated successfully.",
-      "error_title": "Update Failed",
-      "error_message": "Failed to update challenge."
-    },
-    "invite_friends": "Invite Friends",
-    "invite_friends_desc": "Share this challenge with friends",
-    "rank": "Rank",
-    "your_rank": "Your Rank",
-    "no_rank": "No rank yet",
-    "join_challenge": "Join Challenge",
-    "delete_challenge": "Delete Challenge",
-    "check_in": "Check In",
-    "already_checked_in": "You've already checked in today!",
-    "check_in_success": "Check-in recorded! Keep up the great work!",
-    "leaderboard": "Leaderboard",
-    "participants": "Participants",
-    "days_remaining": "{{days}} days remaining",
-    "challenge_ended": "Challenge Ended",
-    "challenge_not_started": "Challenge starts {{date}}",
-    "join_before_deadline": "Join before {{date}} to participate",
-    "join_deadline_passed": "Join deadline has passed. You can no longer join this challenge.",
-    "challenge_already_started": "Challenge has already started. You can no longer join.",
-    "no_challenges_title": "No Challenges Yet",
-    "no_challenges_description": "Join a friend's challenge or create your own to start competing!",
-    "public_challenges": "Public Challenges",
-    "browse_challenges": "Browse Challenges",
-    "todays_plan": "Today's Plan",
-    "view_full_plan": "View Full Plan",
-    "your_progress": "Your Progress",
-    "current_streak": "Current Streak",
-    "total_check_ins": "Total Check-ins",
-    "completion_rate": "Completion Rate",
-    "details": "Challenge Details",
-    "not_found": "Challenge not found",
-    "overview": "Overview",
-    "progress": "Progress",
-    "plan": "Plan",
-    "join_to_see_progress": "Join the challenge to track your progress",
-    "participants_joined": "participants joined",
-    "tap_to_view": "Tap to see the list",
-    "search_participants": "Search participants...",
-    "no_participants_found": "No participants found",
-    "start_date": "Starts",
-    "end_date": "Ends",
-    "days_left": "Days Left",
-    "join": "Join Challenge",
-    "join_deadline": "Join by",
-    "your_position": "Your Position",
-    "points": "pts",
-    "no_participants": "No participants yet",
-    "be_first": "Be the first to join this challenge!",
-    "share_challenge": "Share Challenge",
-    "challenge_settings": "Challenge Settings",
-    "cancel_confirm_title": "Cancel Challenge?",
-    "cancel_confirm_message": "This will end the challenge for all {{count}} participant(s). The leaderboard and check-ins will be preserved.",
-    "delete_confirm_title": "Delete Challenge?",
-    "delete_confirm_message": "This will permanently delete the challenge. This cannot be undone.",
-    "delete_error": "Failed to delete challenge. Please try again.",
-    "delete_has_participants": "Cannot delete a challenge with other participants. Cancel it instead.",
-    "leave_confirm_title": "Leave Challenge?",
-    "leave_confirm_message": "You will be removed from the challenge and your check-ins will be deleted.",
-    "creator_cannot_leave": "As the creator, you cannot leave. Cancel the challenge instead.",
-    "created_by": "Created by",
-    "created_by_you": "Created by you",
-    "untitled": "Untitled Challenge",
-    "workout_plan": "Workout Plan",
-    "your_plan": "Your Plan",
-    "tips": "Tips",
-    "no_plan": "No Plan Available",
-    "no_plan_description": "This challenge doesn't have a structured workout plan. Follow the challenge description and check in daily!",
-    "no_participants_yet": "No Participants Yet",
-    "be_first_to_join": "Be the first to join and claim the top spot!",
-    "limit_reached": "Limit Reached",
-    "limit_reached_title": "Challenge Limit Reached",
-    "limit_reached_message": "You can only have {{limit}} active challenges. Leave an existing challenge to join a new one.",
-    "you_won_title": "🏆 You Won!",
-    "you_won_message": "Congratulations! You won \"{{title}}\" with {{points}} points!",
-    "tie_title": "🏆 It's a Tie!",
-    "tie_message": "You tied for 1st place in \"{{title}}\" with {{points}} points!",
-    "challenge_complete_title": "🏁 Challenge Complete!",
-    "challenge_complete_message": "\"{{title}}\" has ended. You finished #{{rank}} with {{points}} points.",
-    "ending_soon_title": "⏰ Challenge Ending Soon!",
-    "ending_soon_message": "\"{{title}}\" ends on {{date}}. Make sure to complete your check-ins!",
-    "final_day_title": "🏁 Final Day!",
-    "final_day_message": "Today is the last day of \"{{title}}\". Give it your all!",
-    "invites": "Challenge Invites",
-    "received": "Received",
-    "sent": "Sent",
-    "pending": "Pending",
-    "starts": "Starts",
-    "invited_by": "Invited by {{name}}",
-    "invited_user": "Invited: {{name}}",
-    "cancel_request": "Cancel Request",
-    "invite_pending": "Invite pending",
-    "invite_accepted_title": "Joined!",
-    "invite_accepted_message": "You've joined {{name}}!",
-    "accept_invite_error": "Failed to join challenge",
-    "decline_invite_title": "Decline Invite",
-    "decline_invite_message": "Decline the invite to {{name}}?",
-    "decline_invite_error": "Failed to decline invite",
-    "cancel_invite_title": "Cancel Invite",
-    "cancel_invite_message": "Cancel your invite to {{name}}?",
-    "cancel_invite": "Cancel Invite",
-    "cancel_invite_error": "Failed to cancel invite",
-    "no_received_invites": "No Invites",
-    "no_received_invites_desc": "When someone invites you to a challenge, it will appear here.",
-    "no_sent_invites": "No Sent Invites",
-    "no_sent_invites_desc": "Invites you send to friends will appear here.",
-    "no_pending_requests": "No Pending Requests",
-    "no_pending_requests_desc": "Your pending challenge invites will appear here.",
-    "invite_users": "Invite Users",
-    "invite": "Invite",
-    "requested": "Cancel Request",
-    "search_users_title": "Search for Users",
-    "search_users_description": "Enter a name or username to invite to this challenge.",
-    "no_users_to_invite": "No Users Found",
-    "invite_not_allowed": "Invites are no longer allowed for this challenge",
-    "invite_disabled_ended": "This challenge has ended",
-    "invite_disabled_deadline": "Join deadline has passed",
-    "invite_challenge_ended": "This challenge is no longer available",
-    "entity_not_active": "This goal/challenge is not currently active",
-    "cancelled_message": "This challenge has been cancelled and is no longer available.",
-    "private_access_denied": "This is a private challenge. You need an invitation to participate.",
-    "no_users_to_invite_desc": "Try a different search term.",
-    "no_suggestions_challenge": "No Suggestions",
-    "no_suggestions_challenge_desc": "Search for users by name or username to invite them.",
-    "invite_to_challenge": "Invite to Challenge",
-    "inviting_to": "Inviting to: {{name}}",
-    "search_users_placeholder": "Search users by name or username...",
-    "no_challenge_selected": "No challenge selected to invite to",
-    "already_invited_title": "Already Invited",
-    "already_invited_message": "{{name}} has already been invited to this challenge",
-    "send_invite_title": "Send Invite",
-    "send_invite_message": "Invite {{name}} to {{challenge}}?",
-    "send_invite": "Send Invite",
-    "invite_sent_title": "Invite Sent!",
-    "invite_sent_message": "Invitation sent to {{name}}",
-    "send_invite_error": "Failed to send invite",
-    "invited": "Invited"
-  },
   "activity": {
     "title": "Partner Activity",
     "empty_title": "No Activity Yet",
@@ -1925,24 +1749,116 @@
     "retry": "Retry",
     "refreshing": "Checking…"
   },
+  "blog": {
+    "featured": "Featured",
+    "latest": "Latest Articles",
+    "read": "Read",
+    "min_read": "min read",
+    "min": "min",
+    "posts": "posts",
+    "all": "All",
+    "no_posts": "No Posts Yet",
+    "no_posts_description": "Check back soon for new content!"
+  },
   "onboarding": {
-    "ai_motivation": {
-      "title": "AI-Powered Motivation",
-      "description": "Get personalized coaching that keeps you motivated and on track with your fitness goals"
+    "welcome": {
+      "title": "Meet your AI accountability buddy",
+      "description": "Your personal coach that checks in daily, celebrates your wins, and won't let you quit.",
+      "get_started": "Get Started",
+      "have_account": "I already have an account"
     },
-    "track_progress": {
-      "title": "Track Your Progress",
-      "description": "Never miss a beat. Build streaks and celebrate every milestone on your fitness journey"
-    },
-    "join_community": {
-      "title": "Join Our Community",
-      "description": "Connect with like-minded fitness enthusiasts and stay motivated together"
+    "carousel": {
+      "slide1": {
+        "title": "Your AI Accountability Partner",
+        "description": "An AI coach that knows your goals, remembers your journey, and keeps you accountable every day"
+      },
+      "slide2": {
+        "title": "Simple Check-ins, Powerful Streaks",
+        "description": "Just answer Yes or No. Build unstoppable streaks and watch your consistency grow"
+      },
+      "slide3": {
+        "title": "Accountability Partners",
+        "description": "Get matched with a partner who shares your goals. Motivate each other to stay on track"
+      }
     },
     "sign_up": "Sign Up",
     "log_in": "Log in",
+    "name": {
+      "title": "What should I call you?",
+      "subtitle": "This is how your AI buddy will address you.",
+      "placeholder": "Your first name",
+      "continue": "Continue"
+    },
+    "motivation_style": {
+      "title": "How should I motivate you?",
+      "subtitle": "You can change this anytime in settings.",
+      "supportive": {
+        "emoji": "🤗",
+        "title": "Supportive Coach",
+        "description": "Encouraging and understanding. Celebrates every win."
+      },
+      "tough_love": {
+        "emoji": "💪",
+        "title": "Tough Love",
+        "description": "Direct and challenging. Calls out excuses."
+      },
+      "calm": {
+        "emoji": "🧘",
+        "title": "Calm & Steady",
+        "description": "Patient and balanced. Gentle reminders."
+      },
+      "continue": "Continue"
+    },
+    "first_goal": {
+      "title": "What do you want to stay accountable to?",
+      "subtitle": "Popular goals:",
+      "goals": {
+        "read": "📚 Read daily",
+        "meditate": "🧘 Meditate",
+        "hydration": "💧 Drink more water",
+        "journal": "📝 Journal",
+        "custom": "✨ Create my own"
+      },
+      "goal_titles": {
+        "workout": "Work out regularly",
+        "read": "Read daily",
+        "meditate": "Meditate",
+        "hydration": "Drink more water",
+        "journal": "Journal"
+      },
+      "continue": "Continue"
+    },
+    "goal_details": {
+      "subtitle": "Set your schedule",
+      "how_often": "How often?",
+      "per_week": "per week",
+      "which_days": "Which days work best?",
+      "which_days_optional": "(optional)",
+      "select_days_count": "Select up to {{max}} days ({{selected}}/{{max}})",
+      "select_exact_days": "Select {{count}} days ({{selected}}/{{count}})",
+      "days_required_error": "Please select exactly {{count}} days",
+      "checkin_time": "What time should I check in?",
+      "create_goal": "Create Goal"
+    },
+    "custom_goal": {
+      "title": "What's your goal?",
+      "placeholder": "e.g., Practice guitar for 30 minutes",
+      "how_often": "How often?",
+      "daily": "Daily",
+      "times_per_week": "X times per week",
+      "checkin_time": "What time should I check in?",
+      "create_goal": "Create Goal"
+    },
+    "why_matters": {
+      "title": "Why does this matter to you?",
+      "subtitle": "Your buddy will use this to motivate you when things get tough.",
+      "placeholder": "I want to feel stronger and more confident",
+      "continue": "Continue",
+      "skip": "Skip for now"
+    },
     "notifications": {
-      "title": "Stay on Track",
-      "subtitle": "We'll send you smart reminders to help you stay consistent with your fitness goals",
+      "title": "Never miss a check-in",
+      "subtitle": "Your AI buddy needs to reach you! Daily check-ins and motivation messages come through notifications.",
       "benefit_reminders": "Check-in reminders",
       "benefit_motivation": "Motivation when you need it most",
       "benefit_celebrations": "Streak celebrations",
@@ -1950,308 +1866,10 @@
       "maybe_later": "Maybe Later",
       "disclaimer": "You can change this anytime in settings"
     },
-    "personalization": {
-      "welcome": {
-        "title": "Let's personalize your journey",
-        "subtitle": "Answer a few questions to help us create the perfect fitness experience for you",
-        "benefit_goals": "Personalized goal recommendations",
-        "benefit_ai": "AI coaching tailored to your style",
-        "benefit_tracking": "Smart progress tracking"
-      },
-      "step": "Step {{current}} of {{total}}",
-      "continue": "Continue",
-      "get_started": "Get Started",
-      "generate_goals": "Generate My Goals",
-      "generating": "Generating...",
-      "update_profile": "Update Profile",
-      "updating": "Updating...",
-      "submitting": "Generating goals...",
-      "biological_sex": {
-        "title": "Tell us about yourself",
-        "subtitle": "This helps us calculate accurate calorie and nutrition targets for your meal plans",
-        "male": {
-          "title": "Male",
-          "description": "Born biologically male"
-        },
-        "female": {
-          "title": "Female",
-          "description": "Born biologically female"
-        },
-        "prefer_not_to_say": {
-          "title": "Prefer not to say",
-          "description": "We'll use general guidelines instead"
-        },
-        "privacy_note": "This information is only used to personalize your nutrition recommendations. You can skip this step if you prefer."
-      },
-      "fitness_level": {
-        "title": "What's your current fitness level?",
-        "subtitle": "This helps us recommend the right goals for you",
-        "beginner": {
-          "title": "Beginner",
-          "description": "Just starting out or getting back into fitness"
-        },
-        "intermediate": {
-          "title": "Intermediate",
-          "description": "Regularly active, comfortable with basic exercises"
-        },
-        "advanced": {
-          "title": "Advanced",
-          "description": "Very active, looking for challenging workouts"
-        },
-        "athlete": {
-          "title": "Athlete",
-          "description": "Competitive athlete or fitness professional"
-        }
-      },
-      "primary_goal": {
-        "title": "What's your primary fitness goal?",
-        "subtitle": "Choose the goal that matters most to you right now",
-        "lose_weight": {
-          "title": "Lose Weight",
-          "description": "Burn fat and get leaner"
-        },
-        "build_muscle": {
-          "title": "Build Muscle",
-          "description": "Gain strength and muscle mass"
-        },
-        "stay_active": {
-          "title": "Stay Active",
-          "description": "Maintain general fitness and health"
-        },
-        "general_fitness": {
-          "title": "General Fitness",
-          "description": "Improve overall health and wellness"
-        },
-        "sport_specific": {
-          "title": "Sport-Specific",
-          "description": "Train for a specific sport or activity"
-        }
-      },
-      "current_habits": {
-        "title": "How often do you currently exercise?",
-        "subtitle": "Be honest - this helps us set realistic expectations",
-        "never": {
-          "title": "Never",
-          "description": "I don't currently exercise regularly"
-        },
-        "1-2x_week": {
-          "title": "1-2 times per week",
-          "description": "Light activity, getting started"
-        },
-        "3-4x_week": {
-          "title": "3-4 times per week",
-          "description": "Moderately active, good routine"
-        },
-        "5+_week": {
-          "title": "5+ times per week",
-          "description": "Very active, dedicated to fitness"
-        },
-        "daily": {
-          "title": "Daily",
-          "description": "Exercise is a daily habit"
-        }
-      },
-      "workout_setting": {
-        "title": "Where do you prefer to work out?",
-        "subtitle": "This helps us suggest the right types of goals",
-        "gym": {
-          "title": "Gym",
-          "description": "I prefer working out at a gym or fitness center"
-        },
-        "home": {
-          "title": "Home",
-          "description": "I prefer working out at home"
-        },
-        "outdoor": {
-          "title": "Outdoor",
-          "description": "I prefer outdoor activities and exercises"
-        },
-        "mix": {
-          "title": "Mix",
-          "description": "I like to mix it up with different locations"
-        },
-        "dont_know": {
-          "title": "Don't know yet",
-          "description": "I'm still figuring out what works for me"
-        }
-      },
-      "equipment": {
-        "title": "What equipment do you have?",
-        "subtitle": "Select all the equipment you have access to at home",
-        "none": {
-          "title": "No equipment",
-          "description": "I'll use body weight exercises only"
-        },
-        "resistance_band": {
-          "title": "Resistance bands",
-          "description": "Elastic bands for strength training"
-        },
-        "dumbbell": {
-          "title": "Dumbbells",
-          "description": "Free weights for various exercises"
-        },
-        "kettlebell": {
-          "title": "Kettlebell",
-          "description": "Cast iron weight for dynamic movements"
-        },
-        "pull_up_bar": {
-          "title": "Pull-up bar",
-          "description": "Bar for pull-ups and hanging exercises"
-        },
-        "yoga_mat": {
-          "title": "Yoga mat",
-          "description": "Mat for floor exercises and stretching"
-        },
-        "barbell": {
-          "title": "Barbell",
-          "description": "Long bar for heavy compound lifts"
-        },
-        "bench": {
-          "title": "Workout bench",
-          "description": "Bench for pressing and supported exercises"
-        },
-        "cable_machine": {
-          "title": "Cable machine",
-          "description": "Adjustable cable pulley system"
-        },
-        "treadmill": {
-          "title": "Treadmill",
-          "description": "Indoor running and walking machine"
-        },
-        "stationary_bike": {
-          "title": "Stationary bike",
-          "description": "Indoor cycling machine"
-        },
-        "rowing_machine": {
-          "title": "Rowing machine",
-          "description": "Full-body cardio machine"
-        },
-        "foam_roller": {
-          "title": "Foam roller",
-          "description": "For muscle recovery and mobility"
-        },
-        "jump_rope": {
-          "title": "Jump rope",
-          "description": "For cardio and conditioning"
-        },
-        "medicine_ball": {
-          "title": "Medicine ball",
-          "description": "Weighted ball for dynamic exercises"
-        }
-      },
-      "available_time": {
-        "title": "How much time can you commit to workouts?",
-        "subtitle": "This helps us suggest realistic goals",
-        "less_30min": {
-          "title": "Less than 30 minutes",
-          "description": "Quick, efficient workouts"
-        },
-        "30-60min": {
-          "title": "30-60 minutes",
-          "description": "Standard workout duration"
-        },
-        "1-2hrs": {
-          "title": "1-2 hours",
-          "description": "Longer, more comprehensive sessions"
-        },
-        "flexible": {
-          "title": "Flexible",
-          "description": "Time varies depending on the day"
-        }
-      },
-      "biggest_challenge": {
-        "title": "What's your biggest fitness challenge?",
-        "subtitle": "This helps us understand what you need the most support with",
-        "time_management": {
-          "title": "Time Management",
-          "description": "Struggling to find time to exercise regularly"
-        },
-        "lack_of_motivation": {
-          "title": "Lack of Motivation",
-          "description": "Finding it hard to stay motivated and consistent"
-        },
-        "not_knowing_what_to_do": {
-          "title": "Not Knowing What to Do",
-          "description": "Uncertain about what exercises or routines to follow"
-        },
-        "consistency": {
-          "title": "Consistency",
-          "description": "Difficulty maintaining a regular workout routine"
-        },
-        "accountability": {
-          "title": "Accountability",
-          "description": "Need someone to keep me on track"
-        },
-        "injury_concerns": {
-          "title": "Injury Concerns",
-          "description": "Worried about getting hurt or re-injuring myself"
-        }
-      },
-      "motivation_style": {
-        "title": "What motivates you most?",
-        "subtitle": "This helps us tailor your AI coach's personality",
-        "tough_love": {
-          "title": "Tough Love",
-          "description": "I need someone to push me hard and hold me accountable"
-        },
-        "gentle_encouragement": {
-          "title": "Gentle Encouragement",
-          "description": "I respond best to supportive, positive reinforcement"
-        },
-        "data_driven": {
-          "title": "Data-Driven",
-          "description": "I'm motivated by numbers, stats, and measurable progress"
-        },
-        "accountability_buddy": {
-          "title": "Accountability Buddy",
-          "description": "I need someone to check in with and share my journey"
-        }
-      }
-    },
-    "ai_loading": {
-      "analyzing_profile": "Analyzing your fitness profile...",
-      "finding_goals": "Finding the perfect goals for you...",
-      "personalizing": "Personalizing your journey...",
-      "considering_preferences": "Considering your preferences...",
-      "matching_goals": "Matching goals to your lifestyle...",
-      "optimizing_recommendations": "Optimizing recommendations...",
-      "customizing_suggestions": "Customizing suggestions for you...",
-      "refining_details": "Refining the details...",
-      "finalizing": "Finalizing your recommendations...",
-      "almost_there": "Almost there...",
-      "crafting_perfect_plan": "Crafting your perfect plan...",
-      "analyzing_patterns": "Analyzing your patterns...",
-      "generating_insights": "Generating personalized insights...",
-      "tailoring_experience": "Tailoring your experience...",
-      "connecting_dots": "Connecting the dots...",
-      "building_momentum": "Building your momentum...",
-      "discovering_possibilities": "Discovering possibilities...",
-      "creating_magic": "Creating something special...",
-      "polishing_details": "Polishing every detail...",
-      "bringing_it_together": "Bringing it all together..."
-    },
-    "suggested_goals": {
-      "title": "Perfect! Here are some goals we recommend for you",
-      "subtitle": "Based on your answers, we've selected goals that match your fitness level and preferences",
-      "loading": "Finding the perfect goals for you...",
-      "loading_title": "Loading your recommendations...",
-      "loading_message": "Hang tight while we check for any saved suggestions.",
-      "pending_title": "We're crafting your personalized goals",
-      "pending_message": "Our AI is building tailored recommendations in the background. Feel free to explore the app—your goals will be ready soon.",
-      "pending_continue": "Continue exploring",
-      "create_goal": "Create This Goal",
-      "create_goals": "Create {{count}} Goals",
-      "create_custom": "Create My Own Goal",
-      "skip": "Skip for Now",
-      "change_preferences": "Change My Preferences",
-      "error_title": "Something went wrong",
-      "error_loading": "Failed to load suggested goals. Please try again.",
-      "error_timeout": "AI suggestions are taking longer than expected. Please try again or create your own goal.",
-      "error_creating": "Failed to create goal. Please try again.",
-      "error_ai_failed": "Unable to load AI suggestions. Try creating your own goal!",
-      "no_goals": "No goals available at the moment.",
-      "goal_limit_reached": "You can only create {{limit}} goal(s) on your current plan. Upgrade to create more goals.",
-      "too_many_goals_selected": "You've selected {{selected}} goals but can only create {{limit}}. Please deselect some goals."
+    "complete": {
+      "title": "You're ready to go, {{name}}!",
+      "subtitle": "Your first check-in is scheduled for today at {{time}}.",
+      "start_button": "Start Using FitNudge"
     },
     "subscription": {
       "upgrade_required": "Upgrade Required",
@@ -2307,19 +1925,27 @@
       "exit_offer_unavailable_title": "Offer Expired",
       "exit_offer_unavailable_message": "This special offer is no longer available. Please check back later for new deals.",
       "faq": "FAQ of In-App Purchase",
-      "terms": "Terms",
+      "terms": "Terms of Service",
       "privacy": "Privacy Policy",
       "feature_goals_limit": "Access up to {{count}} goals",
       "feature_goals_unlimited": "Unlimited active goals",
       "continue_free": "Continue with Free",
-      "disclaimer": "Cancel anytime. Terms apply.",
+      "disclaimer": "Cancel anytime. Terms of Service and Privacy Policy apply.",
       "exit_offer": {
         "title": "Wait! Special Offer",
         "subtitle": "Before you go, here's an exclusive discount just for you.",
         "disclaimer": "Limited time offer",
         "claim_offer": "Claim This Offer",
         "select_plan": "Select Plan",
-        "continue_free": "No thanks"
+        "continue_free": "No thanks",
+        "discount_badge": "{{percent}}% OFF",
+        "best_value": "BEST VALUE",
+        "per_year": "/year",
+        "monthly_breakdown": "Just ${{monthly}}/month • Save ${{savings}}",
+        "feature_ai_chat": "AI Chat Motivation",
+        "feature_unlimited_goals": "Unlimited goals",
+        "feature_advanced_analytics": "Advanced analytics",
+        "offer_expires_in": "Offer expires in {{time}}"
       },
       "upgrade_banner": {
         "title": "Unlock Your Full Potential",
@@ -2330,11 +1956,19 @@
         "title": "Premium Feature",
         "subtitle": "This feature requires a premium plan",
         "goal_limit_title": "Goal Limit Reached",
-        "goal_limit_subtitle": "Free users can have 1 active goal. Upgrade to create more!",
+        "goal_limit_subtitle": "Your plan allows {{count}} active goal. Archive a goal or upgrade to create more!",
+        "max_limit_title": "Maximum Goals Reached",
+        "max_limit_subtitle": "You can have up to {{count}} active goals. Archive a goal to create a new one.",
         "feature_locked_title": "Feature Locked",
         "feature_locked_subtitle": "Upgrade to access {{feature}}",
         "upgrade_cta": "Upgrade",
-        "continue_free": "Maybe Later"
+        "continue_free": "Maybe Later",
+        "got_it": "Got It",
+        "benefit_unlimited_goals": "Unlimited active goals",
+        "benefit_goals_limit": "Up to {{count}} active goals",
+        "benefit_ai_coaching": "AI-powered coaching",
+        "benefit_analytics": "Advanced analytics",
+        "benefit_recaps": "Weekly progress recaps"
       },
       "manage_subscription": "Manage Subscription",
       "on_highest_plan_title": "You're on Elite! 🎉",
@@ -2345,7 +1979,12 @@
       "manage_error_title": "Unable to Open",
       "manage_error_message": "We couldn't open subscription management. Please try again from your device settings.",
       "cancel_anytime": "Cancel anytime",
-      "rating_badge": "4.9 ★ (50k+ reviews)"
+      "rating_badge": "4.9 ★ (50k+ reviews)",
+      "trial_badge": "{{days}}-day free trial",
+      "per_month": "/month",
+      "per_mo": "/mo",
+      "billed_annually": "Billed ${{price}}/year",
+      "billed_monthly": "Billed monthly"
     }
   },
   "browser": {
@@ -2362,6 +2001,7 @@
     "title": "Weekly Recaps",
     "detail_title": "Weekly Recap",
     "check_ins": "Check-ins",
+    "completion": "Completion",
     "goals_completed": "Goals",
     "streak": "Streak",
     "total_check_ins": "Check-ins",
@@ -2369,12 +2009,35 @@
     "ai_summary": "AI Summary",
     "highlights": "Highlights",
     "recommendations": "Recommendations",
+    "goal_breakdown": "Goal Breakdown",
+    "trend": "4-Week Trend",
+    "achievements": "Achievements Unlocked",
+    "partner": "Accountability Partner",
+    "partners": "Accountability Partners",
+    "week_over_week": "vs last week",
+    "active_days": "active days",
+    "active_days_count": "{{count}}/7 active days",
+    "best_day": "Best day: {{day}}",
+    "day_streak": "{{count}} day streak",
+    "completed_count": "{{completed}}/{{total}} completed",
+    "archived_label": "(Archived)",
+    "goals_hit_count": "{{hit}}/{{total}} Goals Hit",
     "premium_title": "Weekly Recaps",
     "premium_description": "Get AI-powered weekly summaries of your progress, achievements, and personalized insights to help you stay on track.",
     "empty_title": "No recaps yet",
     "empty_description": "Your weekly recaps will appear here once you've completed your first week of activity.",
     "not_found_title": "Recap not found",
-    "not_found_description": "This weekly recap could not be found."
+    "not_found_description": "This weekly recap could not be found.",
+    "free_user_title": "You're viewing your history",
+    "free_user_description": "New weekly recaps require premium. Upgrade to receive fresh AI insights every week.",
+    "win": "Your Big Win",
+    "win_icon": "trophy",
+    "insight": "Key Insight",
+    "insight_icon": "bulb",
+    "focus_next_week": "Focus for Next Week",
+    "focus_icon": "arrow-forward-circle",
+    "motivational_close": "Keep Going!",
+    "motivational_icon": "heart"
   },
   "referral": {
     "title": "Invite Friends",
@@ -2387,7 +2050,7 @@
     "share_link": "Share Referral Link",
     "copy_link": "Copy Link",
     "share_message": "Join me on FitNudge! Use my referral link to get started: {{link}}",
-    "share_message_short": "Join me on FitNudge and start your fitness journey! 💪",
+    "share_message_short": "Join me on FitNudge - your AI accountability partner that helps you stay consistent with any goal! 💪",
     "how_it_works": "How It Works",
     "step1_title": "Share Your Link",
     "step1_desc": "Send your unique referral link to friends",
@@ -2412,7 +2075,11 @@
     "send_email": "Send us an Email",
     "send_email_desc": "We typically respond within 24 hours",
     "live_chat": "Chat with Us",
-    "live_chat_desc": "Get instant support from our team"
+    "live_chat_desc": "Get instant support from our team",
+    "feature_suggestions": "Suggest a Feature",
+    "feature_suggestions_desc": "Help us build what you need",
+    "form_error_title": "Unable to load form",
+    "form_error_message": "Please check your internet connection and try again."
   },
   "update": {
     "title": "Update Available",
@@ -2421,5 +2088,157 @@
     "required": "This update is required to continue using the app",
     "update_now": "Update Now",
     "maybe_later": "Maybe Later"
+  },
+  "ai_coach": {
+    "title": "AI Coach",
+    "premium_title": "AI Coach Chat",
+    "premium_description": "Chat with your AI accountability partner anytime. Get motivation, analyze your patterns, and work through challenges together.",
+    "feature_patterns": "Understand your habit patterns",
+    "feature_motivation": "Personalized motivation when you need it",
+    "feature_advice": "24/7 accountability support",
+    "feature_struggles": "Work through challenges together",
+    "empty_title": "Hey there! 👋",
+    "empty_description": "I'm Coach Nudge, your AI accountability partner. I remember your journey, celebrate your wins, and help you stay on track when things get tough!",
+    "try_asking": "Try asking:",
+    "placeholder": "Ask anything",
+    "typing": "Working on that..",
+    "thinking_messages": [
+      "Let me think for a bit",
+      "Working on that...",
+      "Almost there...",
+      "Putting together my thoughts...",
+      "One moment please...",
+      "Thinking about that..."
+    ],
+    "message_failed": "Message failed. Tap to retry.",
+    "regenerate": "Regenerate response",
+    "no_response": "No response received. Tap to regenerate.",
+    "send": "Send",
+    "reset": "Reset",
+    "speak": "Speak",
+    "recording": "Recording...",
+    "cancel": "Cancel",
+    "microphone_required": "Microphone Required",
+    "microphone_permission_denied": "Please enable microphone access in your device settings to use voice input.",
+    "listening": "Listening...",
+    "voice_unavailable": "Voice Input Unavailable",
+    "voice_unavailable_desc": "Speech recognition is not available on this device.",
+    "voice_error": "Voice Error",
+    "voice_coming_soon": "Voice Input",
+    "voice_coming_soon_desc": "Voice input is coming soon! For now, please type your message.",
+    "clear_chat": "Clear Chat",
+    "new_conversation": "New Conversation",
+    "chat_history": "Chat history",
+    "no_conversations": "No conversations yet",
+    "start_chatting": "Start a conversation with Coach Nudge!",
+    "loading_conversation": "Loading conversation...",
+    "loading_history": "Loading history...",
+    "loading_messages": "Loading older messages...",
+    "load_older": "Load older messages",
+    "loading_more_conversations": "Loading more...",
+    "delete_conversation": "Delete conversation",
+    "delete_conversation_confirm": "Are you sure you want to delete this conversation?",
+    "chat_info": "Chat Info",
+    "delete_chat": "Delete Chat",
+    "rate_limit_title": "Daily Limit Reached",
+    "rate_limit_description": "You've used all your messages for today. Limit resets at midnight UTC.",
+    "upgrade_required": "Upgrade Required",
+    "upgrade_to_chat": "Upgrade to Pro or restore your subscription to chat with Coach Nudge.",
+    "error_generic": "Something went wrong. Please try again.",
+    "error_retry": "Failed to send. Tap to retry.",
+    "daily": "daily",
+    "privacy_title": "Your Privacy",
+    "privacy_description": "Coach Nudge uses AI to provide personalized accountability support. Here's how we handle your data:",
+    "privacy_what_we_share": "What we share with AI:",
+    "privacy_share_goals": "Your goals and why they matter to you",
+    "privacy_share_progress": "Recent check-in history and streaks",
+    "privacy_share_preferences": "Your motivation style preferences",
+    "privacy_what_we_dont": "What we never share:",
+    "privacy_no_personal": "Personal contact info (email, phone)",
+    "privacy_no_third_party": "Data with any third parties for ads",
+    "privacy_footer": "Your conversations are stored securely and can be deleted anytime.",
+    "suggestions": {
+      "motivation": "I need some motivation",
+      "patterns": "What patterns do you see?",
+      "why": "Remind me why this matters",
+      "consistency": "Help me stay consistent",
+      "progress": "How am I doing overall?",
+      "setback": "I had a setback today",
+      "streak": "Tips to protect my streak",
+      "goals": "Help me set better goals"
+    },
+    "limit_reached_title": "Daily Limit Reached",
+    "limit_reached_desc": "You've used all your free messages for today. Watch a short ad to unlock 1 more message, or upgrade for unlimited access.",
+    "premium_limit_title": "Daily Limit Reached",
+    "premium_limit_desc": "You've used all 100 messages for today. Your limit resets at midnight. This is to ensure quality service for all users.",
+    "limit_resets_at": "Resets at midnight",
+    "watch_ad_unlock": "Watch Ad → +1 Message",
+    "loading_ad": "Loading Ad...",
+    "go_premium_unlimited": "Go Premium → Unlimited Messages",
+    "ad_not_ready": "Ad Not Ready",
+    "ad_loading": "Please wait a moment while the ad loads and try again.",
+    "message_unlocked": "Message Unlocked!",
+    "message_unlocked_desc": "You've earned 1 additional message. Keep chatting!",
+    "unlock_failed": "Failed to unlock message. Please try again."
+  },
+  "faq_purchase": {
+    "title": "Frequently Asked Questions",
+    "still_have_questions": "Still have questions?",
+    "contact_support": "Contact Support",
+    "trial": {
+      "how_works_q": "How does the free trial work?",
+      "how_works_a": "When you subscribe to an annual plan, you get a 3-day free trial. During this time, you have full access to all premium features. You won't be charged until the trial ends.",
+      "charged_q": "Will I be charged during the free trial?",
+      "charged_a": "No, you won't be charged anything during your 3-day free trial. Your subscription payment is only processed after the trial period ends. You can cancel anytime before the trial ends to avoid being charged.",
+      "cancel_q": "Can I cancel during the free trial?",
+      "cancel_a": "Yes, you can cancel anytime during your free trial and you won't be charged. To cancel, go to your device's subscription settings (App Store or Google Play Store). After canceling, you'll still have access until the trial ends."
+    },
+    "billing": {
+      "when_charged_q": "When will I be charged?",
+      "when_charged_a": "For trial subscriptions, you'll be charged when your 3-day trial ends. For non-trial subscriptions, you're charged immediately upon subscribing. Your subscription automatically renews at the end of each billing period unless you cancel.",
+      "cancel_q": "How do I cancel my subscription?",
+      "cancel_a": "To cancel your subscription:\n\n• iOS: Go to Settings > Apple ID > Subscriptions > FitNudge > Cancel Subscription\n• Android: Go to Google Play Store > Menu > Subscriptions > FitNudge > Cancel Subscription\n\nYou'll retain access until the end of your current billing period.",
+      "refund_q": "Can I get a refund?",
+      "refund_a": "Refund policies are managed by Apple (iOS) or Google (Android). For iOS, contact Apple Support. For Android, request a refund through Google Play within 48 hours of purchase. We're happy to help if you have issues - contact our support team.",
+      "change_plan_q": "Can I switch from monthly to yearly?",
+      "change_plan_a": "Yes! You can upgrade from monthly to yearly at any time:\n\n• iOS: Go to Settings > Apple ID > Subscriptions > FitNudge > Choose the yearly plan\n• Android: Go to Play Store > Menu > Subscriptions > FitNudge > Update\n\nThe change takes effect at the end of your current billing period."
+    },
+    "features": {
+      "included_q": "What's included in Premium?",
+      "included_a": "Premium includes: unlimited active goals, AI Coach chat for personalized advice, weekly AI-generated progress recaps, advanced analytics, accountability partners, and priority support. Check the subscription screen for the complete feature list.",
+      "lose_data_q": "Do I lose my data if I cancel?",
+      "lose_data_a": "Your goals, check-ins, and progress history are never deleted when you cancel. Free users retain access to one active goal."
+    },
+    "technical": {
+      "restore_q": "How do I restore my purchase?",
+      "restore_a": "If you've previously purchased a subscription and it's not showing, tap 'Restore Purchases' on the subscription screen. Make sure you're signed in with the same Apple ID or Google account you used for the original purchase.",
+      "not_working_q": "Why am I not seeing Premium features after purchase?",
+      "not_working_a": "First, try closing and reopening the app. If the issue persists, tap 'Restore Purchases' on the subscription screen. Make sure you have an active internet connection. If problems continue, contact our support team.",
+      "multi_device_q": "Does my subscription work across devices?",
+      "multi_device_a": "Yes! Your subscription is tied to your Apple ID (iOS) or Google account (Android) and works on all devices where you're signed in with the same account. Note: Subscriptions don't transfer between iOS and Android."
+    }
+  },
+  "ads": {
+    "remove_ads": "Go Premium to remove ads",
+    "ad_label": "Advertisement",
+    "sponsored": "Sponsored"
+  },
+  "report": {
+    "title": "Report User",
+    "subtitle": "Why are you reporting {{username}}?",
+    "reason_inappropriate_username": "Inappropriate Username",
+    "reason_harassment": "Harassment",
+    "reason_spam": "Spam",
+    "reason_other": "Other",
+    "details_label": "Additional details (optional)",
+    "details_required": "Please describe the issue",
+    "details_placeholder": "Provide more context...",
+    "submit": "Report",
+    "submit_block": "Report & Block",
+    "submitted": "Report Submitted",
+    "submitted_message": "Thank you for your report. We'll review it shortly.",
+    "submitted_blocked": "Reported & Blocked",
+    "submitted_blocked_message": "User has been reported and blocked.",
+    "block_failed": "Failed to block user. Please try again."
   }
 }

@@ -327,7 +327,8 @@ export default function LinkedAccountsScreen() {
                 <Ionicons
                   name={
                     providerIcons[primaryProvider as string] ||
-                    (primaryProvider === "email" || primaryProvider === "password"
+                    ((primaryProvider as string) === "email" ||
+                    (primaryProvider as string) === "password"
                       ? "mail"
                       : "person")
                   }

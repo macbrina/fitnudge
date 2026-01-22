@@ -1,13 +1,6 @@
 import React, { useState } from "react";
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  RefreshControl,
-  ActivityIndicator
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { View, Text, FlatList, TouchableOpacity, RefreshControl } from "react-native";
+import { SkeletonBox } from "@/components/ui/SkeletonBox";
 import { useStyles, useTheme } from "@/themes";
 import { tokens } from "@/themes/tokens";
 import { toRN } from "@/lib/units";
@@ -19,9 +12,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { MOBILE_ROUTES } from "@/lib/routes";
 import { useNudges, useMarkNudgeRead, useMarkAllNudgesRead } from "@/hooks/api/useNudges";
+import { usePartnerAccess } from "@/hooks/api/usePartners";
 import { Nudge } from "@/services/api/nudges";
 import { formatTimeAgo } from "@/utils/helper";
-import { useSubscriptionStore } from "@/stores/subscriptionStore";
 import Button from "@/components/ui/Button";
 import { NudgeIcon, NudgeEmojiType, NUDGE_EMOJI_LIST } from "@/components/icons/NudgeIcons";
 
@@ -68,9 +61,8 @@ export const ActivityScreen: React.FC = () => {
 
   const nudges: Nudge[] = nudgesData?.data || [];
 
-  // Subscription check - show content if user has feature OR has existing nudges
-  const { hasFeature } = useSubscriptionStore();
-  const hasPartnerFeature = hasFeature("social_accountability");
+  // Subscription check - use unified hook for consistency
+  const { hasFeature: hasPartnerFeature, openSubscriptionModal } = usePartnerAccess();
   const hasAccess = hasPartnerFeature || nudges.length > 0;
 
   const onRefresh = async () => {
@@ -97,14 +89,12 @@ export const ActivityScreen: React.FC = () => {
       }
     }
 
-    // Navigate ONLY if there's a specific goal/challenge to view
-    // If no goal/challenge, just mark as read - user already sees the message here
-    if (nudge.challenge_id) {
-      router.push(MOBILE_ROUTES.CHALLENGES.DETAILS(nudge.challenge_id));
-    } else if (nudge.goal_id) {
+    // Navigate ONLY if there's a specific goal to view
+    // If no goal, just mark as read - user already sees the message here
+    if (nudge.goal_id) {
       router.push(`${MOBILE_ROUTES.GOALS.DETAILS}?id=${nudge.goal_id}`);
     }
-    // No redirect for general nudges without goal/challenge context
+    // No redirect for general nudges without goal context
   };
 
   // Check if emoji is a valid NudgeIcon emoji type
@@ -177,7 +167,7 @@ export const ActivityScreen: React.FC = () => {
       </Text>
       <Button
         title={t("common.upgrade") || "Upgrade to Unlock"}
-        onPress={() => router.push(MOBILE_ROUTES.ONBOARDING.SUBSCRIPTION)}
+        onPress={openSubscriptionModal}
         style={styles.upgradeButton}
       />
     </View>
@@ -217,8 +207,19 @@ export const ActivityScreen: React.FC = () => {
 
       {/* Loading State */}
       {isLoading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={brandColors.primary} />
+        <View style={styles.listContent}>
+          {[1, 2, 3, 4].map((i) => (
+            <Card key={i} style={styles.nudgeSkeleton}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                <SkeletonBox width={40} height={40} borderRadius={20} />
+                <View style={{ flex: 1, gap: 6 }}>
+                  <SkeletonBox width="70%" height={14} borderRadius={4} />
+                  <SkeletonBox width="50%" height={12} borderRadius={4} />
+                </View>
+                <SkeletonBox width={40} height={12} borderRadius={4} />
+              </View>
+            </Card>
+          ))}
         </View>
       ) : (
         <FlatList
@@ -257,10 +258,9 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     flex: 1,
     backgroundColor: colors.bg.canvas
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center" as const,
-    alignItems: "center" as const
+  nudgeSkeleton: {
+    marginBottom: toRN(tokens.spacing[3]),
+    padding: toRN(tokens.spacing[4])
   },
   actionHeader: {
     flexDirection: "row" as const,

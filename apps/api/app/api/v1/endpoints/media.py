@@ -1,4 +1,13 @@
-from fastapi import APIRouter, HTTPException, status, Depends, UploadFile, File, Query
+from fastapi import (
+    APIRouter,
+    HTTPException,
+    status,
+    Depends,
+    UploadFile,
+    File,
+    Query,
+    Form,
+)
 from pydantic import BaseModel
 from typing import Optional, Literal
 from app.core.flexible_auth import get_current_user
@@ -10,6 +19,14 @@ try:
     MAGIC_AVAILABLE = True
 except ImportError:
     MAGIC_AVAILABLE = False
+
+try:
+    from openai import AsyncOpenAI
+
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
+
 import hashlib
 import json
 import os
@@ -22,12 +39,57 @@ router = APIRouter(
 )  # Disable redirects to preserve Authorization header
 
 # Media types - determines if we store in database
-MediaType = Literal["post", "checkin", "profile", "other"]
+MediaType = Literal["voice_note"]
+
+# Voice note constants (fallback defaults if DB lookup fails)
+DEFAULT_VOICE_NOTE_MAX_DURATION_SECONDS = 30
+DEFAULT_VOICE_NOTE_MAX_FILE_SIZE_MB = 5
+
+
+async def get_voice_note_limits(supabase, user_id: str) -> tuple[int, int]:
+    """
+    Get voice note limits from database for user's plan.
+    Returns (max_duration_seconds, max_file_size_mb).
+    Falls back to defaults if DB lookup fails.
+    """
+    from app.services.subscription_service import get_user_feature_value
+
+    try:
+        # Get max duration from DB
+        db_duration = await get_user_feature_value(
+            supabase, user_id, "voice_note_max_duration"
+        )
+        max_duration = (
+            int(db_duration)
+            if db_duration is not None
+            else DEFAULT_VOICE_NOTE_MAX_DURATION_SECONDS
+        )
+
+        # Get max file size from DB
+        db_file_size = await get_user_feature_value(
+            supabase, user_id, "voice_note_max_file_size"
+        )
+        max_file_size = (
+            int(db_file_size)
+            if db_file_size is not None
+            else DEFAULT_VOICE_NOTE_MAX_FILE_SIZE_MB
+        )
+
+        return max_duration, max_file_size
+    except Exception as e:
+        # Log and return defaults
+        import logging
+
+        logging.warning(f"Failed to get voice note limits from DB: {e}")
+        return (
+            DEFAULT_VOICE_NOTE_MAX_DURATION_SECONDS,
+            DEFAULT_VOICE_NOTE_MAX_FILE_SIZE_MB,
+        )
 
 
 # Pydantic models
 class MediaUploadResponse(BaseModel):
-    id: Optional[str] = None  # Only present for post media
+    id: Optional[str] = None  # Only present for voice note media
     url: str
     filename: str
     file_size: int
@@ -83,34 +145,145 @@ def get_media_duration(file_content: bytes, file_extension: str) -> Optional[int
     return None
 
 
+async def transcribe_audio_whisper(
+    audio_content: bytes, filename: str
+) -> Optional[str]:
+    """Transcribe audio using OpenAI Whisper API (async)."""
+    if not OPENAI_AVAILABLE:
+        return None
+
+    from app.core.config import settings
+
+    api_key = getattr(settings, "OPENAI_API_KEY", None)
+    if not api_key:
+        return None
+
+    try:
+        # Use AsyncOpenAI for proper async operation (matches ai_coach_service.py)
+        client = AsyncOpenAI(api_key=api_key)
+
+        # Save to temp file (Whisper API requires a file)
+        suffix = os.path.splitext(filename)[1] or ".mp3"
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as temp_file:
+            temp_file.write(audio_content)
+            temp_path = temp_file.name
+
+        # Call Whisper API (async)
+        with open(temp_path, "rb") as audio_file:
+            transcript = await client.audio.transcriptions.create(
+                model="whisper-1", file=audio_file, response_format="text"
+            )
+
+        # Cleanup temp file
+        os.unlink(temp_path)
+
+        return transcript.strip() if transcript else None
+
+    except Exception as e:
+        print(f"[Media] Whisper transcription failed: {e}")
+        return None
+
+
+class VoiceNoteUploadResponse(MediaUploadResponse):
+    """Extended response for voice note uploads"""
+
+    transcript: Optional[str] = None  # Whisper transcription
+    checkin_id: Optional[str] = None
+
+
 @router.post(
-    "/upload", response_model=MediaUploadResponse, status_code=status.HTTP_201_CREATED
+    "/upload",
+    response_model=VoiceNoteUploadResponse,
+    status_code=status.HTTP_201_CREATED,
 )
 async def upload_media(
     file: UploadFile = File(...),
     media_type: MediaType = Query(
-        default="other", description="Type of media: post, checkin, profile, other"
+        default="voice_note",
+        description="Type of media: voice_note",
     ),
-    post_id: Optional[str] = Query(
-        default=None, description="Post ID if media is for a post"
-    ),
+    checkin_id: str = Form(...),
+    duration: Optional[int] = Form(None),  # Duration in seconds from frontend
     current_user: dict = Depends(get_current_user),
 ):
     """
-    Upload media file (image, video, audio).
+    Upload media file (audio for voice notes).
 
-    - media_type='post': Stores in media_uploads table (requires post_id)
-    - media_type='checkin': Just uploads to R2, URL stored in check-in's photo_urls
-    - media_type='profile': Just uploads to R2
-    - media_type='other': Just uploads to R2
+    - media_type='voice_note': Uploads to R2, transcribes with Whisper,
+      updates check-in with voice_note_url and voice_note_transcript.
+      PREMIUM FEATURE: Requires voice_notes feature access.
     """
     from app.core.database import get_supabase_client
     from app.core.config import settings
+    from app.services.subscription_service import has_user_feature
     import boto3
     import uuid
 
+    user_id = current_user["id"]
+    supabase = get_supabase_client()
+
+    # =============================================
+    # VOICE NOTE SPECIFIC VALIDATIONS
+    # =============================================
+    if media_type == "voice_note":
+        # Check premium access using subscription_service
+        has_access = await has_user_feature(supabase, user_id, "voice_notes")
+        if not has_access:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Voice notes require a premium subscription",
+            )
+
+        # Validate check-in exists and belongs to user
+        checkin_result = (
+            supabase.table("check_ins")
+            .select("id, user_id, voice_note_url")
+            .eq("id", checkin_id)
+            .maybe_single()
+            .execute()
+        )
+
+        if not checkin_result.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Check-in not found"
+            )
+
+        if checkin_result.data["user_id"] != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You can only add voice notes to your own check-ins",
+            )
+
+        # Check if already has a voice note (one per check-in)
+        if checkin_result.data.get("voice_note_url"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This check-in already has a voice note. Delete it first.",
+            )
+
+        # Get voice note limits from database
+        max_duration_seconds, max_file_size_mb = await get_voice_note_limits(
+            supabase, user_id
+        )
+
+        # Validate duration from frontend
+        if duration and duration > max_duration_seconds:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Voice note too long. Maximum: {max_duration_seconds} seconds",
+            )
+
     # Read file content
     file_content = await file.read()
+
+    # Check voice note file size limit (max_file_size_mb was set in validation block above)
+    if media_type == "voice_note":
+        max_size_bytes = max_file_size_mb * 1024 * 1024
+        if len(file_content) > max_size_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Voice note too large. Maximum: {max_file_size_mb}MB",
+            )
 
     # Enhanced security validation
     validation_result = await validate_file_security(file, file_content)
@@ -124,11 +297,17 @@ async def upload_media(
     # Generate unique filename
     file_extension = os.path.splitext(file.filename)[1].lower()
     unique_filename = f"{uuid.uuid4()}{file_extension}"
-    r2_key = f"media/{current_user['id']}/{unique_filename}"
 
-    # Get duration for audio/video files
-    duration = None
-    if detected_mime.startswith("audio/") or detected_mime.startswith("video/"):
+    # Different path for voice notes
+    if media_type == "voice_note":
+        r2_key = f"voice-notes/{user_id}/{checkin_id}_{unique_filename}"
+    else:
+        r2_key = f"media/{user_id}/{unique_filename}"
+
+    # Get duration for audio/video files (if not provided by frontend)
+    if duration is None and (
+        detected_mime.startswith("audio/") or detected_mime.startswith("video/")
+    ):
         duration = get_media_duration(file_content, file_extension)
 
     # Determine file type category
@@ -166,35 +345,46 @@ async def upload_media(
             detail=f"Failed to upload file: {str(e)}",
         )
 
-    # Only store in database for post media
-    media_id = None
+    # Handle voice note specific logic
+    transcript = None
     created_at = datetime.utcnow().isoformat() + "Z"
 
-    if media_type == "post":
-        supabase = get_supabase_client()
-        media_record = {
-            "user_id": current_user["id"],
-            "post_id": post_id,
-            "cloudflare_r2_key": r2_key,
-            "cloudflare_r2_url": file_url,
-            "file_type": file_type,
-            "file_size": len(file_content),
-            "duration": duration,
-        }
+    if media_type == "voice_note":
+        # Transcribe with Whisper
+        transcript = await transcribe_audio_whisper(
+            file_content, file.filename or "voice_note.mp3"
+        )
 
-        result = supabase.table("media_uploads").insert(media_record).execute()
-        if result.data:
-            media_id = result.data[0]["id"]
-            created_at = result.data[0]["created_at"]
+        # Update check-in with voice note data
+        try:
+            supabase.table("check_ins").update(
+                {
+                    "voice_note_url": file_url,
+                    "voice_note_transcript": transcript,
+                    "updated_at": datetime.utcnow().isoformat(),
+                }
+            ).eq("id", checkin_id).execute()
+        except Exception as e:
+            # Try to delete uploaded file on DB error
+            from app.services.tasks import delete_media_from_r2_task
 
-    return MediaUploadResponse(
-        id=media_id,
+            delete_media_from_r2_task.delay(
+                file_path=r2_key, media_id=f"voice-note-{checkin_id}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to save voice note",
+            )
+
+    return VoiceNoteUploadResponse(
         url=file_url,
         filename=file.filename,
         file_size=len(file_content),
         content_type=detected_mime,
         duration=duration,
         created_at=created_at,
+        transcript=transcript,
+        checkin_id=checkin_id if media_type == "voice_note" else None,
     )
 
 
@@ -249,6 +439,67 @@ async def delete_media(media_id: str, current_user: dict = Depends(get_current_u
     )
 
     return MediaDeleteResponse(message="Media deleted successfully")
+
+
+@router.delete("/voice-note/{checkin_id}", response_model=MediaDeleteResponse)
+async def delete_voice_note(
+    checkin_id: str, current_user: dict = Depends(get_current_user)
+):
+    """Delete a voice note from a check-in."""
+    from app.core.database import get_supabase_client
+    from app.core.config import settings
+    from app.services.tasks import delete_media_from_r2_task
+
+    user_id = current_user["id"]
+    supabase = get_supabase_client()
+
+    # Get check-in
+    checkin_result = (
+        supabase.table("check_ins")
+        .select("id, user_id, voice_note_url")
+        .eq("id", checkin_id)
+        .maybe_single()
+        .execute()
+    )
+
+    if not checkin_result.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Check-in not found"
+        )
+
+    if checkin_result.data["user_id"] != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only delete your own voice notes",
+        )
+
+    voice_note_url = checkin_result.data.get("voice_note_url")
+    if not voice_note_url:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No voice note found for this check-in",
+        )
+
+    # Extract R2 key from URL
+    r2_key = extract_r2_key_from_url(voice_note_url, settings.CLOUDFLARE_R2_PUBLIC_URL)
+
+    # Clear from database
+    supabase.table("check_ins").update(
+        {
+            "voice_note_url": None,
+            "voice_note_transcript": None,
+            "updated_at": datetime.utcnow().isoformat(),
+        }
+    ).eq("id", checkin_id).execute()
+
+    # Queue background task to delete from R2
+    if r2_key:
+        delete_media_from_r2_task.delay(
+            file_path=r2_key,
+            media_id=f"voice-note-{checkin_id}",
+        )
+
+    return MediaDeleteResponse(message="Voice note deleted successfully")
 
 
 class MediaDeleteByUrlRequest(BaseModel):

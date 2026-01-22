@@ -1,14 +1,37 @@
 import * as Notifications from "expo-notifications";
 
+/**
+ * V2 Notification Categories
+ *
+ * Core Types:
+ * - AI_MOTIVATION: AI-generated motivation messages
+ * - REMINDER: Check-in prompts and follow-ups
+ * - ACHIEVEMENT: Achievement unlock notifications
+ * - REENGAGEMENT: User reengagement notifications
+ * - SUBSCRIPTION: Subscription-related notifications
+ * - STREAK_MILESTONE: Streak milestone celebrations
+ * - WEEKLY_RECAP: Weekly recap summaries
+ * - ADAPTIVE_NUDGE: V2 adaptive nudging
+ * - GENERAL: Fallback for generic notifications
+ *
+ * Partner Types:
+ * - PARTNER_REQUEST: Partner request received
+ * - PARTNER_ACCEPTED: Partner request accepted
+ * - PARTNER_NUDGE: Nudge from partner
+ * - PARTNER_CHEER: Cheer from partner
+ * - PARTNER_MILESTONE: Partner achieved a milestone
+ * - PARTNER_INACTIVE: Check on inactive partner
+ */
 export enum NotificationCategory {
   // Core notification types
   AI_MOTIVATION = "ai_motivation",
   REMINDER = "reminder",
-  SOCIAL = "social",
   ACHIEVEMENT = "achievement",
   REENGAGEMENT = "reengagement",
-  PLAN_READY = "plan_ready",
   SUBSCRIPTION = "subscription",
+  STREAK_MILESTONE = "streak_milestone",
+  WEEKLY_RECAP = "weekly_recap",
+  ADAPTIVE_NUDGE = "adaptive_nudge",
   GENERAL = "general",
 
   // Partner notifications
@@ -17,24 +40,7 @@ export enum NotificationCategory {
   PARTNER_NUDGE = "partner_nudge",
   PARTNER_CHEER = "partner_cheer",
   PARTNER_MILESTONE = "partner_milestone",
-  PARTNER_INACTIVE = "partner_inactive",
-
-  // Challenge notifications
-  CHALLENGE = "challenge",
-  CHALLENGE_INVITE = "challenge_invite",
-  CHALLENGE_JOINED = "challenge_joined",
-  CHALLENGE_OVERTAKEN = "challenge_overtaken",
-  CHALLENGE_LEAD = "challenge_lead",
-  CHALLENGE_NUDGE = "challenge_nudge",
-  CHALLENGE_STARTING = "challenge_starting",
-  CHALLENGE_ENDING = "challenge_ending",
-  CHALLENGE_ENDED = "challenge_ended",
-
-  // Other notifications
-  MOTIVATION_MESSAGE = "motivation_message",
-  WEEKLY_RECAP = "weekly_recap",
-  STREAK_MILESTONE = "streak_milestone",
-  GOAL_COMPLETE = "goal_complete"
+  PARTNER_INACTIVE = "partner_inactive"
 }
 
 export interface NotificationData {
@@ -50,6 +56,12 @@ export interface NotificationData {
   [key: string]: unknown;
 }
 
+/**
+ * V2 Notification Preferences
+ *
+ * Core toggles control main notification categories.
+ * Social toggles control partner-specific notifications.
+ */
 export interface NotificationPreferences {
   // Global settings
   enabled: boolean;
@@ -59,29 +71,17 @@ export interface NotificationPreferences {
   // Core notification types
   ai_motivation: boolean;
   reminders: boolean;
-  social: boolean;
   achievements: boolean;
   reengagement: boolean;
+  weekly_recap: boolean;
 
   // Quiet hours
   quiet_hours_enabled: boolean;
   quiet_hours_start: string;
   quiet_hours_end: string;
 
-  // Social - Partner notifications
-  social_partner_requests: boolean;
-  social_partner_nudges: boolean;
-  social_partner_cheers: boolean;
-  social_partner_milestones: boolean;
-
-  // Social - Challenge notifications
-  social_challenge_invites: boolean;
-  social_challenge_leaderboard: boolean;
-  social_challenge_nudges: boolean;
-  social_challenge_reminders: boolean;
-
-  // AI/Motivation messages
-  social_motivation_messages: boolean;
+  // Partner notifications (single toggle for all partner-related)
+  partners: boolean;
 }
 
 export interface DeviceTokenInfo {

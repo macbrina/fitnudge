@@ -12,7 +12,7 @@ This document outlines the complete Realtime implementation for FitNudge, enabli
 
 **Status**: Complete and idempotent (can be run multiple times)
 
-**Tables Enabled**: 18 total
+**Tables Enabled**: 14 total
 
 #### Phase 1: Critical Security (1 table)
 
@@ -30,23 +30,16 @@ This document outlines the complete Realtime implementation for FitNudge, enabli
 - ✅ `motivations` - Scheduled push notifications
 - ✅ `notification_history` - Delivery tracking
 
-#### Phase 4: Meal Tracking (2 tables)
+#### Phase 4: Social & Gamification (3 tables)
 
-- ✅ `meal_logs` - User meal logging
-- ✅ `daily_nutrition_summaries` - Auto-aggregated totals
-
-#### Phase 5: Gamification (8 tables)
-
-- ✅ `achievement_types` - New badges
-- ✅ `user_achievements` - Badge unlocks
+- ✅ `achievements` - Badge unlocks
 - ✅ `accountability_partners` - Partner requests
-- ✅ `challenges` - Live challenges
-- ✅ `challenge_participants` - Join/leave updates
-- ✅ `challenge_leaderboard` - Competitive rankings
+- ✅ `nudges` - Cheers and nudges
 
-#### Already Enabled: Social (4 tables)
+#### Phase 5: Content (2 tables)
 
-- ✅ `posts`, `comments`, `likes`, `follows`
+- ✅ `blog_posts` - Blog content updates
+- ✅ `weekly_recaps` - AI recap generation
 
 ---
 

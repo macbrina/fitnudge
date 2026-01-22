@@ -158,35 +158,34 @@ export function useMarkNotificationOpened() {
 }
 
 /**
- * Hook for marking all notifications as opened with optimistic update
- * Immediately updates UI, processes API calls in background, reverts on error
+ * Hook for marking ALL unread notifications as opened with optimistic update
+ *
+ * Following SCALABILITY.md best practices:
+ * - Single API call (batch operation) instead of N+1 pattern
+ * - Marks ALL unread notifications in DB, not just visible ones
+ * - Optimistic UI update with rollback on error
  */
 export function useMarkAllNotificationsOpened() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    // Pass unread notification IDs as mutation input
-    mutationFn: async (notificationIds: string[]) => {
-      // Process all API calls in parallel (fire and forget style)
-      const results = await Promise.allSettled(
-        notificationIds.map((id) => notificationsService.markOpened(id))
-      );
-
-      // Check if any failed
-      const failures = results.filter((r) => r.status === "rejected");
-      if (failures.length > 0) {
-        throw new Error(`Failed to mark ${failures.length} notification(s) as opened`);
+    // Single batch API call - no notification IDs needed
+    mutationFn: async () => {
+      const response = await notificationsService.markAllOpened();
+      if (response.status !== 200 || !response.data) {
+        throw new Error(response.error || "Failed to mark all notifications as opened");
       }
+      return response.data;
     },
 
-    // Optimistic update - immediately mark ALL as opened in cache
-    onMutate: async (notificationIds: string[]) => {
+    // Optimistic update - immediately mark ALL notifications as opened in cache
+    onMutate: async () => {
       // Cancel any outgoing refetches
       await queryClient.cancelQueries({
         queryKey: notificationHistoryQueryKeys.all
       });
 
-      // Snapshot the previous value for rollback
+      // Snapshot the previous values for rollback
       const previousListData = queryClient.getQueriesData({
         queryKey: notificationHistoryQueryKeys.list()
       });
@@ -196,7 +195,7 @@ export function useMarkAllNotificationsOpened() {
 
       const openedAt = new Date().toISOString();
 
-      // Optimistically update all infinite query pages
+      // Optimistically update ALL notifications in infinite query pages
       queryClient.setQueriesData(
         { queryKey: notificationHistoryQueryKeys.list() },
         (old: { pages: NotificationHistoryItem[][]; pageParams: number[] } | undefined) => {
@@ -205,25 +204,19 @@ export function useMarkAllNotificationsOpened() {
             ...old,
             pages: old.pages.map((page) =>
               page.map((notification) =>
-                notificationIds.includes(notification.id)
-                  ? { ...notification, opened_at: openedAt }
-                  : notification
+                notification.opened_at ? notification : { ...notification, opened_at: openedAt }
               )
             )
           };
         }
       );
 
-      // Also update the unread count query
+      // Clear the unread count (all are now opened)
       queryClient.setQueryData(
         notificationHistoryQueryKeys.unreadCount(),
         (old: NotificationHistoryItem[] | undefined) => {
-          if (!old) return old;
-          return old.map((notification) =>
-            notificationIds.includes(notification.id)
-              ? { ...notification, opened_at: openedAt }
-              : notification
-          );
+          if (!old) return [];
+          return old.map((notification) => ({ ...notification, opened_at: openedAt }));
         }
       );
 
@@ -231,7 +224,7 @@ export function useMarkAllNotificationsOpened() {
     },
 
     // Rollback on error
-    onError: (err, notificationIds, context) => {
+    onError: (_err, _variables, context) => {
       // Restore list queries
       if (context?.previousListData) {
         context.previousListData.forEach(([queryKey, data]) => {
@@ -247,7 +240,7 @@ export function useMarkAllNotificationsOpened() {
       }
     },
 
-    // Invalidate on success to sync with server
+    // Invalidate on success to sync with server (fetches any notifications not yet loaded)
     onSettled: () => {
       queryClient.invalidateQueries({
         queryKey: notificationHistoryQueryKeys.all
@@ -256,11 +249,19 @@ export function useMarkAllNotificationsOpened() {
   });
 }
 
-// Helper to categorize notifications
+/**
+ * V2 Notification Categorization
+ *
+ * Categories:
+ * - requests: Partner requests requiring action
+ * - system: System notifications (subscription, achievements, recaps)
+ * - activity: Partner activity and adaptive nudges
+ * - other: Fallback for uncategorized
+ */
 export function categorizeNotificationType(
   type: NotificationType
-): "requests" | "system" | "other" {
-  const requestTypes: NotificationType[] = ["partner_request", "challenge_invite"];
+): "requests" | "system" | "activity" | "other" {
+  const requestTypes: NotificationType[] = ["partner_request"];
 
   const systemTypes: NotificationType[] = [
     "subscription",
@@ -268,9 +269,17 @@ export function categorizeNotificationType(
     "achievement",
     "streak_milestone",
     "weekly_recap",
-    "plan_ready",
-    "goal_complete",
     "general"
+  ];
+
+  // V2: Activity notifications (partner actions, adaptive nudges)
+  const activityTypes: NotificationType[] = [
+    "partner_nudge",
+    "partner_cheer",
+    "partner_milestone",
+    "partner_accepted",
+    "partner_inactive",
+    "adaptive_nudge"
   ];
 
   if (requestTypes.includes(type)) {
@@ -281,19 +290,26 @@ export function categorizeNotificationType(
     return "system";
   }
 
+  if (activityTypes.includes(type)) {
+    return "activity";
+  }
+
   return "other";
 }
 
-// Helper to get icon for notification type
+/**
+ * V2 Notification Icons
+ * Returns icon name and color for each notification type
+ */
 export function getNotificationIcon(type: NotificationType): {
   name: string;
   color: string;
 } {
   switch (type) {
+    // Core types
     case "reminder":
       return { name: "time-outline", color: "#3B82F6" }; // blue
     case "ai_motivation":
-    case "motivation_message":
       return { name: "sparkles", color: "#8B5CF6" }; // purple
     case "subscription":
       return { name: "card-outline", color: "#F59E0B" }; // amber
@@ -301,42 +317,27 @@ export function getNotificationIcon(type: NotificationType): {
       return { name: "notifications-outline", color: "#6366F1" }; // indigo
     case "achievement":
       return { name: "trophy-outline", color: "#F59E0B" }; // amber
-    case "social":
-      return { name: "people-outline", color: "#10B981" }; // green
-    case "nudge":
-    case "partner_nudge":
-    case "challenge_nudge":
-      return { name: "hand-left-outline", color: "#EC4899" }; // pink
+    case "streak_milestone":
+      return { name: "flame-outline", color: "#F59E0B" }; // amber
+    case "weekly_recap":
+      return { name: "calendar-outline", color: "#3B82F6" }; // blue
+    case "adaptive_nudge":
+      return { name: "bulb-outline", color: "#F59E0B" }; // amber - smart/AI feel
+
+    // Partner types
     case "partner_request":
       return { name: "person-add-outline", color: "#3B82F6" }; // blue
     case "partner_accepted":
       return { name: "people-outline", color: "#10B981" }; // green
+    case "partner_nudge":
+      return { name: "hand-left-outline", color: "#EC4899" }; // pink
     case "partner_cheer":
       return { name: "happy-outline", color: "#10B981" }; // green
     case "partner_milestone":
       return { name: "ribbon-outline", color: "#F59E0B" }; // amber
     case "partner_inactive":
       return { name: "alert-circle-outline", color: "#6366F1" }; // indigo
-    case "challenge":
-    case "challenge_invite":
-    case "challenge_joined":
-      return { name: "trophy-outline", color: "#F59E0B" }; // amber
-    case "challenge_overtaken":
-    case "challenge_lead":
-      return { name: "podium-outline", color: "#8B5CF6" }; // purple
-    case "challenge_starting":
-    case "challenge_ending":
-      return { name: "flag-outline", color: "#10B981" }; // green
-    case "challenge_ended":
-      return { name: "checkmark-done-outline", color: "#10B981" }; // green
-    case "streak_milestone":
-      return { name: "flame-outline", color: "#F59E0B" }; // amber
-    case "weekly_recap":
-      return { name: "calendar-outline", color: "#3B82F6" }; // blue
-    case "plan_ready":
-      return { name: "document-text-outline", color: "#10B981" }; // green
-    case "goal_complete":
-      return { name: "checkmark-circle-outline", color: "#10B981" }; // green
+
     case "general":
     default:
       return { name: "notifications-outline", color: "#6B7280" }; // gray

@@ -1,198 +1,389 @@
+/**
+ * V2.1 Check-ins API Service
+ *
+ * Check-ins are the core of FitNudge V2.1:
+ * - Pre-created daily with status='pending' by backend Celery task
+ * - Updated when users respond to notifications (status -> completed/skipped/rest_day)
+ * - Marked as 'missed' at end of day if no response
+ * - Always associated with a goal
+ * - Include mood (for completed) or skip_reason (for skipped)
+ * - AI generates personalized response after each check-in
+ *
+ * Main endpoint: POST /check-ins
+ */
+
 import { BaseApiService, ApiResponse } from "./base";
-import { ROUTES } from "@/lib/routes";
 
-// Mood values (matches challenge_check_ins)
-export type CheckInMood = "great" | "good" | "okay" | "bad" | "terrible";
+// V2 Mood values (for completed check-ins)
+export type CheckInMood = "tough" | "good" | "amazing";
 
-// Check-ins Types - Unified structure for both goals and challenges
+// V2 Skip reasons (for skipped check-ins)
+export type SkipReason = "work" | "tired" | "sick" | "schedule" | "other";
+
+// V2.1 Check-in status values
+export type CheckInStatus = "pending" | "completed" | "skipped" | "missed" | "rest_day";
+
+// Mood options (for Yes)
+export const MOODS: { value: CheckInMood; emoji: string; labelKey: string }[] = [
+  { value: "tough", emoji: "😤", labelKey: "checkin.mood.tough" },
+  { value: "good", emoji: "😊", labelKey: "checkin.mood.good" },
+  { value: "amazing", emoji: "🔥", labelKey: "checkin.mood.amazing" }
+];
+
+// Skip reason options (for No)
+export const SKIP_REASONS: { value: SkipReason; emoji: string; labelKey: string }[] = [
+  { value: "work", emoji: "🏢", labelKey: "checkin.reason.work" },
+  { value: "tired", emoji: "😴", labelKey: "checkin.reason.tired" },
+  { value: "sick", emoji: "🤒", labelKey: "checkin.reason.sick" },
+  { value: "schedule", emoji: "📅", labelKey: "checkin.reason.schedule" },
+  { value: "other", emoji: "💭", labelKey: "checkin.reason.other" }
+];
+
+/**
+ * V2 Check-in Interface
+ * status is the single source of truth - no completed/is_rest_day columns
+ */
 export interface CheckIn {
   id: string;
-  goal_id?: string; // For goal check-ins
-  challenge_id?: string; // For challenge check-ins
+  goal_id: string;
   user_id: string;
-  check_in_date: string; // Unified date field
-  completed: boolean;
-  is_checked_in?: boolean; // True when user has responded (yes or no)
-  notes?: string; // Unified from 'reflection'
-  mood?: CheckInMood; // Text-based mood (great, good, okay, bad, terrible)
-  photo_url?: string; // Single photo (unified from photo_urls)
+  check_in_date: string;
+  status: CheckInStatus; // pending, completed, skipped, missed, rest_day
+  mood?: CheckInMood;
+  skip_reason?: SkipReason;
+  note?: string;
+  voice_note_url?: string; // Premium feature
+  voice_note_transcript?: string;
+  ai_response?: string; // AI's personalized message after check-in
   created_at: string;
-  updated_at: string;
-  // Related entity info
-  goal?: {
-    id: string;
-    title: string;
-    category?: string;
-    frequency?: string;
-  };
-  challenge?: {
-    id: string;
-    title: string;
-    category?: string;
-  };
 }
 
+/**
+ * Create Check-in Request
+ * Used when user responds to notification: Yes / No / Rest Day
+ */
 export interface CreateCheckInRequest {
-  goal_id?: string;
-  challenge_id?: string;
-  check_in_date: string;
+  goal_id: string;
+  check_in_date?: string; // YYYY-MM-DD, defaults to today
   completed: boolean;
+  is_rest_day?: boolean;
+  mood?: CheckInMood; // For completed check-ins
+  skip_reason?: SkipReason; // For missed check-ins
   notes?: string;
-  mood?: CheckInMood;
-  photo_url?: string;
 }
 
-export interface UpdateCheckInRequest {
-  completed?: boolean;
-  notes?: string;
-  mood?: CheckInMood;
-  photo_url?: string;
-  is_checked_in?: boolean;
+/**
+ * Today's Status Response
+ */
+export interface TodayStatusResponse {
+  goal_id: string;
+  date: string;
+  has_checked_in: boolean;
+  check_in: CheckIn | null;
+  can_check_in: boolean;
+  is_scheduled_today: boolean;
 }
 
-export interface CheckInStats {
-  total_check_ins: number;
-  completed_check_ins: number;
-  current_streak: number;
-  longest_streak: number;
-  completion_rate: number;
-  average_mood?: CheckInMood; // Most common mood
-  most_productive_day: string;
-  most_productive_time: string;
-}
-
-export interface CheckInCalendar {
-  check_in_date: string;
-  completed: boolean;
-  mood?: CheckInMood;
-  goal_id?: string;
-  challenge_id?: string;
-  title: string; // Goal or challenge title
-}
-
-// Check-ins Service
+/**
+ * V2 Check-ins Service
+ *
+ * Note: Check-ins are accessed through goal endpoints in V2.
+ * Use goalsService.getGoal() to get streak/completion data.
+ */
 export class CheckInsService extends BaseApiService {
-  async getCheckIns(goalId?: string): Promise<ApiResponse<CheckIn[]>> {
-    const endpoint = goalId ? ROUTES.GOALS.CHECKINS(goalId) : ROUTES.CHECKINS.LIST;
+  /**
+   * Create a check-in for a goal (core V2 flow)
+   *
+   * This is the main check-in endpoint:
+   * 1. User receives push notification
+   * 2. User taps Yes / No / Rest Day
+   * 3. This endpoint is called
+   * 4. Backend creates check-in and generates AI response
+   *
+   * @param checkIn The check-in data including goal_id
+   */
+  async createCheckIn(checkIn: CreateCheckInRequest): Promise<ApiResponse<CheckIn>> {
+    const { goal_id, ...data } = checkIn;
+    return this.post<CheckIn>(`/check-ins`, { goal_id, ...data });
+  }
+
+  /**
+   * Get check-ins for a specific goal or all check-ins
+   *
+   * @param goalId Optional goal ID to filter by
+   * @param options Filter options
+   */
+  async getCheckIns(
+    goalId?: string,
+    options?: {
+      startDate?: string;
+      endDate?: string;
+      limit?: number;
+      offset?: number;
+      excludePending?: boolean;
+    }
+  ): Promise<ApiResponse<CheckIn[]>> {
+    const params = new URLSearchParams();
+
+    // Goal ID is now a query param, not path param
+    if (goalId) {
+      params.append("goal_id", goalId);
+    }
+    if (options?.startDate) {
+      params.append("start_date", options.startDate);
+    }
+    if (options?.endDate) {
+      params.append("end_date", options.endDate);
+    }
+    if (options?.limit) {
+      params.append("limit", options.limit.toString());
+    }
+    if (options?.offset) {
+      params.append("offset", options.offset.toString());
+    }
+    if (options?.excludePending) {
+      params.append("exclude_pending", "true");
+    }
+
+    const queryString = params.toString();
+    const endpoint = `/check-ins${queryString ? `?${queryString}` : ""}`;
+
     return this.get<CheckIn[]>(endpoint);
   }
 
+  /**
+   * Get today's check-in status for a goal
+   *
+   * Returns:
+   * - has_checked_in: whether user has checked in today
+   * - check_in: the check-in data if exists
+   * - can_check_in: whether user can check in (goal is active, scheduled for today)
+   *
+   * @param goalId The goal ID
+   */
+  async getTodayStatus(goalId: string): Promise<ApiResponse<TodayStatusResponse>> {
+    return this.get<TodayStatusResponse>(`/check-ins/goal/${goalId}/today`);
+  }
+
+  /**
+   * Quick check-in helpers for common scenarios
+   */
+
+  /**
+   * Mark goal as completed for today
+   */
+  async markCompleted(
+    goalId: string,
+    mood?: CheckInMood,
+    notes?: string
+  ): Promise<ApiResponse<CheckIn>> {
+    return this.createCheckIn({
+      goal_id: goalId,
+      completed: true,
+      is_rest_day: false,
+      mood,
+      notes
+    });
+  }
+
+  /**
+   * Mark goal as missed for today
+   */
+  async markMissed(
+    goalId: string,
+    skipReason?: SkipReason,
+    notes?: string
+  ): Promise<ApiResponse<CheckIn>> {
+    return this.createCheckIn({
+      goal_id: goalId,
+      completed: false,
+      is_rest_day: false,
+      skip_reason: skipReason,
+      notes
+    });
+  }
+
+  /**
+   * Mark today as a rest day (streak preserved)
+   */
+  async markRestDay(goalId: string, notes?: string): Promise<ApiResponse<CheckIn>> {
+    return this.createCheckIn({
+      goal_id: goalId,
+      completed: false,
+      is_rest_day: true,
+      notes
+    });
+  }
+
+  /**
+   * Get check-ins for the current week
+   */
+  async getWeekCheckIns(goalId: string): Promise<ApiResponse<CheckIn[]>> {
+    const today = new Date();
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(today.getDate() - today.getDay()); // Sunday
+
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6); // Saturday
+
+    return this.getCheckIns(goalId, {
+      startDate: startOfWeek.toISOString().split("T")[0],
+      endDate: endOfWeek.toISOString().split("T")[0]
+    });
+  }
+
+  /**
+   * Get check-ins for the current month
+   */
+  async getMonthCheckIns(
+    goalId: string,
+    year?: number,
+    month?: number
+  ): Promise<ApiResponse<CheckIn[]>> {
+    const now = new Date();
+    const targetYear = year ?? now.getFullYear();
+    const targetMonth = month ?? now.getMonth() + 1;
+
+    const startDate = `${targetYear}-${String(targetMonth).padStart(2, "0")}-01`;
+    const lastDay = new Date(targetYear, targetMonth, 0).getDate();
+    const endDate = `${targetYear}-${String(targetMonth).padStart(2, "0")}-${lastDay}`;
+
+    return this.getCheckIns(goalId, { startDate, endDate });
+  }
+
+  /**
+   * Get a single check-in by ID
+   */
   async getCheckIn(checkInId: string): Promise<ApiResponse<CheckIn>> {
-    return this.get<CheckIn>(ROUTES.CHECKINS.GET(checkInId));
+    return this.get<CheckIn>(`/check-ins/${checkInId}`);
   }
 
-  async createCheckIn(checkIn: CreateCheckInRequest): Promise<ApiResponse<CheckIn>> {
-    return this.post<CheckIn>(ROUTES.CHECKINS.CREATE, checkIn);
-  }
-
+  /**
+   * Update an existing check-in
+   */
   async updateCheckIn(
     checkInId: string,
-    updates: UpdateCheckInRequest
+    data: Partial<CreateCheckInRequest>
   ): Promise<ApiResponse<CheckIn>> {
-    return this.put<CheckIn>(ROUTES.CHECKINS.UPDATE(checkInId), updates);
+    return this.put<CheckIn>(`/check-ins/${checkInId}`, data);
   }
 
-  async deleteCheckIn(checkInId: string): Promise<ApiResponse> {
-    return this.delete(ROUTES.CHECKINS.DELETE(checkInId));
+  /**
+   * Delete a check-in
+   */
+  async deleteCheckIn(checkInId: string): Promise<ApiResponse<void>> {
+    return this.delete(`/check-ins/${checkInId}`);
   }
 
+  /**
+   * Get check-in stats for a goal or all goals
+   */
   async getCheckInStats(goalId?: string): Promise<ApiResponse<CheckInStats>> {
-    const endpoint = goalId ? ROUTES.CHECKINS.STATS_BY_GOAL(goalId) : ROUTES.CHECKINS.STATS;
-    return this.get<CheckInStats>(endpoint);
+    const params = goalId ? `?goal_id=${goalId}` : "";
+    return this.get<CheckInStats>(`/check-ins/stats${params}`);
   }
 
+  /**
+   * Get check-in calendar data for a specific month
+   */
   async getCheckInCalendar(
     year: number,
     month: number,
     goalId?: string
-  ): Promise<ApiResponse<CheckInCalendar[]>> {
-    const params = new URLSearchParams({
-      year: year.toString(),
-      month: month.toString()
-    });
-
-    if (goalId) {
-      params.append("goal_id", goalId);
-    }
-
-    return this.get<CheckInCalendar[]>(`${ROUTES.CHECKINS.CALENDAR}?${params.toString()}`);
+  ): Promise<ApiResponse<any>> {
+    const params = new URLSearchParams();
+    params.append("year", year.toString());
+    params.append("month", month.toString());
+    if (goalId) params.append("goal_id", goalId);
+    return this.get(`/check-ins/calendar?${params.toString()}`);
   }
 
+  /**
+   * Get check-ins by date range
+   */
   async getCheckInsByDateRange(
     startDate: string,
     endDate: string,
     goalId?: string
   ): Promise<ApiResponse<CheckIn[]>> {
-    const params = new URLSearchParams({
-      start_date: startDate,
-      end_date: endDate
-    });
-
-    if (goalId) {
-      params.append("goal_id", goalId);
-    }
-
-    return this.get<CheckIn[]>(`${ROUTES.CHECKINS.BY_DATE_RANGE}?${params.toString()}`);
+    return this.getCheckIns(goalId, { startDate, endDate });
   }
 
+  /**
+   * Get today's check-ins for all goals
+   */
   async getTodayCheckIns(): Promise<ApiResponse<CheckIn[]>> {
-    return this.get<CheckIn[]>(ROUTES.CHECKINS.TODAY);
+    return this.get<CheckIn[]>("/check-ins/today");
   }
 
-  async getStreakData(goalId?: string): Promise<
-    ApiResponse<{
-      current_streak: number;
-      longest_streak: number;
-      streak_dates: string[];
-    }>
-  > {
-    const endpoint = goalId ? ROUTES.CHECKINS.STREAK_BY_GOAL(goalId) : ROUTES.CHECKINS.STREAK;
-    return this.get(endpoint);
+  /**
+   * Get streak data for a goal or all goals
+   */
+  async getStreakData(goalId?: string): Promise<ApiResponse<StreakData>> {
+    const params = goalId ? `?goal_id=${goalId}` : "";
+    return this.get<StreakData>(`/check-ins/streak${params}`);
   }
 
-  async getStreakInfo(goalId?: string): Promise<
-    ApiResponse<{
-      current_streak: number;
-      longest_streak: number;
-      last_check_in?: string;
-      streak_start?: string;
-    }>
-  > {
-    const params = new URLSearchParams();
-    if (goalId) {
-      params.append("goal_id", goalId);
-    }
-    return this.get(`${ROUTES.CHECKINS.STREAK}?${params.toString()}`);
-  }
-
+  /**
+   * Bulk create check-ins
+   */
   async bulkCreateCheckIns(checkIns: CreateCheckInRequest[]): Promise<ApiResponse<CheckIn[]>> {
-    return this.post<CheckIn[]>(ROUTES.CHECKINS.BULK_CREATE, {
-      check_ins: checkIns
-    });
+    return this.post<CheckIn[]>("/check-ins/bulk", { check_ins: checkIns });
   }
 
-  async getMoodTrends(
-    goalId?: string,
-    days: number = 30
-  ): Promise<
-    ApiResponse<
-      {
-        date: string;
-        average_mood: number;
-        check_ins_count: number;
-      }[]
-    >
-  > {
-    const params = new URLSearchParams({
-      days: days.toString()
-    });
-
-    if (goalId) {
-      params.append("goal_id", goalId);
-    }
-
-    return this.get(`${ROUTES.CHECKINS.MOOD_TRENDS}?${params.toString()}`);
+  /**
+   * Get mood trends for a goal
+   */
+  async getMoodTrends(goalId?: string, days: number = 30): Promise<ApiResponse<MoodTrend[]>> {
+    const params = new URLSearchParams();
+    if (goalId) params.append("goal_id", goalId);
+    params.append("days", days.toString());
+    return this.get<MoodTrend[]>(`/check-ins/mood-trends?${params.toString()}`);
   }
+}
+
+/**
+ * Check-in statistics
+ */
+export interface CheckInStats {
+  total_check_ins: number;
+  completed_check_ins: number;
+  completion_rate: number;
+  current_streak: number;
+  longest_streak: number;
+  checkins_last_7d?: number;
+  checkins_last_30d?: number;
+  most_productive_day?: string;
+  most_productive_time?: string;
+}
+
+/**
+ * Streak data
+ */
+export interface StreakData {
+  current_streak: number;
+  longest_streak: number;
+  last_check_in_date?: string;
+}
+
+/**
+ * Mood trend data
+ */
+export interface MoodTrend {
+  date: string;
+  mood: CheckInMood;
+  count: number;
+}
+
+/**
+ * Update check-in request
+ */
+export interface UpdateCheckInRequest {
+  completed?: boolean;
+  is_rest_day?: boolean;
+  mood?: CheckInMood;
+  skip_reason?: SkipReason;
+  note?: string;
 }
 
 // Export singleton instance
