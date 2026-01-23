@@ -12,6 +12,7 @@ import { RefreshControl, ScrollView, View, Text } from "react-native";
 import Animated, { LinearTransition } from "react-native-reanimated";
 import { MOBILE_ROUTES } from "@/lib/routes";
 import { HeroSection } from "./components/HeroSection";
+import { AICoachCard } from "./components/AICoachCard";
 import { MotivationCard } from "./components/MotivationCard";
 import { AchievementsSection } from "./components/AchievementsSection";
 import { PartnersCard } from "./components/PartnersCard";
@@ -21,6 +22,7 @@ import { useHomeScreenData } from "./hooks/useHomeScreenData";
 import { useTranslation } from "@/lib/i18n";
 import { fontFamily } from "@/lib/fonts";
 import { AdBanner } from "@/components/ads";
+import { useTabBarInsets } from "@/hooks/useTabBarInsets";
 
 export default function HomeScreen() {
   const styles = useStyles(makeHomeScreenStyles);
@@ -28,6 +30,7 @@ export default function HomeScreen() {
   const { user } = useAuthStore();
   const router = useRouter();
   const { t } = useTranslation();
+  const tabBarInsets = useTabBarInsets();
 
   // Subscription modals
   const { openModal: openSubscriptionModal } = useSubscriptionStore();
@@ -124,7 +127,7 @@ export default function HomeScreen() {
     <View style={styles.container}>
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarInsets.bottom }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -138,6 +141,9 @@ export default function HomeScreen() {
         <HeroSection userName={user?.name} />
 
         <View style={styles.content}>
+          {/* AI Coach Card */}
+          <AICoachCard onPress={() => openAICoach()} />
+
           {/* Today's Goals Section */}
           <View style={styles.goalsSection}>
             <Text style={styles.sectionTitle}>{t("home.todays_goals")}</Text>
@@ -193,8 +199,7 @@ const makeHomeScreenStyles = (tokens: any, colors: any, brand: any) => ({
   },
   scrollContent: {},
   content: {
-    paddingHorizontal: toRN(tokens.spacing[4]),
-    paddingBottom: toRN(tokens.spacing[6])
+    paddingHorizontal: toRN(tokens.spacing[4])
   },
 
   // Goals section
@@ -205,7 +210,7 @@ const makeHomeScreenStyles = (tokens: any, colors: any, brand: any) => ({
     gap: toRN(tokens.spacing[2])
   },
   sectionTitle: {
-    fontSize: toRN(tokens.typography.fontSize.lg),
+    fontSize: toRN(tokens.typography.fontSize.base),
     fontWeight: tokens.typography.fontWeight.semibold,
     fontFamily: fontFamily.groteskSemiBold,
     color: colors.text.primary,

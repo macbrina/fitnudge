@@ -22,6 +22,7 @@ import { PremiumChartOverlay } from "@/components/analytics/PremiumChartOverlay"
 import { useGoals } from "@/hooks/api/useGoals";
 import { useAnalyticsDashboard } from "@/hooks/api/useAnalytics";
 import { useSubscriptionStore } from "@/stores/subscriptionStore";
+import { useTabBarInsets } from "@/hooks/useTabBarInsets";
 import { AdBanner } from "@/components/ads";
 import {
   DUMMY_WEEKLY_CONSISTENCY,
@@ -55,6 +56,7 @@ export default function AnalyticsScreen() {
   const styles = useStyles(makeStyles);
   const { colors, brandColors } = useTheme();
   const { t } = useTranslation();
+  const tabBarInsets = useTabBarInsets();
 
   // Check premium status
   const { hasFeature } = useSubscriptionStore();
@@ -351,7 +353,7 @@ export default function AnalyticsScreen() {
 
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarInsets.bottom }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl

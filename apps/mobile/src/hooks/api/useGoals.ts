@@ -19,7 +19,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 export { goalsQueryKeys } from "@/hooks/api/queryKeys";
 
 // Empty response for placeholder (prevents loading spinners)
-const EMPTY_GOALS_RESPONSE = { data: [], status: 200 };
+// const EMPTY_GOALS_RESPONSE = { data: [], status: 200 };
 
 // =============================================================================
 // QUERY HOOKS
@@ -37,8 +37,7 @@ export const useGoals = () => {
     queryFn: () => goalsService.getActiveGoals(),
     enabled: isAuthenticated,
     staleTime: 30 * 1000, // 30 seconds - goals status can change frequently
-    refetchOnMount: true, // Always check for fresh data on mount
-    placeholderData: EMPTY_GOALS_RESPONSE // Show empty instead of loading
+    refetchOnMount: true // Always check for fresh data on mount
   });
 };
 
@@ -58,8 +57,8 @@ export const useAllGoals = () => {
     queryFn: () => goalsService.getAllGoals(),
     enabled: isAuthenticated,
     staleTime: 30 * 1000,
-    refetchOnMount: true,
-    placeholderData: EMPTY_GOALS_RESPONSE
+    refetchOnMount: true
+    // placeholderData: EMPTY_GOALS_RESPONSE
   });
 };
 
@@ -73,8 +72,8 @@ export const useArchivedGoals = () => {
     queryKey: goalsQueryKeys.archived(),
     queryFn: () => goalsService.getArchivedGoals(),
     enabled: isAuthenticated,
-    staleTime: 5 * 60 * 1000, // 5 minutes - archived goals rarely change
-    placeholderData: EMPTY_GOALS_RESPONSE
+    staleTime: 5 * 60 * 1000 // 5 minutes - archived goals rarely change
+    // placeholderData: EMPTY_GOALS_RESPONSE
   });
 };
 

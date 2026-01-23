@@ -61,7 +61,8 @@ def precreate_daily_checkins_task(self) -> Dict[str, Any]:
             },
         ).execute()
 
-        # result.data is now a list of {user_id, goal_id} dicts
+        # result.data is now a list of {out_user_id, out_goal_id} dicts
+        # (columns renamed to avoid PL/pgSQL variable conflict)
         inserted_rows = result.data if result.data else []
         inserted_count = len(inserted_rows)
 
@@ -70,7 +71,7 @@ def precreate_daily_checkins_task(self) -> Dict[str, Any]:
         invalidated_count = 0
         for row in inserted_rows:
             try:
-                invalidate_user_analytics_cache(row["user_id"], row["goal_id"])
+                invalidate_user_analytics_cache(row["out_user_id"], row["out_goal_id"])
                 invalidated_count += 1
             except Exception:
                 # Don't fail the whole task if cache invalidation fails

@@ -17,7 +17,9 @@ import { fontFamily } from "@/lib/fonts";
 import { MOBILE_ROUTES } from "@/lib/routes";
 import { Card } from "@/components/ui/Card";
 import { SkeletonBox } from "@/components/ui/SkeletonBox";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { formatRelativeTime } from "@/utils/helper";
+import { useTabBarInsets } from "@/hooks/useTabBarInsets";
 
 // Hooks
 import {
@@ -36,6 +38,7 @@ export default function NotificationsScreen() {
   const { colors, brandColors } = useTheme();
   const { t } = useTranslation();
   const router = useRouter();
+  const tabBarInsets = useTabBarInsets();
 
   const [activeTab, setActiveTab] = useState<NotificationTab>("all");
   const [refreshing, setRefreshing] = useState(false);
@@ -267,29 +270,19 @@ export default function NotificationsScreen() {
     );
   };
 
-  // Tab config
-  const tabs: { id: NotificationTab; label: string; count?: number }[] = [
-    {
-      id: "all",
-      label: t("notifications.all") || "All",
-      count: allNotifications.length
-    },
-    {
-      id: "activity",
-      label: t("notifications.activity") || "Activity",
-      count: activityCount
-    },
-    {
-      id: "requests",
-      label: t("notifications.requests") || "Requests",
-      count: requestsCount
-    },
-    {
-      id: "system",
-      label: t("notifications.system") || "System",
-      count: systemCount
-    }
+  // Tab config for SegmentedControl
+  const tabIds: NotificationTab[] = ["all", "activity", "requests", "system"];
+  const tabLabels = [
+    t("notifications.all") || "All",
+    t("notifications.activity") || "Activity",
+    t("notifications.requests") || "Requests",
+    t("notifications.system") || "System"
   ];
+  const selectedTabIndex = tabIds.indexOf(activeTab);
+
+  const handleTabChange = (index: number) => {
+    setActiveTab(tabIds[index]);
+  };
 
   // Footer component for loading more
   const renderFooter = () => {
@@ -379,28 +372,13 @@ export default function NotificationsScreen() {
         )}
       </View>
 
-      {/* Tab Bar */}
-      <View style={styles.tabBar}>
-        {tabs.map((tab) => (
-          <TouchableOpacity
-            key={tab.id}
-            style={[styles.tab, activeTab === tab.id && styles.tabActive]}
-            onPress={() => setActiveTab(tab.id)}
-          >
-            <Text style={[styles.tabText, activeTab === tab.id && styles.tabTextActive]}>
-              {tab.label}
-            </Text>
-            {tab.count !== undefined && tab.count > 0 && (
-              <View style={[styles.tabBadge, activeTab === tab.id && styles.tabBadgeActive]}>
-                <Text
-                  style={[styles.tabBadgeText, activeTab === tab.id && styles.tabBadgeTextActive]}
-                >
-                  {tab.count > 99 ? "99+" : tab.count}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        ))}
+      {/* Tab Bar - Segmented Control */}
+      <View style={styles.segmentedControlContainer}>
+        <SegmentedControl
+          options={tabLabels}
+          selectedIndex={selectedTabIndex}
+          onChange={handleTabChange}
+        />
       </View>
 
       {/* Content */}
@@ -408,7 +386,7 @@ export default function NotificationsScreen() {
         data={filteredNotifications}
         renderItem={renderNotificationCard}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { paddingBottom: tabBarInsets.bottom }]}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -458,54 +436,11 @@ const makeStyles = (tokens: any, colors: any, brandColors: any) => ({
     fontFamily: fontFamily.semiBold,
     color: brandColors.primary
   },
-  // Tab Bar
-  tabBar: {
-    flexDirection: "row" as const,
-    backgroundColor: colors.bg.card,
+  // Segmented Control Container
+  segmentedControlContainer: {
     paddingHorizontal: toRN(tokens.spacing[4]),
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.subtle
-  },
-  tab: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
     paddingVertical: toRN(tokens.spacing[3]),
-    paddingHorizontal: toRN(tokens.spacing[3]),
-    marginRight: toRN(tokens.spacing[2]),
-    gap: toRN(tokens.spacing[1.5])
-  },
-  tabActive: {
-    borderBottomWidth: 2,
-    borderBottomColor: brandColors.primary
-  },
-  tabText: {
-    fontSize: toRN(tokens.typography.fontSize.sm),
-    fontFamily: fontFamily.medium,
-    color: colors.text.tertiary
-  },
-  tabTextActive: {
-    fontFamily: fontFamily.semiBold,
-    color: colors.text.primary
-  },
-  tabBadge: {
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: colors.bg.muted,
-    justifyContent: "center" as const,
-    alignItems: "center" as const,
-    paddingHorizontal: toRN(tokens.spacing[1.5])
-  },
-  tabBadgeActive: {
-    backgroundColor: brandColors.primary
-  },
-  tabBadgeText: {
-    fontSize: toRN(tokens.typography.fontSize.xs),
-    fontFamily: fontFamily.semiBold,
-    color: colors.text.secondary
-  },
-  tabBadgeTextActive: {
-    color: "#FFFFFF"
+    backgroundColor: colors.bg.canvas
   },
   // List
   listContent: {

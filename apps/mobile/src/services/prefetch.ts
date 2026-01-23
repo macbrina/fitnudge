@@ -172,10 +172,10 @@ function getPrefetchConfigs(): PrefetchConfig[] {
       priority: "critical"
     },
     {
-      queryKey: goalsQueryKeys.list(),
-      queryFn: () => goalsService.getGoals(),
+      queryKey: goalsQueryKeys.active(),
+      queryFn: () => goalsService.getActiveGoals(),
       staleTime: 30 * 1000, // 30 seconds
-      description: "Goals list",
+      description: "Active goals",
       priority: "critical"
     },
     // Motivation card is visible on home screen - must be critical

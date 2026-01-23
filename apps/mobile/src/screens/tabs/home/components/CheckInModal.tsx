@@ -669,6 +669,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
   missMessage: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.mediumItalic,
+    fontStyle: "italic" as const,
     color: colors.text.primary,
     textAlign: "center" as const,
     lineHeight: lineHeight(tokens.typography.fontSize.lg, tokens.typography.lineHeight.relaxed)

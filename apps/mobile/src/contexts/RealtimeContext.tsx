@@ -79,6 +79,9 @@ export function RealtimeProvider({ children }: RealtimeProviderProps) {
         // V2 Core data - only invalidate data that changes frequently
         // Don't invalidate dailyMotivations, weeklyRecaps, achievements - they rarely change
         // and already have proper staleTime/gcTime caching
+        console.log(
+          "[RealtimeContext] 📱 Invalidating goals, checkIns, user, partners, nudges, home, notificationHistory"
+        );
         queryClient.invalidateQueries({ queryKey: ["goals"] }); // goalsQueryKeys.all
         queryClient.invalidateQueries({ queryKey: ["checkIns"] }); // checkInsQueryKeys.all
         queryClient.invalidateQueries({ queryKey: ["user"] }); // userQueryKeys

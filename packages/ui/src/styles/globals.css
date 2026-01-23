@@ -42,7 +42,7 @@
 
 /* Dark mode - Pure black aesthetic matching mobile app */
 .dark {
-  --background: #000000; /* Pure black canvas */
+  --background: #1a1a1a; /* Pure black canvas */
   --foreground: #ffffff; /* Pure white text */
   --card: #121212; /* Near-black cards */
   --card-foreground: #ffffff;

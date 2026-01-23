@@ -1,8 +1,6 @@
 import React, { useState } from "react";
-import { View, Text, TouchableOpacity, Dimensions, StyleSheet } from "react-native";
-import Svg, { Defs, LinearGradient as SvgLinearGradient, Stop, Rect } from "react-native-svg";
-import { useStyles } from "@/themes";
-import { useTheme } from "@/themes";
+import { View, Text, TouchableOpacity, Platform } from "react-native";
+import { useStyles, useTheme } from "@/themes";
 import { tokens } from "@/themes/tokens";
 import { toRN } from "@/lib/units";
 import { fontFamily } from "@/lib/fonts";
@@ -10,8 +8,7 @@ import { useTranslation } from "@/lib/i18n";
 import { useTodayDailyMotivation } from "@/hooks/api/useDailyMotivations";
 import { SkeletonBox } from "@/components/ui/SkeletonBox";
 import { DailyMotivationModal } from "./DailyMotivationModal";
-import { Ionicons } from "@expo/vector-icons";
-import { getContrastingTextColor } from "@/utils/helper";
+import { ChevronRight } from "lucide-react-native";
 
 interface MotivationCardProps {
   currentStreak: number;
@@ -19,41 +16,15 @@ interface MotivationCardProps {
 
 export function MotivationCard({ currentStreak }: MotivationCardProps) {
   const styles = useStyles(makeMotivationCardStyles);
-  const { colors } = useTheme();
+  const { colors, brandColors, isDark } = useTheme();
   const { t } = useTranslation();
   const [modalVisible, setModalVisible] = useState(false);
 
   const {
     data: dailyMotivation,
     isLoading,
-    error,
     refetch: refetchMotivation
   } = useTodayDailyMotivation();
-
-  // Calculate card width accounting for container padding (spacing[4] on each side)
-  const screenWidth = Dimensions.get("window").width;
-  const containerPadding = toRN(tokens.spacing[4]) * 2;
-  const calculatedCardWidth = screenWidth - containerPadding;
-
-  // Fallback gradient colors if API doesn't provide them
-  const getFallbackGradient = (style: string): string[] => {
-    switch (style) {
-      case "gradient_sunset":
-        return ["#FF9A9E", "#FECFEF", "#FECFEF"];
-      case "gradient_mountain":
-        return ["#E0C3FC", "#C8A8FF", "#9B7BFF"];
-      case "gradient_ocean":
-        return ["#667EEA", "#764BA2", "#667EEA"];
-      case "gradient_forest":
-        return ["#84FAB0", "#8FD3F4", "#84FAB0"];
-      case "gradient_purple":
-        return ["#A8EDEA", "#FED6E3", "#D299C2"];
-      case "gradient_pink":
-        return ["#FFECD2", "#FCB69F", "#FF9A9E"];
-      default:
-        return ["#FF9A9E", "#FECFEF", "#FECFEF"];
-    }
-  };
 
   if (isLoading) {
     return (
@@ -70,22 +41,10 @@ export function MotivationCard({ currentStreak }: MotivationCardProps) {
             borderRadius={toRN(tokens.borderRadius.base)}
           />
         </View>
-        <View style={styles.gradientCard}>
-          <SkeletonBox width="100%" height={200} borderRadius={toRN(tokens.borderRadius.base)} />
-        </View>
+        <SkeletonBox width="100%" height={120} borderRadius={toRN(tokens.borderRadius.xl)} />
       </View>
     );
   }
-
-  // Get gradient colors
-  const gradientColors =
-    dailyMotivation &&
-    dailyMotivation.background_colors &&
-    dailyMotivation.background_colors.length > 0
-      ? dailyMotivation.background_colors
-      : dailyMotivation
-        ? getFallbackGradient(dailyMotivation.background_style)
-        : ["#FF9A9E", "#FECFEF", "#FECFEF"];
 
   const motivationMessage = dailyMotivation
     ? dailyMotivation.message
@@ -97,67 +56,65 @@ export function MotivationCard({ currentStreak }: MotivationCardProps) {
           ? t("home.motivation_growing", { streak: currentStreak })
           : t("home.motivation_strong", { streak: currentStreak });
 
-  // Calculate contrasting text color based on gradient
-  const textColor = getContrastingTextColor(gradientColors);
+  // Card background
+  const cardBgColor = isDark ? colors.bg.card : "#ffffff";
 
   return (
     <>
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>{t("home.motivation_title")}</Text>
+          <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
+            {t("home.motivation_title")}
+          </Text>
           {dailyMotivation && (
             <TouchableOpacity
               style={styles.viewButton}
               onPress={() => setModalVisible(true)}
               activeOpacity={0.7}
             >
-              <Text style={styles.viewText}>{t("home.motivation_view")}</Text>
-              <Ionicons
-                name="chevron-forward"
-                size={toRN(tokens.typography.fontSize.base)}
-                color={colors.text.secondary}
-              />
+              <Text style={[styles.viewText, { color: colors.text.secondary }]}>
+                {t("home.motivation_view")}
+              </Text>
+              <ChevronRight size={14} color={colors.text.secondary} strokeWidth={2} />
             </TouchableOpacity>
           )}
         </View>
 
-        {/* Gradient Card with Motivation */}
+        {/* Clean Quote Card */}
         <TouchableOpacity
           activeOpacity={0.9}
           onPress={() => dailyMotivation && setModalVisible(true)}
-          style={styles.cardContainer}
+          style={[
+            styles.card,
+            {
+              backgroundColor: cardBgColor,
+              borderLeftColor: brandColors.primary,
+              shadowColor: isDark ? brandColors.primary : "#000"
+            }
+          ]}
         >
-          <View style={styles.gradientCard}>
-            {/* SVG Gradient Background */}
-            <Svg width={calculatedCardWidth} height={200} style={StyleSheet.absoluteFill}>
-              <Defs>
-                <SvgLinearGradient id="motivationGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                  {gradientColors.map((color, index) => (
-                    <Stop
-                      key={index}
-                      offset={`${(index / (gradientColors.length - 1)) * 100}%`}
-                      stopColor={color}
-                      stopOpacity="1"
-                    />
-                  ))}
-                </SvgLinearGradient>
-              </Defs>
-              <Rect
-                width={calculatedCardWidth}
-                height={200}
-                rx={toRN(tokens.borderRadius.xl)}
-                fill="url(#motivationGradient)"
-              />
-            </Svg>
+          {/* Decorative Quote Mark */}
+          <Text
+            style={[styles.quoteMark, { color: brandColors.primary, opacity: isDark ? 0.15 : 0.1 }]}
+          >
+            "
+          </Text>
 
-            {/* Motivation Text */}
-            <View style={styles.messageContainer}>
-              <Text style={[styles.messageText, { color: textColor }]} numberOfLines={3}>
-                {motivationMessage}
-              </Text>
-            </View>
-          </View>
+          {/* Motivation Text */}
+          <Text style={[styles.messageText, { color: colors.text.primary }]} numberOfLines={4}>
+            {motivationMessage}
+          </Text>
+
+          {/* Subtle border */}
+          <View
+            style={[
+              styles.innerBorder,
+              {
+                borderColor: isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)"
+              }
+            ]}
+          />
         </TouchableOpacity>
       </View>
 
@@ -167,7 +124,6 @@ export function MotivationCard({ currentStreak }: MotivationCardProps) {
           motivation={dailyMotivation}
           onClose={() => setModalVisible(false)}
           onRegenerateComplete={() => {
-            // Refetch the motivation after regeneration
             refetchMotivation();
           }}
         />
@@ -181,60 +137,69 @@ const makeMotivationCardStyles = (tokens: any, colors: any, brand: any) => ({
     marginBottom: toRN(tokens.spacing[4])
   },
   header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexDirection: "row" as const,
+    justifyContent: "space-between" as const,
+    alignItems: "center" as const,
     marginBottom: toRN(tokens.spacing[3]),
     paddingHorizontal: toRN(tokens.spacing[1])
   },
   headerTitle: {
-    fontSize: toRN(tokens.typography.fontSize.lg),
-    fontFamily: fontFamily.bold,
-    color: colors.text.primary
+    fontSize: toRN(tokens.typography.fontSize.base),
+    fontFamily: fontFamily.bold
   },
   viewButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: toRN(tokens.spacing[1])
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 4
   },
   viewText: {
-    fontSize: toRN(tokens.typography.fontSize.base),
-    fontFamily: fontFamily.regular,
-    color: colors.text.secondary
+    fontSize: toRN(tokens.typography.fontSize.sm),
+    fontFamily: fontFamily.regular
   },
-  cardContainer: {
-    marginHorizontal: 0
-  },
-  gradientCard: {
-    width: "100%",
-    minHeight: 200,
+  card: {
     borderRadius: toRN(tokens.borderRadius.xl),
-    overflow: "hidden",
-    position: "relative",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 4
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4
+    borderLeftWidth: 4,
+    paddingVertical: toRN(tokens.spacing[5]),
+    paddingHorizontal: toRN(tokens.spacing[5]),
+    paddingLeft: toRN(tokens.spacing[6]),
+    minHeight: 120,
+    justifyContent: "center" as const,
+    overflow: "hidden" as const,
+    position: "relative" as const,
+    ...Platform.select({
+      ios: {
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 12
+      },
+      android: {
+        elevation: 4
+      }
+    })
   },
-  messageContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: toRN(tokens.spacing[6]),
-    paddingVertical: toRN(tokens.spacing[8])
+  quoteMark: {
+    position: "absolute" as const,
+    top: -10,
+    left: 12,
+    fontSize: 100,
+    fontFamily: fontFamily.bold,
+    lineHeight: 100
+  },
+  innerBorder: {
+    position: "absolute" as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: toRN(tokens.borderRadius.xl),
+    borderWidth: 1,
+    borderLeftWidth: 0
   },
   messageText: {
-    fontSize: toRN(tokens.typography.fontSize.lg),
-    fontFamily: fontFamily.bold,
-    // color is set dynamically based on gradient luminance
-    textAlign: "center",
-    lineHeight: toRN(tokens.typography.fontSize.lg) * 1.5,
-    textShadowColor: "rgba(0, 0, 0, 0.1)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2
+    fontSize: toRN(tokens.typography.fontSize.base),
+    fontFamily: fontFamily.mediumItalic, // Use italic for quote style
+    fontStyle: "italic" as const,
+    lineHeight: toRN(tokens.typography.fontSize.base) * 1.6,
+    zIndex: 1
   }
 });
