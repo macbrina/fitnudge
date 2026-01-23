@@ -109,7 +109,10 @@
         "title": "Auf dem Laufenden bleiben",
         "description": "Erhalten Sie die neuesten Artikel über Gewohnheitsbildung, Produktivitätstipps und Erfolgsgeschichten direkt in Ihren Posteingang.",
         "placeholder": "Geben Sie Ihre E-Mail-Adresse ein",
-        "subscribe": "Abonnieren"
+        "subscribe": "Abonnieren",
+        "subscribing": "Abonnieren...",
+        "success": "Vielen Dank fürs Abonnieren! Wir halten Sie auf dem Laufenden.",
+        "error": "Etwas ist schiefgelaufen. Bitte versuchen Sie es erneut."
       },
       "cta": {
         "title": "Bereit, bessere Gewohnheiten zu entwickeln?",
@@ -708,9 +711,9 @@
         "title": "Früher Zugang",
         "description": "Seien Sie der Erste, der FitNudge ausprobiert, wenn wir starten"
       },
-      "founder_pricing": {
-        "title": "Gründerpreis",
-        "description": "Sichern Sie sich Sonderpreise für frühe Unterstützer"
+      "exclusive_perks": {
+        "title": "Exklusive Vorteile",
+        "description": "Zugang zu Premium-Funktionen und exklusiven Inhalten"
       },
       "launch_updates": {
         "title": "Start-Updates",

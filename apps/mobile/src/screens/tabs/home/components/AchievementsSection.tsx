@@ -76,7 +76,7 @@ export function AchievementsSection() {
         <View style={styles.header}>
           <Text style={styles.title}>{t("home.achievements")}</Text>
           {achievements && achievements.length > 3 && (
-            <Text style={[styles.viewAll, { color: brandColors.primary }]}>
+            <Text style={[styles.viewAll, { color: colors.text.primary }]}>
               {t("common.view_all")}
             </Text>
           )}
@@ -92,7 +92,7 @@ export function AchievementsSection() {
         {achievements && achievements.length > 0 && (
           <View style={styles.pointsContainer}>
             <Text style={styles.pointsLabel}>{t("home.total_points")}</Text>
-            <Text style={[styles.pointsValue, { color: brandColors.primary }]}>
+            <Text style={[styles.pointsValue, { color: colors.text.secondary }]}>
               {achievements.reduce((sum, a) => sum + (a.points || 0), 0)}
             </Text>
           </View>
@@ -131,13 +131,14 @@ const makeAchievementsSectionStyles = (tokens: any, colors: any, brand: any) => 
     marginBottom: toRN(tokens.spacing[4])
   },
   title: {
-    fontSize: toRN(tokens.typography.fontSize.xl),
+    fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.bold,
     color: colors.text.primary
   },
   viewAll: {
     fontSize: toRN(tokens.typography.fontSize.sm),
-    fontFamily: fontFamily.semiBold
+    fontFamily: fontFamily.semiBold,
+    color: colors.text.primary
   },
   badgeGrid: {
     flexDirection: "row" as const,

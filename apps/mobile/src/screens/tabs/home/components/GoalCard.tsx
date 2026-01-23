@@ -157,7 +157,7 @@ export function GoalCard({ goal, compact = false, onPress, onTalkToBuddy, style 
                   activeOpacity={0.7}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                  <MessageCircle size={18} color={brandColors.primary} />
+                  <MessageCircle size={18} color={colors.text.tertiary} />
                 </TouchableOpacity>
               )}
 
@@ -264,7 +264,7 @@ export function GoalCard({ goal, compact = false, onPress, onTalkToBuddy, style 
             onPress={handleTalkToBuddy}
             activeOpacity={0.7}
           >
-            <MessageCircle size={16} color={brandColors.primary} />
+            <MessageCircle size={16} color={colors.text.primary} />
             <Text style={styles.fullCardTalkButtonText}>{t("home.talk_to_buddy")}</Text>
           </TouchableOpacity>
         )}
@@ -454,6 +454,6 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
   fullCardTalkButtonText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.groteskMedium,
-    color: brand.primary
+    color: colors.text.primary
   }
 });

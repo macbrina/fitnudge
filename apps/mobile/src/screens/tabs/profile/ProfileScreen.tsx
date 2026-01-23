@@ -7,6 +7,7 @@ import { useAppStoreUrls, useExternalUrls } from "@/hooks/api/useAppConfig";
 import { useAlertModal } from "@/contexts/AlertModalContext";
 import { useNudges } from "@/hooks/api/useNudges";
 import { usePartners, usePendingPartnerRequests } from "@/hooks/api/usePartners";
+import { useTabBarInsets } from "@/hooks/useTabBarInsets";
 import { fontFamily } from "@/lib/fonts";
 import { useTranslation } from "@/lib/i18n";
 import { MOBILE_ROUTES } from "@/lib/routes";
@@ -45,6 +46,7 @@ export default function ProfileScreen() {
   const { getPlan, hasFeature, openModal: openSubscriptionModal } = useSubscriptionStore();
   const { t } = useTranslation();
   const router = useRouter();
+  const tabBarInsets = useTabBarInsets();
 
   // Data for badges
   const { data: partnersData } = usePartners();
@@ -140,9 +142,16 @@ export default function ProfileScreen() {
   const { showAlert, showConfirm } = useAlertModal();
 
   const handleLogout = async () => {
-    const success = await logout();
-    if (success) {
-      router.replace(MOBILE_ROUTES.AUTH.LOGIN);
+    const confirmed = await showConfirm({
+      title: t("common.logout") || "Logout",
+      message: t("profile.logout_confirm") || "Are you sure you want to logout?",
+      confirmLabel: t("common.logout") || "Logout",
+      cancelLabel: t("common.cancel") || "Cancel"
+    });
+
+    if (confirmed) {
+      // Just logout - index.tsx auth guard will automatically redirect to login
+      await logout();
     }
   };
 
@@ -306,6 +315,13 @@ export default function ProfileScreen() {
     }
   ];
 
+  const logoutMenuItem: MenuItem = {
+    id: "logout",
+    icon: "log-out-outline",
+    label: t("common.logout") || "Logout",
+    action: handleLogout
+  };
+
   const renderMenuItem = (item: MenuItem) => {
     const handlePress = () => {
       if (item.route) {
@@ -397,7 +413,7 @@ export default function ProfileScreen() {
     <View style={styles.container}>
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarInsets.bottom }]}
         showsVerticalScrollIndicator={false}
       >
         {/* Header / User Info */}
@@ -531,24 +547,16 @@ export default function ProfileScreen() {
             <View style={styles.divider} />
 
             {/* Remaining menu items */}
-            {legalMenuItems.map((item, index) => (
+            {legalMenuItems.map((item) => (
               <React.Fragment key={item.id}>
                 {renderMenuItem(item)}
-                {index < legalMenuItems.length - 1 && <View style={styles.divider} />}
+                <View style={styles.divider} />
               </React.Fragment>
             ))}
+            {/* Logout as last menu item */}
+            {renderMenuItem(logoutMenuItem)}
           </Card>
         </View>
-
-        {/* Logout Button */}
-        <Button
-          title={t("common.logout")}
-          variant="danger"
-          onPress={handleLogout}
-          loading={isLoggingOut}
-          disabled={isLoggingOut}
-          style={styles.logoutButton}
-        />
       </ScrollView>
 
       {/* Theme Selection Modal */}
@@ -681,9 +689,9 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
   // Header
   header: {
     padding: toRN(tokens.spacing[4]),
-    backgroundColor: colors.bg.card,
+    backgroundColor: colors.bg.canvas,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border.subtle,
+    borderBottomColor: colors.border.default,
     marginBottom: toRN(tokens.spacing[4])
   },
   profileRow: {
@@ -891,11 +899,6 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.medium,
     color: colors.text.primary
-  },
-  // Logout
-  logoutButton: {
-    marginHorizontal: toRN(tokens.spacing[4]),
-    marginTop: toRN(tokens.spacing[4])
   },
   // Theme Modal
   modalOverlay: {

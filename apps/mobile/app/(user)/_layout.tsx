@@ -42,6 +42,8 @@ export default function UserLayout() {
     clearExitOffer
   } = useExitOfferStore();
 
+  console.log("isSubscriptionModalVisible", isSubscriptionModalVisible);
+
   const { subscriptionStatus, isReady: isRevenueCatReady, purchaseProExitOffer } = useRevenueCat();
   const { plans } = usePricing();
   const [isExitOfferPurchasing, setIsExitOfferPurchasing] = useState(false);
@@ -183,12 +185,12 @@ export default function UserLayout() {
       </Stack>
 
       {/* Floating AI Coach Button - only shows on allowed screens (tabs) */}
-      {!isModalVisible && shouldShowFloatingButtons && (
+      {/* {!isModalVisible && shouldShowFloatingButtons && (
         <FloatingAICoachButton
           onPress={() => openModal()}
           hasOfferButtonBelow={isOfferButtonVisible}
         />
-      )}
+      )} */}
 
       {/* Floating Offer Button - shows when exit offer countdown is active (global) */}
       {shouldShowFloatingButtons &&

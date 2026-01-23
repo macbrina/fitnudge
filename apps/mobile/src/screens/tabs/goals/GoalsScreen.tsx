@@ -7,6 +7,7 @@ import Button from "@/components/ui/Button";
 import { SkeletonCard } from "@/components/ui/SkeletonBox";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { useAllGoals } from "@/hooks/api/useGoals";
+import { useTabBarInsets } from "@/hooks/useTabBarInsets";
 import { fontFamily } from "@/lib/fonts";
 import { useTranslation } from "@/lib/i18n";
 import { MOBILE_ROUTES } from "@/lib/routes";
@@ -25,6 +26,7 @@ export default function GoalsScreen() {
   const { t } = useTranslation();
   const styles = useStyles(makeStyles);
   const { brandColors, colors } = useTheme();
+  const tabBarInsets = useTabBarInsets();
 
   const [activeTab, setActiveTab] = useState<TabType>("active");
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -125,7 +127,7 @@ export default function GoalsScreen() {
       {/* Goals List */}
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarInsets.bottom }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -224,8 +226,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     flex: 1
   },
   scrollContent: {
-    paddingHorizontal: toRN(tokens.spacing[4]),
-    paddingBottom: toRN(tokens.spacing[8])
+    paddingHorizontal: toRN(tokens.spacing[4])
   },
   emptyContainer: {
     alignItems: "center" as const,

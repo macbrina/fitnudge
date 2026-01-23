@@ -164,7 +164,6 @@ class StorageUtil {
       const keysToRemove = [
         // User-specific onboarding state
         STORAGE_KEYS.HAS_SEEN_PERSONALIZATION,
-        STORAGE_KEYS.HAS_SEEN_SUBSCRIPTION,
 
         // Exit offer tracking (user-specific)
         STORAGE_KEYS.EXIT_OFFER_LAST_SHOWN,

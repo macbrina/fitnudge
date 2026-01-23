@@ -76,41 +76,26 @@ export default function SignupScreen() {
   // Combined loading state - disable all inputs when any auth is in progress
   const isAuthLoading = signupMutation.isPending || isGoogleLoading || isAppleLoading;
 
-  // Prefetch all critical data after signup (non-blocking)
-  // This runs in background while user navigates to home/onboarding
-  const prefetchAfterAuth = () => {
-    // 1. Subscription data (critical for paywall/feature gating)
-    Promise.all([import("@/stores/subscriptionStore"), import("@/stores/pricingStore")])
-      .then(([{ useSubscriptionStore }, { usePricingStore }]) => {
-        return Promise.all([
-          useSubscriptionStore.getState().fetchSubscription(),
-          useSubscriptionStore.getState().fetchFeatures(),
-          usePricingStore.getState().fetchPlans()
-        ]);
-      })
-      .catch((error) => {
-        console.warn("[Signup] Failed to fetch subscription data:", error);
-      });
+  // Prefetch all critical data after signup
+  // Awaited to ensure data is ready before showing home screen
+  // Times out after 5 seconds to prevent blocking on slow networks
+  const prefetchAfterAuth = async (): Promise<void> => {
+    try {
+      const [{ initializeAuthenticatedData }, { queryClient }] = await Promise.all([
+        import("@/services/prefetch"),
+        import("@/lib/queryClient")
+      ]);
 
-    // 2. Critical data (home dashboard, goals, motivation)
-    import("@/services/prefetch")
-      .then(({ prefetchCriticalData }) => {
-        import("@/lib/queryClient").then(({ queryClient }) => {
-          prefetchCriticalData(queryClient).catch((error) => {
-            console.warn("[Signup] Failed to prefetch critical data:", error);
-          });
-        });
-      })
-      .catch(() => {});
-
-    // 3. High priority data (achievements, partners) - runs after critical
-    import("@/services/prefetch")
-      .then(({ prefetchHighPriorityData }) => {
-        import("@/lib/queryClient").then(({ queryClient }) => {
-          prefetchHighPriorityData(queryClient).catch(() => {});
-        });
-      })
-      .catch(() => {});
+      // Use the same initialization as app reload for consistency
+      // Race against timeout to prevent blocking forever on slow networks
+      await Promise.race([
+        initializeAuthenticatedData(queryClient),
+        new Promise((resolve) => setTimeout(resolve, 5000)) // 5s max wait
+      ]);
+    } catch (error) {
+      console.warn("[Signup] Failed to prefetch data:", error);
+      // Don't block navigation on prefetch failure
+    }
   };
 
   // Sync referral code from URL params
@@ -146,8 +131,8 @@ export default function SignupScreen() {
   const handleSocialSuccess = async (payload: LoginResponse) => {
     await login(payload.user, payload.access_token, payload.refresh_token);
 
-    // Fetch subscription data immediately after login (non-blocking for navigation)
-    prefetchAfterAuth();
+    // Prefetch critical data before navigating (ensures home screen has data)
+    await prefetchAfterAuth();
 
     try {
       // V2: Check if user has completed onboarding
@@ -235,8 +220,8 @@ export default function SignupScreen() {
               response.data.refresh_token
             );
 
-            // Fetch subscription data immediately after login (non-blocking for navigation)
-            prefetchAfterAuth();
+            // Prefetch critical data before navigating (ensures home screen has data)
+            await prefetchAfterAuth();
 
             // Check if email verification is required
             const user = response.data.user;

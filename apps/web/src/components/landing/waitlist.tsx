@@ -28,8 +28,8 @@ export function Waitlist() {
     },
     {
       icon: Sparkles,
-      title: t("waitlist.benefits.founder_pricing.title"),
-      description: t("waitlist.benefits.founder_pricing.description"),
+      title: t("waitlist.benefits.exclusive_perks.title"),
+      description: t("waitlist.benefits.exclusive_perks.description"),
     },
     {
       icon: Bell,

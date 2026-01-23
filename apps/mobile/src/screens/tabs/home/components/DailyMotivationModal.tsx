@@ -9,24 +9,21 @@ import {
   Easing,
   Share,
   StatusBar,
-  StyleSheet
+  Platform
 } from "react-native";
-import Svg, { Defs, LinearGradient as SvgLinearGradient, Stop, Rect } from "react-native-svg";
-import { useStyles } from "@/themes";
-import { useTheme } from "@/themes";
+import { useStyles, useTheme } from "@/themes";
 import { tokens } from "@/themes/tokens";
 import { toRN } from "@/lib/units";
 import { fontFamily } from "@/lib/fonts";
 import { useTranslation } from "@/lib/i18n";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
+import { X, Share2, RefreshCw } from "lucide-react-native";
 import { DailyMotivation } from "@/services/api";
 import {
   useShareDailyMotivation,
   useRegenerateDailyMotivation
 } from "@/hooks/api/useDailyMotivations";
 import { useSubscriptionStore } from "@/stores/subscriptionStore";
-import { getContrastingTextColor } from "@/utils/helper";
 
 interface DailyMotivationModalProps {
   visible: boolean;
@@ -35,25 +32,49 @@ interface DailyMotivationModalProps {
   onRegenerateComplete?: (newMotivation: DailyMotivation) => void;
 }
 
-// Fallback gradient colors if API doesn't provide them (shouldn't happen, but safety first)
-const getFallbackGradient = (style: string): string[] => {
-  switch (style) {
-    case "gradient_sunset":
-      return ["#FF9A9E", "#FECFEF", "#FECFEF"];
-    case "gradient_mountain":
-      return ["#E0C3FC", "#C8A8FF", "#9B7BFF"];
-    case "gradient_ocean":
-      return ["#667EEA", "#764BA2", "#667EEA"];
-    case "gradient_forest":
-      return ["#84FAB0", "#8FD3F4", "#84FAB0"];
-    case "gradient_purple":
-      return ["#A8EDEA", "#FED6E3", "#D299C2"];
-    case "gradient_pink":
-      return ["#FFECD2", "#FCB69F", "#FF9A9E"];
-    default:
-      return ["#FF9A9E", "#FECFEF", "#FECFEF"]; // Default sunset
-  }
-};
+// Tiny glow orb component for decorative effect
+function GlowOrb({
+  size,
+  color,
+  opacity,
+  top,
+  left,
+  right,
+  bottom
+}: {
+  size: number;
+  color: string;
+  opacity: number;
+  top?: number;
+  left?: number;
+  right?: number;
+  bottom?: number;
+}) {
+  return (
+    <View
+      style={{
+        position: "absolute" as const,
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        backgroundColor: color,
+        opacity,
+        top,
+        left,
+        right,
+        bottom,
+        ...Platform.select({
+          ios: {
+            shadowColor: color,
+            shadowOffset: { width: 0, height: 0 },
+            shadowOpacity: 0.8,
+            shadowRadius: size / 2
+          }
+        })
+      }}
+    />
+  );
+}
 
 export function DailyMotivationModal({
   visible,
@@ -62,7 +83,7 @@ export function DailyMotivationModal({
   onRegenerateComplete
 }: DailyMotivationModalProps) {
   const styles = useStyles(makeDailyMotivationModalStyles);
-  const { colors } = useTheme();
+  const { colors, brandColors, isDark } = useTheme();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const screenHeight = Dimensions.get("window").height;
@@ -87,11 +108,13 @@ export function DailyMotivationModal({
   );
 
   // Animation values - starts off-screen at the bottom
-  const translateY = useMemo(() => new Animated.Value(screenHeight), []);
+  const translateY = useMemo(() => new Animated.Value(screenHeight), [screenHeight]);
 
   // Handle modal visibility animation - slide from bottom to top
   useEffect(() => {
     if (visible) {
+      // Reset to off-screen position before animating in
+      translateY.setValue(screenHeight);
       Animated.spring(translateY, {
         toValue: 0,
         damping: 20,
@@ -112,11 +135,10 @@ export function DailyMotivationModal({
   const handleShare = async () => {
     try {
       const result = await Share.share({
-        message: `${motivation.message}\n\n- ${t("home.daily_motivation_share_footer")}`,
+        message: `"${motivation.message}"\n\n- ${t("home.daily_motivation_share_footer")}`,
         title: t("home.daily_motivation_share_title")
       });
 
-      // Only increment share count if sharing was successful
       if (result.action === Share.sharedAction) {
         shareMotivation(motivation.id);
       }
@@ -128,34 +150,16 @@ export function DailyMotivationModal({
   const handleRegenerate = () => {
     regenerateMotivation(undefined, {
       onSuccess: (newMotivation) => {
-        // Update local state immediately
         setMotivation(newMotivation);
-        // Notify parent to refetch (which will update the prop)
         if (onRegenerateComplete) {
           onRegenerateComplete(newMotivation);
         }
       },
       onError: (error) => {
         console.error("Error regenerating motivation:", error);
-        // You might want to show an error toast here
       }
     });
   };
-
-  // Use colors from API response, fallback to style-based mapping if not provided
-  const gradientColors =
-    motivation.background_colors && motivation.background_colors.length > 0
-      ? motivation.background_colors
-      : getFallbackGradient(motivation.background_style);
-
-  // Calculate contrasting text color based on gradient
-  const textColor = getContrastingTextColor(gradientColors);
-  const buttonTextColor = textColor; // Use same color for buttons
-  const closeButtonBg =
-    textColor === "#000000" ? "rgba(0, 0, 0, 0.15)" : "rgba(255, 255, 255, 0.2)";
-  const actionButtonBg =
-    textColor === "#000000" ? "rgba(0, 0, 0, 0.15)" : "rgba(255, 255, 255, 0.2)";
-  const actionBarBg = textColor === "#000000" ? "rgba(255, 255, 255, 0.3)" : "rgba(0, 0, 0, 0.3)";
 
   return (
     <Modal
@@ -165,122 +169,116 @@ export function DailyMotivationModal({
       animationType="none"
       onRequestClose={onClose}
     >
-      <StatusBar barStyle="light-content" />
-
       {/* Full Screen Modal Content */}
       <Animated.View
         style={[
           styles.modalContainer,
           {
+            backgroundColor: colors.bg.canvas,
             transform: [{ translateY }]
           }
         ]}
       >
-        {/* Gradient Background using SVG */}
-        <View style={styles.gradientContainer}>
-          <Svg
-            width={Dimensions.get("window").width}
-            height={Dimensions.get("window").height + insets.top + insets.bottom}
-            style={StyleSheet.absoluteFill}
-          >
-            <Defs>
-              <SvgLinearGradient id="backgroundGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                {gradientColors.map((color, index) => (
-                  <Stop
-                    key={index}
-                    offset={`${(index / (gradientColors.length - 1)) * 100}%`}
-                    stopColor={color}
-                    stopOpacity="1"
-                  />
-                ))}
-              </SvgLinearGradient>
-            </Defs>
-            <Rect width="100%" height="100%" fill="url(#backgroundGradient)" />
-          </Svg>
+        {/* Close Button */}
+        <TouchableOpacity
+          style={[
+            styles.closeButton,
+            {
+              top: insets.top + toRN(tokens.spacing[4]),
+              backgroundColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)"
+            }
+          ]}
+          onPress={onClose}
+          accessibilityLabel={t("common.close")}
+          accessibilityRole="button"
+        >
+          <X size={24} color={colors.text.primary} strokeWidth={2} />
+        </TouchableOpacity>
 
-          {/* Close Button */}
-          <TouchableOpacity
-            style={[
-              styles.closeButton,
-              {
-                top: insets.top + toRN(tokens.spacing[4]),
-                backgroundColor: closeButtonBg
-              }
-            ]}
-            onPress={onClose}
-            accessibilityLabel={t("common.close")}
-            accessibilityRole="button"
-          >
-            <Ionicons
-              name="close"
-              size={toRN(tokens.typography.fontSize["2xl"])}
-              color={textColor}
-            />
-          </TouchableOpacity>
+        {/* Scattered Glow Orbs */}
+        <GlowOrb size={10} color={brandColors.primary} opacity={0.12} top={80} left={30} />
+        <GlowOrb size={14} color={brandColors.primary} opacity={0.08} top={150} right={40} />
+        <GlowOrb size={8} color={brandColors.primary} opacity={0.15} top={220} left={60} />
+        <GlowOrb size={12} color={brandColors.primary} opacity={0.1} top={300} right={80} />
+        <GlowOrb size={6} color={brandColors.primary} opacity={0.18} bottom={250} left={40} />
+        <GlowOrb size={16} color={brandColors.primary} opacity={0.06} bottom={180} right={50} />
+        <GlowOrb size={9} color={brandColors.primary} opacity={0.14} bottom={320} left={100} />
+        <GlowOrb size={11} color={brandColors.primary} opacity={0.1} top={400} left={25} />
 
-          {/* Motivation Text */}
-          <View
-            style={[
-              styles.contentContainer,
-              {
-                paddingTop: insets.top + toRN(tokens.spacing[20]),
-                paddingBottom: insets.bottom + toRN(tokens.spacing[20])
-              }
-            ]}
-          >
-            <Text style={[styles.motivationText, { color: textColor }]}>{motivation.message}</Text>
-          </View>
+        {/* Decorative Quote Mark */}
+        <Text
+          style={[
+            styles.quoteMark,
+            {
+              color: brandColors.primary,
+              opacity: isDark ? 0.1 : 0.08
+            }
+          ]}
+        >
+          "
+        </Text>
 
-          {/* Bottom Action Bar */}
-          <View
-            style={[
-              styles.actionBar,
-              {
-                paddingBottom: insets.bottom + toRN(tokens.spacing[4]),
-                backgroundColor: actionBarBg
-              }
-            ]}
-          >
-            {hasUnlimitedMotivation && (
-              <TouchableOpacity
-                style={[
-                  styles.actionButton,
-                  { backgroundColor: actionButtonBg },
-                  isRegenerating && styles.actionButtonDisabled
-                ]}
-                onPress={handleRegenerate}
-                disabled={isRegenerating}
-                accessibilityLabel={t("home.generate_another_motivation")}
-                accessibilityRole="button"
-              >
-                <Ionicons
-                  name={isRegenerating ? "refresh" : "refresh-outline"}
-                  size={toRN(tokens.typography.fontSize.xl)}
-                  color={buttonTextColor}
-                />
-                <Text style={[styles.actionButtonText, { color: buttonTextColor }]}>
-                  {isRegenerating
-                    ? t("home.generating_motivation")
-                    : t("home.generate_another_motivation")}
-                </Text>
-              </TouchableOpacity>
-            )}
+        {/* Motivation Text */}
+        <View
+          style={[
+            styles.contentContainer,
+            {
+              paddingTop: insets.top + 100,
+              paddingBottom: insets.bottom + 120
+            }
+          ]}
+        >
+          <Text style={[styles.motivationText, { color: colors.text.primary }]}>
+            {motivation.message}
+          </Text>
+        </View>
+
+        {/* Bottom Action Bar */}
+        <View
+          style={[
+            styles.actionBar,
+            {
+              paddingBottom: insets.bottom + toRN(tokens.spacing[4]),
+              backgroundColor: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.02)"
+            }
+          ]}
+        >
+          {hasUnlimitedMotivation && (
             <TouchableOpacity
-              style={[styles.actionButton, { backgroundColor: actionButtonBg }]}
-              onPress={handleShare}
-              accessibilityLabel={t("common.share")}
+              style={[
+                styles.actionButton,
+                {
+                  backgroundColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)"
+                },
+                isRegenerating && styles.actionButtonDisabled
+              ]}
+              onPress={handleRegenerate}
+              disabled={isRegenerating}
+              accessibilityLabel={t("home.generate_another_motivation")}
               accessibilityRole="button"
             >
-              <Ionicons
-                name="share-outline"
-                size={toRN(tokens.typography.fontSize.xl)}
-                color={buttonTextColor}
+              <RefreshCw
+                size={18}
+                color={brandColors.primary}
+                strokeWidth={2}
+                style={isRegenerating ? { opacity: 0.5 } : undefined}
               />
-              <Text style={[styles.actionButtonText, { color: buttonTextColor }]}>
-                {t("common.share")}
+              <Text style={[styles.actionButtonText, { color: colors.text.primary }]}>
+                {isRegenerating
+                  ? t("home.generating_motivation")
+                  : t("home.generate_another_motivation")}
               </Text>
             </TouchableOpacity>
-          </View>
+          )}
+          <TouchableOpacity
+            style={[styles.actionButton, { backgroundColor: brandColors.primary }]}
+            onPress={handleShare}
+            accessibilityLabel={t("common.share")}
+            accessibilityRole="button"
+          >
+            <Share2 size={18} color="#ffffff" strokeWidth={2} />
+            <Text style={[styles.actionButtonText, { color: "#ffffff" }]}>{t("common.share")}</Text>
+          </TouchableOpacity>
         </View>
       </Animated.View>
     </Modal>
@@ -290,80 +288,72 @@ export function DailyMotivationModal({
 const makeDailyMotivationModalStyles = (tokens: any, colors: any, brand: any) => ({
   modalContainer: {
     flex: 1,
-    width: "100%",
-    height: "100%",
-    position: "absolute",
+    width: "100%" as const,
+    height: "100%" as const,
+    position: "absolute" as const,
     top: 0,
     left: 0,
     right: 0,
     bottom: 0
   },
-  gradientContainer: {
-    flex: 1,
-    width: "100%",
-    height: "100%",
-    justifyContent: "center",
-    alignItems: "center",
-    position: "relative",
-    overflow: "hidden"
-  },
   closeButton: {
-    position: "absolute",
+    position: "absolute" as const,
     right: toRN(tokens.spacing[4]),
     zIndex: 10,
-    width: toRN(tokens.spacing[10]),
-    height: toRN(tokens.spacing[10]),
-    borderRadius: toRN(tokens.borderRadius.full),
-    // backgroundColor is set dynamically based on text color
-    justifyContent: "center",
-    alignItems: "center"
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: "center" as const,
+    alignItems: "center" as const
+  },
+  quoteMark: {
+    position: "absolute" as const,
+    top: 60,
+    left: 20,
+    fontSize: 200,
+    fontFamily: fontFamily.bold,
+    lineHeight: 200
   },
   contentContainer: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: toRN(tokens.spacing[6]),
-    width: "100%"
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+    paddingHorizontal: toRN(tokens.spacing[8]),
+    width: "100%" as const
   },
   motivationText: {
-    fontSize: toRN(tokens.typography.fontSize["3xl"]),
-    fontFamily: fontFamily.bold,
-    // color is set dynamically based on gradient luminance
-    textAlign: "center",
-    lineHeight: toRN(tokens.typography.fontSize["3xl"]) * 1.4,
-    textShadowColor: "rgba(0, 0, 0, 0.1)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2
+    fontSize: toRN(tokens.typography.fontSize["2xl"]),
+    fontFamily: fontFamily.mediumItalic,
+    fontStyle: "italic" as const,
+    textAlign: "center" as const,
+    lineHeight: toRN(tokens.typography.fontSize["2xl"]) * 1.5
   },
   actionBar: {
-    position: "absolute",
+    position: "absolute" as const,
     bottom: 0,
     left: 0,
     right: 0,
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
+    flexDirection: "row" as const,
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
     gap: toRN(tokens.spacing[3]),
     paddingHorizontal: toRN(tokens.spacing[6]),
     paddingVertical: toRN(tokens.spacing[4])
-    // backgroundColor is set dynamically based on text color
   },
   actionButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
     paddingVertical: toRN(tokens.spacing[3]),
-    paddingHorizontal: toRN(tokens.spacing[6]),
+    paddingHorizontal: toRN(tokens.spacing[5]),
     borderRadius: toRN(tokens.borderRadius.full),
-    // backgroundColor is set dynamically based on text color
     gap: toRN(tokens.spacing[2])
   },
   actionButtonDisabled: {
     opacity: 0.6
   },
   actionButtonText: {
-    fontSize: toRN(tokens.typography.fontSize.base),
+    fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.semiBold
-    // color is set dynamically based on gradient luminance
   }
 });

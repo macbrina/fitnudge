@@ -339,12 +339,12 @@ const makeStyles = (tokens: any, colors: any, brandColors: any) => ({
     marginBottom: toRN(tokens.spacing[3])
   },
   sectionTitle: {
-    fontSize: toRN(tokens.typography.fontSize.lg),
+    fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.groteskSemiBold,
     color: colors.text.primary
   },
   seeAllText: {
-    fontSize: toRN(tokens.typography.fontSize.base),
+    fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
     color: colors.text.secondary
   },
@@ -520,7 +520,7 @@ const makeStyles = (tokens: any, colors: any, brandColors: any) => ({
 
   // Cheer button
   cheerButton: {
-    backgroundColor: `${brandColors.primary}15`,
+    backgroundColor: `${colors.text.primary}15`,
     paddingVertical: toRN(tokens.spacing[2]),
     paddingHorizontal: toRN(tokens.spacing[3]),
     borderRadius: toRN(tokens.borderRadius.lg),
@@ -529,7 +529,7 @@ const makeStyles = (tokens: any, colors: any, brandColors: any) => ({
   cheerButtonText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
-    color: brandColors.primary
+    color: colors.text.primary
   },
 
   // Pagination dots

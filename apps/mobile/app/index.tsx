@@ -107,7 +107,8 @@ export default function Index() {
         if (!hasSeenOnboarding) {
           setRedirectUrl(MOBILE_ROUTES.ONBOARDING.MAIN);
         } else {
-          setRedirectUrl(MOBILE_ROUTES.AUTH.MAIN);
+          // Go directly to login screen (not auth landing page)
+          setRedirectUrl(MOBILE_ROUTES.AUTH.LOGIN);
         }
       }
     };
@@ -126,7 +127,8 @@ export default function Index() {
     if (redirectUrl === MOBILE_ROUTES.ONBOARDING.MAIN) {
       return <Redirect href={redirectUrl} />;
     }
-    return <Redirect href={MOBILE_ROUTES.AUTH.MAIN} />;
+    // Go directly to login screen (not auth landing page)
+    return <Redirect href={MOBILE_ROUTES.AUTH.LOGIN} />;
   }
 
   // Check email verification for email/password users

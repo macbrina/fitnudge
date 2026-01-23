@@ -198,18 +198,24 @@ def prewarm_analytics_cache_task(self, user_ids: list[str] = None):
     Pre-compute analytics for active users during off-peak hours.
 
     This reduces latency for users when they open the Analytics screen.
-    Run at 3 AM local time (low traffic).
-    """
-    from app.services.subscription_service import has_user_feature_sync
+    Run every 8 hours (3x daily).
 
+    V2: Analytics are now per-goal, so we prewarm each goal separately.
+
+    Scalability (per SCALABILITY.md):
+    - Batch prefetch premium users (1 query instead of N)
+    - Batch prefetch all goals for premium users (1 query instead of N)
+    - RPC calls are per-goal (unavoidable due to function signature)
+    - Limits to 100 users and 500 goals per run
+    """
     supabase = get_supabase_client()
 
     try:
         if user_ids:
             # Specific users provided
-            users = user_ids
+            users = user_ids[:100]  # Limit to 100 users
         else:
-            # Get recently active premium users
+            # Get recently active users
             # Active = checked in within last 7 days
             week_ago = (datetime.utcnow() - timedelta(days=7)).date().isoformat()
 
@@ -223,39 +229,99 @@ def prewarm_analytics_cache_task(self, user_ids: list[str] = None):
             if not result.data:
                 return {"status": "no_active_users"}
 
-            # Unique user IDs
-            users = list(set(c["user_id"] for c in result.data))
+            # Unique user IDs, limit to 100
+            users = list(set(c["user_id"] for c in result.data))[:100]
 
+        if not users:
+            return {"status": "no_users"}
+
+        # =====================================================
+        # BATCH 1: Get premium users with advanced_analytics feature
+        # Single query instead of N queries (per SCALABILITY.md 1.3)
+        # =====================================================
+        premium_result = (
+            supabase.table("users")
+            .select("id")
+            .in_("id", users)
+            .eq("plan", "premium")
+            .eq("status", "active")
+            .execute()
+        )
+
+        premium_user_ids = (
+            set(u["id"] for u in premium_result.data) if premium_result.data else set()
+        )
+
+        if not premium_user_ids:
+            return {"status": "no_premium_users", "checked": len(users)}
+
+        # =====================================================
+        # BATCH 2: Get all active goals for premium users
+        # Single query instead of N queries (per SCALABILITY.md 1.3)
+        # =====================================================
+        goals_result = (
+            supabase.table("goals")
+            .select("id, user_id")
+            .in_("user_id", list(premium_user_ids))
+            .eq("status", "active")
+            .execute()
+        )
+
+        if not goals_result.data:
+            return {"status": "no_goals", "premium_users": len(premium_user_ids)}
+
+        # Build list of (user_id, goal_id) tuples to process
+        goals_to_prewarm = [(g["user_id"], g["id"]) for g in goals_result.data]
+
+        # Limit total goals to prevent long-running task
+        MAX_GOALS_PER_RUN = 500
+        goals_to_prewarm = goals_to_prewarm[:MAX_GOALS_PER_RUN]
+
+        # =====================================================
+        # PROCESS: Prewarm each goal's analytics
+        # RPC calls are per-goal (unavoidable - function requires goal_id)
+        # This is acceptable per SCALABILITY.md 13.1 (low volume, off-peak)
+        # =====================================================
         prewarmed = 0
-        skipped = 0
+        skipped_cached = 0
 
-        for user_id in users[:100]:  # Limit to 100 users per run
-            # Check if premium (only premium users get analytics)
-            has_access = has_user_feature_sync(supabase, user_id, "advanced_analytics")
-            if not has_access:
-                skipped += 1
+        for user_id, goal_id in goals_to_prewarm:
+            # Check Redis cache first (O(1) lookup)
+            if get_cached_analytics(user_id, 90, goal_id):
+                skipped_cached += 1
                 continue
 
-            # Check if already cached
-            if get_cached_analytics(user_id, 90):
-                skipped += 1
-                continue
-
-            # Fetch and cache
+            # Fetch and cache per-goal analytics
             try:
                 result = supabase.rpc(
-                    "get_analytics_dashboard", {"p_user_id": user_id, "p_days": 90}
+                    "get_analytics_dashboard",
+                    {"p_user_id": user_id, "p_goal_id": goal_id, "p_days": 90},
                 ).execute()
 
                 if result.data:
-                    set_cached_analytics(user_id, 90, result.data)
+                    set_cached_analytics(user_id, 90, result.data, goal_id)
                     prewarmed += 1
 
             except Exception as e:
-                logger.warning(f"Failed to prewarm analytics for {user_id}: {e}")
+                logger.warning(
+                    f"Failed to prewarm analytics for {user_id}, goal {goal_id}: {e}"
+                )
 
-        logger.info(f"Analytics prewarm: {prewarmed} cached, {skipped} skipped")
-        return {"prewarmed": prewarmed, "skipped": skipped}
+        logger.info(
+            f"Analytics prewarm completed",
+            {
+                "prewarmed": prewarmed,
+                "skipped_cached": skipped_cached,
+                "premium_users": len(premium_user_ids),
+                "total_goals": len(goals_to_prewarm),
+            },
+        )
+        return {
+            "prewarmed": prewarmed,
+            "skipped_cached": skipped_cached,
+            "premium_users": len(premium_user_ids),
+            "total_goals": len(goals_to_prewarm),
+        }
 
     except Exception as e:
         logger.error(f"Analytics prewarm failed: {str(e)}")
