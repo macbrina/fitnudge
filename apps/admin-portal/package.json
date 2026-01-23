@@ -9,6 +9,8 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@fitnudge/lib": "workspace:*",
+    "@fitnudge/ui": "workspace:*",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "next": "16.0.10",
@@ -16,11 +18,12 @@
     "i18next": "^23.0.0"
   },
   "devDependencies": {
-    "typescript": "^5.0.0",
-    "@types/node": "^22.0.0",
+    "@fitnudge/eslint-config": "workspace:*",
+    "@fitnudge/tsconfig": "workspace:*",
+    "@types/node": "^24.9.1",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
-    "eslint": "^9.0.0",
-    "eslint-config-next": "^16.0.0"
+    "eslint": "^9.34.0",
+    "typescript": "5.9.3"
   }
 }

@@ -218,7 +218,7 @@ Add these notes when submitting for review:
 ```
 SUBSCRIPTION INFORMATION:
 
-FitNudge is an AI-powered fitness motivation app. Our subscription unlocks premium features:
+FitNudge is an AI-powered goal and habit accountability app. Our subscription unlocks premium features:
 
 TEST ACCOUNT (if needed):
 Email: review@fitnudge.app
@@ -1092,20 +1092,20 @@ Google typically doesn't require additional screenshots for subscription review,
 
 **Target Keywords:**
 
-- "AI fitness motivation app"
-- "Gym accountability app"
-- "Fitness habit tracker with AI"
-- "Workout reminder app with voice"
-- "How to stay consistent with gym goals"
+- "AI accountability app"
+- "Habit tracker with AI coach"
+- "Goal tracking app with AI"
+- "Daily habit reminder app"
+- "How to stay consistent with goals"
 - "AI motivation vs traditional coaching"
-- "Building fitness habits that stick"
+- "Building habits that stick"
 
 **Content Pillars:**
 
-1. **Fitness Motivation**: Tips, psychology, habit formation
-2. **AI & Technology**: How AI helps fitness, tech trends
+1. **Habit Building**: Tips, psychology, habit formation
+2. **AI & Technology**: How AI helps build habits, tech trends
 3. **Success Stories**: User transformations, case studies
-4. **Fitness Science**: Research-backed fitness advice
+4. **Behavioral Science**: Research-backed habit advice
 5. **App Features**: How to use FitNudge effectively
 
 ### 📱 Short-Form Content Strategy
@@ -1687,42 +1687,43 @@ Net ARR:                          $135,036
 
 ## 📊 Competitor Pricing Comparison (December 2024)
 
-### High-End Fitness Apps
+### High-End Habit/Productivity Apps
 
-| App                      | Monthly | Annual | Key Features                      |
-| ------------------------ | ------- | ------ | --------------------------------- |
-| **Noom**                 | $70     | $209   | Psychology coaching, meal plans   |
-| **Peloton App+**         | $28.99  | $240   | Video classes, celebrity trainers |
-| **MyFitnessPal Premium** | $19.99  | $79.99 | Nutrition tracking, huge database |
+| App              | Monthly | Annual | Key Features                    |
+| ---------------- | ------- | ------ | ------------------------------- |
+| **Noom**         | $70     | $209   | Psychology coaching, meal plans |
+| **Headspace**    | $12.99  | $69.99 | Meditation, mindfulness         |
+| **Calm Premium** | $14.99  | $69.99 | Sleep, meditation, wellness     |
 
-### Mid-Tier Fitness Apps
+### Mid-Tier Habit Apps
 
-| App                 | Monthly | Annual | Key Features        |
-| ------------------- | ------- | ------ | ------------------- |
-| **Peloton App One** | $15.99  | $156   | Basic video classes |
-| **Fitbod**          | $12.99  | $79.99 | AI workout plans    |
-| **Strava Premium**  | $11.99  | $79.99 | Social + analytics  |
+| App                | Monthly | Annual | Key Features       |
+| ------------------ | ------- | ------ | ------------------ |
+| **Fabulous**       | $12.99  | $64.99 | Habit coaching     |
+| **Fitbod**         | $12.99  | $79.99 | AI workout plans   |
+| **Strava Premium** | $11.99  | $79.99 | Social + analytics |
 
-### Budget Fitness Apps
+### Budget Habit Apps
 
-| App                    | Monthly | Annual | Key Features          |
-| ---------------------- | ------- | ------ | --------------------- |
-| **Strong**             | $4.99   | $29.99 | Simple workout logger |
-| **Nike Training Club** | FREE    | FREE   | Basic workouts        |
+| App          | Monthly | Annual | Key Features         |
+| ------------ | ------- | ------ | -------------------- |
+| **Habitica** | $4.99   | $47.99 | Gamified habits      |
+| **Streaks**  | FREE    | $4.99  | Simple habit tracker |
 
 ### FitNudge Positioning (2-Tier System)
 
-| Tier        | Monthly | Annual | vs Competitors                             |
-| ----------- | ------- | ------ | ------------------------------------------ |
-| **Free**    | $0      | $0     | Basic text motivation, 1 goal              |
-| **Premium** | $9.99   | $79.99 | At Strava/Fitbod level, full AI Chat + all |
+| Tier        | Monthly | Annual | vs Competitors                      |
+| ----------- | ------- | ------ | ----------------------------------- |
+| **Free**    | $0      | $0     | Basic text motivation, 1 goal       |
+| **Premium** | $9.99   | $79.99 | Full AI Chat, unlimited goals + all |
 
 **Competitive Advantages:**
 
-- Only app with AI Chat Motivation (unique feature worth premium)
-- Priced at Fitbod/Strava level but with MORE AI features
+- Only app with AI Chat Motivation for any goal (unique feature worth premium)
+- Priced competitively but with MORE AI features
 - Psychology-based motivation like Noom at 1/7th the price ($70 vs $9.99)
 - Social features + AI coaching combo (no competitor has this)
+- Works for ANY goal - fitness, learning, meditation, productivity, etc.
 - Simple 2-tier pricing = higher conversion (no decision paralysis)
 
 ---
