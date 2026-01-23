@@ -954,8 +954,8 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
     color: colors.text.secondary,
-    paddingHorizontal: toRN(tokens.spacing[4]),
-    marginTop: toRN(tokens.spacing[3])
+    paddingHorizontal: toRN(tokens.spacing[4])
+    // marginTop: toRN(tokens.spacing[3])
   },
   // Goal selector and time range row
   controlsRow: {
