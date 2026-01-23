@@ -1309,7 +1309,7 @@ export default function OnboardingScreen() {
     >
       <Text style={styles.title}>Welcome to FitNudge</Text>
       <Text style={styles.subtitle}>
-        Your AI-powered fitness motivation companion
+        Your AI-powered accountability partner
       </Text>
 
       <Card shadow="lg" style={styles.featureCard}>

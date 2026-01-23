@@ -30,14 +30,14 @@
   },
   "home": {
     "welcome_back": "Welcome back, {{name}}!",
-    "subtitle": "Ready to crush your fitness goals today?",
+    "subtitle": "Ready to crush your goals today?",
     "todays_motivation": "Today's Motivation",
     "motivation_quote": "Every step you take is a step closer to your goals. Keep pushing forward! 💪",
     "quick_actions": "Quick Actions",
-    "log_workout": "Log Workout",
+    "log_progress": "Log Progress",
     "set_goal": "Set Goal",
     "recent_activity": "Recent Activity",
-    "activity_message": "You've been consistent with your workouts this week! 🎉"
+    "activity_message": "You've been consistent with your habits this week! 🎉"
   },
   "goals": {
     "title": "My Goals",
@@ -47,15 +47,15 @@
     "create_goal": "Create Goal",
     "categories": "Goal Categories",
     "category_fitness": "Fitness",
-    "category_nutrition": "Nutrition",
+    "category_learning": "Learning",
     "category_wellness": "Wellness",
-    "category_sleep": "Sleep"
+    "category_productivity": "Productivity"
   },
   "feed": {
     "title": "Motivation Feed",
     "subtitle": "AI-powered motivation and community posts",
     "ai_motivation": "AI Motivation",
-    "ai_quote_1": "You're doing amazing! Every workout counts and you're building unstoppable momentum! 🚀",
+    "ai_quote_1": "You're doing amazing! Every check-in counts and you're building unstoppable momentum! 🚀",
     "time_ago": "{{hours}} hours ago"
   },
   "profile": {
@@ -74,14 +74,14 @@
   },
   "web": {
     "hero": {
-      "title": "Your AI-Powered Fitness Coach",
+      "title": "Your AI-Powered Accountability Partner",
       "subtitle": "Get personalized motivation, track your goals, and connect with a community that keeps you accountable. Powered by advanced AI technology.",
       "download_free": "Download for Free",
       "learn_more": "Learn More"
     },
     "blog": {
       "title": "FitNudge Blog",
-      "subtitle": "Insights, tips, and stories to help you on your fitness journey. From AI-powered motivation to community success stories."
+      "subtitle": "Insights, tips, and stories to help you build lasting habits. From AI-powered motivation to community success stories."
     }
   },
   "errors": {

@@ -22,10 +22,11 @@ const siteConfig = {
   name: "FitNudge",
   title: "FitNudge - AI Accountability Partner | Build Lasting Habits",
   description:
-    "Build lasting habits with AI-powered accountability, personalized motivation, and smart goal tracking. Your daily nudge for any goal - fitness, reading, meditation, learning, or anything else.",
+    "Your AI-powered accountability partner for any goal. Build lasting habits with personalized motivation, smart tracking, and daily nudges. Whether it's fitness, reading, meditation, learning, or any habit you want to build.",
   url: process.env.NEXT_PUBLIC_BASE_URL || "https://fitnudge.app",
   ogImage: `${process.env.NEXT_PUBLIC_BASE_URL || "https://fitnudge.app"}/og-image.jpg`,
   twitterHandle: "@fitnudgeapp",
+  facebookAppId: process.env.NEXT_PUBLIC_FACEBOOK_APP_ID || "",
   locale: "en_US",
   // App Store URLs
   iosAppStoreUrl:
@@ -191,6 +192,11 @@ export const metadata: Metadata = {
 
   // Classification
   classification: "Productivity, Health & Fitness, Lifestyle",
+
+  // Facebook App ID
+  facebook: {
+    appId: siteConfig.facebookAppId,
+  },
 
   // Other metadata
   other: {
