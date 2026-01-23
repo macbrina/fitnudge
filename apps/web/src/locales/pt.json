@@ -109,7 +109,10 @@
         "title": "Fique Atualizado",
         "description": "Receba os artigos mais recentes sobre criação de hábitos, dicas de produtividade e histórias de sucesso diretamente na sua caixa de entrada.",
         "placeholder": "Digite seu e-mail",
-        "subscribe": "Inscrever-se"
+        "subscribe": "Inscrever-se",
+        "subscribing": "Inscrevendo...",
+        "success": "Obrigado por se inscrever! Manteremos você atualizado.",
+        "error": "Algo deu errado. Por favor, tente novamente."
       },
       "cta": {
         "title": "Pronto para criar hábitos melhores?",
@@ -708,9 +711,9 @@
         "title": "Acesso Antecipado",
         "description": "Seja o primeiro a experimentar o FitNudge quando lançarmos"
       },
-      "founder_pricing": {
-        "title": "Preço para Fundadores",
-        "description": "Garanta preços especiais para os primeiros apoiadores"
+      "exclusive_perks": {
+        "title": "Vantagens Exclusivas",
+        "description": "Acesso a recursos premium e conteúdo exclusivo"
       },
       "launch_updates": {
         "title": "Atualizações de Lançamento",

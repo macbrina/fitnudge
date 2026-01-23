@@ -109,7 +109,10 @@
         "title": "Blijf op de hoogte",
         "description": "Ontvang de nieuwste artikelen over het opbouwen van gewoonten, productiviteitstips en succesverhalen rechtstreeks in je inbox.",
         "placeholder": "Voer uw e-mailadres in",
-        "subscribe": "Abonneer"
+        "subscribe": "Abonneer",
+        "subscribing": "Abonneren...",
+        "success": "Bedankt voor je aanmelding! We houden je op de hoogte.",
+        "error": "Er is iets misgegaan. Probeer het opnieuw."
       },
       "cta": {
         "title": "Klaar om betere gewoonten op te bouwen?",
@@ -708,9 +711,9 @@
         "title": "Vroege Toegang",
         "description": "Wees de eerste die FitNudge probeert wanneer we lanceren"
       },
-      "founder_pricing": {
-        "title": "Oprichtersprijzen",
-        "description": "Zeker speciale prijzen voor vroege supporters"
+      "exclusive_perks": {
+        "title": "Exclusieve Voordelen",
+        "description": "Krijg toegang tot premium functies en exclusieve content"
       },
       "launch_updates": {
         "title": "Lancering Updates",

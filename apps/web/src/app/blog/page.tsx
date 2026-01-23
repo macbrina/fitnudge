@@ -1,6 +1,7 @@
 "use client";
 
 import { LandingLayout } from "@/components/layout/LandingLayout";
+import { Newsletter } from "@/components/landing/newsletter";
 import { fetchBlogPosts, fetchCategories } from "@/lib/blog/api";
 import type { BlogCategory, BlogPost } from "@/lib/blog/types";
 import { useTranslation } from "@/lib/i18n";
@@ -587,37 +588,7 @@ export default function BlogPage() {
       </section>
 
       {/* Newsletter CTA */}
-      <section className="relative w-full py-4 sm:py-6 lg:py-8">
-        <div className="mx-2 sm:mx-4 bg-secondary rounded-2xl sm:rounded-3xl">
-          <div className="relative z-10 w-full px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
-            <div className="max-w-3xl mx-auto text-center">
-              <motion.div
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6 }}
-                viewport={{ once: true }}
-              >
-                <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-4">
-                  {t("web.blog.newsletter.title")}
-                </h2>
-                <p className="text-muted-foreground mb-8 text-base sm:text-lg">
-                  {t("web.blog.newsletter.description")}
-                </p>
-                <div className="flex flex-col sm:flex-row gap-4 max-w-md mx-auto">
-                  <input
-                    type="email"
-                    placeholder={t("web.blog.newsletter.placeholder")}
-                    className="flex-1 px-4 py-3 rounded-full border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                  <Button className="rounded-full px-8" size="lg">
-                    {t("web.blog.newsletter.subscribe")}
-                  </Button>
-                </div>
-              </motion.div>
-            </div>
-          </div>
-        </div>
-      </section>
+      <Newsletter />
     </LandingLayout>
   );
 }

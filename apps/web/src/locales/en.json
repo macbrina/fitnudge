@@ -112,7 +112,10 @@
         "title": "Stay Updated",
         "description": "Get the latest articles on habit building, productivity tips, and success stories delivered to your inbox.",
         "placeholder": "Enter your email",
-        "subscribe": "Subscribe"
+        "subscribe": "Subscribe",
+        "subscribing": "Subscribing...",
+        "success": "Thanks for subscribing! We'll keep you updated.",
+        "error": "Something went wrong. Please try again."
       },
       "cta": {
         "title": "Ready to Build Better Habits?",
@@ -713,9 +716,9 @@
         "title": "Early Access",
         "description": "Be the first to try FitNudge when we launch"
       },
-      "founder_pricing": {
-        "title": "Founder Pricing",
-        "description": "Lock in special pricing for early supporters"
+      "exclusive_perks": {
+        "title": "Exclusive Perks",
+        "description": "Get access to premium features and exclusive content"
       },
       "launch_updates": {
         "title": "Launch Updates",

@@ -77,11 +77,10 @@ export function Features() {
               viewport={{ once: true }}
             >
               <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4 sm:mb-6 leading-tight">
-                Everything You Need to Stay Consistent
+                {t("features.title")}
               </h2>
               <p className="text-sm sm:text-base lg:text-xl text-muted-foreground max-w-2xl mx-auto px-4">
-                FitNudge is packed with features designed to keep you
-                accountable and motivated on your journey.
+                {t("features.subtitle")}
               </p>
             </motion.div>
 
@@ -89,12 +88,11 @@ export function Features() {
               {features.map((feature, index) => (
                 <motion.div
                   key={feature.title}
-                  className="bg-background rounded-xl sm:rounded-2xl p-5 sm:p-6 lg:p-8 shadow-md hover:shadow-lg transition-all duration-300 border border-border"
-                  initial={{ opacity: 0, y: 30 }}
+                  className="bg-background rounded-xl sm:rounded-2xl p-5 sm:p-6 lg:p-8 shadow-md hover:shadow-lg hover:-translate-y-1 transition-shadow duration-300 border border-border"
+                  initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: index * 0.1 }}
-                  viewport={{ once: true }}
-                  whileHover={{ y: -4 }}
+                  transition={{ duration: 0.4, delay: index * 0.05 }}
+                  viewport={{ once: true, amount: 0.3 }}
                 >
                   <div
                     className={`w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 ${feature.bgColor} rounded-xl sm:rounded-2xl flex items-center justify-center mb-4 sm:mb-5 lg:mb-6`}
