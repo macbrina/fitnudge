@@ -42,8 +42,6 @@ export default function UserLayout() {
     clearExitOffer
   } = useExitOfferStore();
 
-  console.log("isSubscriptionModalVisible", isSubscriptionModalVisible);
-
   const { subscriptionStatus, isReady: isRevenueCatReady, purchaseProExitOffer } = useRevenueCat();
   const { plans } = usePricing();
   const [isExitOfferPurchasing, setIsExitOfferPurchasing] = useState(false);

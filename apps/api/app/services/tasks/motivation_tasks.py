@@ -73,20 +73,61 @@ def generate_checkin_ai_response(self, checkin_id: str, user_id: str, goal_id: s
         goal_data = goal.data
         checkin_data = checkin.data
 
-        # Generate AI response
+        # V2: check_ins uses status only (no completed/is_rest_day columns). Derive from status.
+        status = checkin_data.get("status") or "pending"
+        completed = status == "completed"
+        is_rest_day = status == "rest_day"
+
+        voice_transcript = checkin_data.get("voice_note_transcript")
+        voice_sentiment = checkin_data.get("voice_note_sentiment")
+        payload = {
+            "user_name": user_data.get("name", "there"),
+            "goal_title": goal_data.get("title", "your goal"),
+            "completed": completed,
+            "is_rest_day": is_rest_day,
+            "mood": checkin_data.get("mood"),
+            "skip_reason": checkin_data.get("skip_reason"),
+            "note": checkin_data.get("note"),
+            "voice_note_transcript": voice_transcript,
+            "voice_note_sentiment": voice_sentiment,
+            "current_streak": goal_data.get("current_streak", 0),
+            "longest_streak": goal_data.get("longest_streak", 0),
+            "why_statement": goal_data.get("why_statement"),
+            "motivation_style": user_data.get("motivation_style", "supportive"),
+        }
+        print(  # noqa: T201
+            f"[generate_checkin_ai_response] checkin_id={checkin_id} status={status} "
+            f"completed={completed} is_rest_day={is_rest_day} mood={payload['mood']} "
+            f"note={payload['note']!r} has_voice={bool(voice_transcript)}"
+        )
+        logger.info(
+            "AI response task inputs: checkin_id=%s status=%s completed=%s is_rest_day=%s "
+            "mood=%s note=%s has_voice=%s",
+            checkin_id,
+            status,
+            completed,
+            is_rest_day,
+            payload["mood"],
+            (payload["note"] or "")[:50],
+            bool(voice_transcript),
+        )
+
         ai_response = run_async(
             generate_checkin_motivation(
-                user_name=user_data.get("name", "there"),
-                goal_title=goal_data.get("title", "your goal"),
-                completed=checkin_data.get("completed", False),
-                is_rest_day=checkin_data.get("is_rest_day", False),
-                mood=checkin_data.get("mood"),
-                skip_reason=checkin_data.get("skip_reason"),
-                current_streak=goal_data.get("current_streak", 0),
-                longest_streak=goal_data.get("longest_streak", 0),
-                why_statement=goal_data.get("why_statement"),
-                motivation_style=user_data.get("motivation_style", "supportive"),
-                is_premium=True,  # This task is only for premium users
+                user_name=payload["user_name"],
+                goal_title=payload["goal_title"],
+                completed=payload["completed"],
+                is_rest_day=payload["is_rest_day"],
+                mood=payload["mood"],
+                skip_reason=payload["skip_reason"],
+                note=payload["note"],
+                voice_note_transcript=payload["voice_note_transcript"],
+                voice_note_sentiment=payload["voice_note_sentiment"],
+                current_streak=payload["current_streak"],
+                longest_streak=payload["longest_streak"],
+                why_statement=payload["why_statement"],
+                motivation_style=payload["motivation_style"],
+                is_premium=True,
             )
         )
 

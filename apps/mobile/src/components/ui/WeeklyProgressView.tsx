@@ -48,8 +48,11 @@ export function WeeklyProgressView({
   goalCreatedAt
 }: WeeklyProgressViewProps) {
   const styles = useStyles(makeStyles);
-  const { colors, brandColors } = useTheme();
+  const { colors, brandColors, isDark } = useTheme();
   const { t } = useTranslation();
+
+  // Theme-aware off-day color: visible in light mode, same as HeatMapCalendar
+  const offDayColor = isDark ? colors.border.default : "#b8c4d0";
 
   // Get the current week's days (Monday to Sunday)
   const weekDays = useMemo(() => {
@@ -190,15 +193,15 @@ export function WeeklyProgressView({
         case "pending":
           // Today, actionable (green)
           return {
-            icon: <Clock size={16} color={colors.text.primary} />,
+            icon: <Clock size={16} color="#FFFFFF" />,
             bgColor: colors.feedback.success + "80", // Green ~50%
             status: "pending"
           };
         case "not_scheduled":
-          // Off day but visible
+          // Off day but visible (theme-aware for light mode contrast)
           return {
             icon: <Minus size={16} color={colors.text.tertiary} />,
-            bgColor: colors.border.default, // Border color
+            bgColor: offDayColor,
             status: "not_scheduled"
           };
         case "future":
@@ -223,10 +226,10 @@ export function WeeklyProgressView({
     // No check-in data - determine based on schedule
     // Check off-day FIRST (regardless of past/future)
     if (!isScheduledDay) {
-      // Day not in goal's target days - off day
+      // Day not in goal's target days - off day (theme-aware for light mode contrast)
       return {
         icon: <Minus size={16} color={colors.text.tertiary} />,
-        bgColor: colors.border.default, // Border color - off day
+        bgColor: offDayColor,
         status: "not_scheduled"
       };
     }
@@ -380,7 +383,7 @@ export function WeeklyProgressView({
             </Text>
           </View>
           <View style={styles.summaryItem}>
-            <View style={[styles.summaryDot, { backgroundColor: colors.border.default }]} />
+            <View style={[styles.summaryDot, { backgroundColor: offDayColor }]} />
             <Text style={styles.summaryText}>
               {weekStats.notScheduled} {t("progress.not_scheduled")}
             </Text>

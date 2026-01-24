@@ -148,6 +148,176 @@ def mark_missed_checkins_task(self) -> Dict[str, Any]:
 
 
 # =====================================================
+# CATCH-UP MISSING CHECK-INS TASK (Manual - After Maintenance)
+# =====================================================
+
+
+@celery_app.task(
+    name="catchup_missing_checkins",
+    bind=True,
+    max_retries=2,
+    default_retry_delay=60,
+)
+def catchup_missing_checkins_task(
+    self,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    lookback_days: int | None = None,
+) -> Dict[str, Any]:
+    """
+    Backfills missing check-ins for a date range after maintenance/downtime.
+
+    Can be called in two ways:
+    1. Auto mode: Provide lookback_days (or use default 7) to auto-detect missing dates
+    2. Manual mode: Provide start_date (and optionally end_date) when you know exact dates
+
+    Flow:
+    1. If lookback_days provided: Call catchup_missing_checkins_auto(lookback_days)
+    2. Else: Call catchup_missing_checkins(start_date, end_date)
+    3. Function creates check-ins with status='pending' for all active goals
+       where each date in the range is a scheduled day
+    4. The mark_missed_checkins_task (runs hourly) will immediately mark these
+       as 'missed' since the days have already passed
+    5. Analytics will show them as "missed" (accurate, even if not user fault)
+
+    Args:
+        start_date: Start date in YYYY-MM-DD format (manual mode)
+        end_date: End date in YYYY-MM-DD format (manual mode, defaults to yesterday)
+        lookback_days: Number of days to look back (auto mode, defaults to 7)
+
+    Returns:
+        Dict with success status and results per date
+
+    Scalability: Uses PostgreSQL function with batch operations.
+    """
+    from datetime import datetime, date
+
+    try:
+        supabase = get_supabase_client()
+
+        # Auto mode: use lookback_days to auto-detect
+        if lookback_days is not None or (start_date is None and end_date is None):
+            lookback = lookback_days if lookback_days is not None else 7
+
+            logger.info(
+                f"Catch-up missing check-ins (auto mode)",
+                {"lookback_days": lookback},
+            )
+
+            # Call auto-detection function
+            result = supabase.rpc(
+                "catchup_missing_checkins_auto",
+                {"p_lookback_days": lookback},
+            ).execute()
+
+            results = result.data if result.data else []
+            total_inserted = sum(r.get("inserted_count", 0) for r in results)
+
+            logger.info(
+                f"Catch-up missing check-ins (auto) completed",
+                {
+                    "lookback_days": lookback,
+                    "dates_processed": len(results),
+                    "total_inserted": total_inserted,
+                },
+            )
+
+            return {
+                "success": True,
+                "mode": "auto",
+                "lookback_days": lookback,
+                "dates_processed": len(results),
+                "total_inserted": total_inserted,
+                "results": results,
+            }
+
+        # Manual mode: use provided dates
+        if not start_date:
+            return {
+                "success": False,
+                "error": "Either start_date or lookback_days must be provided",
+            }
+
+        # Validate and parse dates
+        try:
+            start = datetime.strptime(start_date, "%Y-%m-%d").date()
+        except ValueError:
+            return {
+                "success": False,
+                "error": f"Invalid start_date format: {start_date}. Use YYYY-MM-DD",
+            }
+
+        if end_date:
+            try:
+                end = datetime.strptime(end_date, "%Y-%m-%d").date()
+            except ValueError:
+                return {
+                    "success": False,
+                    "error": f"Invalid end_date format: {end_date}. Use YYYY-MM-DD",
+                }
+        else:
+            # Default to yesterday
+            end = (datetime.utcnow() - timedelta(days=1)).date()
+
+        # Validate date range
+        if start > end:
+            return {
+                "success": False,
+                "error": f"start_date ({start_date}) must be <= end_date ({end_date})",
+            }
+
+        if end >= datetime.utcnow().date():
+            return {
+                "success": False,
+                "error": f"end_date ({end_date}) must be < today",
+            }
+
+        logger.info(
+            f"Catch-up missing check-ins (manual mode)",
+            {"start_date": start_date, "end_date": end_date or "yesterday"},
+        )
+
+        # Call PostgreSQL catch-up function
+        result = supabase.rpc(
+            "catchup_missing_checkins",
+            {
+                "p_start_date": start.isoformat(),
+                "p_end_date": end.isoformat(),
+            },
+        ).execute()
+
+        # result.data is a list of {out_date, inserted_count, total_goals} dicts
+        results = result.data if result.data else []
+        total_inserted = sum(r.get("inserted_count", 0) for r in results)
+
+        logger.info(
+            f"Catch-up missing check-ins (manual) completed",
+            {
+                "start_date": start_date,
+                "end_date": end_date or "yesterday",
+                "dates_processed": len(results),
+                "total_inserted": total_inserted,
+            },
+        )
+
+        return {
+            "success": True,
+            "mode": "manual",
+            "start_date": start_date,
+            "end_date": end_date or "yesterday",
+            "dates_processed": len(results),
+            "total_inserted": total_inserted,
+            "results": results,
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to catch-up missing check-ins: {e}")
+        if self.request.retries < self.max_retries:
+            raise self.retry(exc=e)
+        return {"success": False, "error": str(e)}
+
+
+# =====================================================
 # DAILY STREAK RESET TASK (Runs Hourly)
 # =====================================================
 

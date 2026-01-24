@@ -1,0 +1,575 @@
+FITNUDGE KNOWLEDGE BASE FOR APOLLO AI AGENT
+=============================================
+
+WHAT IS FITNUDGE?
+-----------------
+FitNudge is an AI-powered accountability partner app that helps you build lasting habits and achieve any goal you set. Whether you want to get fit, read more, learn a new skill, meditate daily, or build any positive habit, FitNudge provides personalized AI motivation, smart tracking, and a supportive community to keep you on track.
+
+FitNudge works for ANY goal - not just fitness. You can track habits for fitness, learning, productivity, wellness, meditation, reading, or anything else you want to achieve.
+
+KEY FEATURES
+------------
+
+FREE PLAN FEATURES:
+- Create and track 2 active goals
+- Daily motivation messages (AI-generated)
+- Streak tracking
+- Basic check-ins (Yes/No/Rest Day)
+- Achievement badges
+- Blog access
+- Custom reminders (1 reminder time per goal)
+- Basic stats and progress tracking
+- AI Coach Chat: 3 messages per day (watch ads for more)
+- 1 accountability partner
+- Ads shown in app
+
+PREMIUM PLAN FEATURES ($9.99/month or $79.99/year):
+- Up to 10 active goals
+- AI Coach Chat - 100 messages per day with your personal AI coach
+- AI-generated personalized daily motivation messages
+- AI-powered personalized check-in responses (not just templates)
+- Voice notes in check-ins (30 seconds max, Premium feature)
+- Advanced analytics and insights with charts
+- Weekly progress view
+- Activity heat map
+- Weekly AI recaps of your progress
+- Up to 3 accountability partners - find and connect with others
+- Send cheers and nudges to partners
+- Partner insights and progress sharing
+- Pattern detection - AI identifies your success patterns
+- Adaptive nudging - personalized reminders based on your behavior
+- Up to 5 reminder times per goal (Premium)
+- Priority customer support
+- Ad-free experience
+
+PRICING INFORMATION
+-------------------
+
+FREE PLAN:
+- Cost: $0 forever
+- Includes: 2 active goals, AI motivation messages, streak tracking, achievements, 1 reminder time per goal, AI Coach Chat (3 messages/day), 1 accountability partner
+
+PREMIUM PLAN:
+- Monthly: $9.99 per month
+- Annual: $79.99 per year (saves $40 - equivalent to $6.67/month)
+- Best Value: Annual plan saves 33% compared to monthly
+
+SPECIAL OFFERS:
+- Premium Annual includes a 3-day FREE TRIAL
+- Exit offer: 50% off annual plan ($39.99/year) available when you try to leave the subscription screen
+- All prices are in USD
+
+HOW TO GET STARTED
+------------------
+
+STEP 1: DOWNLOAD THE APP
+- Download FitNudge from the App Store (iOS) or Google Play Store (Android)
+- The app is completely free to download
+
+STEP 2: CREATE YOUR ACCOUNT
+- Sign up with email or use social login (Google or Apple)
+- Verify your email address if required
+
+STEP 3: COMPLETE ONBOARDING
+- Grant notification permissions (optional but recommended)
+- Answer personalization questions to help AI understand your preferences:
+  * Your experience level
+  * Primary goal type
+  * Current habits frequency
+  * Available time
+  * Motivation style preference
+  * Biggest challenges
+
+STEP 4: CREATE YOUR FIRST GOAL
+- Tap the "+" button or "Create Goal" option
+- Choose from quick templates or create custom goal
+- Set your goal details
+- Start tracking immediately
+
+STEP 5: EXPLORE FEATURES
+- Check your daily motivation message on home screen
+- Log your first check-in
+- Explore the home screen and see your progress
+
+HOW TO USE KEY FEATURES
+------------------------
+
+CREATING A GOAL:
+1. Go to Goals tab or tap "+" button on home screen
+2. You'll see quick-select templates: "Read daily", "Meditate", "Journal", "Run or walk", "Sleep on time", "Eat healthy", "Work out regularly", "Drink more water", "No phone in bed"
+3. Tap a template to auto-fill, or type your own goal title (minimum 3 characters)
+4. Choose frequency type:
+   - Daily: Goal happens every day
+   - Weekly: Goal happens a specific number of times per week (1-7 times)
+5. If Weekly, select how many times per week (1x, 2x, 3x, 4x, 5x, 6x, or 7x)
+6. If Weekly, select which days of the week (must match the frequency number - e.g., if 3x per week, select exactly 3 days)
+7. Set reminder time(s):
+   - Free users: 1 reminder time per goal (default is 6:00 PM)
+   - Premium users: Multiple reminder times per goal
+8. Optionally add a "Why" statement explaining why this goal matters to you
+9. Tap "Create Goal" button
+10. Your goal is now active and appears on your home screen
+
+Note: Once you create your first check-in for a goal, you cannot change the frequency (daily/weekly) or frequency count. This prevents streak manipulation.
+
+CHECKING IN:
+1. Open your goal from the home screen or Goals tab
+2. Tap "Check In Now" button (only shows if you can check in today)
+3. Choose your response:
+   - Yes: You completed your goal today
+   - No: You didn't complete it
+   - Rest Day: You're taking a planned rest day
+4. If you selected "Yes", optionally add your mood:
+   - Tough: It was challenging but you did it
+   - Good: It went well
+   - Amazing: You crushed it!
+5. If you selected "No", optionally add a skip reason:
+   - Work: Too busy with work
+   - Tired: Felt too tired
+   - Sick: Not feeling well
+   - Schedule: Schedule conflict
+   - Other: Another reason
+6. Optionally add a note (max 140 characters) about your check-in
+7. Premium users can optionally add a voice note (tap microphone icon)
+8. Tap "Submit" button
+9. Your check-in is saved and your streak updates automatically
+
+Note: You can only check in once per day per goal. If you already checked in today, the "Check In Now" button won't appear.
+
+VIEWING YOUR PROGRESS:
+- Home screen shows your current streak for each goal
+- Tap on a goal to see detailed progress screen with:
+  * Goal details and schedule
+  * Pattern insights (Premium feature)
+  * Recent check-ins history
+  * Check-in calendar view
+- Premium users can access Analytics tab for:
+  * Charts and detailed insights
+  * Activity heat map
+  * Weekly progress view
+  * Monthly trends
+  * Skip reason analysis
+  * Mood trends
+
+DAILY MOTIVATION:
+- All users receive AI-generated motivation messages
+- Messages appear on the home screen daily in the Motivation Card
+- Tap the motivation card to view full message
+- You can share or regenerate motivation (Premium feature for regeneration)
+
+AI COACH CHAT:
+1. Access from home screen: Tap the "Your AI Coach" card
+2. Or access from a goal: Tap "Talk to your buddy" button on any goal card
+3. Start chatting with your AI coach
+4. Ask questions about your goals, get advice, or motivation
+5. Your AI coach remembers your conversation history
+6. Available 24/7 for instant support
+7. You can start a new conversation anytime
+8. Voice input is available (tap microphone icon)
+9. Free users: 3 messages per day (can watch ads for more)
+10. Premium users: 100 messages per day
+
+ACCOUNTABILITY PARTNERS:
+1. Go to Profile → Partners
+2. Search for users or browse suggested partners
+3. Send a partner request
+4. Once connected, you can:
+   - See each other's progress
+   - Send cheers and nudges
+   - View partner insights
+   - Stay motivated together
+5. Free users: Can have 1 accountability partner
+6. Premium users: Can have up to 3 accountability partners
+
+ACHIEVEMENTS:
+- Earn badges for milestones (first check-in, 7-day streak, 30-day streak, etc.)
+- View all achievements in Profile → Achievements
+- See your total points and badges earned
+- Share achievements with friends
+- Unlock rare achievements for special milestones
+
+ACCOUNT MANAGEMENT
+------------------
+
+CHANGING YOUR PASSWORD:
+1. Go to Profile → Settings → Security Settings
+2. Tap "Change Password"
+3. Enter current password and new password
+4. Save changes
+
+UPDATING YOUR PROFILE:
+1. Go to Profile → Edit Profile
+2. Update your name, username, bio, profile picture
+3. Save changes
+
+MANAGING NOTIFICATIONS:
+1. Go to Profile → Notification Settings
+2. Toggle notifications on/off for:
+   - Daily reminders
+   - Motivation messages
+   - Partner activity
+   - Achievement unlocks
+   - Weekly recaps
+
+SUBSCRIPTION MANAGEMENT:
+
+VIEWING YOUR SUBSCRIPTION:
+- Go to Profile → Subscription
+- See your current plan (Free or Premium)
+- View subscription details and renewal date
+
+UPGRADING TO PREMIUM:
+1. Go to Profile → Subscription
+2. Choose Monthly ($9.99) or Annual ($79.99)
+3. Complete purchase through App Store or Google Play
+4. Premium features unlock immediately
+
+CANCELLING YOUR SUBSCRIPTION:
+- iOS: Go to Settings → [Your Name] → Subscriptions → FitNudge → Cancel
+- Android: Go to Google Play → Subscriptions → FitNudge → Cancel
+- Your Premium access continues until the end of your billing period
+- You can resubscribe anytime
+
+RESTORING PURCHASES:
+- If you've previously purchased Premium, go to Profile → Subscription → Restore Purchases
+- This syncs your subscription across devices
+
+TROUBLESHOOTING
+---------------
+
+APP WON'T OPEN:
+- Force close the app and reopen
+- Restart your device
+- Check if you have the latest app version
+- Reinstall the app if problem persists
+
+NOTIFICATIONS NOT WORKING:
+- Check app notification permissions in device settings
+- Go to Profile → Notification Settings and ensure notifications are enabled
+- Check your device's Do Not Disturb settings
+- Restart the app
+
+CAN'T LOG IN:
+- Verify your email and password are correct
+- Try "Forgot Password" to reset
+- Check your internet connection
+- Try logging in with social login (Google/Apple) if you used that originally
+
+CHECK-INS NOT SAVING:
+- Check your internet connection
+- Wait a few seconds and try again
+- Force close and reopen the app
+- Check if you've reached any limits (Free plan: 1 goal limit)
+- Make sure you haven't already checked in today for that goal
+
+PREMIUM FEATURES NOT UNLOCKING:
+- Ensure your subscription is active (Profile → Subscription)
+- Try restoring purchases
+- Wait a few minutes for subscription to sync
+- Contact support if issue persists
+
+SYNC ISSUES BETWEEN DEVICES:
+- Ensure you're logged into the same account on all devices
+- Pull down to refresh on each device
+- Log out and log back in
+- Check your internet connection
+
+CAN'T CREATE MORE GOALS:
+- Free users can have up to 2 active goals
+- Archive an existing goal to free up space, or upgrade to Premium for up to 10 active goals
+- Premium users can have up to 10 active goals
+
+CAN'T CHANGE GOAL FREQUENCY:
+- Once you create your first check-in for a goal, frequency is locked
+- This prevents streak manipulation
+- You can still edit the goal title, reminder times, and "why" statement
+
+FREQUENTLY ASKED QUESTIONS
+---------------------------
+
+Q: Is FitNudge really free?
+A: Yes! FitNudge has a free plan that includes 2 active goals, AI-generated motivation messages, streak tracking, achievements, AI Coach Chat (3 messages per day), and 1 accountability partner. You can use FitNudge free forever.
+
+Q: What's the difference between Free and Premium?
+A: Free includes 2 active goals, AI Coach Chat (3 messages/day), 1 accountability partner, basic stats, and 1 reminder time per goal. Premium unlocks up to 10 active goals, AI Coach Chat (100 messages/day), up to 3 accountability partners, advanced analytics, pattern detection, weekly recaps, voice notes, up to 5 reminder times per goal, personalized AI check-in responses, adaptive nudging, priority support, and ad-free experience.
+
+Q: Can I use FitNudge for goals other than fitness?
+A: Absolutely! FitNudge works for ANY goal - fitness, learning, reading, meditation, productivity, wellness, or any habit you want to build.
+
+Q: How does the AI Coach work?
+A: The AI Coach is a chat-based assistant that provides personalized motivation, answers questions about your goals, gives advice, and remembers your conversation history. Free users get 3 messages per day (can watch ads for more). Premium users get 100 messages per day. Access it from the home screen card or from any goal card via "Talk to your buddy" button. It's available 24/7.
+
+Q: What happens if I miss a day?
+A: Your streak resets to 0, but you can start a new streak immediately. Don't worry - setbacks are normal! The important thing is to get back on track.
+
+Q: Can I track multiple goals?
+A: Free users can track 2 active goals. Premium users can track up to 10 active goals simultaneously.
+
+Q: How do accountability partners work?
+A: Free users can have 1 accountability partner. Premium users can have up to 3 accountability partners. You can find and connect with other users, see each other's progress, send encouragement (cheers and nudges), and stay motivated together. It's like having a workout buddy for any goal!
+
+Q: Can I cancel my Premium subscription anytime?
+A: Yes! You can cancel anytime through your App Store or Google Play settings. Your Premium access continues until the end of your current billing period.
+
+Q: Will I lose my data if I cancel Premium?
+A: No! All your goals, check-ins, and progress are saved. However, if you have more than 2 active goals, you'll need to archive some to stay within the free plan limit of 2 active goals. You'll also lose access to Premium features like advanced analytics, pattern detection, weekly recaps, voice notes, and unlimited AI Coach messages (free users get 3/day).
+
+Q: Does FitNudge work offline?
+A: No, FitNudge requires an internet connection to work. The app needs internet to sync your data, receive AI-generated content, access your goals and check-ins, and use social features. If you don't have internet, you'll see a "No Internet" screen.
+
+Q: How do I delete my account?
+A: Go to Profile → Settings → Account Settings → Delete Account. Warning: This permanently deletes all your data and cannot be undone.
+
+Q: Is my data secure?
+A: Yes! FitNudge uses industry-standard encryption and security practices to protect your personal information and data.
+
+Q: Can I export my data?
+A: Yes! Go to Profile → Settings → Data Export to request a copy of all your data. You'll receive an email with your data export.
+
+Q: How do I contact support?
+A: Use the chat widget on our website, email us through the app (Profile → Contact), or use the in-app support feature.
+
+Q: Do you offer refunds?
+A: Refund policies are handled by Apple and Google. Contact them directly for subscription refund requests. We're happy to help resolve any issues you're experiencing.
+
+Q: Can I use FitNudge on multiple devices?
+A: Yes! Your account syncs across all devices. Just log in with the same account on each device.
+
+Q: What languages does FitNudge support?
+A: FitNudge is available in English, Spanish, French, German, Italian, Portuguese, and Dutch. More languages coming soon!
+
+Q: How accurate is the streak tracking?
+A: Streaks are based on your check-ins. If you check in daily and select "Yes", your streak continues. Missing a day or selecting "No" resets the streak.
+
+Q: Can I change my goal after creating it?
+A: Yes! You can edit your goal title, reminder times, and "why" statement anytime by tapping on your goal and selecting "Edit". However, once you create your first check-in, you cannot change the frequency (daily/weekly) or frequency count.
+
+Q: What if I want to pause a goal temporarily?
+A: You can archive goals you're not actively working on. Archived goals don't count toward your active goal limit and can be reactivated anytime.
+
+Q: How do I share my progress with friends?
+A: You can share achievements, streaks, and progress updates. Premium users can also connect as accountability partners for deeper sharing.
+
+Q: Is there a web version?
+A: Currently FitNudge is mobile-only (iOS and Android). A web version may be available in the future.
+
+Q: How do I report a bug or issue?
+A: Use the in-app support chat, email us through Profile → Contact, or report through the app store.
+
+Q: Can I suggest new features?
+A: Absolutely! We love hearing from users. Send your suggestions through Profile → Contact or use the in-app feedback feature.
+
+Q: What are the goal templates available?
+A: Quick-select templates include: "Read daily", "Meditate", "Journal", "Run or walk", "Sleep on time", "Eat healthy", "Work out regularly", "Drink more water", "No phone in bed". You can also create completely custom goals.
+
+Q: How many reminder times can I set?
+A: Free users can set 1 reminder time per goal. Premium users can set up to 5 reminder times per goal.
+
+Q: What happens if I select "Rest Day"?
+A: Rest days don't break your streak. They're planned rest days that don't count as completed or missed. Perfect for recovery days!
+
+Q: Can I check in multiple times per day?
+A: No, you can only check in once per day per goal. This keeps tracking accurate and prevents streak manipulation.
+
+Q: How do I access the AI Coach?
+A: All users can access AI Coach in two ways: 1) Tap the "Your AI Coach" card on the home screen, or 2) Tap "Talk to your buddy" button on any goal card for goal-specific conversations. Free users get 3 messages per day, Premium users get 100 messages per day.
+
+GOAL CREATION DETAILS
+----------------------
+
+GOAL TITLE:
+- Minimum 3 characters required
+- Can be any text describing your goal
+- Examples: "Read 20 pages daily", "Meditate every morning", "Work out 3x per week"
+
+FREQUENCY TYPES:
+
+DAILY GOALS:
+- Goal happens every single day
+- No day selection needed
+- Perfect for habits like reading, meditation, journaling
+
+WEEKLY GOALS:
+- Goal happens a specific number of times per week (1-7 times)
+- Must select exactly that many days
+- Example: "Work out 3x per week" means select exactly 3 days (e.g., Monday, Wednesday, Friday)
+- Perfect for goals that don't need daily commitment
+
+REMINDER TIMES:
+- Set when you want to be reminded to check in
+- Default is 6:00 PM (18:00)
+- Free users: 1 reminder time per goal
+- Premium users: Multiple reminder times per goal
+- Format: 24-hour time (e.g., 18:00 = 6:00 PM)
+
+WHY STATEMENT:
+- Optional field explaining why this goal matters to you
+- Helps with motivation and commitment
+- Can be edited anytime
+- Examples: "To feel more energized", "To improve my health", "To learn a new skill"
+
+CHECK-IN DETAILS
+----------------
+
+CHECK-IN RESPONSES:
+
+YES (Completed):
+- You successfully completed your goal today
+- Extends your streak
+- Optional mood selection: Tough, Good, or Amazing
+- Optional note (max 140 characters)
+- Optional voice note (Premium)
+
+NO (Didn't Complete):
+- You didn't complete your goal today
+- Resets your streak to 0
+- Optional skip reason: Work, Tired, Sick, Schedule, or Other
+- Optional note (max 140 characters)
+- Don't worry - you can start a new streak tomorrow!
+
+REST DAY:
+- Planned rest day
+- Doesn't break your streak
+- Doesn't count as completed or missed
+- Perfect for recovery days or planned breaks
+
+MOODS (for Yes responses):
+- Tough: It was challenging but you did it anyway
+- Good: It went well and felt good
+- Amazing: You crushed it and felt amazing!
+
+SKIP REASONS (for No responses):
+- Work: Too busy with work
+- Tired: Felt too tired to do it
+- Sick: Not feeling well
+- Schedule: Schedule conflict prevented it
+- Other: Another reason
+
+VOICE NOTES (Premium):
+- Record a voice note up to 30 seconds
+- Add personal context to your check-in
+- Great for expressing how you felt
+- Requires microphone permissions
+- Premium feature only
+
+SUCCESS TIPS
+------------
+
+1. START SMALL: Don't try to change everything at once. Pick one goal and focus on it.
+
+2. BE CONSISTENT: Even 5 minutes daily is better than 2 hours once a week. Consistency builds habits.
+
+3. USE REMINDERS: Set up notifications to remind you to check in and work on your goal.
+
+4. CELEBRATE WINS: Every check-in matters! Celebrate your streaks and achievements.
+
+5. DON'T GIVE UP: If you miss a day, don't quit. Start a new streak immediately.
+
+6. USE THE AI COACH: Premium users - chat with your AI coach when you need motivation or advice.
+
+7. FIND A PARTNER: Connect with accountability partners (Premium) to stay motivated together.
+
+8. REVIEW YOUR PROGRESS: Check your analytics regularly (Premium) to see how far you've come.
+
+9. ADJUST AS NEEDED: If a goal isn't working, edit it. Goals should be challenging but achievable.
+
+10. STAY POSITIVE: Building habits takes time. Be patient with yourself and trust the process.
+
+11. USE REST DAYS: Don't be afraid to use "Rest Day" for planned recovery. It won't break your streak!
+
+12. ADD YOUR WHY: Writing a "why" statement helps you stay motivated when things get tough.
+
+COMPETITIVE ADVANTAGES
+-----------------------
+
+WHAT MAKES FITNUDGE DIFFERENT:
+
+1. AI-POWERED PERSONALIZATION: Our AI understands your preferences and provides personalized motivation, not generic messages.
+
+2. WORKS FOR ANY GOAL: Unlike fitness-only apps, FitNudge helps you build ANY habit - fitness, learning, productivity, wellness, or anything else.
+
+3. ACCOUNTABILITY PARTNERS: Connect with others who share similar goals for mutual support and motivation.
+
+4. SMART TRACKING: Advanced analytics help you understand your patterns and what works best for you.
+
+5. VOICE MOTIVATION: Premium users can add voice notes to check-ins for a more personal touch.
+
+6. AI MEMORY: Your AI coach remembers your journey and provides context-aware advice.
+
+7. SIMPLE PRICING: Just Free and Premium - no confusing tiers or hidden costs.
+
+8. BEAUTIFUL DESIGN: Clean, modern interface that makes tracking enjoyable.
+
+9. COMMUNITY SUPPORT: Join a community of people working toward their goals.
+
+10. CONTINUOUS IMPROVEMENT: We regularly add new features based on user feedback.
+
+SUPPORT AND HELP
+----------------
+
+NEED HELP? WE'RE HERE FOR YOU!
+
+IN-APP SUPPORT:
+- Use the chat widget in the app
+- Go to Profile → Contact
+- Response time: Usually within 24 hours
+
+EMAIL SUPPORT:
+- Available through Profile → Contact
+- Premium users get priority support
+
+COMMUNITY HELP:
+- Check our blog for tips and guides
+- Connect with other users through accountability partners
+- Share experiences and learn from others
+
+BUG REPORTS:
+- Report bugs through in-app support
+- Include details about what happened and when
+- Screenshots are helpful
+
+FEATURE REQUESTS:
+- We love hearing your ideas!
+- Send suggestions through Profile → Contact
+- Popular requests may be added in future updates
+
+PRIVACY AND SECURITY
+--------------------
+
+YOUR PRIVACY MATTERS:
+
+DATA COLLECTION:
+- We only collect data necessary to provide our services
+- Your goals, check-ins, and progress are stored securely
+- We never sell your personal data
+
+DATA SECURITY:
+- Industry-standard encryption
+- Secure servers and databases
+- Regular security audits
+
+DATA CONTROL:
+- You can export your data anytime
+- You can delete your account and all data
+- You control what information you share
+
+PRIVACY POLICY:
+- Full privacy policy available in the app
+- We comply with GDPR and data protection regulations
+- Your data is yours - we're just helping you track it
+
+TERMS OF SERVICE:
+- Available in the app settings
+- Standard terms for app usage
+- Fair and transparent policies
+
+FINAL NOTES
+-----------
+
+FitNudge is designed to be your partner in building better habits. Whether you're just starting or have been working on self-improvement for years, FitNudge adapts to your needs and provides the support you need to succeed.
+
+Remember: Building lasting habits takes time and consistency. Don't be discouraged by setbacks - they're part of the journey. Every day you check in is a step toward your goal.
+
+We're constantly improving FitNudge based on user feedback. If you have suggestions, questions, or need help, don't hesitate to reach out. We're here to help you succeed!
+
+Thank you for choosing FitNudge. Let's build those habits together!

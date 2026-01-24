@@ -29,10 +29,13 @@ except ImportError:
 
 import hashlib
 import json
+import logging
 import os
 import tempfile
 from PIL import Image
 import subprocess
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     redirect_slashes=False
@@ -77,13 +80,42 @@ async def get_voice_note_limits(supabase, user_id: str) -> tuple[int, int]:
 
         return max_duration, max_file_size
     except Exception as e:
-        # Log and return defaults
-        import logging
-
-        logging.warning(f"Failed to get voice note limits from DB: {e}")
+        logger.warning("Failed to get voice note limits from DB: %s", e)
         return (
             DEFAULT_VOICE_NOTE_MAX_DURATION_SECONDS,
             DEFAULT_VOICE_NOTE_MAX_FILE_SIZE_MB,
+        )
+
+
+async def _queue_ai_response_on_vn_failure(
+    supabase,
+    user_id: str,
+    checkin_id: str,
+    goal_id: Optional[str],
+) -> None:
+    """Queue generate_checkin_ai_response when voice note processing fails, so user still gets AI feedback."""
+    if not goal_id:
+        return
+    try:
+        from app.services.subscription_service import has_user_feature
+        from app.services.tasks.motivation_tasks import generate_checkin_ai_response
+
+        has_ai = await has_user_feature(supabase, user_id, "ai_checkin_response")
+        if not has_ai:
+            return
+        generate_checkin_ai_response.delay(
+            checkin_id=checkin_id,
+            user_id=user_id,
+            goal_id=goal_id,
+        )
+        logger.info(
+            "[Media] Queued generate_checkin_ai_response (VN failed fallback) for checkin_id=%s",
+            checkin_id,
+        )
+    except Exception as e:
+        logger.warning(
+            "[Media] Failed to queue AI fallback after VN failure: %s",
+            e,
         )
 
 
@@ -184,6 +216,72 @@ async def transcribe_audio_whisper(
         return None
 
 
+VOICE_NOTE_SENTIMENT_PROMPT = """Analyze the sentiment of this check-in voice note transcript.
+
+The user may have selected a mood (tough / good / amazing) for their check-in. Infer the emotional tone from the WORDS ONLY (no audio).
+If mood is provided, check whether the transcript tone matches it (e.g. they picked "amazing" but the note sounds down).
+
+Return valid JSON only, no markdown:
+{"sentiment": "positive"|"negative"|"neutral"|"mixed", "tone": "brief 3–6 word description", "matches_mood": true|false}
+
+Rules:
+- sentiment: overall emotional valence from the text.
+- tone: short descriptor (e.g. "tired but determined", "genuinely upbeat", "frustrated").
+- matches_mood: if no mood given, use false; otherwise true only when transcript tone aligns with the selected mood."""
+
+
+async def analyze_voice_note_sentiment(
+    transcript: str,
+    mood: Optional[str] = None,
+    note: Optional[str] = None,
+) -> Optional[dict]:
+    """Run GPT sentiment analysis on voice note transcript. Returns {sentiment, tone, matches_mood} or None."""
+    if not OPENAI_AVAILABLE or not transcript.strip():
+        return None
+
+    from app.core.config import settings
+
+    api_key = getattr(settings, "OPENAI_API_KEY", None)
+    if not api_key:
+        return None
+
+    try:
+        client = AsyncOpenAI(api_key=api_key)
+        user_content = f"Transcript: {transcript.strip()}"
+        if mood:
+            user_content += f"\nSelected mood: {mood}"
+        if note and note.strip():
+            user_content += f'\nWritten note: "{note.strip()[:200]}"'
+
+        resp = await client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": VOICE_NOTE_SENTIMENT_PROMPT},
+                {"role": "user", "content": user_content},
+            ],
+            temperature=0.2,
+            max_tokens=150,
+        )
+        raw = (resp.choices[0].message.content or "").strip()
+        if not raw:
+            return None
+        # Strip markdown code blocks if present
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+        data = json.loads(raw)
+        out = {
+            "sentiment": data.get("sentiment") or "neutral",
+            "tone": (data.get("tone") or "").strip() or "unclear",
+            "matches_mood": bool(data.get("matches_mood", False)),
+        }
+        if out["sentiment"] not in ("positive", "negative", "neutral", "mixed"):
+            out["sentiment"] = "neutral"
+        return out
+    except (json.JSONDecodeError, KeyError, Exception) as e:
+        logger.warning("[Media] Voice note sentiment analysis failed: %s", e)
+        return None
+
+
 class VoiceNoteUploadResponse(MediaUploadResponse):
     """Extended response for voice note uploads"""
 
@@ -221,6 +319,7 @@ async def upload_media(
 
     user_id = current_user["id"]
     supabase = get_supabase_client()
+    vn_goal_id: Optional[str] = None
 
     # =============================================
     # VOICE NOTE SPECIFIC VALIDATIONS
@@ -234,10 +333,10 @@ async def upload_media(
                 detail="Voice notes require a premium subscription",
             )
 
-        # Validate check-in exists and belongs to user
+        # Validate check-in exists and belongs to user (goal_id needed to queue AI task later)
         checkin_result = (
             supabase.table("check_ins")
-            .select("id, user_id, voice_note_url")
+            .select("id, user_id, goal_id, voice_note_url")
             .eq("id", checkin_id)
             .maybe_single()
             .execute()
@@ -254,8 +353,16 @@ async def upload_media(
                 detail="You can only add voice notes to your own check-ins",
             )
 
+        vn_goal_id = checkin_result.data.get("goal_id")
+
         # Check if already has a voice note (one per check-in)
         if checkin_result.data.get("voice_note_url"):
+            logger.warning(
+                "[Media] Voice note upload 400: check-in already has a voice note"
+            )
+            await _queue_ai_response_on_vn_failure(
+                supabase, user_id, checkin_id, vn_goal_id
+            )
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="This check-in already has a voice note. Delete it first.",
@@ -268,6 +375,14 @@ async def upload_media(
 
         # Validate duration from frontend
         if duration and duration > max_duration_seconds:
+            logger.warning(
+                "[Media] Voice note upload 400: duration %s > max %s",
+                duration,
+                max_duration_seconds,
+            )
+            await _queue_ai_response_on_vn_failure(
+                supabase, user_id, checkin_id, vn_goal_id
+            )
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Voice note too long. Maximum: {max_duration_seconds} seconds",
@@ -280,6 +395,14 @@ async def upload_media(
     if media_type == "voice_note":
         max_size_bytes = max_file_size_mb * 1024 * 1024
         if len(file_content) > max_size_bytes:
+            logger.warning(
+                "[Media] Voice note upload 400: file size %s > max %s MB",
+                len(file_content) / (1024 * 1024),
+                max_file_size_mb,
+            )
+            await _queue_ai_response_on_vn_failure(
+                supabase, user_id, checkin_id, vn_goal_id
+            )
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Voice note too large. Maximum: {max_file_size_mb}MB",
@@ -288,6 +411,14 @@ async def upload_media(
     # Enhanced security validation
     validation_result = await validate_file_security(file, file_content)
     if not validation_result["is_valid"]:
+        logger.warning(
+            "[Media] Voice note upload 400: validation %s",
+            validation_result.get("error", "unknown"),
+        )
+        if media_type == "voice_note" and vn_goal_id:
+            await _queue_ai_response_on_vn_failure(
+                supabase, user_id, checkin_id, vn_goal_id
+            )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=validation_result["error"]
         )
@@ -297,6 +428,23 @@ async def upload_media(
     # Generate unique filename
     file_extension = os.path.splitext(file.filename)[1].lower()
     unique_filename = f"{uuid.uuid4()}{file_extension}"
+
+    # Voice note: validate actual file duration (recorder can flush 2–3s extra; prevent > max)
+    if media_type == "voice_note":
+        actual_duration = get_media_duration(file_content, file_extension)
+        if actual_duration is not None and actual_duration > max_duration_seconds:
+            logger.warning(
+                "[Media] Voice note upload 400: actual file duration %s > max %s",
+                actual_duration,
+                max_duration_seconds,
+            )
+            await _queue_ai_response_on_vn_failure(
+                supabase, user_id, checkin_id, vn_goal_id
+            )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Voice note file is {actual_duration}s. Maximum: {max_duration_seconds} seconds.",
+            )
 
     # Different path for voice notes
     if media_type == "voice_note":
@@ -340,6 +488,10 @@ async def upload_media(
         file_url = f"{settings.CLOUDFLARE_R2_PUBLIC_URL}/{r2_key}"
 
     except Exception as e:
+        if media_type == "voice_note" and vn_goal_id:
+            await _queue_ai_response_on_vn_failure(
+                supabase, user_id, checkin_id, vn_goal_id
+            )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to upload file: {str(e)}",
@@ -347,6 +499,7 @@ async def upload_media(
 
     # Handle voice note specific logic
     transcript = None
+    sentiment = None
     created_at = datetime.utcnow().isoformat() + "Z"
 
     if media_type == "voice_note":
@@ -355,26 +508,76 @@ async def upload_media(
             file_content, file.filename or "voice_note.mp3"
         )
 
-        # Update check-in with voice note data
+        # GPT sentiment analysis on transcript (for insights AI)
+        if transcript:
+            checkin_ctx = (
+                supabase.table("check_ins")
+                .select("mood, note")
+                .eq("id", checkin_id)
+                .maybe_single()
+                .execute()
+            )
+            mood = None
+            note = None
+            if checkin_ctx.data:
+                mood = checkin_ctx.data.get("mood")
+                note = checkin_ctx.data.get("note")
+            sentiment = await analyze_voice_note_sentiment(
+                transcript=transcript, mood=mood, note=note
+            )
+
+        update_payload = {
+            "voice_note_url": file_url,
+            "voice_note_transcript": transcript,
+            "updated_at": datetime.utcnow().isoformat(),
+        }
+        if sentiment is not None:
+            update_payload["voice_note_sentiment"] = sentiment
+
         try:
-            supabase.table("check_ins").update(
-                {
-                    "voice_note_url": file_url,
-                    "voice_note_transcript": transcript,
-                    "updated_at": datetime.utcnow().isoformat(),
-                }
-            ).eq("id", checkin_id).execute()
+            supabase.table("check_ins").update(update_payload).eq(
+                "id", checkin_id
+            ).execute()
         except Exception as e:
-            # Try to delete uploaded file on DB error
             from app.services.tasks import delete_media_from_r2_task
 
             delete_media_from_r2_task.delay(
                 file_path=r2_key, media_id=f"voice-note-{checkin_id}"
             )
+            await _queue_ai_response_on_vn_failure(
+                supabase, user_id, checkin_id, vn_goal_id
+            )
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to save voice note",
             )
+
+        # Queue AI check-in response now that we have transcript + sentiment (premium only)
+        goal_id = checkin_result.data.get("goal_id") if checkin_result.data else None
+        if goal_id:
+            has_ai = await has_user_feature(supabase, user_id, "ai_checkin_response")
+            if has_ai:
+                try:
+                    from app.services.tasks.motivation_tasks import (
+                        generate_checkin_ai_response,
+                    )
+
+                    generate_checkin_ai_response.delay(
+                        checkin_id=checkin_id,
+                        user_id=user_id,
+                        goal_id=goal_id,
+                    )
+                    logger.info(
+                        "[Media] Queued generate_checkin_ai_response after voice note "
+                        "for checkin_id=%s",
+                        checkin_id,
+                    )
+                except ImportError:
+                    pass
+                except Exception as e:
+                    logger.warning(
+                        "[Media] Failed to queue AI response after voice note: %s", e
+                    )
 
     return VoiceNoteUploadResponse(
         url=file_url,
@@ -483,11 +686,12 @@ async def delete_voice_note(
     # Extract R2 key from URL
     r2_key = extract_r2_key_from_url(voice_note_url, settings.CLOUDFLARE_R2_PUBLIC_URL)
 
-    # Clear from database
+    # Clear from database (include voice_note_sentiment)
     supabase.table("check_ins").update(
         {
             "voice_note_url": None,
             "voice_note_transcript": None,
+            "voice_note_sentiment": None,
             "updated_at": datetime.utcnow().isoformat(),
         }
     ).eq("id", checkin_id).execute()
@@ -654,6 +858,7 @@ async def validate_file_security(file: UploadFile, file_content: bytes) -> dict:
         "audio/wav",
         "audio/mp4",
         "audio/aac",
+        "audio/x-m4a",
     }
 
     if detected_mime not in allowed_types:

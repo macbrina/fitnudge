@@ -42,7 +42,7 @@ export default function CheckInHistoryScreen() {
   const { t } = useTranslation();
   const router = useRouter();
 
-  const [selectedCheckIn, setSelectedCheckIn] = useState<CheckIn | null>(null);
+  const [selectedCheckInId, setSelectedCheckInId] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Fetch goal for title
@@ -127,7 +127,7 @@ export default function CheckInHistoryScreen() {
       return (
         <TouchableOpacity
           style={styles.checkInItem}
-          onPress={() => setSelectedCheckIn(item)}
+          onPress={() => setSelectedCheckInId(item.id)}
           activeOpacity={0.7}
         >
           <View style={styles.checkInLeft}>
@@ -213,12 +213,12 @@ export default function CheckInHistoryScreen() {
         }
       />
 
-      {/* Detail Modal */}
+      {/* Detail Modal (checkIn from list so AI response updates live when ready) */}
       <CheckInDetailModal
-        isVisible={!!selectedCheckIn}
-        checkIn={selectedCheckIn}
+        isVisible={!!selectedCheckInId}
+        checkIn={checkIns.find((c) => c.id === selectedCheckInId) ?? null}
         goalTitle={goal?.title}
-        onClose={() => setSelectedCheckIn(null)}
+        onClose={() => setSelectedCheckInId(null)}
       />
     </View>
   );

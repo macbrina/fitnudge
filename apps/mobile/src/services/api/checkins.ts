@@ -69,7 +69,9 @@ export interface CreateCheckInRequest {
   is_rest_day?: boolean;
   mood?: CheckInMood; // For completed check-ins
   skip_reason?: SkipReason; // For missed check-ins
-  notes?: string;
+  note?: string; // Optional reflection
+  /** When true, backend skips queuing AI task; media upload queues it after VN is processed. */
+  expect_voice_note?: boolean;
 }
 
 /**
@@ -175,14 +177,14 @@ export class CheckInsService extends BaseApiService {
   async markCompleted(
     goalId: string,
     mood?: CheckInMood,
-    notes?: string
+    note?: string
   ): Promise<ApiResponse<CheckIn>> {
     return this.createCheckIn({
       goal_id: goalId,
       completed: true,
       is_rest_day: false,
       mood,
-      notes
+      note
     });
   }
 
@@ -192,26 +194,26 @@ export class CheckInsService extends BaseApiService {
   async markMissed(
     goalId: string,
     skipReason?: SkipReason,
-    notes?: string
+    note?: string
   ): Promise<ApiResponse<CheckIn>> {
     return this.createCheckIn({
       goal_id: goalId,
       completed: false,
       is_rest_day: false,
       skip_reason: skipReason,
-      notes
+      note
     });
   }
 
   /**
    * Mark today as a rest day (streak preserved)
    */
-  async markRestDay(goalId: string, notes?: string): Promise<ApiResponse<CheckIn>> {
+  async markRestDay(goalId: string, note?: string): Promise<ApiResponse<CheckIn>> {
     return this.createCheckIn({
       goal_id: goalId,
       completed: false,
       is_rest_day: true,
-      notes
+      note
     });
   }
 

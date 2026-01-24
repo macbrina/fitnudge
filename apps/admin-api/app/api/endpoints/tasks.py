@@ -269,3 +269,95 @@ async def get_registered_tasks(current_admin: dict = Depends(get_current_admin))
         all_tasks.update(worker_tasks)
 
     return {"tasks": sorted(list(all_tasks))}
+
+
+class CatchupCheckinsRequest(BaseModel):
+    start_date: str | None = None  # YYYY-MM-DD format (manual mode)
+    end_date: str | None = None  # YYYY-MM-DD format (manual mode, optional)
+    lookback_days: int | None = None  # Auto mode: days to look back (defaults to 7)
+
+
+@router.post("/catchup-checkins")
+async def trigger_catchup_checkins(
+    request: CatchupCheckinsRequest,
+    current_admin: dict = Depends(get_current_admin),
+):
+    """
+    Trigger catch-up task to backfill missing check-ins after maintenance/downtime.
+
+    Can be used in two modes:
+    1. **Auto mode** (recommended): Provide `lookback_days` or leave all fields null (defaults to 7 days)
+       - Automatically detects missing check-ins for recent dates
+       - Perfect when you don't know exact maintenance dates
+    2. **Manual mode**: Provide `start_date` (and optionally `end_date`)
+       - Use when you know exact dates that need backfilling
+
+    This creates check-ins with status='pending' for all active goals where
+    each date in the range is a scheduled day. The mark_missed_checkins_task
+    (runs hourly) will immediately mark these as 'missed' since the days have
+    already passed.
+
+    Use this after maintenance to ensure analytics accurately reflect scheduled
+    vs non-scheduled days.
+
+    Args:
+        start_date: Start date in YYYY-MM-DD format (manual mode)
+        end_date: End date in YYYY-MM-DD format (manual mode, optional, defaults to yesterday)
+        lookback_days: Number of days to look back (auto mode, optional, defaults to 7)
+
+    Returns:
+        Task ID and status
+    """
+    try:
+        # Determine mode and prepare task args
+        if request.lookback_days is not None or (
+            request.start_date is None and request.end_date is None
+        ):
+            # Auto mode
+            lookback = request.lookback_days if request.lookback_days is not None else 7
+            task_kwargs = {"lookback_days": lookback}
+            mode = "auto"
+        else:
+            # Manual mode
+            if not request.start_date:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Either start_date or lookback_days must be provided",
+                )
+            task_kwargs = {"start_date": request.start_date}
+            if request.end_date:
+                task_kwargs["end_date"] = request.end_date
+            mode = "manual"
+
+        # Trigger the catch-up task
+        task = celery_app.send_task(
+            "catchup_missing_checkins",
+            kwargs=task_kwargs,
+        )
+
+        # Log admin action
+        await log_admin_action(
+            admin_user_id=current_admin["id"],
+            action="trigger_catchup_checkins",
+            resource_type="celery_task",
+            resource_id=task.id,
+            details={
+                "mode": mode,
+                **task_kwargs,
+            },
+        )
+
+        return {
+            "message": f"Catch-up task triggered ({mode} mode)",
+            "task_id": task.id,
+            "mode": mode,
+            **task_kwargs,
+            "status": "PENDING",
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to trigger catch-up task: {str(e)}",
+        )

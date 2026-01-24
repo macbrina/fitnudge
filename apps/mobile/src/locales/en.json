@@ -705,8 +705,8 @@
     "saved": "Check-in saved!",
     "detail_title": "Check-in Details",
     "ai_response": "AI Coach Response",
-    "ai_generating_title": "AI is crafting your response",
-    "ai_generating_subtitle": "Check back in a few minutes for personalized feedback on your check-in.",
+    "ai_generating_title": "Generating your AI response…",
+    "ai_generating_subtitle": "It'll appear here when ready. You can stay on this screen—no need to leave.",
     "ai_upsell_title": "Unlock AI Coach Feedback",
     "ai_upsell_subtitle": "Get personalized encouragement and insights after every check-in with Premium.",
     "ai_upsell_cta": "Upgrade to Premium",
@@ -716,8 +716,11 @@
     "see_all": "See All"
   },
   "voice_notes": {
-    "title": "Voice Note",
+    "title": "Record Voice Note",
+    "title_note": "Voice Note",
+    "starting": "Starting recording…",
     "permission_required": "Microphone permission is required to record voice notes.",
+    "permission_denied_toast": "Microphone access denied. Tap \"Open Settings\" to enable.",
     "tap_to_record": "Tap to record your reflection",
     "tap_to_stop": "Tap to stop recording",
     "tap_pause": "Tap to pause",
@@ -734,6 +737,7 @@
     "uploading": "Uploading voice note...",
     "upload_success": "Voice note saved!",
     "upload_error": "Failed to save voice note",
+    "playback_failed": "Could not play recording. Try again.",
     "premium_required": "Voice notes are a premium feature",
     "add_voice_note": "Add Voice Note",
     "voice_reflection": "Voice Reflection"

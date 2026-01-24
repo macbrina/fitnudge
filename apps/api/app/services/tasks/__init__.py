@@ -26,6 +26,7 @@ V2.1 Architecture Notes:
 from app.services.tasks.goal_tasks import (
     precreate_daily_checkins_task,  # Hourly: pre-create pending check-ins
     mark_missed_checkins_task,  # Hourly: mark pending as missed at EOD
+    catchup_missing_checkins_task,  # Manual: backfill missing check-ins after maintenance
     update_goal_streak_task,  # Legacy: kept for manual recalculation
     reset_missed_streaks_task,  # Hourly: reset streaks for missed days
     reset_weekly_completions_task,  # Monday: reset week_completions counter
@@ -117,6 +118,7 @@ __all__ = [
     # Goal tasks (V2.1: Pre-creation + O(1) inline + batch scheduled tasks)
     "precreate_daily_checkins_task",
     "mark_missed_checkins_task",
+    "catchup_missing_checkins_task",
     "update_goal_streak_task",
     "reset_missed_streaks_task",
     "reset_weekly_completions_task",

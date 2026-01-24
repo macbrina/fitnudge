@@ -21,7 +21,7 @@ import { useSubscriptionStore } from "@/stores/subscriptionStore";
 import { AdBanner } from "@/components/ads";
 import { ChevronRight, Moon, Lock, Sparkles } from "lucide-react-native";
 import PatternInsights from "./PatternInsights";
-import { useCheckIns } from "@/hooks/api/useCheckIns";
+import { useCheckIns, useCheckInsByDateRange } from "@/hooks/api/useCheckIns";
 import { useAlertModal } from "@/contexts/AlertModalContext";
 import { CheckInModal } from "@/screens/tabs/home/components/CheckInModal";
 import { CheckInDetailModal } from "@/components/modals/CheckInDetailModal";
@@ -59,7 +59,7 @@ export default function SingleGoalScreen() {
   const [showCheckInModal, setShowCheckInModal] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [selectedCheckIn, setSelectedCheckIn] = useState<CheckIn | null>(null);
+  const [selectedCheckInId, setSelectedCheckInId] = useState<string | null>(null);
 
   // Subscription check for premium features
   const { hasFeature } = useSubscriptionStore();
@@ -74,7 +74,7 @@ export default function SingleGoalScreen() {
 
   const goal = goalResponse?.data;
 
-  // Fetch check-ins for this goal
+  // Fetch check-ins for this goal (recent list, streak)
   const {
     data: checkInsData,
     isLoading: checkInsLoading,
@@ -83,11 +83,34 @@ export default function SingleGoalScreen() {
 
   const checkIns = checkInsData?.data || [];
 
-  // Fetch insights (Premium only)
-  const { data: insightsResponse, isLoading: insightsLoading } = useGoalInsights(
-    goalId || "",
-    hasPatternDetection
+  // Last-30-day range for schedule-aware completion rate (off-days excluded)
+  // Shows last 30 days, or since goal creation if the goal is newer than 30 days
+  const last30Range = useMemo(() => {
+    if (!goal?.created_at) return null;
+    const today = new Date();
+    const end = today.toISOString().slice(0, 10);
+    const from = new Date(today);
+    from.setDate(today.getDate() - 30);
+    const startDefault = from.toISOString().slice(0, 10);
+    const created = new Date(goal.created_at);
+    const startCreated = created.toISOString().slice(0, 10);
+    const start = startCreated > startDefault ? startCreated : startDefault;
+    return { start, end };
+  }, [goal?.created_at]);
+
+  const { data: last30Data, refetch: refetchLast30 } = useCheckInsByDateRange(
+    last30Range?.start ?? "",
+    last30Range?.end ?? "",
+    goalId ?? undefined
   );
+  const checkInsLast30 = last30Data?.data ?? [];
+
+  // Fetch insights (Premium only) – refetch on pull-to-refresh so PatternInsights uses fresh DB data
+  const {
+    data: insightsResponse,
+    isLoading: insightsLoading,
+    refetch: refetchInsights
+  } = useGoalInsights(goalId || "", hasPatternDetection);
   const insightsData = insightsResponse?.data;
   const insightsStatus = insightsData?.status || "pending";
   const insights = insightsData?.insights || [];
@@ -106,14 +129,59 @@ export default function SingleGoalScreen() {
     }
   }, [goalId, refreshInsightsMutation]);
 
-  // Stats (V2: use status field)
+  // Stats: schedule-aware for last 30 days (or since goal creation if newer)
+  // Off-days excluded from rate - only scheduled days count
   const stats = useMemo(() => {
-    const completed = checkIns.filter((c) => c.status === "completed").length;
-    const total = checkIns.filter((c) => c.status !== "pending").length;
-    const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
+    const completedFromLast30 = checkInsLast30.filter(
+      (c) => c.status === "completed" || c.status === "rest_day"
+    ).length;
 
-    return { completed, total, completionRate };
-  }, [checkIns]);
+    if (!goal || !last30Range) {
+      const completed = checkIns.filter((c) => c.status === "completed").length;
+      const total = checkIns.filter((c) => c.status !== "pending").length;
+      const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
+      return { completed, total, completionRate };
+    }
+
+    const goalCreated = goal.created_at
+      ? new Date(goal.created_at).toISOString().slice(0, 10)
+      : null;
+    if (!goalCreated) {
+      return {
+        completed: completedFromLast30,
+        total: 0,
+        completionRate: 0
+      };
+    }
+
+    const { start, end } = last30Range;
+    let scheduledDays = 0;
+    const s = new Date(start);
+    const e = new Date(end);
+    for (let d = new Date(s); d <= e; d.setDate(d.getDate() + 1)) {
+      const dateStr = d.toISOString().slice(0, 10);
+      if (dateStr < goalCreated) continue;
+      if (goal.frequency_type === "daily") {
+        scheduledDays += 1;
+      } else if (goal.frequency_type === "weekly" && goal.target_days?.length) {
+        const dow = d.getDay();
+        if (goal.target_days.includes(dow)) scheduledDays += 1;
+      } else if (
+        goal.frequency_type === "weekly" &&
+        (!goal.target_days || goal.target_days.length === 0)
+      ) {
+        scheduledDays += 1;
+      }
+    }
+
+    const completionRate =
+      scheduledDays > 0 ? Math.round((100 * completedFromLast30) / scheduledDays) : 0;
+    return {
+      completed: completedFromLast30,
+      total: scheduledDays,
+      completionRate
+    };
+  }, [checkIns, checkInsLast30, goal, last30Range]);
 
   // Check if today is a scheduled day for this goal
   const isScheduledToday = useMemo(() => {
@@ -162,12 +230,12 @@ export default function SingleGoalScreen() {
     }
   }, [shouldOpenCheckIn, goal, canCheckInToday, goalLoading, checkInsLoading]);
 
-  // Refresh handler
+  // Refresh handler – refetch goal, check-ins, last-30 stats, and insights so PatternInsights gets fresh data
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
-    await Promise.all([refetchGoal(), refetchCheckIns()]);
+    await Promise.all([refetchGoal(), refetchCheckIns(), refetchLast30(), refetchInsights()]);
     setIsRefreshing(false);
-  }, [refetchGoal, refetchCheckIns]);
+  }, [refetchGoal, refetchCheckIns, refetchLast30, refetchInsights]);
 
   // Check if goal is archived
   const isArchived = goal?.status === "archived";
@@ -496,7 +564,7 @@ export default function SingleGoalScreen() {
                 <TouchableOpacity
                   key={checkIn.id}
                   style={styles.checkInItem}
-                  onPress={() => setSelectedCheckIn(checkIn)}
+                  onPress={() => setSelectedCheckInId(checkIn.id)}
                   activeOpacity={0.7}
                 >
                   <View style={styles.checkInIcon}>
@@ -558,16 +626,17 @@ export default function SingleGoalScreen() {
             setShowCheckInModal(false);
             refetchGoal();
             refetchCheckIns();
+            refetchLast30();
           }}
         />
       )}
 
-      {/* Check-in Detail Modal */}
+      {/* Check-in Detail Modal (checkIn from list so AI response updates live when ready) */}
       <CheckInDetailModal
-        isVisible={!!selectedCheckIn}
-        checkIn={selectedCheckIn}
+        isVisible={!!selectedCheckInId}
+        checkIn={checkIns.find((c) => c.id === selectedCheckInId) ?? null}
         goalTitle={goal?.title}
-        onClose={() => setSelectedCheckIn(null)}
+        onClose={() => setSelectedCheckInId(null)}
       />
     </View>
   );

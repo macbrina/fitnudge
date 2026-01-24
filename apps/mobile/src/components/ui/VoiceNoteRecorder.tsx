@@ -7,9 +7,11 @@ import {
   Animated,
   ActivityIndicator,
   AppState,
-  AppStateStatus
+  AppStateStatus,
+  Linking,
+  Platform
 } from "react-native";
-import { useAudioRecorder, useAudioPlayer, RecordingPresets } from "expo-audio";
+import { useAudioRecorder, useAudioPlayer, RecordingPresets, setAudioModeAsync } from "expo-audio";
 import { Mic, Play, Pause, Trash2, Check, X } from "lucide-react-native";
 import { useTheme } from "@/themes";
 import { fontFamily } from "@/lib/fonts";
@@ -20,7 +22,9 @@ import { useSubscriptionStore } from "@/stores/subscriptionStore";
 import { useMediaPermissions } from "@/hooks/media/useMediaPermissions";
 
 // Constants
-const MAX_DURATION_SECONDS = 30;
+const DEFAULT_MAX_DURATION_SECONDS = 30;
+/** Stop recording this many seconds before max to avoid native buffer flush exceeding max. */
+const RECORDING_STOP_HEADROOM_SEC = 2;
 const BAR_COUNT = 20;
 const METERING_UPDATE_INTERVAL = 50; // ms
 
@@ -31,6 +35,17 @@ interface VoiceNoteRecorderProps {
   onRecordingComplete: (audioUri: string, duration: number) => void;
   onCancel: () => void;
   disabled?: boolean;
+  /** When true and user has premium, recording starts as soon as the component mounts. */
+  startImmediately?: boolean;
+  /** Max recording length in seconds. Default from subscription voice_note_max_duration or 30. */
+  maxDurationSeconds?: number;
+  /** Optional. Called with { stopRecording, stopPlayback } when mounted, null when unmounted. */
+  onRegisterActions?: (
+    actions: {
+      stopRecording: () => Promise<{ uri: string | null; duration: number }>;
+      stopPlayback: () => Promise<void>;
+    } | null
+  ) => void;
 }
 
 // Voice-reactive audio bars component
@@ -118,7 +133,10 @@ const waveformStyles = StyleSheet.create({
 export function VoiceNoteRecorder({
   onRecordingComplete,
   onCancel,
-  disabled = false
+  disabled = false,
+  startImmediately = false,
+  maxDurationSeconds = DEFAULT_MAX_DURATION_SECONDS,
+  onRegisterActions
 }: VoiceNoteRecorderProps) {
   const { t } = useTranslation();
   const { colors, brandColors } = useTheme();
@@ -136,6 +154,9 @@ export function VoiceNoteRecorder({
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const meteringRef = useRef<NodeJS.Timeout | null>(null);
   const recordingStateRef = useRef(recordingState);
+  const hasStartedImmediatelyRef = useRef(false);
+  const elapsedMsRef = useRef(0);
+  const lastRecordedUrlRef = useRef<string | null>(null);
 
   const hasPremium = hasFeature("voice_notes");
 
@@ -152,15 +173,25 @@ export function VoiceNoteRecorder({
     isLoading: isPermissionLoading
   } = useMediaPermissions();
 
-  // expo-audio hooks
-  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  // Status listener: capture url when available (before stop disposes native object)
+  const handleRecordingStatusUpdate = useCallback(
+    (status: { url?: string | null; isFinished?: boolean }) => {
+      if (status.url) lastRecordedUrlRef.current = status.url;
+    },
+    []
+  );
+
+  // expo-audio: HIGH_QUALITY preset uses platform-specific android/ios/web options (RecordingOptions)
+  const audioRecorder = useAudioRecorder(
+    RecordingPresets.HIGH_QUALITY,
+    handleRecordingStatusUpdate
+  );
   const player = useAudioPlayer(recordedUri || undefined);
 
   // Auto-pause on app background
   useEffect(() => {
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
       if (nextAppState !== "active" && recordingStateRef.current === "recording") {
-        console.log("[VoiceRecorder] App went to background, pausing recording");
         pauseRecording();
       }
     };
@@ -177,29 +208,42 @@ export function VoiceNoteRecorder({
     };
   }, []);
 
-  // Track playback status
+  // Track playback position when playing (matches CheckInDetailModal pattern)
   useEffect(() => {
-    if (player && recordedUri) {
-      const interval = setInterval(() => {
-        if (player.playing) {
-          setPlaybackPosition(player.currentTime);
-        }
-        if (player.currentTime >= duration && player.playing) {
-          setIsPlaying(false);
-          setPlaybackPosition(0);
-        }
-      }, 100);
+    if (!player || !isPlaying) return;
+    const interval = setInterval(() => {
+      const now = player.currentTime ?? 0;
+      const dur = (player.duration ?? duration) || 1;
+      setPlaybackPosition(now);
+      if (dur > 0 && now >= dur - 0.1) {
+        setIsPlaying(false);
+        setPlaybackPosition(0);
+      }
+    }, 100);
+    return () => clearInterval(interval);
+  }, [player, isPlaying, duration]);
 
-      return () => clearInterval(interval);
+  // Start recording immediately when startImmediately + premium (e.g. tap "Record" in check-in)
+  useEffect(() => {
+    if (
+      startImmediately &&
+      hasPremium &&
+      !hasStartedImmediatelyRef.current &&
+      recordingState === "idle"
+    ) {
+      hasStartedImmediatelyRef.current = true;
+      startRecording();
     }
-  }, [player, recordedUri, duration]);
+  }, [startImmediately, hasPremium, recordingState]);
 
-  // Auto-stop at max duration
+  const stopAtSeconds = Math.max(1, maxDurationSeconds - RECORDING_STOP_HEADROOM_SEC);
+
+  // Auto-stop at (max - headroom) to avoid buffer flush exceeding max
   useEffect(() => {
-    if (duration >= MAX_DURATION_SECONDS && recordingState === "recording") {
+    if (duration >= stopAtSeconds && recordingState === "recording") {
       stopRecording();
     }
-  }, [duration, recordingState]);
+  }, [duration, recordingState, stopAtSeconds]);
 
   // Metering for audio visualization
   const startMetering = useCallback(() => {
@@ -232,33 +276,35 @@ export function VoiceNoteRecorder({
     // Check/request microphone permission
     if (!hasMicrophonePermission) {
       const granted = await requestMicrophonePermission();
-      if (!granted) {
-        console.log("Microphone permission denied");
-        return;
-      }
+      if (!granted) return;
     }
 
     try {
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+      await audioRecorder.prepareToRecordAsync();
       audioRecorder.record();
       setRecordingState("recording");
       setDuration(0);
       progressAnim.setValue(0);
+      elapsedMsRef.current = 0;
 
-      // Start timer
+      const TICK_MS = 50;
+      const stopAtMs = Math.max(1, maxDurationSeconds - RECORDING_STOP_HEADROOM_SEC) * 1000;
+
       timerRef.current = setInterval(() => {
-        setDuration((prev) => {
-          const newDuration = prev + 1;
-          const progress = newDuration / MAX_DURATION_SECONDS;
-          Animated.timing(progressAnim, {
-            toValue: progress,
-            duration: 900,
-            useNativeDriver: false
-          }).start();
-          return newDuration;
-        });
-      }, 1000);
+        elapsedMsRef.current = Math.min(elapsedMsRef.current + TICK_MS, stopAtMs);
+        const progress = elapsedMsRef.current / stopAtMs;
+        progressAnim.setValue(progress);
+        setDuration(Math.floor(elapsedMsRef.current / 1000));
+        if (elapsedMsRef.current >= stopAtMs) {
+          if (timerRef.current) {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+          }
+          stopRecording();
+        }
+      }, TICK_MS);
 
-      // Start audio level metering
       startMetering();
     } catch (err) {
       console.error("Failed to start recording:", err);
@@ -285,41 +331,63 @@ export function VoiceNoteRecorder({
       audioRecorder.record();
       setRecordingState("recording");
 
-      // Resume timer
-      timerRef.current = setInterval(() => {
-        setDuration((prev) => {
-          const newDuration = prev + 1;
-          const progress = newDuration / MAX_DURATION_SECONDS;
-          Animated.timing(progressAnim, {
-            toValue: progress,
-            duration: 900,
-            useNativeDriver: false
-          }).start();
-          return newDuration;
-        });
-      }, 1000);
+      const TICK_MS = 50;
+      const stopAtMs = Math.max(1, maxDurationSeconds - RECORDING_STOP_HEADROOM_SEC) * 1000;
 
-      // Resume metering
+      timerRef.current = setInterval(() => {
+        elapsedMsRef.current = Math.min(elapsedMsRef.current + TICK_MS, stopAtMs);
+        const progress = elapsedMsRef.current / stopAtMs;
+        progressAnim.setValue(progress);
+        setDuration(Math.floor(elapsedMsRef.current / 1000));
+        if (elapsedMsRef.current >= stopAtMs) {
+          if (timerRef.current) {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+          }
+          stopRecording();
+        }
+      }, TICK_MS);
+
       startMetering();
     } catch (err) {
       console.error("Failed to resume recording:", err);
     }
   };
 
-  const stopRecording = async () => {
+  const stopRecording = async (): Promise<{ uri: string | null; duration: number }> => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
     stopMetering();
 
+    const noResult = { uri: null as string | null, duration: 0 };
     try {
+      await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
+      let uri: string | null = null;
+      try {
+        uri =
+          lastRecordedUrlRef.current ??
+          (audioRecorder as { getStatus?: () => { url?: string | null } })?.getStatus?.()?.url ??
+          (audioRecorder as { uri?: string | null }).uri ??
+          null;
+      } catch {
+        uri = lastRecordedUrlRef.current;
+      }
       await audioRecorder.stop();
-      const uri = audioRecorder.uri;
+      lastRecordedUrlRef.current = null;
+      const finalDuration = Math.floor(elapsedMsRef.current / 1000);
       setRecordedUri(uri || null);
+      setDuration(finalDuration);
+      if (startImmediately && uri) {
+        onRecordingComplete(uri, finalDuration);
+        return { uri, duration: finalDuration };
+      }
       setRecordingState("recorded");
+      return { uri, duration: finalDuration };
     } catch (err) {
       console.error("Failed to stop recording:", err);
+      return noResult;
     }
   };
 
@@ -333,12 +401,19 @@ export function VoiceNoteRecorder({
       stopMetering();
       try {
         await audioRecorder.stop();
+        await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
       } catch (err) {
         console.warn("Error stopping during delete:", err);
       }
     }
 
-    // Reset all state
+    // When opened from CheckInModal (startImmediately): delete = close recorder, back to "Record Voice Note" button.
+    if (startImmediately) {
+      onCancel();
+      return;
+    }
+
+    // Standalone recorder: reset to idle so user can tap record again
     setRecordedUri(null);
     setDuration(0);
     setPlaybackPosition(0);
@@ -348,12 +423,14 @@ export function VoiceNoteRecorder({
 
   const playRecording = async () => {
     if (!recordedUri || !player) return;
-
     try {
-      player.play();
+      await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
+      player.seekTo(0);
+      await player.play();
       setIsPlaying(true);
     } catch (err) {
-      console.error("Failed to play recording:", err);
+      console.error("[VoiceNoteRecorder] player.play() failed", err);
+      setIsPlaying(false);
     }
   };
 
@@ -363,6 +440,22 @@ export function VoiceNoteRecorder({
       setIsPlaying(false);
     }
   };
+
+  useEffect(() => {
+    if (!onRegisterActions) return;
+    onRegisterActions({
+      stopRecording: async () => {
+        if (recordingStateRef.current === "recording" || recordingStateRef.current === "paused") {
+          return stopRecording();
+        }
+        return { uri: recordedUri, duration };
+      },
+      stopPlayback: pausePlayback
+    });
+    return () => {
+      onRegisterActions?.(null);
+    };
+  }, [onRegisterActions, recordedUri, duration]);
 
   const confirmRecording = () => {
     if (recordedUri) {
@@ -385,13 +478,27 @@ export function VoiceNoteRecorder({
     );
   }
 
-  // Permission denied
+  const openAppSettings = () => {
+    if (Platform.OS === "ios") {
+      Linking.openURL("app-settings:").catch(() => {});
+    } else {
+      Linking.openSettings().catch(() => {});
+    }
+  };
+
+  // Permission denied: toast already shown on deny; one tap opens FitNudge app settings
   if (microphoneStatus === "denied") {
     return (
       <View style={[styles.container, { backgroundColor: colors.bg.muted }]}>
         <Text style={[styles.permissionText, { color: colors.text.secondary }]}>
           {t("voice_notes.permission_required")}
         </Text>
+        <TouchableOpacity
+          onPress={openAppSettings}
+          style={[styles.openSettingsButton, { backgroundColor: brandColors.primary }]}
+        >
+          <Text style={styles.openSettingsText}>{t("common.open_settings")}</Text>
+        </TouchableOpacity>
         <TouchableOpacity onPress={onCancel} style={styles.cancelButton}>
           <Text style={[styles.cancelText, { color: brandColors.primary }]}>
             {t("common.cancel")}
@@ -401,12 +508,13 @@ export function VoiceNoteRecorder({
     );
   }
 
-  // Recorded - show playback controls
+  // Recorded - show playback controls (only when not startImmediately; otherwise we already called onRecordingComplete on stop)
   if (recordingState === "recorded" && recordedUri) {
+    const totalSec = (player?.duration ?? duration) || 1;
+    const percent = totalSec > 0 ? (playbackPosition / totalSec) * 100 : 0;
     return (
       <View style={[styles.container, { backgroundColor: colors.bg.muted }]}>
         <View style={styles.playbackRow}>
-          {/* Play/Pause Button */}
           <TouchableOpacity
             onPress={isPlaying ? pausePlayback : playRecording}
             style={[styles.playButton, { backgroundColor: brandColors.primary }]}
@@ -418,26 +526,20 @@ export function VoiceNoteRecorder({
             )}
           </TouchableOpacity>
 
-          {/* Progress Bar */}
           <View style={styles.progressBarContainer}>
             <View
               style={[
                 styles.progressBarFill,
-                {
-                  backgroundColor: brandColors.primary,
-                  width: `${duration > 0 ? (playbackPosition / duration) * 100 : 0}%`
-                }
+                { backgroundColor: brandColors.primary, width: `${percent}%` }
               ]}
             />
           </View>
 
-          {/* Duration */}
           <Text style={[styles.timeText, { color: colors.text.secondary }]}>
-            {formatTime(playbackPosition)} / {formatTime(duration)}
+            {formatTime(playbackPosition)} / {formatTime(totalSec)}
           </Text>
         </View>
 
-        {/* Action Buttons */}
         <View style={styles.actionRow}>
           <TouchableOpacity
             onPress={deleteRecording}
@@ -445,13 +547,11 @@ export function VoiceNoteRecorder({
           >
             <Trash2 size={18} color={colors.feedback.error} />
           </TouchableOpacity>
-
           <TouchableOpacity
             onPress={confirmRecording}
-            style={[styles.confirmButton, { backgroundColor: brandColors.primary }]}
+            style={[styles.doneCircleButton, { backgroundColor: brandColors.primary }]}
           >
-            <Check size={18} color="#fff" />
-            <Text style={styles.confirmText}>{t("voice_notes.save")}</Text>
+            <Check size={22} color="#fff" strokeWidth={2.5} />
           </TouchableOpacity>
         </View>
       </View>
@@ -473,7 +573,7 @@ export function VoiceNoteRecorder({
             ]}
           />
           <Text style={[styles.timerText, { color: colors.text.primary }]}>
-            {formatTime(duration)} / {formatTime(MAX_DURATION_SECONDS)}
+            {formatTime(duration)} / {formatTime(maxDurationSeconds)}
           </Text>
         </View>
 
@@ -484,8 +584,8 @@ export function VoiceNoteRecorder({
           color={isRecording ? colors.feedback.error : colors.text.tertiary}
         />
 
-        {/* Progress bar */}
-        <View style={[styles.progressBar, { backgroundColor: colors.border.subtle }]}>
+        {/* Progress bar — track = unfilled, fill = elapsed */}
+        <View style={[styles.progressBar, { backgroundColor: colors.text.tertiary + "30" }]}>
           <Animated.View
             style={[
               styles.progressFill,
@@ -513,25 +613,24 @@ export function VoiceNoteRecorder({
           {/* Pause/Resume button */}
           <TouchableOpacity
             onPress={isRecording ? pauseRecording : resumeRecording}
-            disabled={disabled || duration >= MAX_DURATION_SECONDS}
+            disabled={disabled || duration >= maxDurationSeconds}
             style={[
               styles.mainButton,
               {
                 backgroundColor: isRecording ? colors.text.primary : brandColors.primary,
-                opacity: duration >= MAX_DURATION_SECONDS ? 0.5 : 1
+                opacity: duration >= maxDurationSeconds ? 0.5 : 1
               }
             ]}
           >
             {isRecording ? <Pause size={24} color="#fff" /> : <Mic size={24} color="#fff" />}
           </TouchableOpacity>
 
-          {/* Stop/Done button - finalize recording */}
+          {/* Done = check in circle only (no separate "Save"; check-in submits everything) */}
           <TouchableOpacity
             onPress={stopRecording}
-            style={[styles.confirmButton, { backgroundColor: brandColors.primary }]}
+            style={[styles.doneCircleButton, { backgroundColor: brandColors.primary }]}
           >
-            <Check size={18} color="#fff" />
-            <Text style={styles.confirmText}>{t("voice_notes.done")}</Text>
+            <Check size={22} color="#fff" strokeWidth={2.5} />
           </TouchableOpacity>
         </View>
 
@@ -545,11 +644,27 @@ export function VoiceNoteRecorder({
     );
   }
 
-  // Idle state - ready to record
+  // Idle: when startImmediately, we never show "Tap to record" — entry point is CheckInModal's "Record Voice Note". Show "Starting…" briefly until recording starts.
+  if (startImmediately && recordingState === "idle") {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.bg.muted }]}>
+        <View style={styles.startingRow}>
+          <ActivityIndicator color={brandColors.primary} size="small" />
+          <Text style={[styles.startingText, { color: colors.text.secondary }]}>
+            {t("voice_notes.starting")}
+          </Text>
+          <TouchableOpacity onPress={onCancel} style={styles.closeButton}>
+            <X size={20} color={colors.text.tertiary} />
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  // Idle state - only when NOT startImmediately (e.g. standalone recorder). "Tap to record" lives in parent; we show manual trigger here.
   return (
     <View style={[styles.container, { backgroundColor: colors.bg.muted }]}>
       <View style={styles.idleRow}>
-        {/* Record Button */}
         <TouchableOpacity
           onPress={startRecording}
           disabled={disabled}
@@ -557,8 +672,6 @@ export function VoiceNoteRecorder({
         >
           <Mic size={24} color="#fff" />
         </TouchableOpacity>
-
-        {/* Instructions */}
         <View style={styles.idleTextContainer}>
           <Text style={[styles.idleTitle, { color: colors.text.primary }]}>
             {t("voice_notes.title")}
@@ -567,8 +680,6 @@ export function VoiceNoteRecorder({
             {t("voice_notes.tap_to_record")}
           </Text>
         </View>
-
-        {/* Cancel Button */}
         <TouchableOpacity onPress={onCancel} style={styles.closeButton}>
           <X size={20} color={colors.text.tertiary} />
         </TouchableOpacity>
@@ -589,6 +700,18 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: toRN(tokens.spacing[3])
   },
+  openSettingsButton: {
+    alignSelf: "center",
+    paddingVertical: toRN(tokens.spacing[2]),
+    paddingHorizontal: toRN(tokens.spacing[4]),
+    borderRadius: toRN(tokens.borderRadius.md),
+    marginBottom: toRN(tokens.spacing[2])
+  },
+  openSettingsText: {
+    fontSize: toRN(tokens.typography.fontSize.sm),
+    fontFamily: fontFamily.groteskSemiBold,
+    color: "#fff"
+  },
   cancelButton: {
     alignSelf: "center",
     padding: toRN(tokens.spacing[2])
@@ -596,6 +719,16 @@ const styles = StyleSheet.create({
   cancelText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.groteskMedium
+  },
+  startingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: toRN(tokens.spacing[3])
+  },
+  startingText: {
+    fontSize: toRN(tokens.typography.fontSize.sm),
+    fontFamily: fontFamily.groteskRegular,
+    flex: 1
   },
   // Idle state
   idleRow: {
@@ -707,6 +840,13 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  doneCircleButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center"
   },

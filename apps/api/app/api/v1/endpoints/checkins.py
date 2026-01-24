@@ -57,6 +57,9 @@ class CheckInCreate(BaseModel):
     mood: Optional[str] = None  # tough, good, amazing (for completed)
     skip_reason: Optional[str] = None  # work, tired, sick, schedule, other (for missed)
     note: Optional[str] = None  # Optional reflection
+    expect_voice_note: Optional[bool] = (
+        False  # When True, media upload queues the task after VN is processed.
+    )
 
 
 class CheckInUpdate(BaseModel):
@@ -89,6 +92,10 @@ class CheckInResponse(BaseModel):
     # Streak info (populated on create)
     current_streak: Optional[int] = None
     week_completions: Optional[int] = None  # For weekly goals: X/Y this week
+    # Voice note (Premium) – must be in response so list/today refetches keep them
+    voice_note_url: Optional[str] = None
+    voice_note_transcript: Optional[str] = None
+    voice_note_sentiment: Optional[dict] = None
 
     model_config = {"from_attributes": True}
 
@@ -171,6 +178,20 @@ async def create_check_in(
     user_id = current_user["id"]
     user_timezone = current_user.get("timezone", "UTC")
     user_plan = current_user.get("plan", "free")
+
+    # Log incoming check-in data for debugging
+    logger.info(
+        f"[CheckIn] create_check_in received: goal_id={checkin_data.goal_id}, "
+        f"completed={checkin_data.completed}, is_rest_day={checkin_data.is_rest_day}, "
+        f"mood={checkin_data.mood}, skip_reason={checkin_data.skip_reason}, "
+        f"note={checkin_data.note}, expect_voice_note={checkin_data.expect_voice_note}"
+    )
+    print(
+        f"[CheckIn] create_check_in received: goal_id={checkin_data.goal_id}, "
+        f"completed={checkin_data.completed}, is_rest_day={checkin_data.is_rest_day}, "
+        f"mood={checkin_data.mood}, skip_reason={checkin_data.skip_reason}, "
+        f"note={checkin_data.note}, expect_voice_note={checkin_data.expect_voice_note}"
+    )
 
     # Verify goal belongs to user and is active
     goal = (
@@ -266,6 +287,7 @@ async def create_check_in(
 
     # Build check-in data
     # V2: Only store status - no completed/is_rest_day columns
+    note_val = (checkin_data.note or "").strip() or None
     checkin = {
         "goal_id": checkin_data.goal_id,
         "user_id": user_id,
@@ -273,7 +295,7 @@ async def create_check_in(
         "status": checkin_status,
         "mood": checkin_data.mood,
         "skip_reason": checkin_data.skip_reason,
-        "note": checkin_data.note.strip() if checkin_data.note else None,
+        "note": note_val,
     }
 
     # Determine if user gets AI check-in response feature
@@ -336,8 +358,21 @@ async def create_check_in(
 
     created_checkin = result.data[0]
 
-    # For users WITH ai_checkin_response feature: Queue background task to generate AI response
-    if has_ai_checkin_response:
+    # For users WITH ai_checkin_response: Queue AI task only when no voice note is coming.
+    # When expect_voice_note is True, media upload queues the task after VN is processed.
+    expect_vn = checkin_data.expect_voice_note or False
+    should_queue_ai = has_ai_checkin_response and not expect_vn
+
+    logger.info(
+        f"[CheckIn] AI task decision: has_ai_checkin_response={has_ai_checkin_response}, "
+        f"expect_voice_note={expect_vn}, should_queue_ai={should_queue_ai}"
+    )
+    print(
+        f"[CheckIn] AI task decision: has_ai_checkin_response={has_ai_checkin_response}, "
+        f"expect_voice_note={expect_vn}, should_queue_ai={should_queue_ai}"
+    )
+
+    if should_queue_ai:
         try:
             from app.services.tasks.motivation_tasks import generate_checkin_ai_response
 

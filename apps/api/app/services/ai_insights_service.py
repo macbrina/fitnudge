@@ -114,6 +114,11 @@ Respond with valid JSON:
 - **best_nudge_time**: When to send reminder based on their successful check-in times (HH:MM format)
 - **needs_extra_motivation**: true if user has consecutive skips or declining trend
 
+## VOICE NOTES (when present)
+Some check-ins include a voice note: **transcript** (what they said) and **sentiment** (tone, matches_mood).
+- Use this for pattern/tip/warning insights when relevant (e.g. "Your last 3 voice notes sounded 'tired but pushing'—consider a lighter day mid‑week").
+- If **matches_mood** is false, they picked a mood (e.g. "amazing") but their words sounded different (e.g. down). You MAY mention this gently as a **tip** or **warning** only when it fits a pattern (e.g. often saying they're fine while sounding stressed). Never be judgmental.
+
 ## GUIDELINES
 1. Generate 1-3 insights MAX (only if data supports them)
 2. Reference specific numbers, days, patterns
@@ -315,7 +320,7 @@ class AIInsightsService:
             return None
 
     async def _get_checkin_count(self, goal_id: str) -> int:
-        """Get number of check-ins in last 90 days."""
+        """Get number of responded check-ins in last 90 days (excludes pending)."""
         try:
             cutoff = (date.today() - timedelta(days=90)).isoformat()
             result = (
@@ -323,6 +328,7 @@ class AIInsightsService:
                 .select("id", count="exact")
                 .eq("goal_id", goal_id)
                 .gte("check_in_date", cutoff)
+                .neq("status", "pending")
                 .execute()
             )
             return result.count or 0 if result else 0
@@ -524,15 +530,45 @@ class AIInsightsService:
                     f"- \"{reason.get('reason', 'Unknown')}\": {reason.get('count', 0)} times"
                 )
 
-        # Recent check-ins sample (V2: use status field)
+        # Recent check-ins sample (V2: use status, mood, note, voice note)
         if checkins:
             context_parts.extend(["", "## Recent Check-ins (Last 10)"])
             for ci in checkins[:10]:
                 ci_status = ci.get("status", "pending")
-                status = "✓" if ci_status == "completed" else ("💤" if ci_status == "rest_day" else "✗")
+                status = (
+                    "✓"
+                    if ci_status == "completed"
+                    else ("💤" if ci_status == "rest_day" else "✗")
+                )
                 day = ci.get("day_name", "").strip()
                 reason = f" ({ci.get('skip_reason')})" if ci.get("skip_reason") else ""
-                context_parts.append(f"- {ci.get('date')} ({day}): {status}{reason}")
+                mood_str = f" mood={ci.get('mood')}" if ci.get("mood") else ""
+                note_str = ""
+                if ci.get("note"):
+                    note_str = (
+                        f' note="{ci.get("note", "")[:80]}..."'
+                        if len(ci.get("note", "")) > 80
+                        else f' note="{ci.get("note", "")}"'
+                    )
+                line = (
+                    f"- {ci.get('date')} ({day}): {status}{reason}{mood_str}{note_str}"
+                )
+                context_parts.append(line)
+                vn = ci.get("voice_note_transcript")
+                sn = ci.get("voice_note_sentiment")
+                if vn or sn:
+                    vn_preview = (vn or "")[:120] + (
+                        "..." if (vn and len(vn) > 120) else ""
+                    )
+                    sn_str = ""
+                    if isinstance(sn, dict):
+                        s = sn.get("sentiment", "")
+                        t = sn.get("tone", "")
+                        m = sn.get("matches_mood")
+                        sn_str = f' sentiment={s} tone="{t}" matches_mood={m}'
+                    context_parts.append(
+                        f'  voice_note: transcript="{vn_preview}"{sn_str}'
+                    )
 
         return "\n".join(context_parts)
 

@@ -742,7 +742,6 @@ class RealtimeService {
     }
 
     if (payload.eventType === "INSERT") {
-      console.log("CHECKIN NEW RECORD", newRecord);
       // Add to today's check-ins cache
       this.queryClient.setQueryData(checkInsQueryKeys.today(), (old: any) => {
         if (!old?.data) return old;
@@ -787,16 +786,25 @@ class RealtimeService {
 
       // Force refetch for immediate UI update
       this.queryClient.refetchQueries({ queryKey: checkInsQueryKeys.today(), type: "active" });
+      this.queryClient.refetchQueries({ queryKey: checkInsQueryKeys.all, type: "active" });
       this.queryClient.refetchQueries({ queryKey: goalsQueryKeys.list(), type: "active" });
       this.queryClient.refetchQueries({ queryKey: goalsQueryKeys.active(), type: "active" });
       this.queryClient.refetchQueries({
         queryKey: homeDashboardQueryKeys.dashboard(),
         type: "active"
       });
-      // Refetch analytics if user is on analytics screen (backend cache already invalidated)
       this.queryClient.refetchQueries({ queryKey: analyticsQueryKeys.all, type: "active" });
+      if (goalId) {
+        this.queryClient.refetchQueries({
+          queryKey: goalsQueryKeys.detail(goalId),
+          type: "active"
+        });
+        this.queryClient.refetchQueries({
+          queryKey: goalsQueryKeys.insights(goalId),
+          type: "active"
+        });
+      }
     } else if (payload.eventType === "UPDATE") {
-      console.log("CHECKIN UPDATE RECORD", newRecord);
       // Update in today's check-ins
       this.queryClient.setQueryData(checkInsQueryKeys.today(), (old: any) => {
         if (!old?.data) return old;
@@ -830,14 +838,25 @@ class RealtimeService {
       this.queryClient.invalidateQueries({ queryKey: analyticsQueryKeys.all });
       // Note: Partner invalidation is handled by DB trigger → accountability_partners → handleAccountabilityPartnersChange
 
+      // Refetch everything SingleGoalScreen uses: check-ins (list + dateRange), goal detail, insights
+      this.queryClient.refetchQueries({ queryKey: checkInsQueryKeys.all, type: "active" });
       this.queryClient.refetchQueries({ queryKey: goalsQueryKeys.list(), type: "active" });
       this.queryClient.refetchQueries({ queryKey: goalsQueryKeys.active(), type: "active" });
       this.queryClient.refetchQueries({
         queryKey: homeDashboardQueryKeys.dashboard(),
         type: "active"
       });
-      // Refetch analytics if user is on analytics screen (backend cache already invalidated)
       this.queryClient.refetchQueries({ queryKey: analyticsQueryKeys.all, type: "active" });
+      if (goalId) {
+        this.queryClient.refetchQueries({
+          queryKey: goalsQueryKeys.detail(goalId),
+          type: "active"
+        });
+        this.queryClient.refetchQueries({
+          queryKey: goalsQueryKeys.insights(goalId),
+          type: "active"
+        });
+      }
     } else if (payload.eventType === "DELETE") {
       // Remove from today's check-ins
       this.queryClient.setQueryData(checkInsQueryKeys.today(), (old: any) => {
@@ -866,15 +885,25 @@ class RealtimeService {
       this.queryClient.invalidateQueries({ queryKey: analyticsQueryKeys.all });
       // Note: Partner invalidation is handled by DB trigger → accountability_partners → handleAccountabilityPartnersChange
 
-      this.queryClient.refetchQueries({ queryKey: checkInsQueryKeys.today(), type: "active" });
+      // Refetch everything SingleGoalScreen uses: check-ins (today, list, dateRange), goal detail, insights
+      this.queryClient.refetchQueries({ queryKey: checkInsQueryKeys.all, type: "active" });
       this.queryClient.refetchQueries({ queryKey: goalsQueryKeys.list(), type: "active" });
       this.queryClient.refetchQueries({ queryKey: goalsQueryKeys.active(), type: "active" });
       this.queryClient.refetchQueries({
         queryKey: homeDashboardQueryKeys.dashboard(),
         type: "active"
       });
-      // Refetch analytics if user is on analytics screen (backend cache already invalidated)
       this.queryClient.refetchQueries({ queryKey: analyticsQueryKeys.all, type: "active" });
+      if (goalId) {
+        this.queryClient.refetchQueries({
+          queryKey: goalsQueryKeys.detail(goalId),
+          type: "active"
+        });
+        this.queryClient.refetchQueries({
+          queryKey: goalsQueryKeys.insights(goalId),
+          type: "active"
+        });
+      }
     }
   }
 
