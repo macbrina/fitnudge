@@ -15,7 +15,7 @@ Check-in responses are generated:
 - In background for PREMIUM users (async AI)
 """
 
-from typing import Optional, List
+from typing import Any, Dict, List, Optional
 from openai import AsyncOpenAI
 from app.core.config import settings
 from app.services.logger import logger
@@ -219,6 +219,9 @@ async def generate_checkin_motivation(
     is_rest_day: bool = False,
     mood: Optional[str] = None,
     skip_reason: Optional[str] = None,
+    note: Optional[str] = None,
+    voice_note_transcript: Optional[str] = None,
+    voice_note_sentiment: Optional[Dict[str, Any]] = None,
     current_streak: int = 0,
     longest_streak: int = 0,
     why_statement: Optional[str] = None,
@@ -229,7 +232,9 @@ async def generate_checkin_motivation(
     Generate AI response after a check-in.
 
     For FREE users: Returns template-based response (no API call)
-    For PREMIUM users: Full GPT-generated personalized response
+    For PREMIUM users: Full GPT-generated personalized response.
+    When voice_note_transcript / voice_note_sentiment are present (from voice note upload),
+    the AI uses them to personalize the response.
     """
     # FREE USERS: Template-based responses (no AI cost)
     if not is_premium:
@@ -249,6 +254,9 @@ async def generate_checkin_motivation(
         is_rest_day=is_rest_day,
         mood=mood,
         skip_reason=skip_reason,
+        note=note,
+        voice_note_transcript=voice_note_transcript,
+        voice_note_sentiment=voice_note_sentiment,
         current_streak=current_streak,
         longest_streak=longest_streak,
         why_statement=why_statement,
@@ -263,12 +271,27 @@ async def _generate_ai_checkin_response(
     is_rest_day: bool,
     mood: Optional[str],
     skip_reason: Optional[str],
+    note: Optional[str],
+    voice_note_transcript: Optional[str],
+    voice_note_sentiment: Optional[Dict[str, Any]],
     current_streak: int,
     longest_streak: int,
     why_statement: Optional[str],
     motivation_style: str,
 ) -> str:
     """Full AI-generated response for premium users."""
+    print(  # noqa: T201
+        f"[_generate_ai_checkin_response] completed={completed} is_rest_day={is_rest_day} "
+        f"mood={mood!r} note={note!r} has_voice={bool(voice_note_transcript)}"
+    )
+    logger.info(
+        "AI check-in prompt inputs: completed=%s is_rest_day=%s mood=%s note=%s has_voice=%s",
+        completed,
+        is_rest_day,
+        mood,
+        (note or "")[:80],
+        bool(voice_note_transcript),
+    )
     # Build outcome context
     if is_rest_day:
         outcome = "took a rest day"
@@ -311,6 +334,22 @@ async def _generate_ai_checkin_response(
         elif current_streak == longest_streak:
             streak_context += "This is their longest streak ever! "
 
+    note_context = (
+        f'\n- Note they left: "{note.strip()}"' if (note and note.strip()) else ""
+    )
+
+    voice_context = ""
+    if voice_note_transcript and voice_note_transcript.strip():
+        voice_context = f'\n- Voice note transcript: "{voice_note_transcript.strip()}"'
+        if voice_note_sentiment and isinstance(voice_note_sentiment, dict):
+            s = voice_note_sentiment.get("sentiment", "")
+            t = voice_note_sentiment.get("tone", "")
+            m = voice_note_sentiment.get("matches_mood")
+            voice_context += (
+                f'\n- Voice note sentiment: sentiment={s}, tone="{t}", matches_mood={m}'
+            )
+        voice_context += "\nUse the voice note to personalize your response; consider tone/sentiment when relevant (e.g. if they sound tired or down, acknowledge it gently)."
+
     try:
         system_prompt = f"""You are the user's personal accountability coach in the FitNudge app.
 
@@ -323,7 +362,7 @@ Context:
 - Goal: {goal_title}
 - Outcome: {outcome}
 - {streak_context}
-- Their "why": {why_statement or "not specified"}
+- Their "why": {why_statement or "not specified"}{note_context}{voice_context}
 
 Rules:
 - Address them by name
@@ -331,6 +370,8 @@ Rules:
 - If streak is notable (7+, 14+, 30+), mention it
 - If they're close to their longest streak, mention it
 - If they missed, reference their "why" to remind them
+- If they left a note, you may briefly acknowledge it when relevant
+- If they left a voice note, use it to personalize (tone, sentiment) when relevant
 - Be specific, not generic
 - No emojis in the response
 - Keep it conversational and genuine"""

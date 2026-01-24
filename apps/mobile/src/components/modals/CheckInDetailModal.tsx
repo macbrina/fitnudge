@@ -85,6 +85,8 @@ export function CheckInDetailModal({
   useEffect(() => {
     if (isVisible) {
       setInternalVisible(true);
+      // Reset to off-screen before animating in (fixes animation on subsequent opens)
+      translateY.setValue(SCREEN_HEIGHT);
       Animated.spring(translateY, {
         toValue: 0,
         damping: 20,
@@ -312,7 +314,7 @@ export function CheckInDetailModal({
               <View style={styles.detailSection}>
                 <View style={styles.voiceNoteHeader}>
                   <Mic size={16} color={brandColors.primary} />
-                  <Text style={styles.voiceNoteLabel}>{t("voice_notes.title")}</Text>
+                  <Text style={styles.voiceNoteLabel}>{t("voice_notes.title_note")}</Text>
                 </View>
                 <View style={styles.voiceNotePlayer}>
                   {/* Play/Pause Button */}
@@ -375,9 +377,9 @@ export function CheckInDetailModal({
                     <Text style={styles.aiText}>{checkIn.ai_response}</Text>
                   </View>
                 ) : isPremium ? (
-                  // Premium user but no AI response yet - generating
+                  // Premium user but no AI response yet - generating (updates via live checkIn when ready)
                   <View style={styles.aiGeneratingBox}>
-                    <Sparkles size={20} color={brandColors.primary} />
+                    <ActivityIndicator size="small" color={brandColors.primary} />
                     <View style={styles.aiGeneratingContent}>
                       <Text style={styles.aiGeneratingTitle}>
                         {t("checkin.ai_generating_title")}

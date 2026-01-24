@@ -1092,7 +1092,8 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     gap: toRN(tokens.spacing[1]),
     paddingVertical: toRN(tokens.spacing[2]),
     paddingHorizontal: toRN(tokens.spacing[4]),
-    backgroundColor: colors.bg.muted
+    backgroundColor: colors.bg.muted,
+    marginBottom: toRN(tokens.spacing[2])
   },
   cacheHintBannerText: {
     fontSize: toRN(tokens.typography.fontSize.xs),

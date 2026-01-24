@@ -44,7 +44,7 @@ export function HeatMapCalendar({
   goalCreatedAt
 }: HeatMapCalendarProps) {
   const { t } = useTranslation();
-  const { colors, brandColors } = useTheme();
+  const { colors, brandColors, isDark } = useTheme();
 
   // Create a map for quick lookup
   const checkInMap = useMemo(() => {
@@ -181,8 +181,10 @@ export function HeatMapCalendar({
   // 2. Missed/Skipped = Red - negative, attention needed
   // 3. Rest = Amber - user-marked rest day, intentional break
   // 4. Pending = Green with opacity - today, actionable
-  // 5. Not Scheduled = Border color - off day, visible but inactive
+  // 5. Not Scheduled = theme-aware off-day; dark: border gray, light: medium gray so it’s visible on white
   // 6. Future/No Data = Muted - almost invisible
+  const offDayColor = isDark ? colors.border.default : "#b8c4d0"; // Medium gray visible on light backgrounds (avoids border.default blending with white)
+
   const getCellColor = (status: string) => {
     switch (status) {
       case "completed":
@@ -195,7 +197,7 @@ export function HeatMapCalendar({
       case "pending":
         return colors.feedback.success + "80"; // Green ~50% - actionable today
       case "not_scheduled":
-        return colors.border.default; // Border color - off day but visible
+        return offDayColor;
       case "future":
       case "no_data":
       default:
@@ -280,7 +282,7 @@ export function HeatMapCalendar({
             </Text>
           </View>
           <View style={styles.legendItem}>
-            <View style={[styles.legendCell, { backgroundColor: colors.border.default }]} />
+            <View style={[styles.legendCell, { backgroundColor: offDayColor }]} />
             <Text style={[styles.legendText, { color: colors.text.tertiary }]}>
               {t("progress.not_scheduled")}
             </Text>

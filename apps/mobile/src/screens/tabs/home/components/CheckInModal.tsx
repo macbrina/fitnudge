@@ -22,7 +22,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
-  Keyboard
+  Keyboard,
+  ActivityIndicator
 } from "react-native";
 import { useStyles, useTheme } from "@/themes";
 import { tokens, lineHeight } from "@/themes/tokens";
@@ -35,10 +36,12 @@ import { useAlertModal } from "@/contexts/AlertModalContext";
 import { CheckInMood, MOODS, SKIP_REASONS, SkipReason } from "@/services/api/checkins";
 import Button from "@/components/ui/Button";
 import { TextInput } from "@/components/ui/TextInput";
-import { X, CheckCircle, XCircle, Moon, Mic, Crown } from "lucide-react-native";
+import { X, CheckCircle, XCircle, Moon, Mic, Crown, Play, Pause } from "lucide-react-native";
 import { MoodIcons, SkipIcons } from "@/components/icons/CheckinIcons";
 import { VoiceNoteRecorder } from "@/components/ui/VoiceNoteRecorder";
 import { useSubscriptionStore } from "@/stores/subscriptionStore";
+import { voiceNotesService } from "@/services/api/voiceNotes";
+import { useAudioPlayer, setAudioModeAsync } from "expo-audio";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -77,16 +80,39 @@ export function CheckInModal({ isVisible, goal, onClose, onSuccess }: CheckInMod
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
   const [voiceNoteUri, setVoiceNoteUri] = useState<string | null>(null);
   const [voiceNoteDuration, setVoiceNoteDuration] = useState<number>(0);
+  const [isPlayingVoiceNote, setIsPlayingVoiceNote] = useState(false);
+  const [isPlaybackLoading, setIsPlaybackLoading] = useState(false);
 
   // Premium check for voice notes
-  const { hasFeature, openModal } = useSubscriptionStore();
+  const { hasFeature, getFeatureValue, openModal } = useSubscriptionStore();
   const hasVoiceNotes = hasFeature("voice_notes");
+  const voiceNoteMaxDuration =
+    (getFeatureValue("voice_note_max_duration") as number | null | undefined) ?? 30;
+
+  // Playback for the recorded voice note preview (play before submitting)
+  const voiceNotePlayer = useAudioPlayer(voiceNoteUri ?? undefined);
 
   // Mutations
   const createCheckIn = useCreateCheckIn();
 
   // Scroll ref for auto-scrolling to note input
   const scrollViewRef = useRef<ScrollView>(null);
+  const recorderActionsRef = useRef<{
+    stopRecording: () => Promise<{ uri: string | null; duration: number }>;
+    stopPlayback: () => Promise<void>;
+  } | null>(null);
+
+  const setRecorderActions = useCallback(
+    (
+      actions: {
+        stopRecording: () => Promise<{ uri: string | null; duration: number }>;
+        stopPlayback: () => Promise<void>;
+      } | null
+    ) => {
+      recorderActionsRef.current = actions;
+    },
+    []
+  );
 
   // Animation effects
   useEffect(() => {
@@ -131,59 +157,112 @@ export function CheckInModal({ isVisible, goal, onClose, onSuccess }: CheckInMod
       setShowVoiceRecorder(false);
       setVoiceNoteUri(null);
       setVoiceNoteDuration(0);
+      setIsPlayingVoiceNote(false);
+      setIsPlaybackLoading(false);
     }
   }, [isVisible]);
 
-  // Fire-and-forget submit with silent retry (Instagram pattern)
-  const submitCheckIn = useCallback(
-    (checkInData: {
-      goal_id: string;
-      check_in_date: string;
-      completed: boolean;
-      is_rest_day: boolean;
-      mood?: CheckInMood;
-      skip_reason?: SkipReason;
-      notes?: string;
-    }) => {
-      const attemptSubmit = (retryCount: number) => {
-        createCheckIn.mutate(checkInData, {
-          onError: () => {
-            // Silent retry once
-            if (retryCount < 1) {
-              setTimeout(() => attemptSubmit(retryCount + 1), 1000);
-            }
-            // After retry, silently fail - user already moved on
-            // Optimistic update will be rolled back by React Query
-          }
-        });
-      };
-      attemptSubmit(0);
-    },
-    [createCheckIn]
-  );
+  // When preview is cleared, stop playback
+  useEffect(() => {
+    if (!voiceNoteUri && isPlayingVoiceNote) {
+      voiceNotePlayer?.pause?.();
+      setIsPlayingVoiceNote(false);
+    }
+  }, [voiceNoteUri, isPlayingVoiceNote]);
 
-  // Submit handler - fire-and-forget pattern
-  const handleSubmit = useCallback(() => {
+  // Auto-scroll to show full VoiceNoteRecorder when recording starts
+  useEffect(() => {
+    if (showVoiceRecorder) {
+      const t = setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 150);
+      return () => clearTimeout(t);
+    }
+  }, [showVoiceRecorder]);
+
+  // Detect when voice note playback finishes
+  useEffect(() => {
+    if (!voiceNoteUri || !isPlayingVoiceNote || !voiceNotePlayer) return;
+    const interval = setInterval(() => {
+      const dur = voiceNotePlayer.duration ?? voiceNoteDuration;
+      if (dur > 0 && (voiceNotePlayer.currentTime ?? 0) >= dur - 0.1) {
+        setIsPlayingVoiceNote(false);
+      }
+    }, 200);
+    return () => clearInterval(interval);
+  }, [voiceNoteUri, isPlayingVoiceNote, voiceNotePlayer, voiceNoteDuration]);
+
+  // Stop playback and recording (if active), then close and submit. Voice note upload runs after create succeeds (fire-and-forget).
+  // When user submits while still recording, we stop first and use returned { uri, duration } so we don't miss the VN.
+  const handleSubmit = useCallback(async () => {
     if (!response) return;
 
-    // Immediate haptic feedback + close (Instagram pattern)
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-    // Close modal immediately
-    onClose();
-    onSuccess?.();
+    if (isPlayingVoiceNote && voiceNotePlayer) {
+      voiceNotePlayer.pause();
+      setIsPlayingVoiceNote(false);
+    }
 
-    // Fire-and-forget API call with silent retry
-    submitCheckIn({
+    let uri: string | null = voiceNoteUri;
+    let dur: number = voiceNoteDuration;
+
+    if (showVoiceRecorder && recorderActionsRef.current) {
+      await recorderActionsRef.current.stopPlayback();
+      const stopped = await recorderActionsRef.current.stopRecording();
+      if (stopped.uri != null) {
+        uri = stopped.uri;
+        dur = stopped.duration;
+      }
+    }
+
+    const expectVoiceNote = !!(uri != null && dur != null);
+
+    const checkInPayload = {
       goal_id: goal.id,
       check_in_date: new Date().toISOString().split("T")[0],
       completed: response === "yes",
       is_rest_day: response === "rest_day",
       mood: mood || undefined,
       skip_reason: skipReason || undefined,
-      notes: note.trim() || undefined
-    });
-  }, [response, goal.id, mood, skipReason, note, showToast, t, onClose, onSuccess, submitCheckIn]);
+      note: note.trim() || undefined,
+      expect_voice_note: expectVoiceNote
+    };
+
+    onClose();
+    onSuccess?.();
+
+    const attemptSubmit = (retryCount: number) => {
+      createCheckIn.mutate(checkInPayload, {
+        onSuccess: (res) => {
+          if (uri != null && dur != null && res?.data?.id) {
+            voiceNotesService.uploadVoiceNote(res.data.id, uri, dur).catch((e) => {
+              const msg = e?.response?.data?.detail ?? e?.message ?? String(e);
+              console.warn("[CheckInModal] Voice note upload failed:", msg);
+            });
+          }
+        },
+        onError: () => {
+          if (retryCount < 1) setTimeout(() => attemptSubmit(retryCount + 1), 1000);
+        }
+      });
+    };
+    attemptSubmit(0);
+  }, [
+    response,
+    goal.id,
+    mood,
+    skipReason,
+    note,
+    voiceNoteUri,
+    voiceNoteDuration,
+    isPlayingVoiceNote,
+    voiceNotePlayer,
+    showVoiceRecorder,
+    createCheckIn,
+    onClose,
+    onSuccess
+  ]);
 
   // Can submit?
   const canSubmit = response !== null;
@@ -461,31 +540,80 @@ export function CheckInModal({ isVisible, goal, onClose, onSuccess }: CheckInMod
                       </TouchableOpacity>
                     )}
 
-                  {/* Voice Recorder */}
+                  {/* Voice Recorder — premium: starts recording immediately, no extra tap */}
                   {(response === "yes" || response === "no") && showVoiceRecorder && (
                     <VoiceNoteRecorder
-                      onRecordingComplete={(uri, duration) => {
+                      startImmediately={hasVoiceNotes}
+                      maxDurationSeconds={voiceNoteMaxDuration}
+                      onRecordingComplete={(uri, dur) => {
                         setVoiceNoteUri(uri);
-                        setVoiceNoteDuration(duration);
+                        setVoiceNoteDuration(dur);
                         setShowVoiceRecorder(false);
                       }}
                       onCancel={() => setShowVoiceRecorder(false)}
+                      onRegisterActions={setRecorderActions}
                     />
                   )}
 
-                  {/* Voice Note Preview (after recording) */}
+                  {/* Voice Note Preview (after recording) — play to listen before submitting */}
                   {(response === "yes" || response === "no") &&
                     voiceNoteUri &&
                     !showVoiceRecorder && (
                       <View style={styles.voiceNotePreview}>
-                        <Mic size={16} color={brandColors.primary} />
+                        <TouchableOpacity
+                          onPress={async () => {
+                            if (!voiceNotePlayer) return;
+                            if (isPlayingVoiceNote) {
+                              voiceNotePlayer.pause();
+                              setIsPlayingVoiceNote(false);
+                              return;
+                            }
+                            setIsPlaybackLoading(true);
+                            try {
+                              await setAudioModeAsync({
+                                allowsRecording: false,
+                                playsInSilentMode: true
+                              });
+                              voiceNotePlayer.seekTo(0);
+                              await voiceNotePlayer.play();
+                              setIsPlayingVoiceNote(true);
+                            } catch (e) {
+                              setIsPlayingVoiceNote(false);
+                              showToast({
+                                title: t("voice_notes.playback_failed"),
+                                variant: "error"
+                              });
+                            } finally {
+                              setIsPlaybackLoading(false);
+                            }
+                          }}
+                          disabled={isPlaybackLoading}
+                          style={[
+                            styles.voiceNotePlayButton,
+                            {
+                              backgroundColor: brandColors.primary,
+                              opacity: isPlaybackLoading ? 0.7 : 1
+                            }
+                          ]}
+                        >
+                          {isPlaybackLoading ? (
+                            <ActivityIndicator size="small" color="#fff" />
+                          ) : isPlayingVoiceNote ? (
+                            <Pause size={16} color="#fff" />
+                          ) : (
+                            <Play size={16} color="#fff" fill="#fff" />
+                          )}
+                        </TouchableOpacity>
                         <Text style={[styles.voiceNotePreviewText, { color: colors.text.primary }]}>
                           {t("voice_notes.title")} ({voiceNoteDuration}s)
                         </Text>
                         <TouchableOpacity
                           onPress={() => {
+                            if (isPlayingVoiceNote) voiceNotePlayer?.pause?.();
                             setVoiceNoteUri(null);
                             setVoiceNoteDuration(0);
+                            setIsPlayingVoiceNote(false);
+                            setIsPlaybackLoading(false);
                           }}
                         >
                           <X size={16} color={colors.text.tertiary} />
@@ -757,6 +885,13 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     paddingHorizontal: toRN(tokens.spacing[4]),
     backgroundColor: brand.primary + "10",
     borderRadius: toRN(tokens.borderRadius.lg)
+  },
+  voiceNotePlayButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center" as const,
+    justifyContent: "center" as const
   },
   voiceNotePreviewText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
