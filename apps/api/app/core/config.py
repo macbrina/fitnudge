@@ -69,6 +69,9 @@ class Settings(BaseSettings):
     # AI Services
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     ELEVENLABS_API_KEY: str = os.getenv("ELEVENLABS_API_KEY", "")
+    AI_COACH_STREAMING_ENABLED: bool = (
+        os.getenv("AI_COACH_STREAMING_ENABLED", "true").lower() == "true"
+    )
 
     # Redis Configuration
     REDIS_HOST: str = os.getenv("REDIS_HOST", "localhost")

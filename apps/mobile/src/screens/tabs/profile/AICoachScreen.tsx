@@ -71,6 +71,73 @@ interface AnimatedAudioBarsProps {
   gap?: number;
 }
 
+// Bouncing 3-dot indicator (no i18n, used for initial loading)
+function BouncingDots({
+  color = "#FFFFFF",
+  dotSize = 8,
+  gap = 4
+}: {
+  color?: string;
+  dotSize?: number;
+  gap?: number;
+}) {
+  const anims = useRef(Array.from({ length: 3 }, () => new Animated.Value(0))).current;
+
+  useEffect(() => {
+    const timeouts: ReturnType<typeof setTimeout>[] = [];
+    const loops: Animated.CompositeAnimation[] = [];
+    anims.forEach((anim, i) => {
+      const loop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(anim, {
+            toValue: 1,
+            duration: 400,
+            easing: Easing.out(Easing.ease),
+            useNativeDriver: true
+          }),
+          Animated.timing(anim, {
+            toValue: 0,
+            duration: 400,
+            easing: Easing.in(Easing.ease),
+            useNativeDriver: true
+          })
+        ])
+      );
+      loops.push(loop);
+      const t = setTimeout(() => loop.start(), i * 120);
+      timeouts.push(t);
+    });
+    return () => {
+      timeouts.forEach((t) => clearTimeout(t));
+      loops.forEach((l) => l.stop());
+    };
+  }, [anims]);
+
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap }}>
+      {anims.map((anim, i) => (
+        <Animated.View
+          key={i}
+          style={{
+            width: dotSize,
+            height: dotSize,
+            borderRadius: dotSize / 2,
+            backgroundColor: color,
+            transform: [
+              {
+                translateY: anim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, -6]
+                })
+              }
+            ]
+          }}
+        />
+      ))}
+    </View>
+  );
+}
+
 function AnimatedAudioBars({
   color = "#FFFFFF",
   barCount = 4,
@@ -405,17 +472,24 @@ export default function AICoachModal({ visible, onClose, goalId }: AICoachModalP
       return false;
     // Messages are inverted, so first item is the most recent
     const lastMessage = messages[0];
+
     // Show regenerate if:
     // 1. Last message is from user (no AI response after it)
     // 2. Not in a failed/error state (already shown separately)
     // 3. Not pending
     return lastMessage.user._id === 1 && !lastMessage.pending && !lastMessage.failed && !error;
   }, [messages, isStreaming, isLoadingConversation, isLoadingRateLimit, error]);
-
-  // Thinking messages that cycle while waiting
-  const thinkingMessages = t("ai_coach.thinking_messages", { returnObjects: true }) as string[];
+  // Thinking messages that cycle while waiting (memoized to avoid effect re-runs)
+  const thinkingMessages = useMemo(
+    () => (t("ai_coach.thinking_messages", { returnObjects: true }) as string[]) || [],
+    [t]
+  );
   const [currentThinkingMessage, setCurrentThinkingMessage] = useState("");
   const thinkingMessageRef = useRef<string>("");
+
+  // Loading UX: bouncing dots for first 5-6s, then typing indicator (cycling thinking messages)
+  const [showTypingIndicator, setShowTypingIndicator] = useState(false);
+  const pendingTransitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // FlatList ref for scrolling
   const flatListRef = useRef<FlatList<Message>>(null);
@@ -447,6 +521,39 @@ export default function AICoachModal({ visible, onClose, goalId }: AICoachModalP
     }
   }, [isProcessing, pulseAnim]);
 
+  // Loading UX: show bouncing dots for first 5-6s, then switch to typing indicator
+  const hasPendingAssistant = messages.some((m) => m.user._id !== 1 && m.pending && !m.text);
+  useEffect(() => {
+    if (pendingTransitionTimerRef.current) {
+      clearTimeout(pendingTransitionTimerRef.current);
+      pendingTransitionTimerRef.current = null;
+    }
+    if (isProcessing && hasPendingAssistant) {
+      setShowTypingIndicator(false);
+      pendingTransitionTimerRef.current = setTimeout(() => {
+        setShowTypingIndicator(true);
+        pendingTransitionTimerRef.current = null;
+      }, 5000);
+    } else {
+      setShowTypingIndicator(false);
+    }
+    return () => {
+      if (pendingTransitionTimerRef.current) {
+        clearTimeout(pendingTransitionTimerRef.current);
+        pendingTransitionTimerRef.current = null;
+      }
+    };
+  }, [isProcessing, hasPendingAssistant]);
+
+  // Clear transition state when conversation changes
+  useEffect(() => {
+    setShowTypingIndicator(false);
+    if (pendingTransitionTimerRef.current) {
+      clearTimeout(pendingTransitionTimerRef.current);
+      pendingTransitionTimerRef.current = null;
+    }
+  }, [conversationId]);
+
   // Cycle through thinking messages while processing
   useEffect(() => {
     if (isProcessing && Array.isArray(thinkingMessages) && thinkingMessages.length > 0) {
@@ -458,10 +565,8 @@ export default function AICoachModal({ visible, onClose, goalId }: AICoachModalP
         const initial = getRandomMessage();
         setCurrentThinkingMessage(initial);
         thinkingMessageRef.current = initial;
-      } else {
-        // Use the message already set by handleSend
-        setCurrentThinkingMessage(thinkingMessageRef.current);
       }
+      // When ref exists, handleSend already set state - skip setState to avoid re-render loop
 
       // Cycle every 3 seconds
       const interval = setInterval(() => {
@@ -834,7 +939,7 @@ export default function AICoachModal({ visible, onClose, goalId }: AICoachModalP
       // Handle failed message with retry
       if (item.failed) {
         // Show user-friendly message for common errors
-        let displayError = item.errorMessage || t("ai_coach.error_retry");
+        let displayError = item.errorMessage ?? t("ai_coach.error_retry");
         const lowerError = displayError.toLowerCase();
         if (
           lowerError.includes("no response body") ||
@@ -867,7 +972,7 @@ export default function AICoachModal({ visible, onClose, goalId }: AICoachModalP
         );
       }
 
-      const canCopy = !isPending && !item.failed && !!item.text?.trim();
+      const canCopy = !item.pending && !item.failed && !!item.text?.trim();
 
       return (
         <View style={[styles.messageBubble, isUser ? styles.userBubble : styles.assistantBubble]}>
@@ -886,15 +991,23 @@ export default function AICoachModal({ visible, onClose, goalId }: AICoachModalP
                 <Text style={styles.userMessageText}>{item.text}</Text>
               ) : isPending ? (
                 <View style={styles.typingIndicator}>
-                  <Animated.View
-                    style={[
-                      styles.pulsingDot,
-                      { backgroundColor: brandColors.primary, opacity: pulseAnim }
-                    ]}
-                  />
-                  <Text style={styles.typingText}>
-                    {currentThinkingMessage || thinkingMessageRef.current || t("ai_coach.typing")}
-                  </Text>
+                  {showTypingIndicator ? (
+                    <>
+                      <Animated.View
+                        style={[
+                          styles.pulsingDot,
+                          { backgroundColor: brandColors.primary, opacity: pulseAnim }
+                        ]}
+                      />
+                      <Text style={styles.typingText}>
+                        {currentThinkingMessage ||
+                          thinkingMessageRef.current ||
+                          t("ai_coach.typing")}
+                      </Text>
+                    </>
+                  ) : (
+                    <BouncingDots color={brandColors.primary} dotSize={8} gap={4} />
+                  )}
                 </View>
               ) : (
                 <Markdown style={markdownStyles}>{item.text}</Markdown>
@@ -926,7 +1039,8 @@ export default function AICoachModal({ visible, onClose, goalId }: AICoachModalP
       retryLastMessage,
       pulseAnim,
       currentThinkingMessage,
-      handleCopyMessage
+      handleCopyMessage,
+      showTypingIndicator
     ]
   );
 
@@ -1774,6 +1888,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: "transparent"
   },
   failedContent: {
+    flex: 1,
     backgroundColor: "#FEE2E2",
     borderWidth: 1,
     borderColor: "#FECACA"
@@ -1784,10 +1899,11 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     gap: toRN(tokens.spacing[2])
   },
   failedText: {
+    flex: 1,
+    minWidth: 0,
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
-    color: "#EF4444",
-    flex: 1
+    color: "#EF4444"
   },
   coachAvatarError: {
     backgroundColor: "#EF4444"

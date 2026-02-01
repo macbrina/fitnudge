@@ -23,7 +23,9 @@ export interface PendingAIResponse {
   conversationId: string;
   content: string;
   messageIndex: number;
-  status: "pending" | "completed" | "failed";
+  status: "pending" | "completed" | "failed" | "generating";
+  /** When true, update content only - do not clear waiting state */
+  isPartial?: boolean;
 }
 
 interface AICoachState {

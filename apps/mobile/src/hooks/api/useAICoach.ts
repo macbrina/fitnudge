@@ -369,7 +369,7 @@ export function useAICoachChat() {
     };
   }, [conversationId, hasAccess, convertToGiftedMessages, queryClient]);
 
-  // Handle pending AI response from realtime - SIMPLE: just update the UI directly
+  // Handle pending AI response from realtime (partial streaming + final completed)
   useEffect(() => {
     if (!pendingAIResponse) return;
 
@@ -379,21 +379,38 @@ export function useAICoachChat() {
       return;
     }
 
-    const fullText = pendingAIResponse.content || "";
+    const content = pendingAIResponse.content || "";
+    const isPartial = pendingAIResponse.isPartial === true;
 
+    if (isPartial) {
+      // Streaming partial: update content only if new content is longer (ignore out-of-order stale partials)
+      setMessages((prev) =>
+        prev.map((msg) => {
+          if (msg.pending && msg.user._id !== 1) {
+            const currentLen = (msg.text || "").length;
+            if (content.length > currentLen) {
+              return { ...msg, text: content };
+            }
+            return msg;
+          }
+          return msg;
+        })
+      );
+      clearPendingAIResponse();
+      return;
+    }
+
+    // Final completed response
     console.log("[AI Coach] 📬 Received AI response from realtime, updating UI directly", {
-      contentLength: fullText.length,
+      contentLength: content.length,
       conversationId: conversationId?.substring(0, 8)
     });
 
-    // SIMPLE: Just update the pending assistant message with the full response immediately
     setMessages((prev) =>
       prev.map((msg) => {
-        // Find the pending assistant message and replace it with the actual response
         if (msg.pending && msg.user._id !== 1) {
-          return { ...msg, text: fullText, pending: false, failed: false, status: "completed" };
+          return { ...msg, text: content, pending: false, failed: false, status: "completed" };
         }
-        // Mark the most recent pending user message as completed too
         if (msg.pending && msg.user._id === 1) {
           return { ...msg, pending: false, status: "completed" };
         }
@@ -401,7 +418,6 @@ export function useAICoachChat() {
       })
     );
 
-    // Clear waiting states and recovery timeout
     if (pendingAIResponse.conversationId) {
       setWaitingByConversationId((prev) => ({
         ...prev,
@@ -414,12 +430,10 @@ export function useAICoachChat() {
     failedMessageRef.current = null;
     clearRecoveryTimeout();
 
-    // Force refetch rate limit - AI responded successfully so rate limit was decremented
     queryClient.refetchQueries({
       queryKey: aiCoachQueryKeys.rateLimit()
     });
 
-    // Clear the pending response
     clearPendingAIResponse();
 
     console.log("[AI Coach] ✅ UI updated with AI response");

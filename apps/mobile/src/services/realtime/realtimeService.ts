@@ -1964,8 +1964,31 @@ class RealtimeService {
           if (Array.isArray(parsedMessages) && parsedMessages.length > 0) {
             const lastMessage = parsedMessages[parsedMessages.length - 1];
             const lastMessageAt = lastMessage?.created_at;
+            const currentConversationId = useAICoachStore.getState().currentConversationId;
 
-            // Check if it's a NEW assistant message with completed status
+            // Streaming partial update: status "generating" with content
+            // Skip if we already processed "completed" for this message (out-of-order delivery)
+            if (
+              lastMessage?.role === "assistant" &&
+              lastMessage?.status === "generating" &&
+              currentConversationId === conversationId &&
+              !(lastMessageAt && lastMessageAt === this.lastProcessedAIMessageAt)
+            ) {
+              useAICoachStore.getState().setPendingAIResponse({
+                conversationId,
+                content: lastMessage.content || "",
+                messageIndex: parsedMessages.length - 1,
+                status: "generating",
+                isPartial: true
+              });
+              scheduleInvalidate(aiCoachQueryKeys.conversations());
+              if (currentConversationId === conversationId) {
+                scheduleInvalidate(aiCoachQueryKeys.conversation(conversationId));
+              }
+              return;
+            }
+
+            // Final completed message: use dedupe to avoid double-clearing
             if (
               lastMessage?.role === "assistant" &&
               lastMessage?.status === "completed" &&
@@ -1976,10 +1999,6 @@ class RealtimeService {
 
               console.log(`[Realtime] 🤖 New AI response detected`);
 
-              // Get the current conversation user is viewing
-              const currentConversationId = useAICoachStore.getState().currentConversationId;
-
-              // Only update UI if user is viewing this conversation
               if (currentConversationId === conversationId) {
                 useAICoachStore.getState().setPendingAIResponse({
                   conversationId,
@@ -1990,6 +2009,9 @@ class RealtimeService {
               }
 
               scheduleInvalidate(aiCoachQueryKeys.conversations());
+              if (currentConversationId === conversationId) {
+                scheduleInvalidate(aiCoachQueryKeys.conversation(conversationId));
+              }
               return;
             }
           }
