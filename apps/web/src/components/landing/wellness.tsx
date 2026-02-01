@@ -10,8 +10,12 @@ export function Wellness() {
   const { t } = useTranslation();
   const { theme } = useTheme();
 
+  // Cache busting: increment version when you update the images
+  const imageVersion = "v2"; // Change this when you update mockup images
   const mockupImage =
-    theme === "dark" ? "/mockups/home-dark.png" : "/mockups/home-light.png";
+    theme === "dark" 
+      ? `/mockups/home-dark.png?${imageVersion}` 
+      : `/mockups/home-light.png?${imageVersion}`;
 
   const highlights = [
     t("wellness.highlights.ai_messages"),

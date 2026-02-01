@@ -330,7 +330,16 @@ def _stream_first_completion(
                     messages_list[idx]["content"] = accumulated
                     messages_list[idx]["status"] = "generating"
                     messages_list[idx].setdefault("created_at", now_iso)
-                    _update_conversation_messages(supabase, conversation_id, messages_list)
+                    stream_via_redis = getattr(
+                        settings, "AI_COACH_STREAM_VIA_REDIS", False
+                    ) and request_id
+                    if stream_via_redis:
+                        from app.services.ai_coach_stream_service import publish_chunk
+                        publish_chunk(request_id, accumulated)
+                    else:
+                        _update_conversation_messages(
+                            supabase, conversation_id, messages_list
+                        )
                     last_update_at = now_t
 
             # Tool calls (incremental)
@@ -393,7 +402,11 @@ def _stream_first_completion(
         }
     except Exception as e:
         logger.warning(f"[AI Coach Task] First completion streaming failed: {e}")
-        if accumulated:
+        stream_via_redis = getattr(settings, "AI_COACH_STREAM_VIA_REDIS", False) and request_id
+        if stream_via_redis:
+            from app.services.ai_coach_stream_service import publish_error
+            publish_error(request_id, str(e))
+        elif accumulated:
             messages_list[idx]["content"] = accumulated
             messages_list[idx]["status"] = "generating"
             _update_conversation_messages(supabase, conversation_id, messages_list)
@@ -451,7 +464,16 @@ def _stream_completion_and_update_db(
                 messages_list[idx]["content"] = accumulated
                 messages_list[idx]["status"] = "generating"
                 messages_list[idx].setdefault("created_at", now_iso)
-                _update_conversation_messages(supabase, conversation_id, messages_list)
+                stream_via_redis = getattr(
+                    settings, "AI_COACH_STREAM_VIA_REDIS", False
+                ) and request_id
+                if stream_via_redis:
+                    from app.services.ai_coach_stream_service import publish_chunk
+                    publish_chunk(request_id, accumulated)
+                else:
+                    _update_conversation_messages(
+                        supabase, conversation_id, messages_list
+                    )
                 last_update_at = now
 
         if accumulated:
@@ -460,7 +482,11 @@ def _stream_completion_and_update_db(
         return accumulated, tokens_used
     except Exception as e:
         logger.warning(f"[AI Coach Task] Streaming failed: {e}")
-        if accumulated:
+        stream_via_redis = getattr(settings, "AI_COACH_STREAM_VIA_REDIS", False) and request_id
+        if stream_via_redis:
+            from app.services.ai_coach_stream_service import publish_error
+            publish_error(request_id, str(e))
+        elif accumulated:
             messages_list[idx]["content"] = accumulated
             messages_list[idx]["status"] = "generating"
             _update_conversation_messages(supabase, conversation_id, messages_list)
@@ -836,6 +862,11 @@ def process_ai_coach_message_task(
                 }
             )
 
+        # Publish done to Redis when streaming via Redis (for SSE clients)
+        if getattr(settings, "AI_COACH_STREAM_VIA_REDIS", False) and request_id:
+            from app.services.ai_coach_stream_service import publish_done
+            publish_done(request_id, full_response)
+
         # Re-fetch, merge our updates into fresh data, then write (prevents race overwrites)
         _merge_and_write_messages(
             supabase=supabase,
@@ -874,6 +905,14 @@ def process_ai_coach_message_task(
             {"conversation_id": conversation_id, "error": str(e)},
             exc_info=True,
         )
+
+        # Notify SSE clients when Redis streaming enabled
+        if getattr(settings, "AI_COACH_STREAM_VIA_REDIS", False) and request_id:
+            try:
+                from app.services.ai_coach_stream_service import publish_error
+                publish_error(request_id, str(e))
+            except Exception:
+                pass
 
         # Mark the message/placeholder as failed
         try:

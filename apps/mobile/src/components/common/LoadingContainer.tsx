@@ -55,10 +55,9 @@ export const LoadingContainer: React.FC<LoadingContainerProps> = ({
 }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
-  const rotateAnim = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
   const textFadeAnim = useRef(new Animated.Value(0)).current;
   const textScaleAnim = useRef(new Animated.Value(0.9)).current;
-  const textPulseAnim = useRef(new Animated.Value(1)).current;
   const { t } = useTranslation();
 
   const styles = useStyles(makeLoadingContainerStyles);
@@ -103,36 +102,25 @@ export const LoadingContainer: React.FC<LoadingContainerProps> = ({
         ])
       ]).start();
 
-      // Continuous text animation (pulse effect) - separate from initial scale
-      const textPulseAnimation = Animated.loop(
+      // Continuous pulse animation for both favicon and text
+      const pulseAnimation = Animated.loop(
         Animated.sequence([
-          Animated.timing(textPulseAnim, {
+          Animated.timing(pulseAnim, {
             toValue: 1.1,
             duration: 1000,
             useNativeDriver: true
           }),
-          Animated.timing(textPulseAnim, {
+          Animated.timing(pulseAnim, {
             toValue: 1,
             duration: 1000,
             useNativeDriver: true
           })
         ])
       );
-      textPulseAnimation.start();
-
-      // Continuous rotation animation
-      const rotateAnimation = Animated.loop(
-        Animated.timing(rotateAnim, {
-          toValue: 1,
-          duration: 2000,
-          useNativeDriver: true
-        })
-      );
-      rotateAnimation.start();
+      pulseAnimation.start();
 
       return () => {
-        rotateAnimation.stop();
-        textPulseAnimation.stop();
+        pulseAnimation.stop();
       };
     } else {
       Animated.timing(fadeAnim, {
@@ -141,12 +129,7 @@ export const LoadingContainer: React.FC<LoadingContainerProps> = ({
         useNativeDriver: true
       }).start();
     }
-  }, [visible, fadeAnim, scaleAnim, rotateAnim]);
-
-  const rotate = rotateAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["0deg", "360deg"]
-  });
+  }, [visible, fadeAnim, scaleAnim, pulseAnim]);
 
   if (!visible) return null;
 
@@ -155,7 +138,7 @@ export const LoadingContainer: React.FC<LoadingContainerProps> = ({
       <Animated.View
         style={{
           opacity: fadeAnim,
-          transform: [{ scale: scaleAnim }, { rotate: rotate }]
+          transform: [{ scale: scaleAnim }, { scale: pulseAnim }]
         }}
       >
         <Image
@@ -170,7 +153,7 @@ export const LoadingContainer: React.FC<LoadingContainerProps> = ({
         <Animated.View
           style={{
             opacity: textFadeAnim,
-            transform: [{ scale: textScaleAnim }, { scale: textPulseAnim }]
+            transform: [{ scale: textScaleAnim }, { scale: pulseAnim }]
             // marginTop: toRN(tokens.spacing[4]),
           }}
         >

@@ -287,6 +287,10 @@ export const ROUTES = {
     ACCESS: "/ai-coach/access",
     RATE_LIMIT: "/ai-coach/rate-limit",
     CHAT_ASYNC: "/ai-coach/chat/async",
+    STREAM: (requestId: string, conversationId?: string) =>
+      `/ai-coach/stream?request_id=${encodeURIComponent(requestId)}${
+        conversationId ? `&conversation_id=${encodeURIComponent(conversationId)}` : ""
+      }`,
     CONVERSATIONS: "/ai-coach/conversations",
     CONVERSATION: (id: string) => `/ai-coach/conversations/${id}`,
     CURRENT_CONVERSATION: "/ai-coach/conversations/current",

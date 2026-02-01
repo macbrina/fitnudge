@@ -4,7 +4,13 @@
  * Handles API calls for AI Coach chat functionality.
  */
 
-import { BaseApiService, ApiResponse } from "./base";
+import {
+  BaseApiService,
+  ApiResponse,
+  apiRequestSSE,
+  SSEConnection,
+  SSEEventHandlers
+} from "./base";
 import { ROUTES } from "@/lib/routes";
 
 // ============================================================================
@@ -63,6 +69,15 @@ export interface StreamEvent {
   conversation_id?: string;
   full_response?: string;
   tokens_used?: number;
+  message?: string;
+}
+
+/** Redis SSE stream event payload (meta | chunk | done | error) */
+export interface RedisStreamEvent {
+  type: "meta" | "chunk" | "done" | "error";
+  /** Set on meta event when backend sends source (e.g. "redis") */
+  source?: string;
+  content?: string;
   message?: string;
 }
 
@@ -188,6 +203,20 @@ class AICoachService extends BaseApiService {
    */
   async sendMessageAsync(request: AsyncChatRequest): Promise<ApiResponse<AsyncChatResponse>> {
     return this.post<AsyncChatResponse>(ROUTES.AI_COACH.CHAT_ASYNC, request);
+  }
+
+  /**
+   * Stream AI response via SSE (Redis pub/sub). Connect after sendMessageAsync.
+   * Only works when AI_COACH_STREAM_VIA_REDIS is enabled on backend.
+   * Falls back to Realtime when 501 or on error.
+   */
+  streamResponse(
+    requestId: string,
+    handlers: SSEEventHandlers<RedisStreamEvent>,
+    conversationId?: string
+  ): Promise<SSEConnection> {
+    const endpoint = ROUTES.AI_COACH.STREAM(requestId, conversationId);
+    return apiRequestSSE<RedisStreamEvent>(endpoint, { method: "GET" }, handlers);
   }
 
   /**

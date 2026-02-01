@@ -4,15 +4,26 @@ AI Coach Chat API Endpoints
 Provides async (background) chat with AI coach for personalized habit guidance.
 Premium feature with daily message limits for rate control.
 Uses Celery task; user sees message immediately, response via realtime when ready.
+When AI_COACH_STREAM_VIA_REDIS enabled, SSE endpoint streams via Redis pub/sub.
 """
+
+import asyncio
+import json
+import threading
+import time
+from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from starlette.responses import StreamingResponse
 from datetime import datetime, date, timedelta
+
+from app.core.config import settings
 from app.core.flexible_auth import get_current_user
 from app.core.database import get_supabase_client
+from app.core.cache import get_redis_client
 from app.services.ai_coach_service import get_ai_coach_service
+from app.services.ai_coach_stream_service import check_done
 from app.services.subscription_service import has_user_feature
 from app.services.logger import logger
 
@@ -266,6 +277,165 @@ async def chat_with_coach_async(
         request_id=result.get("request_id"),
         user_message_id=result.get("user_message_id"),
         assistant_message_id=result.get("assistant_message_id"),
+    )
+
+
+@router.get("/stream")
+async def stream_ai_response(
+    request_id: str = Query(..., description="Request ID from POST /chat/async"),
+    conversation_id: Optional[str] = Query(
+        None, description="Conversation ID (optional, for DB fallback check)"
+    ),
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    SSE stream for AI Coach response. Connect after POST /chat/async.
+
+    When AI_COACH_STREAM_VIA_REDIS is enabled, streams chunks via Redis pub/sub.
+    Single DB write when complete; if user leaves, response is persisted in DB.
+
+    Returns 501 if Redis streaming is disabled (use Realtime fallback).
+    """
+    if not getattr(settings, "AI_COACH_STREAM_VIA_REDIS", False):
+        raise HTTPException(
+            status_code=501,
+            detail="Redis streaming not enabled. Use Realtime for updates.",
+        )
+
+    user_id = current_user["id"]
+
+    has_access, reason = await check_ai_coach_access(user_id)
+    if not has_access:
+        raise HTTPException(status_code=403, detail=reason)
+
+    # Check if response already complete (late-connecting SSE or Redis done key)
+    done_content = check_done(request_id)
+    if done_content is not None:
+        # Yield done event and close
+        async def already_done():
+            yield f"data: {json.dumps({'type': 'meta', 'source': 'redis'})}\n\n"
+            yield f"data: {json.dumps({'type': 'done', 'content': done_content})}\n\n"
+
+        return StreamingResponse(
+            already_done(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            },
+        )
+
+    # Check DB for completed response (conversation_id optional; Redis done may have expired)
+    if conversation_id:
+        service = get_ai_coach_service()
+        conv = await service.get_conversation_history(
+            user_id, conversation_id=conversation_id, limit=50, offset=0
+        )
+        if conv and conv.get("messages"):
+            for msg in conv["messages"]:
+                if (
+                    msg.get("role") == "assistant"
+                    and msg.get("request_id") == request_id
+                    and msg.get("status") == "completed"
+                ):
+                    content = msg.get("content") or ""
+
+                    async def db_done():
+                        yield f"data: {json.dumps({'type': 'meta', 'source': 'redis'})}\n\n"
+                        yield f"data: {json.dumps({'type': 'done', 'content': content})}\n\n"
+
+                    return StreamingResponse(
+                        db_done(),
+                        media_type="text/event-stream",
+                        headers={
+                            "Cache-Control": "no-cache",
+                            "Connection": "keep-alive",
+                            "X-Accel-Buffering": "no",
+                        },
+                    )
+
+    # Subscribe to Redis and stream
+    redis = get_redis_client()
+    if not redis or not hasattr(redis, "pubsub"):
+        raise HTTPException(
+            status_code=503,
+            detail="Redis not available for streaming.",
+        )
+
+    from app.services.ai_coach_stream_service import channel_for_request
+
+    channel = channel_for_request(request_id)
+    queue: asyncio.Queue = asyncio.Queue()
+    done_event = threading.Event()
+    loop = asyncio.get_running_loop()
+
+    def redis_listener():
+        try:
+            pubsub = redis.pubsub()
+            pubsub.subscribe(channel)
+            while not done_event.is_set():
+                msg = pubsub.get_message(timeout=1.0)
+                if msg and msg["type"] == "message":
+                    try:
+                        data = msg["data"]
+                        if isinstance(data, bytes):
+                            data = data.decode("utf-8")
+                        payload = json.loads(data)
+                        loop.call_soon_threadsafe(queue.put_nowait, payload)
+                        if payload.get("type") in ("done", "error"):
+                            break
+                    except Exception:
+                        pass
+            pubsub.unsubscribe(channel)
+            pubsub.close()
+        except Exception as e:
+            logger.warning(f"[AI Coach SSE] Redis listener error: {e}")
+            try:
+                loop.call_soon_threadsafe(
+                    queue.put_nowait, {"type": "error", "message": str(e)}
+                )
+            except Exception:
+                pass
+        finally:
+            done_event.set()
+
+    async def event_generator():
+        try:
+            # First event: tell client this stream is from Redis
+            yield f"data: {json.dumps({'type': 'meta', 'source': 'redis'})}\n\n"
+
+            listener_thread = threading.Thread(target=redis_listener)
+            listener_thread.daemon = True
+            listener_thread.start()
+
+            timeout_secs = 120
+            started = time.monotonic()
+            while True:
+                try:
+                    remaining = timeout_secs - (time.monotonic() - started)
+                    if remaining <= 0:
+                        break
+                    event = await asyncio.wait_for(
+                        queue.get(), timeout=min(1.0, remaining)
+                    )
+                    payload = json.dumps(event)
+                    yield f"data: {payload}\n\n"
+                    if event.get("type") in ("done", "error"):
+                        break
+                except asyncio.TimeoutError:
+                    continue
+        finally:
+            done_event.set()
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
     )
 
 

@@ -447,6 +447,7 @@ POSTHOG_HOST: str = os.getenv("POSTHOG_HOST", "https://us.i.posthog.com")
 | **Goal Check-ins (daily)** | 1 query per goal        | Batch `.in_()` prefetch | 100x faster         |
 | **Re-engagement Prefs**    | 2 queries per user      | Batch `.in_()` prefetch | 100x faster         |
 | **Achievement Unlocking**  | 1 query per badge       | Batch `.in_()` prefetch | 100x faster         |
+| **AI Coach streaming**     | 12-20+ DB writes/msg    | Redis pub/sub + 1 write | 15x fewer DB writes |
 
 ---
 
@@ -466,6 +467,8 @@ POSTHOG_HOST: str = os.getenv("POSTHOG_HOST", "https://us.i.posthog.com")
 | `goal_tasks.py`                | Batch check-in existence queries           |
 | `notification_tasks.py`        | Batch re-engagement prefs/checkins         |
 | `achievement_service.py`       | Batch user_achievements lookup             |
+| `ai_coach_stream_service.py`   | Redis pub/sub for AI streaming (optional)  |
+| `ai_coach_tasks.py`            | Single DB write when Redis streaming on   |
 
 ---
 
@@ -481,6 +484,7 @@ These patterns have N+1 potential but are acceptable due to low volume or per-us
 | AI motivation generation     | `notification_tasks.py`  | Already has `already_sent` check (could batch in future) |
 | Check-in prompts             | `notification_tasks.py`  | Time-filtered, most goals skip early                     |
 | Achievement condition checks | `achievement_service.py` | Per-user, async background                               |
+| AI Coach chat streaming      | `ai_coach_tasks.py`      | When `AI_COACH_STREAM_VIA_REDIS=true`: Redis pub/sub for streaming, **single DB write** when complete. O(1) writes per message. Realtime fallback when disabled. |
 
 ### 13.2 Future Optimizations (500K+ Users)
 

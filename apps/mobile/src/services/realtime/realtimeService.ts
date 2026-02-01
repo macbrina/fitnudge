@@ -1954,6 +1954,42 @@ class RealtimeService {
     await this.queryClient.cancelQueries({ queryKey: aiCoachQueryKeys.all });
 
     if (payload.eventType === "UPDATE") {
+      // Check if messages were removed (deletion detection)
+      let messagesWereRemoved = false;
+      try {
+        const oldMessages = oldRecord?.messages;
+        const newMessages = newRecord?.messages;
+
+        if (oldMessages && newMessages) {
+          const parsedOld = typeof oldMessages === "string" ? JSON.parse(oldMessages) : oldMessages;
+          const parsedNew = typeof newMessages === "string" ? JSON.parse(newMessages) : newMessages;
+
+          if (Array.isArray(parsedOld) && Array.isArray(parsedNew)) {
+            // If new array is shorter, messages were removed
+            messagesWereRemoved = parsedNew.length < parsedOld.length;
+            if (messagesWereRemoved) {
+              console.log(`[Realtime] 🗑️ AI Coach message(s) removed from conversation`, {
+                oldCount: parsedOld.length,
+                newCount: parsedNew.length
+              });
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("[Realtime] Failed to compare old/new messages:", e);
+      }
+
+      // If messages were removed, force UI to reload this conversation (works for general + goal-specific)
+      if (messagesWereRemoved) {
+        scheduleInvalidate(aiCoachQueryKeys.conversations());
+        scheduleInvalidate(aiCoachQueryKeys.conversation(conversationId));
+        scheduleRefetch(aiCoachQueryKeys.conversation(conversationId), "active");
+        scheduleRefetch(aiCoachQueryKeys.conversations(), "active");
+        // UI displays from local state; tell the hook to reload this conversation
+        useAICoachStore.getState().setConversationMessagesInvalidatedId(conversationId);
+        return;
+      }
+
       // Check if there's a new assistant message
       const messages = newRecord?.messages;
 

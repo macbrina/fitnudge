@@ -93,7 +93,7 @@ export const useCheckAchievements = () => {
 
 /** Theme subset needed for rarity colors */
 export type RarityTheme = {
-  colors: { feedback: { warning: string }; text: { tertiary: string } };
+  colors: { feedback: { warning: string; error: string }; text: { tertiary: string } };
   brandColors: { primary: string };
 };
 
@@ -109,7 +109,7 @@ export const getRarityColor = (rarity?: string, theme?: RarityTheme): string => 
     case "legendary":
       return colors.feedback.warning;
     case "epic":
-      return brandColors.primary;
+      return colors.feedback.error;
     case "rare":
       return brandColors.primary;
     default:

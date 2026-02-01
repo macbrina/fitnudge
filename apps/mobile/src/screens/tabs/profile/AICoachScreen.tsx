@@ -658,13 +658,13 @@ export default function AICoachModal({ visible, onClose, goalId }: AICoachModalP
     [colors]
   );
 
-  // On open: always clear and load for current context (general vs goal).
+  // On open: load conversation for current context (general vs goal).
   // General (goalId null): most recent conversation. Goal: goal-scoped thread or empty.
+  // loadConversation now handles caching internally - no need to clear every time.
   useEffect(() => {
     if (!visible || !hasAccess) return;
-    clearLocalStateOnly();
     loadConversation(undefined, goalId ?? undefined);
-  }, [visible, hasAccess, goalId, loadConversation, clearLocalStateOnly]);
+  }, [visible, hasAccess, goalId, loadConversation]);
 
   // Voice recording handler
   const handleSpeakPress = async () => {

@@ -72,6 +72,9 @@ class Settings(BaseSettings):
     AI_COACH_STREAMING_ENABLED: bool = (
         os.getenv("AI_COACH_STREAMING_ENABLED", "true").lower() == "true"
     )
+    AI_COACH_STREAM_VIA_REDIS: bool = (
+        os.getenv("AI_COACH_STREAM_VIA_REDIS", "false").lower() == "true"
+    )
 
     # Redis Configuration
     REDIS_HOST: str = os.getenv("REDIS_HOST", "localhost")

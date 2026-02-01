@@ -72,9 +72,9 @@ celery_app.conf.update(
         "precreate-daily-checkins": {
             "task": "precreate_daily_checkins",
             "schedule": 60.0 * 60.0,  # Run HOURLY to catch all timezones
-            # Pre-creates check-ins with status='pending' for all active goals
-            # Uses PostgreSQL batch function - O(1) performance
-            # Trigger on goal INSERT also creates check-ins for new goals
+            # Pre-creates check-ins with status='pending' for all active goals for today
+            # Uses PostgreSQL precreate_checkins_for_date(p_target_date) - O(1) batch
+            # Trigger on goal INSERT (trg_goal_insert_checkin) also creates today's check-in for new goals
         },
         "mark-missed-checkins": {
             "task": "mark_missed_checkins",

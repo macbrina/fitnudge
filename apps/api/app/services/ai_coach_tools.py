@@ -550,18 +550,20 @@ class ToolExecutor:
             frequency_count = len(target_days_names)
 
         # Convert day names to integers for database (0=Sun, 1=Mon, ..., 6=Sat)
-        target_days_ints = (
-            [day_name_to_int(d) for d in target_days_names]
-            if target_days_names
-            else None
-        )
+        # Daily = all days [0,1,2,3,4,5,6] so precreate/schedule logic works consistently
+        if frequency_type == "daily":
+            target_days_ints = [0, 1, 2, 3, 4, 5, 6]
+        elif target_days_names:
+            target_days_ints = [day_name_to_int(d) for d in target_days_names]
+        else:
+            target_days_ints = None
 
         goal_data = {
             "user_id": self.user_id,
             "title": params["title"].strip(),
             "frequency_type": frequency_type,
             "frequency_count": frequency_count if frequency_type == "weekly" else 1,
-            "target_days": target_days_ints if frequency_type == "weekly" else None,
+            "target_days": target_days_ints,
             "reminder_times": params.get("reminder_times", ["09:00"]),
             "why_statement": (
                 params.get("why_statement", "").strip()[:200]
@@ -586,6 +588,22 @@ class ToolExecutor:
 
             goal = result.data[0]
             goal_id = goal["id"]
+
+            # Refresh Live Activity / NextUp so user sees new goal immediately (DB trigger created today's check-in)
+            try:
+                from app.services.tasks.live_activity_tasks import (
+                    refresh_live_activity_for_user_task,
+                )
+                from app.services.tasks.nextup_fcm_tasks import (
+                    refresh_nextup_fcm_for_user_task,
+                )
+
+                refresh_live_activity_for_user_task.delay(str(self.user_id))
+                refresh_nextup_fcm_for_user_task.delay(str(self.user_id))
+            except Exception as e:
+                logger.warning(
+                    f"[AI Coach Tools] Failed to queue live activity/nextup refresh: {e}"
+                )
 
             # Build structured data for AI to craft its response
             day_display_names = {
@@ -622,6 +640,8 @@ class ToolExecutor:
                     # Limit info if paused
                     "limit_reached": will_be_paused,
                     "goal_limit": limit_check.get("limit") if will_be_paused else None,
+                    # Hint for UI: suggest pull-to-refresh on Goals screen if they don't see the new goal
+                    "refresh_hint": "If you don't see the new goal on the Goals screen, pull down to refresh.",
                 },
             }
 

@@ -46,6 +46,9 @@ interface AICoachState {
   // The UI then consumes it and triggers manual character-by-character streaming
   pendingAIResponse: PendingAIResponse | null;
 
+  /** When set, the open chat should reload this conversation (e.g. message removed via DB/realtime) */
+  conversationMessagesInvalidatedId: string | null;
+
   // Actions
   openModal: (goalId?: string) => void;
   closeModal: () => void;
@@ -57,6 +60,9 @@ interface AICoachState {
   setPendingAIResponse: (response: PendingAIResponse | null) => void;
   clearPendingAIResponse: () => void;
 
+  /** Tell the open chat to reload conversation messages (realtime detected change, e.g. message removed) */
+  setConversationMessagesInvalidatedId: (id: string | null) => void;
+
   // Reset
   resetState: () => void;
 }
@@ -66,7 +72,8 @@ const initialState = {
   selectedLanguage: "en",
   currentConversationId: null,
   focusedGoalId: null,
-  pendingAIResponse: null
+  pendingAIResponse: null,
+  conversationMessagesInvalidatedId: null
 };
 
 export const useAICoachStore = create<AICoachState>()(
@@ -100,6 +107,10 @@ export const useAICoachStore = create<AICoachState>()(
 
       clearPendingAIResponse: () => {
         set({ pendingAIResponse: null });
+      },
+
+      setConversationMessagesInvalidatedId: (id: string | null) => {
+        set({ conversationMessagesInvalidatedId: id });
       },
 
       resetState: () => {
