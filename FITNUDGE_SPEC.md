@@ -1466,16 +1466,6 @@ CREATE TABLE ai_conversations (
   message_count INTEGER DEFAULT 0
 );
 
-CREATE TABLE ai_messages (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  conversation_id UUID REFERENCES ai_conversations(id) ON DELETE CASCADE,
-
-  role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
-  content TEXT NOT NULL,
-
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
 CREATE INDEX idx_ai_messages_conversation ON ai_messages(conversation_id);
 
 -- =====================================================

@@ -3,10 +3,12 @@ AI Coach Tasks
 
 Celery tasks for background AI coach message processing.
 Allows users to send a message and leave - response is processed in background.
+Supports streaming: partial content pushed to DB for realtime delivery.
 """
 
 import json
-from typing import Dict, Any, Optional
+import time
+from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
 from app.services.tasks.base import celery_app, get_supabase_client, logger
 from app.core.config import settings
@@ -114,6 +116,381 @@ def _safe_json_dumps(obj: Any) -> str:
         return json.dumps(
             {"success": False, "error": "Serialization failed", "raw": str(obj)}
         )
+
+
+def _update_conversation_messages(
+    supabase,
+    conversation_id: str,
+    messages: List[Dict[str, Any]],
+) -> None:
+    """Update conversation with current messages (partial or final)."""
+    supabase.table("ai_coach_conversations").update(
+        {
+            "messages": json.dumps(messages),
+            "updated_at": datetime.utcnow().isoformat(),
+            "last_message_at": datetime.utcnow().isoformat(),
+        }
+    ).eq("id", conversation_id).execute()
+
+
+def _merge_and_write_messages(
+    supabase,
+    conversation_id: str,
+    full_response: str,
+    request_id: Optional[str],
+    assistant_message_id: Optional[str],
+    user_message_id: Optional[str],
+    fallback_messages: Optional[List[Dict[str, Any]]] = None
+) -> None:
+    """
+    Re-fetch conversation, merge our assistant response into fresh data, then write.
+    Prevents race where concurrent tasks overwrite each other's messages.
+    """
+    conv_result = (
+        supabase.table("ai_coach_conversations")
+        .select("messages")
+        .eq("id", conversation_id)
+        .single()
+        .execute()
+    )
+    if not conv_result.data:
+        if fallback_messages:
+            supabase.table("ai_coach_conversations").update(
+                {
+                    "messages": json.dumps(fallback_messages),
+                    "message_count": len(fallback_messages),
+                    "last_message_at": datetime.utcnow().isoformat(),
+                    "updated_at": datetime.utcnow().isoformat(),
+                }
+            ).eq("id", conversation_id).execute()
+        else:
+            logger.warning("[AI Coach Task] Re-fetch before merge failed, skipping write")
+        return
+
+    fresh = conv_result.data.get("messages", [])
+    if isinstance(fresh, str):
+        fresh = json.loads(fresh) if fresh else []
+
+    now_iso = datetime.utcnow().isoformat()
+
+    # Use fresh as base; add/update our assistant (and user status) so we never overwrite.
+    merged = list(fresh)
+
+    # Find our assistant in merged; update if found
+    assistant_found = False
+    for i, msg in enumerate(merged):
+        if msg.get("role") != "assistant":
+            continue
+        if (request_id and msg.get("request_id") == request_id) or (
+            assistant_message_id and msg.get("message_id") == assistant_message_id
+        ):
+            merged[i] = {**msg, "content": full_response, "status": "completed"}
+            merged[i].setdefault("created_at", now_iso)
+            assistant_found = True
+            break
+
+    if not assistant_found:
+        # Our assistant not in DB; insert after our user message to preserve order
+        our_assistant = {
+            "role": "assistant",
+            "content": full_response,
+            "status": "completed",
+            "created_at": now_iso,
+            "request_id": request_id,
+            "message_id": assistant_message_id,
+        }
+        insert_at = len(merged)
+        for i, msg in enumerate(merged):
+            if msg.get("role") != "user":
+                continue
+            if (user_message_id and msg.get("message_id") == user_message_id) or (
+                request_id and msg.get("request_id") == request_id
+            ):
+                insert_at = i + 1
+                break
+        merged.insert(insert_at, our_assistant)
+
+    # Mark our user message completed
+    for i, msg in enumerate(merged):
+        if msg.get("role") != "user":
+            continue
+        if (user_message_id and msg.get("message_id") == user_message_id) or (
+            request_id and msg.get("request_id") == request_id
+        ):
+            merged[i] = {**msg, "status": "completed"}
+            break
+
+    supabase.table("ai_coach_conversations").update(
+        {
+            "messages": json.dumps(merged),
+            "message_count": len(merged),
+            "last_message_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.utcnow().isoformat(),
+        }
+    ).eq("id", conversation_id).execute()
+
+
+def _find_or_create_assistant_message(
+    messages: List[Dict[str, Any]],
+    assistant_message_id: Optional[str],
+    request_id: Optional[str],
+    now_iso: str,
+) -> int:
+    """Find assistant message index (most recent match) or append one. Returns index."""
+    # Search from end (most recent) to find current turn's assistant placeholder
+    for i in range(len(messages) - 1, -1, -1):
+        msg = messages[i]
+        if msg.get("role") == "assistant":
+            if assistant_message_id and msg.get("message_id") == assistant_message_id:
+                return i
+            if request_id and msg.get("request_id") == request_id:
+                return i
+    logger.warning(
+        "[AI Coach Task] No matching assistant placeholder found, appending one"
+    )
+    messages.append(
+        {
+            "role": "assistant",
+            "content": "",
+            "status": "generating",
+            "created_at": now_iso,
+            "request_id": request_id,
+            "message_id": assistant_message_id,
+        }
+    )
+    return len(messages) - 1
+
+
+def _stream_first_completion(
+    client,
+    messages: List[Dict[str, Any]],
+    supabase,
+    conversation_id: str,
+    messages_list: List[Dict[str, Any]],
+    assistant_message_id: Optional[str],
+    request_id: Optional[str],
+) -> Dict[str, Any]:
+    """
+    Stream first OpenAI completion. Handles both content-only and tool_calls.
+    Returns dict with:
+    - has_tool_calls: bool
+    - content: str (when no tool calls)
+    - tokens_used: int
+    - follow_up_messages: list (when has_tool_calls, for second completion)
+    - tool_calls_list: list (when has_tool_calls)
+    """
+    from app.services.ai_coach_tools import TOOL_DEFINITIONS
+
+    now_iso = datetime.utcnow().isoformat()
+    idx = _find_or_create_assistant_message(
+        messages_list, assistant_message_id, request_id, now_iso
+    )
+    accumulated = ""
+    tokens_used = 0
+    last_update_at = 0.0
+    min_update_interval = 0.25
+    min_chunk_chars = 25
+
+    # Tool calls buffer: index -> {id, name, arguments}
+    tool_calls_buf: Dict[int, Dict[str, Any]] = {}
+    finish_reason = None
+
+    try:
+        stream = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=messages,
+            temperature=0.3,
+            max_tokens=1000,
+            tools=TOOL_DEFINITIONS,
+            tool_choice="auto",
+            stream=True,
+        )
+        for chunk in stream:
+            # Usage is on chunk, not on choice (OpenAI streaming API)
+            chunk_usage = getattr(chunk, "usage", None)
+            if chunk_usage and hasattr(chunk_usage, "total_tokens"):
+                tokens_used = chunk_usage.total_tokens or 0
+
+            if not chunk.choices:
+                continue
+            choice = chunk.choices[0]
+            delta = getattr(choice, "delta", None) or {}
+            if choice.finish_reason:
+                finish_reason = choice.finish_reason
+
+            # Content
+            if getattr(delta, "content", None):
+                accumulated += delta.content
+                now_t = time.time()
+                should_update = (
+                    len(accumulated) >= min_chunk_chars
+                    or (now_t - last_update_at >= min_update_interval and accumulated)
+                )
+                if should_update and accumulated:
+                    messages_list[idx]["content"] = accumulated
+                    messages_list[idx]["status"] = "generating"
+                    messages_list[idx].setdefault("created_at", now_iso)
+                    stream_via_redis = getattr(
+                        settings, "AI_COACH_STREAM_VIA_REDIS", False
+                    ) and request_id
+                    if stream_via_redis:
+                        from app.services.ai_coach_stream_service import publish_chunk
+                        publish_chunk(request_id, accumulated)
+                    else:
+                        _update_conversation_messages(
+                            supabase, conversation_id, messages_list
+                        )
+                    last_update_at = now_t
+
+            # Tool calls (incremental)
+            delta_tc = getattr(delta, "tool_calls", None) or []
+            for tc in delta_tc:
+                i = getattr(tc, "index", None)
+                if i is None:
+                    continue
+                if i not in tool_calls_buf:
+                    tool_calls_buf[i] = {
+                        "id": getattr(tc, "id", None) or "",
+                        "name": "",
+                        "arguments": "",
+                    }
+                fn = getattr(tc, "function", None)
+                if fn:
+                    if getattr(fn, "name", None):
+                        tool_calls_buf[i]["name"] = fn.name
+                    if getattr(fn, "arguments", None):
+                        tool_calls_buf[i]["arguments"] += fn.arguments
+
+        if accumulated:
+            messages_list[idx]["content"] = accumulated
+            messages_list[idx]["status"] = "generating"
+
+        has_tool_calls = finish_reason == "tool_calls" and len(tool_calls_buf) > 0
+
+        if has_tool_calls:
+            # Build tool_calls in order
+            sorted_indices = sorted(tool_calls_buf.keys())
+            tool_calls_list = [
+                {
+                    "id": tool_calls_buf[i]["id"],
+                    "type": "function",
+                    "function": {
+                        "name": tool_calls_buf[i]["name"],
+                        "arguments": tool_calls_buf[i]["arguments"],
+                    },
+                }
+                for i in sorted_indices
+            ]
+            assistant_msg = {
+                "role": "assistant",
+                "content": accumulated or None,
+                "tool_calls": tool_calls_list,
+            }
+            follow_up = messages + [assistant_msg]
+            return {
+                "has_tool_calls": True,
+                "content": "",
+                "tokens_used": tokens_used,
+                "follow_up_messages": follow_up,
+                "tool_calls_list": tool_calls_list,
+            }
+        return {
+            "has_tool_calls": False,
+            "content": accumulated,
+            "tokens_used": tokens_used,
+            "follow_up_messages": None,
+        }
+    except Exception as e:
+        logger.warning(f"[AI Coach Task] First completion streaming failed: {e}")
+        stream_via_redis = getattr(settings, "AI_COACH_STREAM_VIA_REDIS", False) and request_id
+        if stream_via_redis:
+            from app.services.ai_coach_stream_service import publish_error
+            publish_error(request_id, str(e))
+        elif accumulated:
+            messages_list[idx]["content"] = accumulated
+            messages_list[idx]["status"] = "generating"
+            _update_conversation_messages(supabase, conversation_id, messages_list)
+        raise
+
+
+def _stream_completion_and_update_db(
+    client,
+    messages: List[Dict[str, Any]],
+    supabase,
+    conversation_id: str,
+    messages_list: List[Dict[str, Any]],
+    assistant_message_id: Optional[str],
+    request_id: Optional[str],
+) -> tuple[str, int]:
+    """
+    Stream OpenAI completion and push partial content to DB for realtime.
+    Returns (full_response, tokens_used).
+    """
+    now_iso = datetime.utcnow().isoformat()
+    idx = _find_or_create_assistant_message(
+        messages_list, assistant_message_id, request_id, now_iso
+    )
+    accumulated = ""
+    tokens_used = 0
+    last_update_at = 0.0
+    min_update_interval = 0.25  # 250ms
+    min_chunk_chars = 25
+
+    try:
+        stream = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=messages,
+            temperature=0.3,
+            max_tokens=1000,
+            stream=True,
+        )
+        for chunk in stream:
+            # Usage is on chunk, not on choice (OpenAI streaming API)
+            chunk_usage = getattr(chunk, "usage", None)
+            if chunk_usage and hasattr(chunk_usage, "total_tokens"):
+                tokens_used = chunk_usage.total_tokens or 0
+
+            if chunk.choices and chunk.choices[0].delta:
+                delta = chunk.choices[0].delta
+                if delta.content:
+                    accumulated += delta.content
+
+            now = time.time()
+            should_update = (
+                len(accumulated) >= min_chunk_chars
+                or (now - last_update_at >= min_update_interval and accumulated)
+            )
+            if should_update and accumulated:
+                messages_list[idx]["content"] = accumulated
+                messages_list[idx]["status"] = "generating"
+                messages_list[idx].setdefault("created_at", now_iso)
+                stream_via_redis = getattr(
+                    settings, "AI_COACH_STREAM_VIA_REDIS", False
+                ) and request_id
+                if stream_via_redis:
+                    from app.services.ai_coach_stream_service import publish_chunk
+                    publish_chunk(request_id, accumulated)
+                else:
+                    _update_conversation_messages(
+                        supabase, conversation_id, messages_list
+                    )
+                last_update_at = now
+
+        if accumulated:
+            messages_list[idx]["content"] = accumulated
+            messages_list[idx]["status"] = "generating"
+        return accumulated, tokens_used
+    except Exception as e:
+        logger.warning(f"[AI Coach Task] Streaming failed: {e}")
+        stream_via_redis = getattr(settings, "AI_COACH_STREAM_VIA_REDIS", False) and request_id
+        if stream_via_redis:
+            from app.services.ai_coach_stream_service import publish_error
+            publish_error(request_id, str(e))
+        elif accumulated:
+            messages_list[idx]["content"] = accumulated
+            messages_list[idx]["status"] = "generating"
+            _update_conversation_messages(supabase, conversation_id, messages_list)
+        raise
 
 
 @celery_app.task(
@@ -285,22 +662,76 @@ def process_ai_coach_message_task(
 
         # Call OpenAI
         client = OpenAI(api_key=settings.OPENAI_API_KEY)
-
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=openai_messages,
-            temperature=0.3,
-            max_tokens=1000,
-            tools=TOOL_DEFINITIONS,
-            tool_choice="auto",
+        streaming_enabled = getattr(
+            settings, "AI_COACH_STREAMING_ENABLED", True
         )
 
-        assistant_message = response.choices[0].message
-        full_response = ""
-        tokens_used = 0
+        if streaming_enabled:
+            # Stream first completion (works for both content-only and tool_calls)
+            result = _stream_first_completion(
+                client=client,
+                messages=openai_messages,
+                supabase=supabase,
+                conversation_id=conversation_id,
+                messages_list=messages,
+                assistant_message_id=assistant_message_id,
+                request_id=request_id,
+            )
+            if result["has_tool_calls"]:
+                # Execute tools, then stream second completion
+                tool_executor = ToolExecutor(user_id, supabase)
+                follow_up = list(result["follow_up_messages"])
+                for tc in result["tool_calls_list"]:
+                    tool_name = tc["function"]["name"]
+                    try:
+                        tool_args = json.loads(tc["function"]["arguments"])
+                    except json.JSONDecodeError:
+                        tool_args = {}
+                    exec_result = _run_async(
+                        tool_executor.execute(tool_name, tool_args)
+                    )
+                    follow_up.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": tc["id"],
+                            "content": _safe_json_dumps(exec_result),
+                        }
+                    )
+                full_response, tokens_used = _stream_completion_and_update_db(
+                    client=client,
+                    messages=follow_up,
+                    supabase=supabase,
+                    conversation_id=conversation_id,
+                    messages_list=messages,
+                    assistant_message_id=assistant_message_id,
+                    request_id=request_id,
+                )
+                tokens_used += result.get("tokens_used", 0)
+            else:
+                full_response = result["content"]
+                tokens_used = result.get("tokens_used", 0)
+        else:
+            # Non-streaming path (legacy)
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=openai_messages,
+                temperature=0.3,
+                max_tokens=1000,
+                tools=TOOL_DEFINITIONS,
+                tool_choice="auto",
+            )
+            assistant_message = response.choices[0].message
+            full_response = assistant_message.content or ""
+            tokens_used = response.usage.total_tokens if response.usage else 0
 
-        # Handle tool calls if any
-        if assistant_message.tool_calls:
+            if assistant_message.tool_calls:
+                # Fall through to tool execution (non-streaming)
+                pass
+            else:
+                assistant_message = None  # Skip tool block
+
+        # Handle tool calls if any (non-streaming path only)
+        if not streaming_enabled and assistant_message and assistant_message.tool_calls:
             tool_executor = ToolExecutor(user_id, supabase)
             tool_results = []
 
@@ -354,21 +785,19 @@ def process_ai_coach_message_task(
                     }
                 )
 
-            # Get final response
+            # Get final response (non-streaming path)
             follow_up_response = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=follow_up_messages,
                 temperature=0.3,
                 max_tokens=1000,
             )
-
-            full_response = follow_up_response.choices[0].message.content or ""
+            full_response = (
+                follow_up_response.choices[0].message.content or ""
+            )
+            tokens_used = 0
             if follow_up_response.usage:
                 tokens_used = follow_up_response.usage.total_tokens
-        else:
-            full_response = assistant_message.content or ""
-            if response.usage:
-                tokens_used = response.usage.total_tokens
 
         # Update statuses + fill the assistant placeholder (idempotent).
         now_iso = datetime.utcnow().isoformat()
@@ -433,15 +862,21 @@ def process_ai_coach_message_task(
                 }
             )
 
-        # Update conversation (retry handled by ResilientSupabaseClient)
-        supabase.table("ai_coach_conversations").update(
-            {
-                "messages": json.dumps(messages),
-                "message_count": len(messages),
-                "last_message_at": datetime.utcnow().isoformat(),
-                "updated_at": datetime.utcnow().isoformat(),
-            }
-        ).eq("id", conversation_id).execute()
+        # Publish done to Redis when streaming via Redis (for SSE clients)
+        if getattr(settings, "AI_COACH_STREAM_VIA_REDIS", False) and request_id:
+            from app.services.ai_coach_stream_service import publish_done
+            publish_done(request_id, full_response)
+
+        # Re-fetch, merge our updates into fresh data, then write (prevents race overwrites)
+        _merge_and_write_messages(
+            supabase=supabase,
+            conversation_id=conversation_id,
+            full_response=full_response,
+            request_id=request_id,
+            assistant_message_id=assistant_message_id,
+            user_message_id=user_message_id,
+            fallback_messages=messages,
+        )
 
         # Generate title if needed
         if not conversation.get("title"):
@@ -471,6 +906,14 @@ def process_ai_coach_message_task(
             exc_info=True,
         )
 
+        # Notify SSE clients when Redis streaming enabled
+        if getattr(settings, "AI_COACH_STREAM_VIA_REDIS", False) and request_id:
+            try:
+                from app.services.ai_coach_stream_service import publish_error
+                publish_error(request_id, str(e))
+            except Exception:
+                pass
+
         # Mark the message/placeholder as failed
         try:
             conv_result = (
@@ -486,14 +929,14 @@ def process_ai_coach_message_task(
                 if isinstance(messages, str):
                     messages = json.loads(messages)
 
-                # Prefer updating by ids/request_id, fallback to first pending user + generating assistant.
+                # User message: mark COMPLETED (user successfully sent it - failure is AI-side only)
                 if user_message_id:
                     for i, msg in enumerate(messages):
                         if (
                             msg.get("role") == "user"
                             and msg.get("message_id") == user_message_id
                         ):
-                            messages[i]["status"] = "failed"
+                            messages[i]["status"] = "completed"
                             break
                 elif request_id:
                     for i, msg in enumerate(messages):
@@ -501,15 +944,15 @@ def process_ai_coach_message_task(
                             msg.get("role") == "user"
                             and msg.get("request_id") == request_id
                         ):
-                            messages[i]["status"] = "failed"
+                            messages[i]["status"] = "completed"
                             break
                 else:
                     for i, msg in enumerate(messages):
                         if msg.get("status") == "pending" and msg.get("role") == "user":
-                            messages[i]["status"] = "failed"
+                            messages[i]["status"] = "completed"
                             break
 
-                # Assistant placeholder
+                # Assistant placeholder: mark FAILED (AI failed to respond)
                 if assistant_message_id:
                     for i, msg in enumerate(messages):
                         if (
@@ -714,7 +1157,9 @@ def _get_general_scope_context_sync() -> str:
 
 **CRITICAL:** You may discuss **any** of the user's goals. Use get_goals() to see them when needed.
 
-**OFF-TOPIC (STRICT):** If the user asks something that does **NOT** relate to any of their goals → respond: "I can't help with that because it's outside the scope of **your goals**. Let's get back to **your goals**." Do **NOT** engage (e.g. "while I'm here to support your fitness goals, X is valuable too") — **strictly redirect**.
+**COURTESY:** Always respond to greetings (hi, hello, hey, thanks, etc.) with a warm reply. Never reject greetings as off-topic.
+
+**OFF-TOPIC (STRICT):** If the user asks something that does **NOT** relate to any of their goals (other than greetings) → respond: "I can't help with that because it's outside the scope of **your goals**. Let's get back to **your goals**." Do **NOT** engage (e.g. "while I'm here to support your fitness goals, X is valuable too") — **strictly redirect**.
 """
 
 
@@ -729,7 +1174,9 @@ def _get_goal_focus_context_sync(goal_id: str) -> str:
 - Ignore all other goals in any context. Do not list multiple goals, compare goals, or give cross-goal summaries.
 - Focus for next week, suggestions, and next steps must ONLY reference **this goal**. Never suggest actions for other goals (e.g. "complete one more workout" when this goal is language learning).
 
-**OFF-TOPIC (STRICT):** If the user asks something **unrelated** to this goal → respond: "I can't help with that because it's outside the scope of **[goal title]**. Let's get back to **[goal title]**." Use the goal title from get_goals(goal_id). Do **NOT** engage (e.g. "while I'm here to support your fitness goals, X is valuable too") — **strictly redirect**.
+**COURTESY:** Always respond to greetings (hi, hello, hey, thanks, etc.) with a warm reply. Never reject greetings as off-topic.
+
+**OFF-TOPIC (STRICT):** If the user asks something **unrelated** to this goal (other than greetings) → respond: "I can't help with that because it's outside the scope of **[goal title]**. Let's get back to **[goal title]**." Use the goal title from get_goals(goal_id). Do **NOT** engage (e.g. "while I'm here to support your fitness goals, X is valuable too") — **strictly redirect**.
 
 **Focused goal_id:** `{goal_id}`
 

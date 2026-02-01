@@ -480,6 +480,20 @@ async def create_goal(
     except Exception as e:
         logger.warning(f"Failed to notify partners: {e}")
 
+    # Refresh Live Activity / NextUp so user sees new goal immediately (trigger already created today's check-in)
+    try:
+        from app.services.tasks.live_activity_tasks import (
+            refresh_live_activity_for_user_task,
+        )
+        from app.services.tasks.nextup_fcm_tasks import (
+            refresh_nextup_fcm_for_user_task,
+        )
+
+        refresh_live_activity_for_user_task.delay(str(user_id))
+        refresh_nextup_fcm_for_user_task.delay(str(user_id))
+    except Exception as e:
+        logger.warning(f"Failed to queue live activity/nextup refresh: {e}")
+
     return result.data[0]
 
 

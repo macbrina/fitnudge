@@ -1,5 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  images: {
+    localPatterns: [
+      {
+        pathname: '/mockups/**',
+      },
+    ],
+  },
   async headers() {
     return [
       {

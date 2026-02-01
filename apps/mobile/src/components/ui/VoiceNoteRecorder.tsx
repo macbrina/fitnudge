@@ -48,88 +48,6 @@ interface VoiceNoteRecorderProps {
   ) => void;
 }
 
-// Voice-reactive audio bars component
-function AudioWaveformBars({
-  isActive,
-  audioLevel,
-  color,
-  barCount = BAR_COUNT
-}: {
-  isActive: boolean;
-  audioLevel: number; // 0-1 normalized
-  color: string;
-  barCount?: number;
-}) {
-  const barAnims = useRef<Animated.Value[]>(
-    Array.from({ length: barCount }, () => new Animated.Value(0.2))
-  ).current;
-
-  useEffect(() => {
-    if (isActive) {
-      // Animate bars based on audio level with some randomization for natural look
-      barAnims.forEach((anim, index) => {
-        // Create wave-like effect - center bars react more
-        const centerFactor = 1 - Math.abs(index - barCount / 2) / (barCount / 2);
-        const targetHeight = Math.max(
-          0.15,
-          Math.min(1, audioLevel * (0.5 + centerFactor * 0.8) + Math.random() * 0.2)
-        );
-
-        Animated.timing(anim, {
-          toValue: targetHeight,
-          duration: METERING_UPDATE_INTERVAL,
-          useNativeDriver: false
-        }).start();
-      });
-    } else {
-      // Reset to minimal height when not active
-      barAnims.forEach((anim) => {
-        Animated.timing(anim, {
-          toValue: 0.15,
-          duration: 200,
-          useNativeDriver: false
-        }).start();
-      });
-    }
-  }, [isActive, audioLevel]);
-
-  return (
-    <View style={waveformStyles.container}>
-      {barAnims.map((anim, index) => (
-        <Animated.View
-          key={index}
-          style={[
-            waveformStyles.bar,
-            {
-              backgroundColor: color,
-              height: anim.interpolate({
-                inputRange: [0, 1],
-                outputRange: ["15%", "100%"]
-              })
-            }
-          ]}
-        />
-      ))}
-    </View>
-  );
-}
-
-const waveformStyles = StyleSheet.create({
-  container: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    height: 40,
-    gap: 2,
-    flex: 1
-  },
-  bar: {
-    width: 3,
-    borderRadius: 1.5,
-    minHeight: 6
-  }
-});
-
 export function VoiceNoteRecorder({
   onRecordingComplete,
   onCancel,
@@ -139,7 +57,7 @@ export function VoiceNoteRecorder({
   onRegisterActions
 }: VoiceNoteRecorderProps) {
   const { t } = useTranslation();
-  const { colors, brandColors } = useTheme();
+  const { colors, brandColors, isDark } = useTheme();
   const { hasFeature, openModal } = useSubscriptionStore();
 
   // Recording state machine
@@ -360,7 +278,6 @@ export function VoiceNoteRecorder({
         const status = (
           audioRecorder as { getStatus?: () => { durationMillis?: number } }
         )?.getStatus?.();
-        console.log("status", status);
         statusDurationMs = status?.durationMillis ?? null;
         uri =
           lastRecordedUrlRef.current ??
@@ -373,15 +290,11 @@ export function VoiceNoteRecorder({
 
       await audioRecorder.stop();
       lastRecordedUrlRef.current = null;
-      const durationMs = statusDurationMs ?? elapsedMsRef.current;
+      // Prefer timer-derived duration when native durationMillis is missing or 0 (expo-audio can return 0)
+      const durationMs =
+        statusDurationMs != null && statusDurationMs > 0 ? statusDurationMs : elapsedMsRef.current;
       elapsedMsRef.current = durationMs;
-      const finalDuration = Math.floor(durationMs / 1000);
-      console.log("[VoiceNoteRecorder] stopRecording", {
-        elapsedMs: durationMs,
-        finalDuration,
-        statusDurationMs,
-        uri
-      });
+      const finalDuration = Math.max(0, Math.floor(durationMs / 1000));
       setRecordedUri(uri || null);
       setDuration(finalDuration);
       if (startImmediately && uri) {
@@ -582,13 +495,6 @@ export function VoiceNoteRecorder({
           </Text>
         </View>
 
-        {/* Waveform visualization */}
-        <AudioWaveformBars
-          isActive={isRecording}
-          audioLevel={audioLevel}
-          color={isRecording ? colors.feedback.error : colors.text.tertiary}
-        />
-
         {/* Progress bar — track = unfilled, fill = elapsed */}
         <View style={[styles.progressBar, { backgroundColor: colors.text.tertiary + "30" }]}>
           <Animated.View
@@ -627,7 +533,11 @@ export function VoiceNoteRecorder({
               }
             ]}
           >
-            {isRecording ? <Pause size={24} color="#fff" /> : <Mic size={24} color="#fff" />}
+            {isRecording ? (
+              <Pause size={24} color={isDark ? "#000" : "#fff"} />
+            ) : (
+              <Mic size={24} color="#fff" />
+            )}
           </TouchableOpacity>
 
           {/* Done = check in circle only (no separate "Save"; check-in submits everything) */}

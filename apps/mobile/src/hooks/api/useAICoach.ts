@@ -139,13 +139,17 @@ export function useAICoachChat() {
     focusedGoalId,
     setFocusedGoalId,
     pendingAIResponse,
-    clearPendingAIResponse
+    clearPendingAIResponse,
+    conversationMessagesInvalidatedId,
+    setConversationMessagesInvalidatedId
   } = useAICoachStore();
 
   // State
   const [messages, setMessages] = useState<Message[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState("");
+  /** "redis" = SSE stream from backend, "realtime" = Supabase Realtime fallback, null = not streaming */
+  const [streamingVia, setStreamingVia] = useState<"redis" | "realtime" | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoadingConversation, setIsLoadingConversation] = useState(false);
@@ -170,11 +174,24 @@ export function useAICoachChat() {
   // Track the pending assistant message ID for updates
   const pendingAssistantMessageIdRef = useRef<string | null>(null);
 
+  // SSE connection ref (Redis streaming) - close on unmount or new message
+  const sseConnectionRef = useRef<{ close: () => void } | null>(null);
+
   // Streaming animation ref
   const streamingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Track if next message should force create a new conversation
   const forceNewChatRef = useRef(false);
+
+  // Track last loaded conversation context to avoid redundant fetches
+  const lastContextRef = useRef<{ conversationId: string | null; goalId: string | null }>({
+    conversationId: null,
+    goalId: null
+  });
+
+  // Track what we're currently loading to prevent duplicate API calls
+  // Value is the loading key (specificId or "goal:{goalId}"), or null if not loading
+  const isLoadingRef = useRef<string | null>(null);
 
   // Check feature access
   const hasAccess = hasFeature("ai_coach_chat");
@@ -279,12 +296,22 @@ export function useAICoachChat() {
     [checkForAIResponse, clearRecoveryTimeout]
   );
 
-  // Clean up recovery timeout on unmount
+  // Clean up recovery timeout and SSE connection on unmount
   useEffect(() => {
     return () => {
       clearRecoveryTimeout();
+      sseConnectionRef.current?.close();
+      sseConnectionRef.current = null;
     };
   }, [clearRecoveryTimeout]);
+
+  // Close SSE when conversation changes (user switched)
+  useEffect(() => {
+    return () => {
+      sseConnectionRef.current?.close();
+      sseConnectionRef.current = null;
+    };
+  }, [conversationId]);
 
   // Sync conversation ID with store for realtime to detect
   useEffect(() => {
@@ -369,7 +396,7 @@ export function useAICoachChat() {
     };
   }, [conversationId, hasAccess, convertToGiftedMessages, queryClient]);
 
-  // Handle pending AI response from realtime - SIMPLE: just update the UI directly
+  // Handle pending AI response from realtime (partial streaming + final completed)
   useEffect(() => {
     if (!pendingAIResponse) return;
 
@@ -379,21 +406,36 @@ export function useAICoachChat() {
       return;
     }
 
-    const fullText = pendingAIResponse.content || "";
+    const content = pendingAIResponse.content || "";
+    const isPartial = pendingAIResponse.isPartial === true;
 
-    console.log("[AI Coach] 📬 Received AI response from realtime, updating UI directly", {
-      contentLength: fullText.length,
-      conversationId: conversationId?.substring(0, 8)
-    });
+    if (isPartial) {
+      setStreamingVia("realtime");
+      // Streaming partial: update content only if new content is longer (ignore out-of-order stale partials)
+      setMessages((prev) =>
+        prev.map((msg) => {
+          if (msg.pending && msg.user._id !== 1) {
+            const currentLen = (msg.text || "").length;
+            if (content.length > currentLen) {
+              return { ...msg, text: content };
+            }
+            return msg;
+          }
+          return msg;
+        })
+      );
+      clearPendingAIResponse();
+      return;
+    }
 
-    // SIMPLE: Just update the pending assistant message with the full response immediately
+    // Final completed response
+    setStreamingVia("realtime");
+
     setMessages((prev) =>
       prev.map((msg) => {
-        // Find the pending assistant message and replace it with the actual response
         if (msg.pending && msg.user._id !== 1) {
-          return { ...msg, text: fullText, pending: false, failed: false, status: "completed" };
+          return { ...msg, text: content, pending: false, failed: false, status: "completed" };
         }
-        // Mark the most recent pending user message as completed too
         if (msg.pending && msg.user._id === 1) {
           return { ...msg, pending: false, status: "completed" };
         }
@@ -401,7 +443,6 @@ export function useAICoachChat() {
       })
     );
 
-    // Clear waiting states and recovery timeout
     if (pendingAIResponse.conversationId) {
       setWaitingByConversationId((prev) => ({
         ...prev,
@@ -410,16 +451,15 @@ export function useAICoachChat() {
     }
     setIsStreaming(false);
     setStreamingText("");
+    setStreamingVia(null);
     pendingAssistantMessageIdRef.current = null;
     failedMessageRef.current = null;
     clearRecoveryTimeout();
 
-    // Force refetch rate limit - AI responded successfully so rate limit was decremented
     queryClient.refetchQueries({
       queryKey: aiCoachQueryKeys.rateLimit()
     });
 
-    // Clear the pending response
     clearPendingAIResponse();
 
     console.log("[AI Coach] ✅ UI updated with AI response");
@@ -443,6 +483,71 @@ export function useAICoachChat() {
         setTotalMessages(0);
         return;
       }
+
+      // Check if we're loading the SAME conversation context we already have
+      const currentGoalId = goalId ?? null;
+      const currentSpecificId = specificConversationId ?? null;
+
+      // Build a unique key for this loading request
+      const loadingKey = currentSpecificId || `goal:${currentGoalId}`;
+
+      // If we're already loading the SAME thing, skip
+      if (isLoadingRef.current === loadingKey) {
+        console.log("[AI Coach] Already loading this context, skipping", { loadingKey });
+        return;
+      }
+
+      // Determine if this is the same context we already have loaded
+      // For specific conversation: match by ID
+      // For current/goal-specific: match by goalId only (each goal has one thread)
+      const isSameContext =
+        (currentSpecificId && currentSpecificId === lastContextRef.current.conversationId) ||
+        (!currentSpecificId && currentGoalId === lastContextRef.current.goalId);
+
+      // If same context AND we have messages, skip API call (avoid loading flash)
+      if (isSameContext && messages.length > 0) {
+        console.log("[AI Coach] Using cached conversation from state (same context)", {
+          goalId: currentGoalId,
+          messagesCount: messages.length
+        });
+        return;
+      }
+
+      // Mark what we're loading IMMEDIATELY to prevent duplicate calls
+      isLoadingRef.current = loadingKey;
+
+      // Different context detected - need to clear and reload
+      // This triggers when goal changes (including null <-> non-null)
+      const isContextChange =
+        (lastContextRef.current.conversationId !== null ||
+          lastContextRef.current.goalId !== null) &&
+        currentGoalId !== lastContextRef.current.goalId;
+
+      if (isContextChange) {
+        console.log("[AI Coach] Context changed - clearing state", {
+          from: lastContextRef.current,
+          to: { goalId: currentGoalId }
+        });
+        // Clear state when context changes
+        setConversationId(null);
+        setMessages([]);
+        setHasMoreMessages(false);
+        setTotalMessages(0);
+        messageOffsetRef.current = 0;
+      }
+
+      // Update lastContextRef immediately
+      lastContextRef.current = {
+        conversationId: lastContextRef.current.conversationId,
+        goalId: currentGoalId
+      };
+
+      // Proceed with loading
+      console.log("[AI Coach] Loading conversation", {
+        reason: isContextChange ? "context changed" : "initial load",
+        goalId: currentGoalId,
+        specificId: currentSpecificId
+      });
 
       // Clear force new flag when loading an existing conversation
       forceNewChatRef.current = false;
@@ -505,12 +610,22 @@ export function useAICoachChat() {
           setHasMoreMessages(conversation.has_more_messages ?? false);
           setTotalMessages(conversation.total_messages ?? conversation.messages.length);
           messageOffsetRef.current = conversation.messages.length;
+          // Update last loaded context
+          lastContextRef.current = {
+            conversationId: conversation.id,
+            goalId: currentGoalId
+          };
         } else {
           // No conversation found (or no goal thread yet) — reset state, show empty
           setConversationId(null);
           setMessages([]);
           setHasMoreMessages(false);
           setTotalMessages(0);
+          // Update last loaded context (no conversation)
+          lastContextRef.current = {
+            conversationId: null,
+            goalId: currentGoalId
+          };
         }
       } catch (err: unknown) {
         // Don't log 403 errors to Sentry - they're expected for free users (premium feature)
@@ -524,11 +639,29 @@ export function useAICoachChat() {
         setHasMoreMessages(false);
         setTotalMessages(0);
       } finally {
+        isLoadingRef.current = null;
         setIsLoadingConversation(false);
       }
     },
     [convertToGiftedMessages, hasAccess, queryClient]
   );
+
+  // When realtime detects message removal (or other conversation change), reload this conversation
+  useEffect(() => {
+    if (
+      conversationMessagesInvalidatedId &&
+      conversationId &&
+      conversationMessagesInvalidatedId === conversationId
+    ) {
+      setConversationMessagesInvalidatedId(null);
+      loadConversation(conversationId);
+    }
+  }, [
+    conversationMessagesInvalidatedId,
+    conversationId,
+    loadConversation,
+    setConversationMessagesInvalidatedId
+  ]);
 
   // Load more (older) messages for infinite scroll
   const loadMoreMessages = useCallback(async () => {
@@ -577,6 +710,8 @@ export function useAICoachChat() {
     setHasMoreMessages(false);
     setTotalMessages(0);
     messageOffsetRef.current = 0;
+    // Reset last context when clearing
+    lastContextRef.current = { conversationId: null, goalId: null };
   }, []);
 
   // Start a new conversation (local only - no API call)
@@ -592,6 +727,8 @@ export function useAICoachChat() {
     setTotalMessages(0);
     messageOffsetRef.current = 0;
     forceNewChatRef.current = true;
+    // Reset last context when starting new chat
+    lastContextRef.current = { conversationId: null, goalId: null };
   }, [setFocusedGoalId]);
 
   // Send message using async endpoint (background processing via Celery)
@@ -694,14 +831,100 @@ export function useAICoachChat() {
             });
           }
 
-          // Start recovery timeout - if no realtime response in 30s, check conversation
+          // Start recovery timeout - if no realtime/SSE response in 30s, check conversation
           const convIdForRecovery = newConversationId || conversationId;
           if (convIdForRecovery) {
             startRecoveryTimeout(convIdForRecovery, 30000);
           }
 
-          // Now we wait for realtime to notify us when the response is ready
-          // The useEffect listening to pendingAIResponse will handle the streaming
+          // Try SSE (Redis streaming) - on 501 or error, fall back to Realtime
+          const reqId = response.data.request_id;
+          const convId = newConversationId || conversationId;
+          if (reqId) {
+            sseConnectionRef.current?.close();
+            aiCoachService
+              .streamResponse(
+                reqId,
+                {
+                  onMessage: (event) => {
+                    if (event.type === "meta" && event.source === "redis") {
+                      setStreamingVia("redis");
+                      return;
+                    }
+                    if (event.type === "chunk" && event.content != null) {
+                      setMessages((prev) =>
+                        prev.map((msg) => {
+                          if (msg.pending && msg.user._id !== 1) {
+                            const currentLen = (msg.text || "").length;
+                            if (event.content!.length > currentLen) {
+                              return { ...msg, text: event.content! };
+                            }
+                          }
+                          return msg;
+                        })
+                      );
+                    } else if (event.type === "done" && event.content != null) {
+                      setMessages((prev) =>
+                        prev.map((msg) => {
+                          if (msg.pending && msg.user._id !== 1) {
+                            return {
+                              ...msg,
+                              text: event.content!,
+                              pending: false,
+                              failed: false,
+                              status: "completed"
+                            };
+                          }
+                          if (msg.pending && msg.user._id === 1) {
+                            return { ...msg, pending: false, status: "completed" };
+                          }
+                          return msg;
+                        })
+                      );
+                      if (convId) {
+                        setWaitingByConversationId((prev) => ({ ...prev, [convId]: false }));
+                      }
+                      clearRecoveryTimeout();
+                      queryClient.refetchQueries({ queryKey: aiCoachQueryKeys.rateLimit() });
+                      pendingAssistantMessageIdRef.current = null;
+                      failedMessageRef.current = null;
+                      setStreamingVia(null);
+                      sseConnectionRef.current?.close();
+                      sseConnectionRef.current = null;
+                    } else if (event.type === "error") {
+                      setError(event.message || "Response failed");
+                      if (convId) {
+                        setWaitingByConversationId((prev) => ({ ...prev, [convId]: false }));
+                      }
+                      setMessages((prev) =>
+                        prev.map((msg) =>
+                          msg.pending && msg.user._id !== 1
+                            ? { ...msg, pending: false, failed: true, errorMessage: event.message }
+                            : msg
+                        )
+                      );
+                      clearRecoveryTimeout();
+                      setStreamingVia(null);
+                      sseConnectionRef.current?.close();
+                      sseConnectionRef.current = null;
+                    }
+                  },
+                  onError: () => {
+                    setStreamingVia(null);
+                    sseConnectionRef.current = null;
+                  }
+                },
+                convId ?? undefined
+              )
+              .then((conn) => {
+                sseConnectionRef.current = conn;
+              })
+              .catch(() => {
+                sseConnectionRef.current = null;
+              });
+          }
+
+          // Realtime fallback: useEffect listening to pendingAIResponse handles streaming when Redis disabled
         } else {
           throw new Error("No response data from async endpoint");
         }
@@ -814,6 +1037,7 @@ export function useAICoachChat() {
     clearRecoveryTimeout();
 
     setIsStreaming(false);
+    setStreamingVia(null);
     const currentKey = conversationId || "__new__";
     setWaitingByConversationId((prev) => ({ ...prev, [currentKey]: false }));
     setStreamingText("");
@@ -879,6 +1103,8 @@ export function useAICoachChat() {
     isStreaming,
     isWaitingForResponse, // True for the active conversation only
     streamingText,
+    /** "redis" when SSE stream is active, "realtime" when using Realtime fallback, null otherwise */
+    streamingVia,
     conversationId,
     error,
     hasAccess,

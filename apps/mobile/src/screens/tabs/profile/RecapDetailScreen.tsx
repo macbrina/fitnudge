@@ -1,31 +1,29 @@
-import React from "react";
-import { View, Text, ScrollView, RefreshControl, TouchableOpacity } from "react-native";
-import { NotFoundState } from "@/components/ui/NotFoundState";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import { UserAvatar } from "@/components/avatars";
+import { RecapDetailSkeleton } from "@/components/skeletons";
+import { BackButton } from "@/components/ui/BackButton";
+import Button from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
 import CheckmarkCircle from "@/components/ui/CheckmarkCircle";
+import { NotFoundState } from "@/components/ui/NotFoundState";
+import { getRarityColor } from "@/hooks/api/useAchievements";
+import { useWeeklyRecapDetail } from "@/hooks/api/useWeeklyRecaps";
+import { fontFamily } from "@/lib/fonts";
 import { useTranslation } from "@/lib/i18n";
+import { toRN } from "@/lib/units";
+import type {
+  AchievementUnlocked,
+  CompletionRateTrend,
+  GoalBreakdown
+} from "@/services/api/recaps";
+import { useSubscriptionStore } from "@/stores/subscriptionStore";
 import { useStyles, useTheme } from "@/themes";
 import { tokens } from "@/themes/tokens";
-import { toRN } from "@/lib/units";
-import { fontFamily } from "@/lib/fonts";
-import { Card } from "@/components/ui/Card";
-import { BackButton } from "@/components/ui/BackButton";
-import { SkeletonBox } from "@/components/ui/SkeletonBox";
-import Button from "@/components/ui/Button";
-import Markdown from "react-native-markdown-display";
 import { formatWeekRange } from "@/utils/helper";
-import { useWeeklyRecapDetail } from "@/hooks/api/useWeeklyRecaps";
-import { useSubscriptionStore } from "@/stores/subscriptionStore";
-import { UserAvatar } from "@/components/avatars";
+import { Ionicons } from "@expo/vector-icons";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { RefreshControl, ScrollView, Text, View } from "react-native";
+import Markdown from "react-native-markdown-display";
 import Svg, { Circle } from "react-native-svg";
-import type {
-  GoalBreakdown,
-  CompletionRateTrend,
-  AchievementUnlocked
-} from "@/services/api/recaps";
-import { RecapDetailSkeleton } from "@/components/skeletons";
-import { getRarityColor } from "@/hooks/api/useAchievements";
 
 export default function RecapDetailScreen() {
   const params = useLocalSearchParams<{ id?: string }>();

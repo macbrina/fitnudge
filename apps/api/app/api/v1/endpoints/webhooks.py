@@ -409,6 +409,8 @@ async def process_referral_bonus_on_subscription(supabase, user_id: str):
 
 async def handle_subscription_active(supabase, event: RevenueCatEvent, user_id: str):
     """Handle active subscription (new purchase, renewal, uncancellation)"""
+    from app.services.subscription_service import reset_ai_coach_daily_usage_on_downgrade
+
     # Prefer entitlement_ids over product_id for plan determination
     # This is more reliable during product changes where RENEWAL may have stale product_id
     plan_from_entitlements = get_plan_from_entitlement_ids(event.entitlement_ids)
@@ -492,6 +494,10 @@ async def handle_subscription_active(supabase, event: RevenueCatEvent, user_id: 
 
     # Update user's plan
     supabase.table("users").update({"plan": plan}).eq("id", user_id).execute()
+
+    # Reset AI Coach daily usage on INITIAL_PURCHASE and RENEWAL (fresh slate for new period)
+    if event.type in ["INITIAL_PURCHASE", "RENEWAL"]:
+        await reset_ai_coach_daily_usage_on_downgrade(supabase, user_id)
 
     # Grant referral bonus on first purchase (not on renewals/uncancellations)
     if event.type == "INITIAL_PURCHASE":

@@ -658,15 +658,20 @@ BEGIN
   FROM goals
   WHERE user_id = p_user_id AND status = 'active';
   
-  SELECT jsonb_agg(jsonb_build_object(
-    'type', insight_type,
-    'text', insight_text,
-    'data', insight_data
-  ))
-  INTO patterns_data
-  FROM pattern_insights
-  WHERE user_id = p_user_id
-    AND status = 'completed';
+  -- Use insights JSONB (migration 021 replaced insight_type/insight_text/insight_data)
+  SELECT COALESCE(jsonb_agg(pattern_item), '[]'::jsonb) INTO patterns_data
+  FROM (
+    SELECT jsonb_build_object(
+      'type', COALESCE(elem->>'type', 'pattern'),
+      'text', COALESCE(elem->>'text', elem->>'message', ''),
+      'goal_id', pi.goal_id
+    ) as pattern_item
+    FROM pattern_insights pi,
+         jsonb_array_elements(COALESCE(pi.insights, '[]'::jsonb)) as elem
+    WHERE pi.user_id = p_user_id
+      AND pi.status = 'completed'
+    LIMIT 50
+  ) sub;
   
   -- Recent stats (exclude pending)
   SELECT 
