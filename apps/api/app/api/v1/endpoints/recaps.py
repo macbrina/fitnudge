@@ -267,13 +267,13 @@ async def get_recap_by_id(
             .execute()
         )
 
-        if not result.data:
+        # Supabase client can (rarely) return None here; treat as not found
+        recap = getattr(result, "data", None) if result is not None else None
+        if not recap:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Weekly recap not found",
             )
-
-        recap = result.data
 
         # Mark as viewed if not already viewed
         if not recap.get("viewed_at"):
@@ -301,7 +301,7 @@ async def get_recap_by_id(
         raise
     except Exception as e:
         logger.error(
-            f"Failed to get weekly recap {recap_id} for user {current_user['id']}",
+            f"Failed to get weekly recap {recap_id} for user {current_user['id']} str({e})",
             {"error": str(e), "user_id": current_user["id"], "recap_id": recap_id},
         )
         raise HTTPException(

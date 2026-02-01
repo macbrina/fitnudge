@@ -26,7 +26,11 @@ Production requires the API service and at least one Celery worker process onlin
 3. **Add the API service:**
    - Deploy the `apps/api` directory.
    - Set build command to `poetry install --no-root`.
-   - Set start command to `poetry run uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}`.
+   - Set start command to run **multiple uvicorn workers** in production (so sync Supabase in one request doesn’t block others):
+     - **Railway (or any host that supplies `PORT`):**  
+       `poetry run uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --workers ${UVICORN_WORKERS:-4}`  
+       Set `ENVIRONMENT=production` and optionally `UVICORN_WORKERS` (default 4).
+     - **Local / `python main.py`:** When `ENVIRONMENT=production`, `main.py` applies workers automatically; use `UVICORN_WORKERS` to override.
 4. **Add a Celery worker service (separate Railway service):**
    - Same build command.
    - Start command: `poetry run celery -A app.core.celery_app.celery_app worker --loglevel=info`.
@@ -34,31 +38,62 @@ Production requires the API service and at least one Celery worker process onlin
 
 Railway automatically provides the `PORT` environment variable. Ensure the API binds to `0.0.0.0`.
 
+### Testing multi-worker locally
+
+To confirm multiple workers are running and handling requests concurrently:
+
+1. **Start the API in production mode with 2 workers**
+
+   ```bash
+   cd apps/api
+   ENVIRONMENT=production UVICORN_WORKERS=2 poetry run python main.py
+   ```
+
+   Logs should show multiple worker processes (e.g. uvicorn “Started child process” or similar).
+
+2. **Optional: hit the API from two terminals at once**
+   - Terminal 1: `curl -s -o /dev/null -w "%{time_total}\n" http://localhost:8000/health`
+   - Terminal 2: run the same at the same time  
+     With multiple workers, both complete quickly. With a single worker, one long-running request would delay the other.
+
+3. **Optional: use a load generator**
+   ```bash
+   ab -n 8 -c 4 http://localhost:8000/health
+   ```
+   With 2+ workers you get concurrent handling; total time stays low.
+
 ---
 
 ## 3. Environment Variables
 
 Create a shared “Environment Group” in Railway (or copy the same variables into each service). Required keys:
 
-| Key                                                                                                                                    | Description                                                                                    |
-| -------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `ENVIRONMENT`                                                                                                                          | e.g. `production`.                                                                             |
-| `DEBUG`                                                                                                                                | `false` in production.                                                                         |
-| `DATABASE_URL`                                                                                                                         | Supabase Postgres connection string (if API performs direct DB access).                        |
-| `SUPABASE_URL` / `SUPABASE_SERVICE_KEY`                                                                                                | Supabase REST and service credentials.                                                         |
-| `SECRET_KEY`                                                                                                                           | JWT signing secret.                                                                            |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` / `REFRESH_TOKEN_EXPIRE_DAYS`                                                                            | Override defaults if needed.                                                                   |
-| `ALLOWED_ORIGINS`                                                                                                                      | Comma list of frontend domains (`https://app.fitnudge.app,https://fitnudge.app`).              |
-| `ALLOWED_HOSTS`                                                                                                                        | Domains that can reach the API.                                                                |
-| `REDIS_URL`                                                                                                                            | `rediss://...` Upstash endpoint. Append `?ssl_cert_reqs=none` if you rely on Upstash defaults. |
-| `OPENAI_API_KEY`                                                                                                                       | If prompting features are enabled.                                                             |
-| `ELEVENLABS_API_KEY`                                                                                                                   | Voice synthesis.                                                                               |
-| `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_ACCESS_KEY_ID`, `CLOUDFLARE_SECRET_ACCESS_KEY`, `CLOUDFLARE_BUCKET_NAME`, `CLOUDFLARE_PUBLIC_URL` | R2 credentials.                                                                                |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `FROM_EMAIL`, `FROM_NAME`, `REPLY_TO_EMAIL`                                | Namecheap Private Email settings.                                                              |
-| `POSTHOG_API_KEY`, `POSTHOG_HOST`                                                                                                      | Analytics for API-triggered events.                                                            |
-| `NEW_RELIC_LICENSE_KEY`, `NEW_RELIC_APP_NAME`                                                                                          | Optional monitoring.                                                                           |
+| Key                                                                                                                                    | Description                                                                                             |
+| -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `ENVIRONMENT`                                                                                                                          | e.g. `production`. Required for multi-worker mode.                                                      |
+| `UVICORN_WORKERS`                                                                                                                      | Number of uvicorn worker processes (default `4`). Use when start command runs uvicorn with `--workers`. |
+| `DEBUG`                                                                                                                                | `false` in production. See **TrustedHost and local testing** below.                                     |
+| `DATABASE_URL`                                                                                                                         | Supabase Postgres connection string (if API performs direct DB access).                                 |
+| `SUPABASE_URL` / `SUPABASE_SERVICE_KEY`                                                                                                | Supabase REST and service credentials.                                                                  |
+| `SECRET_KEY`                                                                                                                           | JWT signing secret.                                                                                     |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` / `REFRESH_TOKEN_EXPIRE_DAYS`                                                                            | Override defaults if needed.                                                                            |
+| `ALLOWED_ORIGINS`                                                                                                                      | Comma list of frontend domains (`https://app.fitnudge.app,https://fitnudge.app`).                       |
+| `ALLOWED_HOSTS`                                                                                                                        | Domains that can reach the API (comma-separated). Use `*` to allow any host.                            |
+| `REDIS_URL`                                                                                                                            | `rediss://...` Upstash endpoint. Append `?ssl_cert_reqs=none` if you rely on Upstash defaults.          |
+| `OPENAI_API_KEY`                                                                                                                       | If prompting features are enabled.                                                                      |
+| `ELEVENLABS_API_KEY`                                                                                                                   | Voice synthesis.                                                                                        |
+| `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_ACCESS_KEY_ID`, `CLOUDFLARE_SECRET_ACCESS_KEY`, `CLOUDFLARE_BUCKET_NAME`, `CLOUDFLARE_PUBLIC_URL` | R2 credentials.                                                                                         |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `FROM_EMAIL`, `FROM_NAME`, `REPLY_TO_EMAIL`                                | Namecheap Private Email settings.                                                                       |
+| `POSTHOG_API_KEY`, `POSTHOG_HOST`                                                                                                      | Analytics for API-triggered events.                                                                     |
 
 Other keys (OAuth client IDs, LaunchDarkly, Supabase anon keys, etc.) live in the mobile/web configs via Expo/Next environment handling. Keep them in the hosting platform you use for those clients.
+
+### TrustedHost and local testing
+
+The API uses **TrustedHostMiddleware** only when all of these are true: `ENVIRONMENT=production`, `DEBUG=false`, and `ALLOWED_HOSTS` is not `*`. It then rejects requests whose `Host` header is not in `ALLOWED_HOSTS` (400 Bad Request, often shown as “invalid host header” in clients).
+
+- **Deployed production:** Set `DEBUG=false` and `ALLOWED_HOSTS` to your API host(s) (e.g. `api.fitnudge.app`). TrustedHost is enabled and enforces the Host check.
+- **Local testing** (including multi-worker with Expo → localhost / tunnel): Keep `DEBUG=true` in `.env` / `.env.local`. TrustedHost is **not** used, so you avoid 400s from Host validation. Use `ALLOWED_HOSTS=*` if you prefer; that also disables TrustedHost.
 
 ---
 
@@ -73,11 +108,13 @@ Other keys (OAuth client IDs, LaunchDarkly, Supabase anon keys, etc.) live in th
 In production, run **separate processes** instead of combining `--beat` with the worker:
 
 #### Development (combined - fine for local dev):
+
 ```bash
 poetry run celery -A celery_worker worker --beat --loglevel=info
 ```
 
 #### Production (recommended - separate services):
+
 ```bash
 # Service 1: Worker (can have multiple instances for scaling)
 poetry run celery -A celery_worker worker --loglevel=info
@@ -92,11 +129,11 @@ poetry run celery -A celery_worker flower --port=5555
 
 #### Why Separate in Production?
 
-| Component | Instances | Purpose |
-|-----------|-----------|---------|
-| **Worker** | 1-4+ | Executes tasks. Scale based on load. |
-| **Beat** | Exactly 1 | Schedules periodic tasks. Multiple instances = duplicate tasks! |
-| **Flower** | 0-1 | Web UI for monitoring. Optional but recommended. |
+| Component  | Instances | Purpose                                                         |
+| ---------- | --------- | --------------------------------------------------------------- |
+| **Worker** | 1-4+      | Executes tasks. Scale based on load.                            |
+| **Beat**   | Exactly 1 | Schedules periodic tasks. Multiple instances = duplicate tasks! |
+| **Flower** | 0-1       | Web UI for monitoring. Optional but recommended.                |
 
 #### Railway Service Configuration
 
@@ -135,22 +172,26 @@ For Railway, create separate services:
 ## 7. Monitoring & Health Checks
 
 - Railway Health Check: point to `/health` (JSON response). It merges multiple component checks (Supabase, Redis, Celery, SMTP, Cloudflare, AI keys).
-- Optionally integrate New Relic by setting the env vars and adding the agent start-up script.
 
 ### Celery Task Monitoring
 
 #### Option 1: Flower (Recommended for Quick Setup)
+
 Real-time web-based monitor:
+
 ```bash
 poetry run celery -A celery_worker flower --port=5555
 ```
+
 Features:
+
 - Task success/failure rates and history
 - Real-time task progress
 - Worker status and resource usage
 - Can be password-protected for production
 
 #### Option 2: Custom Admin Dashboard (Future)
+
 For a fully integrated admin, use Celery signals to log task results to the database:
 
 ```python
@@ -207,11 +248,11 @@ poetry run uvicorn main:app --host 0.0.0.0 --port ${PORT:-8001}
 
 Create a separate Railway service for admin-api:
 
-| Setting | Value |
-|---------|-------|
-| **Root Directory** | `apps/admin-api` |
-| **Build Command** | `poetry install --no-root` |
-| **Start Command** | `poetry run uvicorn main:app --host 0.0.0.0 --port ${PORT:-8001}` |
+| Setting            | Value                                                             |
+| ------------------ | ----------------------------------------------------------------- |
+| **Root Directory** | `apps/admin-api`                                                  |
+| **Build Command**  | `poetry install --no-root`                                        |
+| **Start Command**  | `poetry run uvicorn main:app --host 0.0.0.0 --port ${PORT:-8001}` |
 
 #### Security Recommendations
 
@@ -221,20 +262,20 @@ Create a separate Railway service for admin-api:
 
 #### Admin API Endpoints
 
-| Endpoint | Description |
-|----------|-------------|
-| `POST /api/auth/login` | Admin login |
-| `GET /api/users` | List/search users |
-| `GET /api/users/{id}` | User details |
-| `PATCH /api/users/{id}` | Update user |
-| `GET /api/subscriptions` | List subscriptions |
-| `GET /api/subscriptions/stats` | MRR and subscription metrics |
-| `POST /api/subscriptions/grant` | Grant subscription to user |
-| `GET /api/tasks/overview` | Celery task queue status |
-| `GET /api/tasks/workers` | Worker details |
-| `GET /api/tasks/{id}` | Task status |
-| `POST /api/tasks/{id}/revoke` | Cancel a task |
-| `GET /api/analytics/dashboard` | Admin dashboard stats |
+| Endpoint                        | Description                  |
+| ------------------------------- | ---------------------------- |
+| `POST /api/auth/login`          | Admin login                  |
+| `GET /api/users`                | List/search users            |
+| `GET /api/users/{id}`           | User details                 |
+| `PATCH /api/users/{id}`         | Update user                  |
+| `GET /api/subscriptions`        | List subscriptions           |
+| `GET /api/subscriptions/stats`  | MRR and subscription metrics |
+| `POST /api/subscriptions/grant` | Grant subscription to user   |
+| `GET /api/tasks/overview`       | Celery task queue status     |
+| `GET /api/tasks/workers`        | Worker details               |
+| `GET /api/tasks/{id}`           | Task status                  |
+| `POST /api/tasks/{id}/revoke`   | Cancel a task                |
+| `GET /api/analytics/dashboard`  | Admin dashboard stats        |
 
 ### Admin Dashboard (`apps/admin`)
 
@@ -268,6 +309,7 @@ NEXT_PUBLIC_ADMIN_API_URL=https://admin-api.fitnudge.app
 - [ ] Observability: verify logs, alerts, and metrics on Railway.
 
 ### Admin API
+
 - [ ] Admin API `/health` returns OK with database and Celery connected.
 - [ ] Admin login works with an admin user (`role = 'admin'`).
 - [ ] Task monitoring shows active Celery workers.

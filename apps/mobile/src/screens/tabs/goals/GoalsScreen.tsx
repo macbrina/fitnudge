@@ -1,12 +1,12 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { Plus } from "lucide-react-native";
 
 import Button from "@/components/ui/Button";
 import { SkeletonCard } from "@/components/ui/SkeletonBox";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
-import { useAllGoals } from "@/hooks/api/useGoals";
+import { useAllGoals, useArchivedGoals, useCompletedGoals } from "@/hooks/api/useGoals";
 import { useTabBarInsets } from "@/hooks/useTabBarInsets";
 import { fontFamily } from "@/lib/fonts";
 import { useTranslation } from "@/lib/i18n";
@@ -19,10 +19,11 @@ import { useStyles, useTheme } from "@/themes";
 import { tokens } from "@/themes/tokens";
 import useAICoachStore from "@/stores/aiCoachStore";
 
-type TabType = "active" | "archived";
+type TabType = "active" | "completed" | "archived";
 
 export default function GoalsScreen() {
   const router = useRouter();
+  const { status } = useLocalSearchParams<{ status?: string }>();
   const { t } = useTranslation();
   const styles = useStyles(makeStyles);
   const { brandColors, colors } = useTheme();
@@ -33,7 +34,7 @@ export default function GoalsScreen() {
   // AI Coach modal - for goal-specific conversations
   const { openModal: openAICoach } = useAICoachStore();
 
-  // Fetch all goals (active + archived)
+  // Fetch all goals (active + archived + completed)
   const { data: goalsData, isLoading: goalsLoading, refetch: refetchGoals } = useAllGoals();
 
   const goals: Goal[] = useMemo(() => {
@@ -45,11 +46,28 @@ export default function GoalsScreen() {
     return goals.filter((g) => g.status === "active");
   }, [goals]);
 
+  const completedGoals = useMemo(() => {
+    return goals.filter((g) => g.status === "completed");
+  }, [goals]);
+
   const archivedGoals = useMemo(() => {
     return goals.filter((g) => g.status === "archived");
   }, [goals]);
 
-  const displayedGoals = activeTab === "active" ? activeGoals : archivedGoals;
+  const displayedGoals =
+    activeTab === "active"
+      ? activeGoals
+      : activeTab === "completed"
+        ? completedGoals
+        : archivedGoals;
+
+  useEffect(() => {
+    if (status === "active" || status === "completed" || status === "archived") {
+      setActiveTab(status);
+    } else if (status) {
+      setActiveTab("active");
+    }
+  }, [status]);
 
   // Handle refresh
   const handleRefresh = useCallback(async () => {
@@ -85,9 +103,10 @@ export default function GoalsScreen() {
   // Tab options for segmented control
   const tabOptions = [
     `${t("goals.tabs.active")} (${activeGoals.length})`,
+    `${t("goals.tabs.completed")} (${completedGoals.length})`,
     `${t("goals.tabs.archived")} (${archivedGoals.length})`
   ];
-  const selectedIndex = activeTab === "active" ? 0 : 1;
+  const selectedIndex = activeTab === "active" ? 0 : activeTab === "completed" ? 1 : 2;
 
   // Loading state
   if (goalsLoading && !goals.length) {
@@ -120,7 +139,9 @@ export default function GoalsScreen() {
         <SegmentedControl
           options={tabOptions}
           selectedIndex={selectedIndex}
-          onChange={(index) => setActiveTab(index === 0 ? "active" : "archived")}
+          onChange={(index) =>
+            setActiveTab(index === 0 ? "active" : index === 1 ? "completed" : "archived")
+          }
         />
       </View>
 
@@ -140,16 +161,26 @@ export default function GoalsScreen() {
         {displayedGoals.length === 0 ? (
           <View style={styles.emptyContainer}>
             <EmptyState
-              icon={activeTab === "active" ? "flag-outline" : "archive-outline"}
+              icon={
+                activeTab === "active"
+                  ? "flag-outline"
+                  : activeTab === "completed"
+                    ? "checkmark-circle-outline"
+                    : "archive-outline"
+              }
               title={
                 activeTab === "active"
                   ? t("goals.empty.active_title")
-                  : t("goals.empty.archived_title")
+                  : activeTab === "completed"
+                    ? t("goals.empty.completed_title")
+                    : t("goals.empty.archived_title")
               }
               message={
                 activeTab === "active"
                   ? t("goals.empty.active_description")
-                  : t("goals.empty.archived_description")
+                  : activeTab === "completed"
+                    ? t("goals.empty.completed_description")
+                    : t("goals.empty.archived_description")
               }
             />
             {activeTab === "active" && (

@@ -17,12 +17,15 @@ import Markdown from "react-native-markdown-display";
 import { formatWeekRange } from "@/utils/helper";
 import { useWeeklyRecapDetail } from "@/hooks/api/useWeeklyRecaps";
 import { useSubscriptionStore } from "@/stores/subscriptionStore";
+import { UserAvatar } from "@/components/avatars";
+import Svg, { Circle } from "react-native-svg";
 import type {
   GoalBreakdown,
   CompletionRateTrend,
   AchievementUnlocked
 } from "@/services/api/recaps";
 import { RecapDetailSkeleton } from "@/components/skeletons";
+import { getRarityColor } from "@/hooks/api/useAchievements";
 
 export default function RecapDetailScreen() {
   const params = useLocalSearchParams<{ id?: string }>();
@@ -50,32 +53,19 @@ export default function RecapDetailScreen() {
   };
 
   const getCompletionRateColor = (rate: number) => {
-    if (rate >= 80) return "#22C55E";
-    if (rate >= 50) return "#F59E0B";
-    return "#EF4444";
+    if (rate >= 80) return colors.feedback.success;
+    if (rate >= 50) return colors.feedback.warning;
+    return colors.feedback.error;
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case "excellent":
-        return "#22C55E";
+        return colors.feedback.success;
       case "good":
-        return "#F59E0B";
+        return colors.feedback.warning;
       default:
-        return "#EF4444";
-    }
-  };
-
-  const getRarityColor = (rarity?: string) => {
-    switch (rarity) {
-      case "legendary":
-        return "#F59E0B";
-      case "epic":
-        return "#8B5CF6";
-      case "rare":
-        return "#3B82F6";
-      default:
-        return "#6B7280";
+        return colors.feedback.error;
     }
   };
 
@@ -121,6 +111,59 @@ export default function RecapDetailScreen() {
 
   const stats = recap.stats || {};
   const weekOverWeekChange = stats.week_over_week_change || 0;
+  const completionRate = stats.completion_rate || 0;
+  const completionColor = getCompletionRateColor(completionRate);
+
+  const CompletionRing = ({
+    size,
+    strokeWidth,
+    percent,
+    color
+  }: {
+    size: number;
+    strokeWidth: number;
+    percent: number;
+    color: string;
+  }) => {
+    const clamped = Math.max(0, Math.min(100, percent));
+    const r = (size - strokeWidth) / 2;
+    const cx = size / 2;
+    const cy = size / 2;
+    const circumference = 2 * Math.PI * r;
+    const dashOffset = circumference * (1 - clamped / 100);
+
+    return (
+      <View style={[styles.ringWrap, { width: size, height: size }]}>
+        <Svg width={size} height={size}>
+          <Circle
+            cx={cx}
+            cy={cy}
+            r={r}
+            stroke={colors.border.subtle}
+            strokeWidth={strokeWidth}
+            fill="none"
+          />
+          <Circle
+            cx={cx}
+            cy={cy}
+            r={r}
+            stroke={color}
+            strokeWidth={strokeWidth}
+            fill="none"
+            strokeLinecap="round"
+            strokeDasharray={`${circumference} ${circumference}`}
+            strokeDashoffset={dashOffset}
+            rotation={-90}
+            origin={`${cx}, ${cy}`}
+          />
+        </Svg>
+        <View style={styles.ringCenter}>
+          <Text style={[styles.ringValue, { color }]}>{Math.round(clamped)}%</Text>
+          <Text style={styles.ringLabel}>{t("recaps.completion") || "Completion"}</Text>
+        </View>
+      </View>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -142,115 +185,114 @@ export default function RecapDetailScreen() {
           />
         }
       >
-        {/* Week Header */}
-        <View style={styles.weekHeader}>
-          <Text style={styles.weekRange}>
-            {formatRecapWeekRange(recap.week_start, recap.week_end)}
-          </Text>
-          {weekOverWeekChange !== 0 && (
-            <View
-              style={[
-                styles.changeBadge,
-                { backgroundColor: weekOverWeekChange > 0 ? "#22C55E15" : "#EF444415" }
-              ]}
-            >
-              <Ionicons
-                name={weekOverWeekChange > 0 ? "trending-up" : "trending-down"}
-                size={14}
-                color={weekOverWeekChange > 0 ? "#22C55E" : "#EF4444"}
-              />
-              <Text
-                style={[
-                  styles.changeText,
-                  { color: weekOverWeekChange > 0 ? "#22C55E" : "#EF4444" }
-                ]}
-              >
-                {weekOverWeekChange > 0 ? "+" : ""}
-                {weekOverWeekChange} {t("recaps.week_over_week")}
+        {/* Hero Summary */}
+        <Card shadow="lg" style={styles.heroCard}>
+          <View style={styles.heroTopRow}>
+            <View style={styles.heroTitleWrap}>
+              <Text style={styles.heroWeekRange}>
+                {formatRecapWeekRange(recap.week_start, recap.week_end)}
               </Text>
-            </View>
-          )}
-        </View>
-
-        {/* Stats Overview */}
-        <Card style={styles.statsCard}>
-          <View style={styles.statsGrid}>
-            <View style={styles.statItem}>
-              <View style={[styles.statIcon, { backgroundColor: `${brandColors.primary}15` }]}>
-                <CheckmarkCircle size={24} />
+              <View style={styles.heroMetaRow}>
+                <View style={styles.heroMetaPill}>
+                  <Ionicons name="flag" size={14} color={colors.text.tertiary} />
+                  <Text style={styles.heroMetaText}>
+                    {t("recaps.goals_hit_count", {
+                      hit: recap.goals_hit || 0,
+                      total: recap.goals_total || 0
+                    })}
+                  </Text>
+                </View>
+                <View style={styles.heroMetaPill}>
+                  <Ionicons name="calendar" size={14} color={colors.text.tertiary} />
+                  <Text style={styles.heroMetaText}>
+                    {t("recaps.active_days_count", { count: stats.days_with_checkins || 0 })}
+                  </Text>
+                </View>
               </View>
-              <Text style={styles.statValue}>{stats.total_check_ins || 0}</Text>
-              <Text style={styles.statLabel}>{t("recaps.total_check_ins") || "Check-ins"}</Text>
             </View>
-            <View style={styles.statItem}>
+
+            {weekOverWeekChange !== 0 && (
               <View
                 style={[
-                  styles.statIcon,
-                  { backgroundColor: `${getCompletionRateColor(stats.completion_rate || 0)}15` }
+                  styles.wowBadge,
+                  weekOverWeekChange > 0 ? styles.wowBadgePositive : styles.wowBadgeNegative
                 ]}
               >
                 <Ionicons
-                  name="pie-chart"
-                  size={24}
-                  color={getCompletionRateColor(stats.completion_rate || 0)}
+                  name={weekOverWeekChange > 0 ? "trending-up" : "trending-down"}
+                  size={14}
+                  color={weekOverWeekChange > 0 ? colors.feedback.success : colors.feedback.error}
                 />
+                <Text
+                  style={[
+                    styles.wowText,
+                    weekOverWeekChange > 0 ? styles.wowTextPositive : styles.wowTextNegative
+                  ]}
+                >
+                  {weekOverWeekChange > 0 ? "+" : ""}
+                  {weekOverWeekChange}
+                </Text>
               </View>
-              <Text
-                style={[
-                  styles.statValue,
-                  { color: getCompletionRateColor(stats.completion_rate || 0) }
-                ]}
-              >
-                {Math.round(stats.completion_rate || 0)}%
-              </Text>
-              <Text style={styles.statLabel}>{t("recaps.completion") || "Completion"}</Text>
+            )}
+          </View>
+
+          <View style={styles.heroBody}>
+            <View style={styles.heroRingRow}>
+              <CompletionRing
+                size={104}
+                strokeWidth={10}
+                percent={completionRate}
+                color={completionColor}
+              />
             </View>
-            <View style={styles.statItem}>
-              <View style={[styles.statIcon, { backgroundColor: "#EF444415" }]}>
-                <Ionicons name="flame" size={24} color="#EF4444" />
+
+            <View style={styles.heroTilesRow}>
+              <View style={styles.heroTile}>
+                <View
+                  style={[styles.heroTileIcon, { backgroundColor: `${brandColors.primary}15` }]}
+                >
+                  <CheckmarkCircle size={18} />
+                </View>
+                <View style={styles.heroTileText}>
+                  <Text style={styles.heroTileValue}>{stats.total_check_ins || 0}</Text>
+                  <Text style={styles.heroTileLabel}>
+                    {t("recaps.total_check_ins") || "Check-ins"}
+                  </Text>
+                </View>
               </View>
-              <Text style={styles.statValue}>{stats.current_streak || 0}</Text>
-              <Text style={styles.statLabel}>{t("recaps.current_streak") || "Streak"}</Text>
+
+              <View style={styles.heroTile}>
+                <View
+                  style={[styles.heroTileIcon, { backgroundColor: `${colors.feedback.error}15` }]}
+                >
+                  <Ionicons name="flame" size={18} color={colors.feedback.error} />
+                </View>
+                <View style={styles.heroTileText}>
+                  <Text style={styles.heroTileValue}>{stats.current_streak || 0}</Text>
+                  <Text style={styles.heroTileLabel}>{t("recaps.current_streak") || "Streak"}</Text>
+                </View>
+              </View>
             </View>
           </View>
 
           {/* Additional Stats Row */}
           <View style={styles.additionalStats}>
-            <View style={styles.additionalStatItem}>
-              <Ionicons name="calendar" size={16} color={colors.text.tertiary} />
-              <Text style={styles.additionalStatText}>
-                {t("recaps.active_days_count", { count: stats.days_with_checkins || 0 })}
-              </Text>
-            </View>
             {stats.strongest_day && (
               <View style={styles.additionalStatItem}>
-                <Ionicons name="star" size={16} color="#F59E0B" />
+                <Ionicons name="star" size={16} color={colors.feedback.warning} />
                 <Text style={styles.additionalStatText}>
                   {t("recaps.best_day", { day: stats.strongest_day })}
                 </Text>
               </View>
             )}
           </View>
-
-          {/* Goals Hit Summary */}
-          {(recap.goals_hit !== undefined || recap.goals_total !== undefined) && (
-            <View style={styles.goalsHitRow}>
-              <Ionicons name="flag" size={16} color={brandColors.primary} />
-              <Text style={styles.goalsHitText}>
-                {t("recaps.goals_hit_count", {
-                  hit: recap.goals_hit || 0,
-                  total: recap.goals_total || 0
-                })}
-              </Text>
-            </View>
-          )}
         </Card>
 
         {/* AI Summary */}
         {recap.recap_text && (
           <Card style={styles.summaryCard}>
             <View style={styles.cardHeader}>
-              <Ionicons name="sparkles" size={20} color={brandColors.primary} />
+              <Ionicons name="sparkles" size={20} color={colors.text.primary} />
               <Text style={styles.cardTitle}>{t("recaps.ai_summary")}</Text>
             </View>
             <Markdown
@@ -301,10 +343,10 @@ export default function RecapDetailScreen() {
             {/* Your Big Win */}
             {recap.win && (
               <Card style={styles.insightCard}>
-                <View style={[styles.insightIconContainer, { backgroundColor: "#F59E0B15" }]}>
-                  <Ionicons name="trophy" size={24} color="#F59E0B" />
+                <View style={styles.insightHeader}>
+                  <Ionicons name="trophy" size={16} color={colors.feedback.warning} />
+                  <Text style={styles.insightLabel}>{t("recaps.win")}</Text>
                 </View>
-                <Text style={styles.insightLabel}>{t("recaps.win")}</Text>
                 <Text style={styles.insightText}>{recap.win}</Text>
               </Card>
             )}
@@ -312,15 +354,10 @@ export default function RecapDetailScreen() {
             {/* Key Insight */}
             {recap.insight && (
               <Card style={styles.insightCard}>
-                <View
-                  style={[
-                    styles.insightIconContainer,
-                    { backgroundColor: `${brandColors.primary}15` }
-                  ]}
-                >
-                  <Ionicons name="bulb" size={24} color={brandColors.primary} />
+                <View style={styles.insightHeader}>
+                  <Ionicons name="bulb" size={16} color={brandColors.primary} />
+                  <Text style={styles.insightLabel}>{t("recaps.insight")}</Text>
                 </View>
-                <Text style={styles.insightLabel}>{t("recaps.insight")}</Text>
                 <Text style={styles.insightText}>{recap.insight}</Text>
               </Card>
             )}
@@ -328,10 +365,10 @@ export default function RecapDetailScreen() {
             {/* Focus for Next Week */}
             {recap.focus_next_week && (
               <Card style={styles.insightCard}>
-                <View style={[styles.insightIconContainer, { backgroundColor: "#22C55E15" }]}>
-                  <Ionicons name="arrow-forward-circle" size={24} color="#22C55E" />
+                <View style={styles.insightHeader}>
+                  <Ionicons name="arrow-forward-circle" size={16} color={colors.feedback.success} />
+                  <Text style={styles.insightLabel}>{t("recaps.focus_next_week")}</Text>
                 </View>
-                <Text style={styles.insightLabel}>{t("recaps.focus_next_week")}</Text>
                 <Text style={styles.insightText}>{recap.focus_next_week}</Text>
               </Card>
             )}
@@ -339,10 +376,10 @@ export default function RecapDetailScreen() {
             {/* Motivational Close */}
             {recap.motivational_close && (
               <Card style={styles.insightCard}>
-                <View style={[styles.insightIconContainer, { backgroundColor: "#EF444415" }]}>
-                  <Ionicons name="heart" size={24} color="#EF4444" />
+                <View style={styles.insightHeader}>
+                  <Ionicons name="heart" size={16} color={colors.feedback.error} />
+                  <Text style={styles.insightLabel}>{t("recaps.motivational_close")}</Text>
                 </View>
-                <Text style={styles.insightLabel}>{t("recaps.motivational_close")}</Text>
                 <Text style={styles.insightText}>{recap.motivational_close}</Text>
               </Card>
             )}
@@ -353,7 +390,7 @@ export default function RecapDetailScreen() {
         {recap.goal_breakdown && recap.goal_breakdown.length > 0 && (
           <Card style={styles.breakdownCard}>
             <View style={styles.cardHeader}>
-              <Ionicons name="flag" size={20} color={brandColors.primary} />
+              <Ionicons name="flag" size={20} color={colors.text.primary} />
               <Text style={styles.cardTitle}>{t("recaps.goal_breakdown") || "Goal Breakdown"}</Text>
             </View>
             {recap.goal_breakdown.map((goal: GoalBreakdown, index: number) => (
@@ -411,7 +448,7 @@ export default function RecapDetailScreen() {
         {recap.completion_rate_trend && recap.completion_rate_trend.length > 0 && (
           <Card style={styles.trendCard}>
             <View style={styles.cardHeader}>
-              <Ionicons name="analytics" size={20} color={brandColors.primary} />
+              <Ionicons name="analytics" size={20} color={colors.text.primary} />
               <Text style={styles.cardTitle}>{t("recaps.trend") || "4-Week Trend"}</Text>
             </View>
             <View style={styles.trendContainer}>
@@ -438,13 +475,16 @@ export default function RecapDetailScreen() {
         {recap.achievements_unlocked && recap.achievements_unlocked.length > 0 && (
           <Card style={styles.achievementsCard}>
             <View style={styles.cardHeader}>
-              <Ionicons name="ribbon" size={20} color="#F59E0B" />
+              <Ionicons name="ribbon" size={20} color={colors.text.primary} />
               <Text style={styles.cardTitle}>
                 {t("recaps.achievements") || "Achievements Unlocked"}
               </Text>
             </View>
             {recap.achievements_unlocked.map((achievement: AchievementUnlocked, index: number) => {
-              const rarityColor = getRarityColor(achievement.rarity);
+              const rarityColor = getRarityColor(achievement.rarity || "common", {
+                colors,
+                brandColors
+              });
               const hasBorder = index < recap.achievements_unlocked!.length - 1;
               return (
                 <View
@@ -475,7 +515,7 @@ export default function RecapDetailScreen() {
         {recap.partner_context && recap.partner_context.length > 0 && (
           <Card style={styles.partnerCard}>
             <View style={styles.cardHeader}>
-              <Ionicons name="people" size={20} color={brandColors.primary} />
+              <Ionicons name="people" size={20} color={colors.text.primary} />
               <Text style={styles.cardTitle}>
                 {recap.partner_context.length === 1
                   ? t("recaps.partner") || "Accountability Partner"
@@ -490,11 +530,18 @@ export default function RecapDetailScreen() {
                   index < (recap.partner_context?.length ?? 0) - 1 && styles.partnerItemBorder
                 ]}
               >
-                <Ionicons name="person-circle" size={40} color={brandColors.primary} />
+                <UserAvatar
+                  profilePictureUrl={
+                    partner?.profile_picture_url ?? partner?.profilePictureUrl ?? undefined
+                  }
+                  name={partner?.partner_name}
+                  size={44}
+                  placeholderColor={brandColors.primary}
+                />
                 <View style={styles.partnerDetails}>
                   <Text style={styles.partnerName}>{partner.partner_name}</Text>
                   <View style={styles.partnerStreak}>
-                    <Ionicons name="flame" size={14} color="#EF4444" />
+                    <Ionicons name="flame" size={14} color={colors.feedback.error} />
                     <Text style={styles.partnerStreakText}>
                       {t("recaps.day_streak", { count: partner.partner_streak })}
                     </Text>
@@ -523,6 +570,141 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
   scrollContent: {
     padding: toRN(tokens.spacing[4])
   },
+  // Hero
+  heroCard: {
+    marginBottom: toRN(tokens.spacing[4]),
+    padding: toRN(tokens.spacing[5]),
+    borderRadius: toRN(tokens.borderRadius["2xl"])
+  },
+  heroTopRow: {
+    flexDirection: "row" as const,
+    alignItems: "flex-start" as const,
+    justifyContent: "space-between" as const,
+    gap: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[4])
+  },
+  heroTitleWrap: {
+    flex: 1
+  },
+  heroWeekRange: {
+    fontSize: toRN(tokens.typography.fontSize["2xl"]),
+    fontFamily: fontFamily.bold,
+    color: colors.text.primary,
+    marginBottom: toRN(tokens.spacing[1])
+  },
+  heroMetaRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: toRN(tokens.spacing[2]),
+    flexWrap: "wrap" as const
+  },
+  heroMetaText: {
+    fontSize: toRN(tokens.typography.fontSize.sm),
+    fontFamily: fontFamily.medium,
+    color: colors.text.secondary
+  },
+  heroMetaPill: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: toRN(tokens.spacing[1.5]),
+    paddingVertical: toRN(tokens.spacing[1]),
+    paddingHorizontal: toRN(tokens.spacing[2]),
+    borderRadius: toRN(tokens.borderRadius.full),
+    backgroundColor: colors.bg.muted,
+    borderWidth: 1,
+    borderColor: colors.border.subtle
+  },
+  wowBadge: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: toRN(tokens.spacing[1.5]),
+    paddingVertical: toRN(tokens.spacing[1]),
+    paddingHorizontal: toRN(tokens.spacing[2]),
+    borderRadius: toRN(tokens.borderRadius.full)
+  },
+  wowBadgePositive: {
+    backgroundColor: `${colors.feedback.success}15`
+  },
+  wowBadgeNegative: {
+    backgroundColor: `${colors.feedback.error}15`
+  },
+  wowText: {
+    fontSize: toRN(tokens.typography.fontSize.sm),
+    fontFamily: fontFamily.semiBold
+  },
+  wowTextPositive: {
+    color: colors.feedback.success
+  },
+  wowTextNegative: {
+    color: colors.feedback.error
+  },
+  heroBody: {
+    marginBottom: toRN(tokens.spacing[4])
+  },
+  heroRingRow: {
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    marginBottom: toRN(tokens.spacing[4])
+  },
+  heroTilesRow: {
+    flexDirection: "row" as const,
+    gap: toRN(tokens.spacing[3])
+  },
+  heroTile: {
+    flex: 1,
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: toRN(tokens.spacing[3]),
+    paddingVertical: toRN(tokens.spacing[3]),
+    paddingHorizontal: toRN(tokens.spacing[4]),
+    borderRadius: toRN(tokens.borderRadius.xl),
+    backgroundColor: colors.bg.surface,
+    borderWidth: 1,
+    borderColor: colors.border.subtle
+  },
+  heroTileIcon: {
+    width: toRN(tokens.spacing[10]),
+    height: toRN(tokens.spacing[10]),
+    borderRadius: toRN(tokens.borderRadius.full),
+    alignItems: "center" as const,
+    justifyContent: "center" as const
+  },
+  heroTileText: {
+    flex: 1
+  },
+  heroTileValue: {
+    fontSize: toRN(tokens.typography.fontSize.xl),
+    fontFamily: fontFamily.bold,
+    color: colors.text.primary
+  },
+  heroTileLabel: {
+    fontSize: toRN(tokens.typography.fontSize.sm),
+    fontFamily: fontFamily.regular,
+    color: colors.text.tertiary,
+    marginTop: toRN(tokens.spacing[0.5])
+  },
+  ringWrap: {
+    position: "relative" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const
+  },
+  ringCenter: {
+    position: "absolute" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    paddingHorizontal: toRN(tokens.spacing[2])
+  },
+  ringValue: {
+    fontSize: toRN(tokens.typography.fontSize.lg),
+    fontFamily: fontFamily.bold
+  },
+  ringLabel: {
+    fontSize: toRN(tokens.typography.fontSize.xs),
+    fontFamily: fontFamily.medium,
+    color: colors.text.tertiary,
+    marginTop: toRN(tokens.spacing[0.5])
+  },
+  // (removed) old side-by-side hero stat rows in favor of hero tiles
   // Week Header
   weekHeader: {
     alignItems: "center" as const,
@@ -549,7 +731,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
   // Stats Card
   statsCard: {
     marginBottom: toRN(tokens.spacing[4]),
-    padding: toRN(tokens.spacing[4])
+    padding: toRN(tokens.spacing[5])
   },
   statsGrid: {
     flexDirection: "row" as const,
@@ -559,9 +741,9 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     alignItems: "center" as const
   },
   statIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: toRN(tokens.spacing[12]),
+    height: toRN(tokens.spacing[12]),
+    borderRadius: toRN(tokens.borderRadius.full),
     justifyContent: "center" as const,
     alignItems: "center" as const,
     marginBottom: toRN(tokens.spacing[2])
@@ -609,28 +791,28 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
   goalsHitText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.semiBold,
-    color: brand.primary
+    color: colors.text.primary
   },
   // Cards
   summaryCard: {
     marginBottom: toRN(tokens.spacing[4]),
-    padding: toRN(tokens.spacing[4])
+    padding: toRN(tokens.spacing[5])
   },
   breakdownCard: {
     marginBottom: toRN(tokens.spacing[4]),
-    padding: toRN(tokens.spacing[4])
+    padding: toRN(tokens.spacing[5])
   },
   trendCard: {
     marginBottom: toRN(tokens.spacing[4]),
-    padding: toRN(tokens.spacing[4])
+    padding: toRN(tokens.spacing[5])
   },
   achievementsCard: {
     marginBottom: toRN(tokens.spacing[4]),
-    padding: toRN(tokens.spacing[4])
+    padding: toRN(tokens.spacing[5])
   },
   partnerCard: {
     marginBottom: toRN(tokens.spacing[4]),
-    padding: toRN(tokens.spacing[4])
+    padding: toRN(tokens.spacing[5])
   },
   cardHeader: {
     flexDirection: "row" as const,
@@ -651,16 +833,17 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
   },
   // AI Insights Grid
   insightsGrid: {
-    flexDirection: "row" as const,
-    flexWrap: "wrap" as const,
-    gap: toRN(tokens.spacing[3]),
     marginBottom: toRN(tokens.spacing[4])
   },
   insightCard: {
-    flex: 1,
-    minWidth: "47%" as any,
     padding: toRN(tokens.spacing[4]),
-    alignItems: "center" as const
+    marginBottom: toRN(tokens.spacing[4])
+  },
+  insightHeader: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: toRN(tokens.spacing[2]),
+    marginBottom: toRN(tokens.spacing[1.5])
   },
   insightIconContainer: {
     width: 56,
@@ -675,14 +858,12 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     fontFamily: fontFamily.semiBold,
     color: colors.text.tertiary,
     textTransform: "uppercase" as const,
-    letterSpacing: 0.5,
-    marginBottom: toRN(tokens.spacing[1.5])
+    letterSpacing: 0.5
   },
   insightText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
     color: colors.text.primary,
-    textAlign: "center" as const,
     lineHeight: toRN(tokens.typography.fontSize.sm) * 1.5
   },
   // Goal Breakdown

@@ -12,6 +12,10 @@ CREATE TABLE ai_coach_conversations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   
+  -- Goal-scoped thread: when set, conversation is locked to this goal (persistent per goal).
+  -- NULL = general chat. When goal is deleted, CASCADE removes this conversation.
+  goal_id UUID REFERENCES goals(id) ON DELETE CASCADE,
+  
   -- Conversation metadata
   title TEXT, -- Optional: AI-generated title based on conversation
   
@@ -34,6 +38,11 @@ CREATE TABLE ai_coach_conversations (
 
 -- Fast lookup by user (most common query)
 CREATE INDEX idx_ai_coach_conversations_user_id ON ai_coach_conversations(user_id);
+
+-- Lookup goal-specific thread: one persistent thread per user per goal
+CREATE UNIQUE INDEX idx_ai_coach_conversations_user_goal
+  ON ai_coach_conversations(user_id, goal_id)
+  WHERE goal_id IS NOT NULL AND is_archived = FALSE;
 
 -- Active conversations for a user (exclude archived)
 CREATE INDEX idx_ai_coach_conversations_user_active 
@@ -160,6 +169,6 @@ CREATE TRIGGER update_ai_coach_daily_usage_updated_at
 -- =====================================================
 -- COMMENTS
 -- =====================================================
-COMMENT ON TABLE ai_coach_conversations IS 'Stores AI Coach chat conversations with embedded message history';
+COMMENT ON TABLE ai_coach_conversations IS 'Stores AI Coach chat conversations with embedded message history. goal_id: when set, thread is locked to that goal (persistent per goal); NULL = general chat.';
 COMMENT ON TABLE ai_coach_daily_usage IS 'Tracks daily AI Coach usage for rate limiting';
 

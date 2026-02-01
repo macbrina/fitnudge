@@ -96,6 +96,7 @@ class CheckInResponse(BaseModel):
     voice_note_url: Optional[str] = None
     voice_note_transcript: Optional[str] = None
     voice_note_sentiment: Optional[dict] = None
+    voice_note_duration: Optional[int] = None
 
     model_config = {"from_attributes": True}
 
@@ -358,15 +359,26 @@ async def create_check_in(
 
     created_checkin = result.data[0]
 
+    # Server-driven iOS Live Activity (Mode B): refresh after status change.
+    # Fire-and-forget: never block check-in response on APNs.
+    try:
+        from app.services.tasks.live_activity_tasks import (
+            refresh_live_activity_for_user_task,
+        )
+        from app.services.tasks.nextup_fcm_tasks import (
+            refresh_nextup_fcm_for_user_task,
+        )
+
+        refresh_live_activity_for_user_task.delay(str(user_id))
+        refresh_nextup_fcm_for_user_task.delay(str(user_id))
+    except Exception:
+        pass
+
     # For users WITH ai_checkin_response: Queue AI task only when no voice note is coming.
     # When expect_voice_note is True, media upload queues the task after VN is processed.
     expect_vn = checkin_data.expect_voice_note or False
     should_queue_ai = has_ai_checkin_response and not expect_vn
 
-    logger.info(
-        f"[CheckIn] AI task decision: has_ai_checkin_response={has_ai_checkin_response}, "
-        f"expect_voice_note={expect_vn}, should_queue_ai={should_queue_ai}"
-    )
     print(
         f"[CheckIn] AI task decision: has_ai_checkin_response={has_ai_checkin_response}, "
         f"expect_voice_note={expect_vn}, should_queue_ai={should_queue_ai}"
@@ -386,75 +398,39 @@ async def create_check_in(
         except Exception as e:
             logger.warning(f"Failed to queue AI response task: {e}")
 
-    # O(1) Streak Update - Update goal stats directly
-    # Both daily and weekly goals increment streak on each scheduled day completion
-    # Streak = consecutive scheduled days of completing (same logic for both types)
+    # Streak and goal stats are automatically updated by database trigger
+    # (recalculate_goal_stats() in migration 026_fix_streak_calculation.sql)
+    # Fetch updated goal data to include in response
+    current_streak = goal_data.get("current_streak", 0)  # Fallback value
     try:
-        goal_updates = {"last_checkin_date": user_today.isoformat()}
-        new_streak = goal_data.get("current_streak", 0)
-        is_weekly_goal = goal_data.get("frequency_type") == "weekly"
+        updated_goal = (
+            supabase.table("goals")
+            .select("current_streak, longest_streak, week_completions")
+            .eq("id", checkin_data.goal_id)
+            .single()
+            .execute()
+        )
 
-        if checkin_data.is_rest_day:
-            # Rest day: preserve streak, don't count as completion
-            pass
-        elif checkin_data.completed:
-            # Success: increment streak (same for daily AND weekly goals)
-            new_streak = goal_data.get("current_streak", 0) + 1
-            goal_updates["current_streak"] = new_streak
-            goal_updates["longest_streak"] = max(
-                goal_data.get("longest_streak", 0), new_streak
-            )
-            goal_updates["last_completed_date"] = user_today.isoformat()
-            goal_updates["total_completions"] = (
-                goal_data.get("total_completions", 0) + 1
-            )
-
-            # Set streak start if this is first day of streak
-            if goal_data.get("current_streak", 0) == 0:
-                goal_updates["streak_start_date"] = user_today.isoformat()
-
-            # For weekly goals: also track week_completions for "X/Y this week" display
-            if is_weekly_goal:
-                week_start = user_today - timedelta(days=user_today.weekday())
-                current_week_start = goal_data.get("week_start_date")
-
-                if current_week_start != str(week_start):
-                    # New week - reset counter
-                    goal_updates["week_completions"] = 1
-                    goal_updates["week_start_date"] = str(week_start)
-                else:
-                    goal_updates["week_completions"] = (
-                        goal_data.get("week_completions", 0) + 1
-                    )
-        else:
-            # Explicit "No" - break streak (both daily and weekly)
-            goal_updates["current_streak"] = 0
-            goal_updates["streak_start_date"] = None
-            new_streak = 0
-
-        # Single UPDATE query - O(1)
-        supabase.table("goals").update(goal_updates).eq(
-            "id", checkin_data.goal_id
-        ).execute()
-
-        # Update created_checkin with streak info for response
-        created_checkin["current_streak"] = new_streak
-        if is_weekly_goal:
-            created_checkin["week_completions"] = goal_updates.get(
-                "week_completions", goal_data.get("week_completions", 0)
-            )
-
+        if updated_goal and updated_goal.data:
+            current_streak = updated_goal.data.get("current_streak", 0)
+            created_checkin["current_streak"] = current_streak
+            if goal_data.get("frequency_type") == "weekly":
+                created_checkin["week_completions"] = updated_goal.data.get(
+                    "week_completions", 0
+                )
     except Exception as e:
-        logger.warning(f"Failed to update goal streak: {e}")
+        logger.warning(f"Failed to fetch updated goal stats: {e}")
+        # Fallback to original values
+        created_checkin["current_streak"] = current_streak
 
     # Note: Partner notification is now handled by DB trigger
     # (018_checkin_partner_notification_trigger.sql)
 
     # Streak milestone celebration notification (fire-and-forget, non-blocking)
     # When user hits a milestone (7, 14, 21, 30, 50, 100, etc.), send celebration
-    if checkin_data.completed and new_streak > 0:
+    if checkin_data.completed and current_streak > 0:
         STREAK_MILESTONES = [7, 14, 21, 30, 50, 100, 200, 365, 500, 730, 1000]
-        if new_streak in STREAK_MILESTONES:
+        if current_streak in STREAK_MILESTONES:
             try:
                 from app.services.tasks.notification_tasks import (
                     send_streak_milestone_notification,
@@ -467,10 +443,10 @@ async def create_check_in(
                     user_id=user_id,
                     goal_id=checkin_data.goal_id,
                     goal_title=goal_title,
-                    streak=new_streak,
+                    streak=current_streak,
                 )
                 logger.info(
-                    f"Queued streak milestone notification: {new_streak} days for user {user_id}"
+                    f"Queued streak milestone notification: {current_streak} days for user {user_id}"
                 )
             except Exception as e:
                 logger.warning(f"Failed to queue streak milestone notification: {e}")
@@ -497,6 +473,36 @@ async def create_check_in(
         invalidate_user_analytics_cache(user_id, str(checkin_data.goal_id))
     except Exception:
         pass  # Non-critical
+
+    # Trigger pattern insights generation after check-in (premium only, fire-and-forget)
+    # This ensures insights stay fresh after each check-in instead of waiting for weekly batch
+    # More cost-effective: only generates when there's new data
+    try:
+        has_pattern_detection = await has_user_feature(
+            supabase, user_id, "pattern_detection"
+        )
+        logger.info(
+            f"[CheckIn] Pattern insights check: has_pattern_detection={has_pattern_detection}, "
+            f"goal_id={checkin_data.goal_id}, user_id={user_id}"
+        )
+        if has_pattern_detection:
+            # Use the insights service which handles all the logic:
+            # - Checks if already generating (skips if so)
+            # - Checks if fresh (skips if < 24h old)
+            # - Checks if enough data
+            # - Marks as generating and queues task
+            from app.services.ai_insights_service import get_ai_insights_service
+
+            insights_service = get_ai_insights_service()
+            # Force refresh to ensure insights are regenerated after new check-in
+            result = await insights_service.get_or_generate_insights(
+                goal_id=str(checkin_data.goal_id),
+                user_id=user_id,
+                force_refresh=True,
+            )
+    except Exception as e:
+        logger.warning(f"Failed to queue pattern insights generation: {e}")
+        # Non-critical - insights will still generate on-demand when user views goal
 
     return created_checkin
 
@@ -965,6 +971,20 @@ async def update_check_in(
         )
     except Exception:
         pass  # Non-critical
+
+    # Server-driven iOS Live Activity (Mode B): refresh after status change.
+    try:
+        from app.services.tasks.live_activity_tasks import (
+            refresh_live_activity_for_user_task,
+        )
+        from app.services.tasks.nextup_fcm_tasks import (
+            refresh_nextup_fcm_for_user_task,
+        )
+
+        refresh_live_activity_for_user_task.delay(str(current_user["id"]))
+        refresh_nextup_fcm_for_user_task.delay(str(current_user["id"]))
+    except Exception:
+        pass
 
     return updated_checkin
 

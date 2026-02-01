@@ -1,25 +1,27 @@
-import React, { useCallback, useState, useEffect } from "react";
-import { RefreshControl, ScrollView, Text, View } from "react-native";
-import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
 import { Switch } from "@/components/ui/Switch";
+import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
+import { useRouter } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
+import { Linking, Platform, Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
 
+import { useLiveActivitiesStatus } from "@/features/nextUp/ios/useLiveActivitiesStatus";
+
+import { NotificationSettingsSkeleton } from "@/components/skeletons";
 import { BackButton } from "@/components/ui/BackButton";
 import { Card } from "@/components/ui/Card";
-import { SkeletonBox } from "@/components/ui/SkeletonBox";
 import { TimePicker } from "@/components/ui/TimePicker";
-import { fontFamily } from "@/lib/fonts";
-import { useTranslation } from "@/lib/i18n";
-import { toRN } from "@/lib/units";
 import {
   useNotificationPreferences,
   useUpdateNotificationPreferences
 } from "@/hooks/api/useNotificationPreferences";
-import { NotificationPreferences } from "@/services/notifications/notificationTypes";
-import { useStyles, useTheme } from "@/themes";
-import { useAuthStore } from "@/stores/authStore";
 import { useUpdateProfile } from "@/hooks/api/useUser";
-import { NotificationSettingsSkeleton } from "@/components/skeletons";
+import { fontFamily } from "@/lib/fonts";
+import { useTranslation } from "@/lib/i18n";
+import { toRN } from "@/lib/units";
+import { NotificationPreferences } from "@/services/notifications/notificationTypes";
+import { useAuthStore } from "@/stores/authStore";
+import { useStyles, useTheme } from "@/themes";
 
 // Default preferences for initial render before data loads
 const DEFAULT_PREFERENCES: NotificationPreferences = {
@@ -71,6 +73,15 @@ export default function NotificationSettingsScreen() {
   } = useNotificationPreferences();
   const updatePreferencesMutation = useUpdateNotificationPreferences();
 
+  const { enabled: liveActivitiesEnabled, refresh: refreshLiveActivitiesStatus } =
+    useLiveActivitiesStatus();
+
+  useFocusEffect(
+    useCallback(() => {
+      if (Platform.OS === "ios") refreshLiveActivitiesStatus();
+    }, [refreshLiveActivitiesStatus])
+  );
+
   const updatePreference = useCallback(
     (key: keyof NotificationPreferences, value: any) => {
       const newPreferences = { ...preferences, [key]: value };
@@ -113,6 +124,35 @@ export default function NotificationSettingsScreen() {
   );
 
   // Render setting row with icon
+  // Link row for settings that open system Settings (e.g. Live Activities)
+  const renderSettingsLinkRow = (
+    icon: keyof typeof Ionicons.glyphMap,
+    iconColor: string,
+    label: string,
+    description: string,
+    statusLabel: string,
+    onPress: () => void
+  ) => (
+    <Pressable
+      style={({ pressed }) => [styles.settingRow, pressed && styles.settingRowPressed]}
+      onPress={onPress}
+    >
+      <View style={styles.settingLeft}>
+        <View style={[styles.settingIcon, { backgroundColor: `${iconColor}15` }]}>
+          <Ionicons name={icon} size={20} color={iconColor} />
+        </View>
+        <View style={styles.settingContent}>
+          <Text style={styles.settingLabel}>{label}</Text>
+          <Text style={styles.settingDescription}>{description}</Text>
+        </View>
+      </View>
+      <View style={styles.settingRight}>
+        <Text style={styles.settingStatus}>{statusLabel}</Text>
+        <Ionicons name="chevron-forward" size={18} color={colors.text.tertiary} />
+      </View>
+    </Pressable>
+  );
+
   const renderSettingRow = (
     icon: keyof typeof Ionicons.glyphMap,
     iconColor: string,
@@ -197,6 +237,24 @@ export default function NotificationSettingsScreen() {
               preferences.email_notifications,
               (value) => updatePreference("email_notifications", value),
               !preferences.enabled
+            )}
+            {Platform.OS === "ios" && (
+              <>
+                <View style={styles.divider} />
+                {renderSettingsLinkRow(
+                  "phone-landscape-outline",
+                  "#8B5CF6",
+                  t("notifications.settings.live_activities") || "Live Activities",
+                  t("notifications.settings.live_activities_desc") ||
+                    "Today's focus on Lock Screen",
+                  liveActivitiesEnabled === null
+                    ? "..."
+                    : liveActivitiesEnabled
+                      ? t("notifications.settings.live_activities_enabled") || "Enabled"
+                      : t("notifications.settings.live_activities_disabled") || "Disabled",
+                  () => Linking.openSettings()
+                )}
+              </>
             )}
           </Card>
         </View>
@@ -380,7 +438,19 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     alignItems: "center" as const,
     justifyContent: "space-between" as const,
     paddingVertical: toRN(tokens.spacing[3])
-    // paddingHorizontal: toRN(tokens.spacing[4])
+  },
+  settingRowPressed: {
+    opacity: 0.7
+  },
+  settingRight: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: toRN(tokens.spacing[1])
+  },
+  settingStatus: {
+    fontSize: toRN(tokens.typography.fontSize.sm),
+    fontFamily: fontFamily.regular,
+    color: colors.text.tertiary
   },
   settingRowDisabled: {
     opacity: 0.5

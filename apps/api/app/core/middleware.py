@@ -422,7 +422,7 @@ class SessionManagementMiddleware(BaseHTTPMiddleware):
 class UserActivityMiddleware(BaseHTTPMiddleware):
     """
     Updates user's last_active_at timestamp for activity tracking.
-    
+
     Features:
     - Only updates for authenticated API requests
     - Debounced: max one update per 5 minutes per user (reduces DB writes)
@@ -445,9 +445,7 @@ class UserActivityMiddleware(BaseHTTPMiddleware):
             auth_header = request.headers.get("Authorization", "")
             if auth_header.startswith("Bearer "):
                 # Schedule async update (don't await - fire and forget)
-                asyncio.create_task(
-                    self._update_user_activity(auth_header)
-                )
+                asyncio.create_task(self._update_user_activity(auth_header))
 
         return response
 
@@ -465,18 +463,29 @@ class UserActivityMiddleware(BaseHTTPMiddleware):
                     token,
                     settings.SUPABASE_JWT_SECRET,
                     algorithms=["HS256"],
-                    options={"verify_exp": False}  # Don't verify expiry for activity tracking
+                    options={
+                        "verify_exp": False
+                    },  # Don't verify expiry for activity tracking
                 )
                 user_id = payload.get("sub")
                 if not user_id:
                     return
             except Exception:
-                return  # Invalid token, skip
+                # Fallback: decode without signature verification (activity tracking only)
+                try:
+                    payload = jwt.decode(
+                        token, options={"verify_signature": False, "verify_exp": False}
+                    )
+                    user_id = payload.get("sub")
+                    if not user_id:
+                        return
+                except Exception:
+                    return  # Invalid token, skip
 
             # Check debounce in Redis
             redis = get_redis_client()
             debounce_key = f"user_activity:{user_id}"
-            
+
             # If key exists, skip update (already updated recently)
             if redis.exists(debounce_key):
                 return
@@ -485,10 +494,12 @@ class UserActivityMiddleware(BaseHTTPMiddleware):
             redis.setex(debounce_key, self.DEBOUNCE_SECONDS, "1")
 
             # Update last_active_at in database
+            from datetime import datetime, timezone
+
             supabase = get_supabase_client()
-            supabase.table("users").update({
-                "last_active_at": "now()"
-            }).eq("id", user_id).execute()
+            supabase.table("users").update(
+                {"last_active_at": datetime.now(timezone.utc).isoformat()}
+            ).eq("id", user_id).execute()
 
         except Exception as e:
             # Silently fail - activity tracking shouldn't break requests

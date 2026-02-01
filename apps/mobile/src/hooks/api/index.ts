@@ -11,6 +11,7 @@ export * from "./useAICoach";
 export * from "./useWeeklyRecaps";
 export * from "./useNotificationHistory";
 export * from "./useNotificationPreferences";
+export * from "./useBroadcasts";
 export * from "./useHomeDashboard";
 export * from "./useReferral";
 

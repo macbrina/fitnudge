@@ -417,20 +417,6 @@ CREATE POLICY webhook_events_deny ON webhook_events
   USING (false);
 
 -- =====================================================
--- SYSTEM TABLES (No user access)
--- =====================================================
-ALTER TABLE system_health_history ENABLE ROW LEVEL SECURITY;
-ALTER TABLE system_health_updates ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY system_health_history_deny ON system_health_history
-  FOR ALL TO authenticated
-  USING (false);
-
-CREATE POLICY system_health_updates_deny ON system_health_updates
-  FOR ALL TO authenticated
-  USING (false);
-
--- =====================================================
 -- ENABLE REALTIME FOR CORE TABLES
 -- =====================================================
 -- CRITICAL: users table must be enabled for security (auto-logout on ban/suspend)
@@ -488,6 +474,12 @@ ALTER TABLE accountability_partners REPLICA IDENTITY FULL;
 
 -- Nudges: detect is_read changes
 ALTER TABLE social_nudges REPLICA IDENTITY FULL;
+
+-- Blog posts: detect status changes (draft → published)
+ALTER TABLE blog_posts REPLICA IDENTITY FULL;
+
+-- Pattern insights: detect status changes (pending → generating)
+ALTER TABLE pattern_insights REPLICA IDENTITY FULL;
 
 -- AI Coach: detect message additions/status changes
 ALTER TABLE ai_coach_conversations REPLICA IDENTITY FULL;

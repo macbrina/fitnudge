@@ -12,6 +12,7 @@ import { checkInsQueryKeys, goalsQueryKeys, userQueryKeys } from "@/hooks/api/qu
 import { homeDashboardQueryKeys } from "@/hooks/api/useHomeDashboard";
 import { useGoalNotifications } from "@/hooks/notifications/useGoalNotifications";
 import { CreateGoalRequest, Goal, goalsService, UpdateGoalRequest } from "@/services/api/goals";
+import { ApiError } from "@/services/api/base";
 import { useAuthStore } from "@/stores/authStore";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -78,14 +79,48 @@ export const useArchivedGoals = () => {
 };
 
 /**
+ * Get completed goals only
+ */
+export const useCompletedGoals = () => {
+  const { isAuthenticated } = useAuthStore();
+
+  return useQuery({
+    queryKey: goalsQueryKeys.completed(),
+    queryFn: async () => {
+      const response = await goalsService.getAllGoals();
+      // Filter to only completed goals
+      if (response.data) {
+        response.data = response.data.filter((g: Goal) => g.status === "completed");
+      }
+      return response;
+    },
+    enabled: isAuthenticated,
+    staleTime: 5 * 60 * 1000 // 5 minutes - completed goals rarely change
+  });
+};
+
+/**
  * Get a single goal by ID
  */
 export const useGoal = (goalId: string) => {
   return useQuery({
     queryKey: goalsQueryKeys.detail(goalId),
-    queryFn: () => goalsService.getGoal(goalId),
+    queryFn: async () => {
+      try {
+        return await goalsService.getGoal(goalId);
+      } catch (err) {
+        // BaseApiService throws ApiError on non-2xx.
+        // For a true 404, return an "empty" response so screens can render NotFoundState
+        // and React Query replaces stale cached data.
+        if (err instanceof ApiError && err.status === 404) {
+          return { status: 404, data: undefined, error: "Goal not found" };
+        }
+        throw err;
+      }
+    },
     enabled: !!goalId,
-    staleTime: 2 * 60 * 1000 // 2 minutes
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    retry: false
   });
 };
 
@@ -205,13 +240,25 @@ export const useCreateGoal = () => {
         // Replace optimistic goal with real one
         queryClient.setQueryData(goalsQueryKeys.active(), (old: any) => {
           if (!old?.data) return old;
-          const filtered = old.data.filter((g: Goal) => !g.id.startsWith("temp-"));
+          const idx = old.data.findIndex((g: Goal) => g.id.startsWith("temp-"));
+          if (idx >= 0) {
+            const next = [...old.data];
+            next[idx] = realGoal;
+            return { ...old, data: next };
+          }
+          const filtered = old.data.filter((g: Goal) => g.id !== realGoal.id);
           return { ...old, data: [realGoal, ...filtered] };
         });
 
         queryClient.setQueryData(goalsQueryKeys.list(), (old: any) => {
           if (!old?.data) return old;
-          const filtered = old.data.filter((g: Goal) => !g.id.startsWith("temp-"));
+          const idx = old.data.findIndex((g: Goal) => g.id.startsWith("temp-"));
+          if (idx >= 0) {
+            const next = [...old.data];
+            next[idx] = realGoal;
+            return { ...old, data: next };
+          }
+          const filtered = old.data.filter((g: Goal) => g.id !== realGoal.id);
           return { ...old, data: [realGoal, ...filtered] };
         });
       }
@@ -733,11 +780,13 @@ export const useArchiveGoal = () => {
       await queryClient.cancelQueries({ queryKey: goalsQueryKeys.active() });
       await queryClient.cancelQueries({ queryKey: goalsQueryKeys.list() });
       await queryClient.cancelQueries({ queryKey: goalsQueryKeys.archived() });
+      await queryClient.cancelQueries({ queryKey: goalsQueryKeys.completed() });
       await queryClient.cancelQueries({ queryKey: goalsQueryKeys.detail(goalId) });
 
       const previousActiveGoals = queryClient.getQueryData(goalsQueryKeys.active());
       const previousAllGoals = queryClient.getQueryData(goalsQueryKeys.list());
       const previousArchivedGoals = queryClient.getQueryData(goalsQueryKeys.archived());
+      const previousCompletedGoals = queryClient.getQueryData(goalsQueryKeys.completed());
       const previousDetail = queryClient.getQueryData(goalsQueryKeys.detail(goalId));
       const previousUserStats = queryClient.getQueryData(userQueryKeys.userStats());
 
@@ -754,6 +803,14 @@ export const useArchiveGoal = () => {
           if (!old?.data) return old;
           return { ...old, data: old.data.filter((g: Goal) => g.id !== goalId) };
         });
+
+        // Remove from completed if it was completed
+        if (goal.status === "completed") {
+          queryClient.setQueryData(goalsQueryKeys.completed(), (old: any) => {
+            if (!old?.data) return old;
+            return { ...old, data: old.data.filter((g: Goal) => g.id !== goalId) };
+          });
+        }
 
         // Update in all goals
         queryClient.setQueryData(goalsQueryKeys.list(), (old: any) => {
@@ -802,6 +859,7 @@ export const useArchiveGoal = () => {
         previousActiveGoals,
         previousAllGoals,
         previousArchivedGoals,
+        previousCompletedGoals,
         previousDetail,
         previousUserStats,
         goalId
@@ -817,6 +875,9 @@ export const useArchiveGoal = () => {
       }
       if (context?.previousArchivedGoals) {
         queryClient.setQueryData(goalsQueryKeys.archived(), context.previousArchivedGoals);
+      }
+      if (context?.previousCompletedGoals) {
+        queryClient.setQueryData(goalsQueryKeys.completed(), context.previousCompletedGoals);
       }
       if (context?.previousDetail) {
         queryClient.setQueryData(goalsQueryKeys.detail(goalId), context.previousDetail);
@@ -845,6 +906,140 @@ export const useArchiveGoal = () => {
   });
 };
 
+/**
+ * Mark a goal as completed (set status to 'completed')
+ * Completed goals cannot be resumed - they represent achieved goals
+ */
+export const useCompleteGoal = () => {
+  const queryClient = useQueryClient();
+  const { cancelGoalNotifications } = useGoalNotifications();
+
+  return useMutation({
+    mutationFn: (goalId: string) => goalsService.completeGoal(goalId),
+
+    onMutate: async (goalId) => {
+      await queryClient.cancelQueries({ queryKey: goalsQueryKeys.active() });
+      await queryClient.cancelQueries({ queryKey: goalsQueryKeys.list() });
+      await queryClient.cancelQueries({ queryKey: goalsQueryKeys.completed() });
+      await queryClient.cancelQueries({ queryKey: goalsQueryKeys.archived() });
+      await queryClient.cancelQueries({ queryKey: goalsQueryKeys.detail(goalId) });
+
+      const previousActiveGoals = queryClient.getQueryData(goalsQueryKeys.active());
+      const previousAllGoals = queryClient.getQueryData(goalsQueryKeys.list());
+      const previousCompletedGoals = queryClient.getQueryData(goalsQueryKeys.completed());
+      const previousArchivedGoals = queryClient.getQueryData(goalsQueryKeys.archived());
+      const previousDetail = queryClient.getQueryData(goalsQueryKeys.detail(goalId));
+      const previousUserStats = queryClient.getQueryData(userQueryKeys.userStats());
+
+      // Get goal data before completing
+      const allGoals = previousAllGoals as any;
+      const goal = allGoals?.data?.find((g: Goal) => g.id === goalId);
+      const wasActive = goal?.status === "active";
+      const completedAt = new Date().toISOString();
+
+      if (goal) {
+        const completedGoal = { ...goal, status: "completed" as const, completed_at: completedAt };
+
+        // Remove from active goals
+        queryClient.setQueryData(goalsQueryKeys.active(), (old: any) => {
+          if (!old?.data) return old;
+          return { ...old, data: old.data.filter((g: Goal) => g.id !== goalId) };
+        });
+
+        // Remove from archived if it was archived
+        if (goal.status === "archived") {
+          queryClient.setQueryData(goalsQueryKeys.archived(), (old: any) => {
+            if (!old?.data) return old;
+            return { ...old, data: old.data.filter((g: Goal) => g.id !== goalId) };
+          });
+        }
+
+        // Update in all goals
+        queryClient.setQueryData(goalsQueryKeys.list(), (old: any) => {
+          if (!old?.data) return old;
+          return {
+            ...old,
+            data: old.data.map((g: Goal) => (g.id === goalId ? completedGoal : g))
+          };
+        });
+
+        // Add to completed goals
+        queryClient.setQueryData(goalsQueryKeys.completed(), (old: any) => {
+          if (!old?.data) return { data: [completedGoal], status: 200 };
+          const exists = old.data.some((g: Goal) => g.id === goalId);
+          if (exists) {
+            return {
+              ...old,
+              data: old.data.map((g: Goal) => (g.id === goalId ? completedGoal : g))
+            };
+          }
+          return { ...old, data: [...old.data, completedGoal] };
+        });
+
+        // Update detail
+        queryClient.setQueryData(goalsQueryKeys.detail(goalId), (old: any) => {
+          if (!old?.data) return old;
+          return { ...old, data: completedGoal };
+        });
+      }
+
+      // Update user stats if was active
+      if (wasActive) {
+        queryClient.setQueryData(userQueryKeys.userStats(), (old: any) => {
+          if (!old?.data) return old;
+          return {
+            ...old,
+            data: {
+              ...old.data,
+              active_goals: Math.max(0, (old.data.active_goals || 1) - 1)
+            }
+          };
+        });
+      }
+
+      return {
+        previousActiveGoals,
+        previousAllGoals,
+        previousCompletedGoals,
+        previousArchivedGoals,
+        previousDetail,
+        previousUserStats,
+        goalId
+      };
+    },
+
+    onError: (_err, goalId, context) => {
+      if (context?.previousActiveGoals) {
+        queryClient.setQueryData(goalsQueryKeys.active(), context.previousActiveGoals);
+      }
+      if (context?.previousAllGoals) {
+        queryClient.setQueryData(goalsQueryKeys.list(), context.previousAllGoals);
+      }
+      if (context?.previousCompletedGoals) {
+        queryClient.setQueryData(goalsQueryKeys.completed(), context.previousCompletedGoals);
+      }
+      if (context?.previousArchivedGoals) {
+        queryClient.setQueryData(goalsQueryKeys.archived(), context.previousArchivedGoals);
+      }
+      if (context?.previousDetail) {
+        queryClient.setQueryData(goalsQueryKeys.detail(goalId), context.previousDetail);
+      }
+      if (context?.previousUserStats) {
+        queryClient.setQueryData(userQueryKeys.userStats(), context.previousUserStats);
+      }
+    },
+
+    onSuccess: (_data, goalId) => {
+      // Cancel notifications for completed goal
+      cancelGoalNotifications(goalId);
+
+      queryClient.invalidateQueries({ queryKey: goalsQueryKeys.summary() });
+      queryClient.invalidateQueries({ queryKey: userQueryKeys.userStats() });
+      queryClient.invalidateQueries({ queryKey: homeDashboardQueryKeys.dashboard() });
+    }
+  });
+};
+
 // =============================================================================
 // GOAL INSIGHTS (Premium)
 // =============================================================================
@@ -854,6 +1049,8 @@ export const useArchiveGoal = () => {
  * Premium feature - returns empty array for free users
  */
 export const useGoalInsights = (goalId: string, enabled: boolean = true) => {
+  console.log("[useGoalInsights] goalId", goalId);
+  console.log("[useGoalInsights] enabled", enabled);
   return useQuery({
     queryKey: goalsQueryKeys.insights(goalId),
     queryFn: () => goalsService.getGoalInsights(goalId),

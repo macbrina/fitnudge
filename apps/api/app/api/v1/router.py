@@ -49,6 +49,8 @@ from app.api.v1.endpoints import (
     blog,
     data_export,
     analytics,
+    live_activity,
+    next_up,
 )
 
 # Create main API router
@@ -104,9 +106,7 @@ api_router.include_router(webhooks.router, prefix="/webhooks", tags=["Webhooks"]
 api_router.include_router(
     app_version.router, prefix="/app-version", tags=["App Version"]
 )
-api_router.include_router(
-    app_config.router, prefix="/app-config", tags=["App Config"]
-)
+api_router.include_router(app_config.router, prefix="/app-config", tags=["App Config"])
 
 # ===== Other =====
 api_router.include_router(blog.router, prefix="/blog", tags=["Blog"])
@@ -114,3 +114,11 @@ api_router.include_router(
     data_export.router, prefix="/data-export", tags=["Data Export"]
 )
 api_router.include_router(analytics.router, prefix="/analytics", tags=["Analytics"])
+
+# ===== iOS Live Activities (ActivityKit) =====
+api_router.include_router(
+    live_activity.router, prefix="/live-activity", tags=["Live Activities"]
+)
+
+# ===== Android NextUp Mode B (FCM) =====
+api_router.include_router(next_up.router, prefix="/next-up", tags=["NextUp Push"])

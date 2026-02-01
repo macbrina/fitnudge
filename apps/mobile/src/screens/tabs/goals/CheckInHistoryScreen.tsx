@@ -133,7 +133,9 @@ export default function CheckInHistoryScreen() {
           <View style={styles.checkInLeft}>
             <View style={styles.iconWrap}>{getStatusIcon()}</View>
             <View style={styles.checkInInfo}>
-              <Text style={styles.checkInDate}>{formatDate(item.check_in_date)}</Text>
+              <Text style={styles.checkInDate}>
+                {formatDate(item.check_in_date, "short", true)}
+              </Text>
               <Text style={[styles.checkInStatus, { color: getStatusColor() }]}>
                 {getStatusText()}
               </Text>

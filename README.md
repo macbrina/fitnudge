@@ -56,7 +56,7 @@ Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
 
 - **Monorepo**: Turborepo for build orchestration
 - **Deployment**: Vercel (web), Railway/Render (API), EAS (mobile)
-- **Monitoring**: Sentry, New Relic, PostHog
+- **Monitoring**: Sentry, PostHog
 - **Localization**: n8n automation for mobile/web only
 
 ## 🛠️ Development Tools

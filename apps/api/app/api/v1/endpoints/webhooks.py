@@ -527,6 +527,7 @@ async def handle_subscription_expired(supabase, event: RevenueCatEvent, user_id:
     """
     from app.services.subscription_service import (
         handle_subscription_expiry_deactivation,
+        reset_ai_coach_daily_usage_on_downgrade,
     )
 
     # Get current plan before expiring
@@ -548,6 +549,9 @@ async def handle_subscription_expired(supabase, event: RevenueCatEvent, user_id:
 
     # Downgrade user to free plan
     supabase.table("users").update({"plan": "free"}).eq("id", user_id).execute()
+
+    # Reset AI Coach daily usage for today so they get a fresh free limit (same day)
+    await reset_ai_coach_daily_usage_on_downgrade(supabase, user_id)
 
     # Handle all deactivations
     try:
@@ -580,6 +584,7 @@ async def handle_subscription_expired(supabase, event: RevenueCatEvent, user_id:
                 },
                 notification_type="subscription",
                 skip_preference_check=True,  # Critical - always send
+                save_to_notification_history=False,  # No goal/partner; push + deepLink enough
             )
         except Exception as notify_error:
             logger.error(
@@ -647,6 +652,7 @@ async def handle_billing_issue(supabase, event: RevenueCatEvent, user_id: str):
             },
             notification_type="subscription",
             skip_preference_check=True,  # Critical - always send
+            save_to_notification_history=False,  # No goal/partner; push + deepLink enough
         )
     except Exception as notify_error:
         logger.error(
@@ -655,9 +661,10 @@ async def handle_billing_issue(supabase, event: RevenueCatEvent, user_id: str):
 
 
 async def handle_product_change(supabase, event: RevenueCatEvent, user_id: str):
-    """Handle plan change (upgrade/downgrade)"""
+    """Handle plan change (upgrade/downgrade). Single plan: used for resubscribe (free→premium)."""
     from app.services.subscription_service import (
         handle_subscription_expiry_deactivation,
+        reset_ai_coach_daily_usage_on_downgrade,
     )
 
     # Prefer entitlement_ids over product_id for plan determination
@@ -697,11 +704,15 @@ async def handle_product_change(supabase, event: RevenueCatEvent, user_id: str):
 
     logger.info(f"Plan changed for user {user_id} from {previous_plan} to {new_plan}")
 
+    # Reset AI Coach daily usage for today on any plan change (upgrade or downgrade).
+    # Upgrade: had free usage, now premium — fresh slate. Downgrade: had premium usage, now free — fresh free limit.
+    await reset_ai_coach_daily_usage_on_downgrade(supabase, user_id)
+
     # Check if this is a downgrade that requires deactivation
     plan_tiers = {"free": 0, "premium": 1}
 
     if plan_tiers.get(new_plan, 0) < plan_tiers.get(previous_plan, 0):
-        # This is a downgrade - may need to deactivate excess items
+        # Downgrade path: single plan so rarely hit; deactivate excess items if ever
         try:
             summary = await handle_subscription_expiry_deactivation(
                 supabase, user_id, previous_plan, reason="manual"  # Voluntary downgrade

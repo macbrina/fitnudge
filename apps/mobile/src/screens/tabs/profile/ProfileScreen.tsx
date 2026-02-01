@@ -2,7 +2,7 @@ import Button from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import CheckmarkCircle from "@/components/ui/CheckmarkCircle";
 import LinkText from "@/components/ui/LinkText";
-import { PROFILE_AVATARS } from "@/constants/general";
+import { AvatarImage, normalizeAvatarId } from "@/components/avatars";
 import { useAppStoreUrls, useExternalUrls } from "@/hooks/api/useAppConfig";
 import { useAlertModal } from "@/contexts/AlertModalContext";
 import { useNudges } from "@/hooks/api/useNudges";
@@ -396,18 +396,7 @@ export default function ProfileScreen() {
     }
   };
 
-  // Get avatar display from profile_picture_url (which stores the avatar ID)
-  const getAvatarDisplay = useCallback(() => {
-    const avatarId = user?.profile_picture_url;
-    const avatar = PROFILE_AVATARS.find((a) => a.id === avatarId);
-    if (avatar) {
-      return avatar;
-    }
-    // Default avatar
-    return { id: "default", icon: "person-circle", color: brandColors.primary };
-  }, [user?.profile_picture_url, brandColors.primary]);
-
-  const currentAvatar = getAvatarDisplay();
+  const avatarId = normalizeAvatarId(user?.profile_picture_url) ?? "1";
 
   return (
     <View style={styles.container}>
@@ -420,12 +409,8 @@ export default function ProfileScreen() {
         <View style={styles.header}>
           <View style={styles.profileRow}>
             {/* Avatar */}
-            <View style={[styles.avatarContainer, { backgroundColor: `${currentAvatar.color}20` }]}>
-              <Ionicons
-                name={currentAvatar.icon as keyof typeof Ionicons.glyphMap}
-                size={36}
-                color={currentAvatar.color}
-              />
+            <View style={[styles.avatarContainer, { backgroundColor: `${colors.border.subtle}` }]}>
+              <AvatarImage avatarId={avatarId} size={36} />
             </View>
 
             {/* Info */}

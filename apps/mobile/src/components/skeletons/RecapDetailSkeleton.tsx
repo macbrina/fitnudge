@@ -2,16 +2,18 @@ import React from "react";
 import { ScrollView, View } from "react-native";
 import { useRouter } from "expo-router";
 import { BackButton } from "@/components/ui/BackButton";
-import { Card } from "@/components/ui/Card";
 import { SkeletonBox } from "@/components/ui/SkeletonBox";
 import { useTranslation } from "@/lib/i18n";
 import { toRN } from "@/lib/units";
-import { useStyles, useTheme } from "@/themes";
+import { useStyles } from "@/themes";
+import { tokens } from "@/themes/tokens";
+import { CARD_PADDING_VALUES } from "@/constants/general";
 
 export function RecapDetailSkeleton() {
   const styles = useStyles(makeStyles);
   const { t } = useTranslation();
   const router = useRouter();
+  const cardPadding = CARD_PADDING_VALUES.SM;
 
   return (
     <View style={styles.container}>
@@ -28,7 +30,14 @@ export function RecapDetailSkeleton() {
         </View>
 
         {/* Summary Card */}
-        <Card style={styles.summaryCard}>
+        <SkeletonBox
+          width="100%"
+          height={232}
+          borderRadius={toRN(tokens.borderRadius.xl)}
+          inner
+          innerPadding={cardPadding}
+          style={styles.summaryCard}
+        >
           {/* Completion Rate Circle */}
           <View style={styles.rateSection}>
             <SkeletonBox width={100} height={100} borderRadius={50} />
@@ -50,21 +59,38 @@ export function RecapDetailSkeleton() {
               <SkeletonBox width={70} height={12} borderRadius={4} style={{ marginTop: 6 }} />
             </View>
           </View>
-        </Card>
+        </SkeletonBox>
 
         {/* AI Summary */}
-        <Card style={styles.card}>
-          <SkeletonBox width={100} height={16} borderRadius={6} style={{ marginBottom: 12 }} />
-          <SkeletonBox width="100%" height={14} borderRadius={4} />
-          <SkeletonBox width="90%" height={14} borderRadius={4} style={{ marginTop: 6 }} />
-          <SkeletonBox width="75%" height={14} borderRadius={4} style={{ marginTop: 6 }} />
-        </Card>
+        <SkeletonBox
+          width="100%"
+          height={120}
+          borderRadius={toRN(tokens.borderRadius.xl)}
+          inner
+          innerPadding={cardPadding}
+          style={styles.card}
+        >
+          <View style={{ padding: toRN(tokens.spacing[2]) }}>
+            <SkeletonBox width={100} height={16} borderRadius={6} style={{ marginBottom: 12 }} />
+            <SkeletonBox width="100%" height={14} borderRadius={4} />
+            <SkeletonBox width="90%" height={14} borderRadius={4} style={{ marginTop: 6 }} />
+            <SkeletonBox width="75%" height={14} borderRadius={4} style={{ marginTop: 6 }} />
+          </View>
+        </SkeletonBox>
 
         {/* Goals Breakdown Section */}
         <View style={styles.section}>
           <SkeletonBox width={120} height={18} borderRadius={6} style={{ marginBottom: 12 }} />
           {[1, 2].map((i) => (
-            <Card key={i} style={styles.goalCard}>
+            <SkeletonBox
+              key={i}
+              width="100%"
+              height={72}
+              borderRadius={toRN(tokens.borderRadius.xl)}
+              inner
+              innerPadding={cardPadding}
+              style={styles.goalCard}
+            >
               <View style={styles.goalHeader}>
                 <SkeletonBox width={24} height={24} borderRadius={12} />
                 <View style={{ flex: 1, marginLeft: 12 }}>
@@ -73,21 +99,29 @@ export function RecapDetailSkeleton() {
                 </View>
                 <SkeletonBox width={50} height={20} borderRadius={10} />
               </View>
-            </Card>
+            </SkeletonBox>
           ))}
         </View>
 
         {/* Achievements */}
         <View style={styles.section}>
           <SkeletonBox width={140} height={18} borderRadius={6} style={{ marginBottom: 12 }} />
-          <View style={styles.achievementRow}>
-            {[1, 2].map((i) => (
-              <View key={i} style={styles.achievementItem}>
-                <SkeletonBox width={48} height={48} borderRadius={24} />
-                <SkeletonBox width={60} height={12} borderRadius={4} style={{ marginTop: 8 }} />
-              </View>
-            ))}
-          </View>
+          <SkeletonBox
+            width="100%"
+            height={100}
+            borderRadius={toRN(tokens.borderRadius.xl)}
+            inner
+            innerPadding={cardPadding}
+          >
+            <View style={styles.achievementRow}>
+              {[1, 2].map((i) => (
+                <View key={i} style={styles.achievementItem}>
+                  <SkeletonBox width={48} height={48} borderRadius={24} />
+                  <SkeletonBox width={60} height={12} borderRadius={4} style={{ marginTop: 8 }} />
+                </View>
+              ))}
+            </View>
+          </SkeletonBox>
         </View>
       </ScrollView>
     </View>
@@ -111,13 +145,13 @@ const makeStyles = (tokens: any, colors: any, brandColors: any) => ({
     marginBottom: toRN(tokens.spacing[4])
   },
   summaryCard: {
-    padding: toRN(tokens.spacing[4]),
     marginBottom: toRN(tokens.spacing[4]),
     alignItems: "center" as const
   },
   rateSection: {
     alignItems: "center" as const,
-    marginBottom: toRN(tokens.spacing[4])
+    marginBottom: toRN(tokens.spacing[4]),
+    marginTop: toRN(tokens.spacing[2])
   },
   statsRow: {
     flexDirection: "row" as const,
@@ -138,16 +172,17 @@ const makeStyles = (tokens: any, colors: any, brandColors: any) => ({
     marginBottom: toRN(tokens.spacing[4])
   },
   goalCard: {
-    padding: toRN(tokens.spacing[4]),
     marginBottom: toRN(tokens.spacing[3])
   },
   goalHeader: {
     flexDirection: "row" as const,
-    alignItems: "center" as const
+    alignItems: "center" as const,
+    padding: toRN(tokens.spacing[2])
   },
   achievementRow: {
     flexDirection: "row" as const,
-    gap: toRN(tokens.spacing[4])
+    gap: toRN(tokens.spacing[4]),
+    padding: toRN(tokens.spacing[2])
   },
   achievementItem: {
     alignItems: "center" as const

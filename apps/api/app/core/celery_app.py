@@ -108,9 +108,9 @@ celery_app.conf.update(
         },
         "send-reengagement-notifications": {
             "task": "send_reengagement_notifications",
-            "schedule": 60.0 * 60.0 * 24.0,  # Run DAILY at midnight UTC
-            # Detects users inactive for 2+ days and sends re-engagement push
-            # Alternative: crontab(hour=10, minute=0) for 10 AM UTC daily
+            "schedule": 60.0 * 60.0 * 24.0,  # Run DAILY
+            # Sends re-engagement when user has not opened app for 7+ days (users.last_active_at).
+            # Distinct from check_missed_days_intervention (missed check-ins while still using app).
         },
         "notify-inactive-partners": {
             "task": "notify_inactive_partners",
@@ -135,16 +135,9 @@ celery_app.conf.update(
             # This only resets the "X/Y this week" counter for UI display
             # Alternative: crontab(hour=0, minute=0, day_of_week=1) for Monday only
         },
-        "detect-patterns": {
-            "task": "detect_patterns",
-            "schedule": 60.0 * 60.0 * 24.0 * 7,  # Run WEEKLY (Sunday)
-            # Analyzes premium users' check-in history for patterns:
-            # - Best/worst days of week
-            # - Common skip reasons
-            # - Dropout points
-            # Stores in pattern_insights table for AI coach context
-            # Alternative: crontab(hour=20, minute=0, day_of_week=0) for Sunday 8pm
-        },
+        # REMOVED: "detect-patterns" weekly batch task
+        # Pattern insights now generate on-demand after each check-in (more cost-effective)
+        # See: generate_goal_insights_task triggered in checkins.py create_check_in endpoint
         "refresh-analytics-views": {
             "task": "refresh_analytics_views",
             "schedule": 60.0 * 60.0,  # Run HOURLY

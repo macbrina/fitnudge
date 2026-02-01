@@ -22,7 +22,7 @@ import { SkeletonBox } from "@/components/ui/SkeletonBox";
 import { useAlertModal } from "@/contexts/AlertModalContext";
 import { ApiError } from "@/services/api/base";
 import { useTranslation } from "@/lib/i18n";
-import { useStyles, useTheme } from "@/themes";
+import { tokens, useStyles, useTheme } from "@/themes";
 import { toRN } from "@/lib/units";
 import { fontFamily } from "@/lib/fonts";
 import { partnersQueryKeys } from "@/hooks/api/queryKeys";
@@ -35,35 +35,12 @@ import {
   usePartnerAccess
 } from "@/hooks/api/usePartners";
 import { SearchUserResult, RequestStatus } from "@/services/api/partners";
+import { getActivityColor, getActivityStatus } from "@/utils/helper";
+import { CARD_PADDING_VALUES } from "@/constants/general";
 
 type PartnerTab = "search" | "suggested";
 
 // Activity status based on last_active_at
-type ActivityStatus = "active" | "recent" | "inactive";
-
-const getActivityStatus = (lastActiveAt?: string): ActivityStatus => {
-  if (!lastActiveAt) return "inactive";
-
-  const lastActive = new Date(lastActiveAt);
-  const now = new Date();
-  const diffHours = (now.getTime() - lastActive.getTime()) / (1000 * 60 * 60);
-
-  if (diffHours <= 24) return "active"; // Active today
-  if (diffHours <= 168) return "recent"; // Active this week (7 days)
-  return "inactive"; // Inactive
-};
-
-const getActivityColor = (status: ActivityStatus): string => {
-  switch (status) {
-    case "active":
-      return "#22C55E"; // Green
-    case "recent":
-      return "#F59E0B"; // Amber
-    case "inactive":
-      return "#9CA3AF"; // Gray
-  }
-};
-
 export const FindPartnerScreen: React.FC = () => {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -558,14 +535,32 @@ export const FindPartnerScreen: React.FC = () => {
     () => (
       <View style={styles.skeletonContainer}>
         {[1, 2, 3, 4, 5].map((i) => (
-          <View key={i} style={styles.skeletonCard}>
-            <SkeletonBox width={48} height={48} borderRadius={24} />
-            <View style={styles.skeletonContent}>
+          <SkeletonBox
+            key={i}
+            width="100%"
+            height={75}
+            borderRadius={toRN(tokens.borderRadius.xl)}
+            inner
+            innerPadding={CARD_PADDING_VALUES.SM}
+            style={styles.skeletonCard}
+          >
+            <SkeletonBox
+              width={48}
+              height={48}
+              borderRadius={24}
+              style={{ marginLeft: toRN(tokens.spacing[2]) }}
+            />
+            <View style={[styles.skeletonContent, { padding: toRN(tokens.spacing[2]) }]}>
               <SkeletonBox width={120} height={16} borderRadius={4} />
               <SkeletonBox width={80} height={12} borderRadius={4} style={{ marginTop: 4 }} />
             </View>
-            <SkeletonBox width={60} height={32} borderRadius={16} />
-          </View>
+            <SkeletonBox
+              width={60}
+              height={32}
+              borderRadius={16}
+              style={{ marginRight: toRN(tokens.spacing[2]) }}
+            />
+          </SkeletonBox>
         ))}
       </View>
     ),
@@ -890,9 +885,6 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
   skeletonCard: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    padding: toRN(tokens.spacing[4]),
-    backgroundColor: colors.bg.card,
-    borderRadius: toRN(tokens.borderRadius.lg),
     marginBottom: toRN(tokens.spacing[3])
   },
   skeletonContent: {

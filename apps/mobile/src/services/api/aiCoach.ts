@@ -20,9 +20,12 @@ export interface ConversationSummary {
 }
 
 export interface ConversationMessage {
+  message_id?: string;
+  request_id?: string;
   role: "user" | "assistant";
   content: string;
   created_at?: string;
+  status?: "pending" | "completed" | "failed" | "generating";
 }
 
 export interface ConversationDetail {
@@ -73,9 +76,14 @@ export interface AsyncChatRequest {
 }
 
 export interface AsyncChatResponse {
-  conversation_id: string;
-  message_index: number;
-  status: "pending";
+  success: boolean;
+  conversation_id?: string;
+  message_status?: "pending" | "processing" | "completed" | "failed";
+  task_id?: string;
+  request_id?: string;
+  user_message_id?: string;
+  assistant_message_id?: string;
+  error?: string;
 }
 
 export interface UnlockMessageRequest {
@@ -140,18 +148,22 @@ class AICoachService extends BaseApiService {
   }
 
   /**
-   * Get the current (most recent) conversation with paginated messages
+   * Get the current (most recent) conversation with paginated messages.
+   * When goalId is set, returns the persistent goal-specific thread (or null if none yet).
    * @param messageLimit Max number of messages to return (default 50)
    * @param messageOffset Offset from most recent messages for pagination
+   * @param goalId Optional goal ID to load the goal-scoped thread
    */
   async getCurrentConversation(
     messageLimit: number = 50,
-    messageOffset: number = 0
+    messageOffset: number = 0,
+    goalId?: string | null
   ): Promise<ApiResponse<ConversationDetail | null>> {
     const params = new URLSearchParams({
       message_limit: messageLimit.toString(),
       message_offset: messageOffset.toString()
     });
+    if (goalId) params.set("goal_id", goalId);
     return this.get<ConversationDetail | null>(`${ROUTES.AI_COACH.CURRENT_CONVERSATION}?${params}`);
   }
 

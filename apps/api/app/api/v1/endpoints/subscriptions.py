@@ -259,6 +259,13 @@ async def sync_subscription(
 
             supabase.table("users").update({"plan": "free"}).eq("id", user_id).execute()
 
+            # Reset AI Coach daily usage for today so they get a fresh free limit (same day)
+            from app.services.subscription_service import (
+                reset_ai_coach_daily_usage_on_downgrade,
+            )
+
+            await reset_ai_coach_daily_usage_on_downgrade(supabase, user_id)
+
             logger.info(f"[Sync] Downgraded user {user_id}: {current_db_plan} -> free")
 
             return {

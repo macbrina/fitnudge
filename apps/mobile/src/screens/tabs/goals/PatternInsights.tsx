@@ -5,6 +5,7 @@ import { useTranslation } from "@/lib/i18n";
 import { toRN } from "@/lib/units";
 import { GoalInsightsResponse, InsightsMetrics, PatternInsight } from "@/services/api/goals";
 import { useSubscriptionStore } from "@/stores/subscriptionStore";
+import { useAICoachStore } from "@/stores/aiCoachStore";
 import { useStyles, useTheme } from "@/themes";
 import {
   AlertTriangle,
@@ -14,11 +15,12 @@ import {
   Crown,
   Flame,
   Lightbulb,
+  MessageSquare,
   Target,
   TrendingDown,
   TrendingUp
 } from "lucide-react-native";
-import { ActivityIndicator, Text, View } from "react-native";
+import { ActivityIndicator, Text, TouchableOpacity, View } from "react-native";
 
 interface PatternInsightsProps {
   goalId: string;
@@ -48,6 +50,14 @@ export default function PatternInsights({
   const styles = useStyles(makeStyles);
   const { colors, brandColors } = useTheme();
   const { t } = useTranslation();
+  const { hasFeature } = useSubscriptionStore();
+  const { openModal: openAICoach } = useAICoachStore();
+
+  // Check if user has AI Coach access
+  const hasAICoachAccess = hasFeature("ai_coach_chat");
+
+  // Check if there are any warning insights
+  const hasWarningInsights = insights.some((insight) => insight.type === "warning");
 
   // Show loading state inside the card
   if (isLoading) {
@@ -72,9 +82,6 @@ export default function PatternInsights({
   return (
     <Card style={styles.insightsCard}>
       <View style={styles.insightsHeader}>
-        <View style={styles.insightsIconWrap}>
-          <Lightbulb size={18} color={brandColors.primary} />
-        </View>
         <Text style={styles.sectionTitle}>{t("goals.insights")}</Text>
       </View>
 
@@ -198,50 +205,82 @@ export default function PatternInsights({
           </Text>
         </View>
       ) : (
-        // Show actual AI-generated insights
-        insights.map((insight, index) => {
-          const getInsightIcon = () => {
-            switch (insight.type) {
-              case "pattern":
-                return <TrendingUp size={16} color={brandColors.primary} />;
-              case "encouragement":
-                return <Award size={16} color={colors.feedback.success} />;
-              case "warning":
-                return <AlertTriangle size={16} color={colors.feedback.warning} />;
-              case "tip":
-                return <Lightbulb size={16} color={brandColors.primary} />;
-              default:
-                return <BarChart2 size={16} color={colors.text.tertiary} />;
-            }
-          };
+        <>
+          {insightsData?.summary && (
+            <Text style={styles.insightsSummaryText}>{insightsData?.summary}</Text>
+          )}
+          {/* Show actual AI-generated insights */}
+          {insights.map((insight, index) => {
+            const getInsightIcon = () => {
+              switch (insight.type) {
+                case "pattern":
+                  return <TrendingUp size={16} color={brandColors.primary} />;
+                case "encouragement":
+                  return <Award size={16} color={colors.feedback.success} />;
+                case "warning":
+                  return <AlertTriangle size={16} color={colors.feedback.warning} />;
+                case "tip":
+                  return <Lightbulb size={16} color={brandColors.primary} />;
+                default:
+                  return <BarChart2 size={16} color={colors.text.tertiary} />;
+              }
+            };
 
-          const getInsightBgColor = () => {
-            switch (insight.type) {
-              case "pattern":
-                return brandColors.primary + "15";
-              case "encouragement":
-                return colors.feedback.success + "15";
-              case "warning":
-                return colors.feedback.warning + "15";
-              case "tip":
-                return brandColors.primary + "15";
-              default:
-                return colors.text.tertiary + "15";
-            }
-          };
+            const getInsightBgColor = () => {
+              switch (insight.type) {
+                case "pattern":
+                  return brandColors.primary + "15";
+                case "encouragement":
+                  return colors.feedback.success + "15";
+                case "warning":
+                  return colors.feedback.warning + "15";
+                case "tip":
+                  return brandColors.primary + "15";
+                default:
+                  return colors.text.tertiary + "15";
+              }
+            };
 
-          return (
-            <View
-              key={index}
-              style={[styles.insightItem, index < insights.length - 1 && styles.insightItemBorder]}
-            >
-              <View style={[styles.insightIconWrap, { backgroundColor: getInsightBgColor() }]}>
-                {getInsightIcon()}
+            return (
+              <View
+                key={index}
+                style={[
+                  styles.insightItem,
+                  index < insights.length - 1 && styles.insightItemBorder
+                ]}
+              >
+                <View style={[styles.insightIconWrap, { backgroundColor: getInsightBgColor() }]}>
+                  {getInsightIcon()}
+                </View>
+                <Text style={styles.insightText}>{insight.text}</Text>
               </View>
-              <Text style={styles.insightText}>{insight.text}</Text>
-            </View>
-          );
-        })
+            );
+          })}
+
+          {/* AI Coach CTA - Only show for warning insights and if user has AI Coach access */}
+          {hasWarningInsights && hasAICoachAccess && insightsStatus === "completed" && (
+            <TouchableOpacity
+              style={styles.aiCoachCTA}
+              onPress={() => openAICoach(goalId)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.aiCoachCTAContent}>
+                <View style={styles.aiCoachCTAIconWrap}>
+                  <MessageSquare size={16} color={brandColors.primary} />
+                </View>
+                <View style={styles.aiCoachCTAText}>
+                  <Text style={styles.aiCoachCTATitle}>
+                    {t("goals.insights_ai_coach_cta_title") || "Want personalized help?"}
+                  </Text>
+                  <Text style={styles.aiCoachCTASubtitle}>
+                    {t("goals.insights_ai_coach_cta_subtitle") ||
+                      "Chat with Coach Nudge about this pattern"}
+                  </Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+          )}
+        </>
       )}
 
       {/* Metrics Section - Only show when there's valuable data (trend comparison or best/worst day) */}
@@ -257,52 +296,74 @@ export default function PatternInsights({
             <Text style={styles.metricsTitle}>{t("goals.insights_metrics_title")}</Text>
 
             <View style={styles.metricsGrid}>
-              {/* Completion Rate Trend - Only show when we have previous metrics to compare */}
-              {previousMetrics && previousMetrics.completion_rate_30d !== undefined && (
-                <View style={styles.metricCard}>
-                  <View style={styles.metricHeader}>
-                    <Target size={16} color={brandColors.primary} />
-                    <Text style={styles.metricLabel}>{t("goals.insights_completion_trend")}</Text>
-                  </View>
-                  <View style={styles.metricValueRow}>
-                    <Text style={styles.metricValue}>
-                      {currentMetrics.completion_rate_30d || 0}%
-                    </Text>
-                    <View style={styles.metricTrend}>
-                      {currentMetrics.completion_rate_30d > previousMetrics.completion_rate_30d ? (
-                        <>
-                          <TrendingUp size={12} color={colors.feedback.success} />
-                          <Text
-                            style={[styles.metricTrendText, { color: colors.feedback.success }]}
-                          >
-                            +
-                            {Math.round(
-                              currentMetrics.completion_rate_30d -
-                                previousMetrics.completion_rate_30d
-                            )}
-                            %
-                          </Text>
-                        </>
-                      ) : currentMetrics.completion_rate_30d <
-                        previousMetrics.completion_rate_30d ? (
-                        <>
-                          <TrendingDown size={12} color={colors.feedback.error} />
-                          <Text style={[styles.metricTrendText, { color: colors.feedback.error }]}>
-                            {Math.round(
-                              currentMetrics.completion_rate_30d -
-                                previousMetrics.completion_rate_30d
-                            )}
-                            %
-                          </Text>
-                        </>
-                      ) : (
-                        <Text style={styles.metricTrendText}>{t("goals.insights_no_change")}</Text>
-                      )}
+              {/* Completion Rate Trend - Only show when:
+                  1. We have previous metrics to compare
+                  2. Goal is at least 30 days old (or goal_age_days >= 30 if available)
+              */}
+              {(() => {
+                const hasPreviousMetrics = !!previousMetrics;
+                const hasPreviousCompletionRate =
+                  previousMetrics?.completion_rate_30d !== undefined;
+                const goalAgeCheck =
+                  currentMetrics?.goal_age_days === undefined || currentMetrics.goal_age_days >= 30;
+
+                return (
+                  hasPreviousMetrics &&
+                  hasPreviousCompletionRate &&
+                  goalAgeCheck && (
+                    <View style={styles.metricCard}>
+                      <View style={styles.metricHeader}>
+                        <Target size={16} color={brandColors.primary} />
+                        <Text style={styles.metricLabel}>
+                          {t("goals.insights_completion_trend")}
+                        </Text>
+                      </View>
+                      <View style={styles.metricValueRow}>
+                        <Text style={styles.metricValue}>
+                          {currentMetrics.completion_rate_30d || 0}%
+                        </Text>
+                        <View style={styles.metricTrend}>
+                          {currentMetrics.completion_rate_30d >
+                          previousMetrics.completion_rate_30d ? (
+                            <>
+                              <TrendingUp size={12} color={colors.feedback.success} />
+                              <Text
+                                style={[styles.metricTrendText, { color: colors.feedback.success }]}
+                              >
+                                +
+                                {Math.round(
+                                  currentMetrics.completion_rate_30d -
+                                    previousMetrics.completion_rate_30d
+                                )}
+                                %
+                              </Text>
+                            </>
+                          ) : currentMetrics.completion_rate_30d <
+                            previousMetrics.completion_rate_30d ? (
+                            <>
+                              <TrendingDown size={12} color={colors.feedback.error} />
+                              <Text
+                                style={[styles.metricTrendText, { color: colors.feedback.error }]}
+                              >
+                                {Math.round(
+                                  currentMetrics.completion_rate_30d -
+                                    previousMetrics.completion_rate_30d
+                                )}
+                                %
+                              </Text>
+                            </>
+                          ) : (
+                            <Text style={styles.metricTrendText}>
+                              {t("goals.insights_no_change")}
+                            </Text>
+                          )}
+                        </View>
+                      </View>
+                      <Text style={styles.metricSubtext}>{t("goals.insights_vs_previous")}</Text>
                     </View>
-                  </View>
-                  <Text style={styles.metricSubtext}>{t("goals.insights_vs_previous")}</Text>
-                </View>
-              )}
+                  )
+                );
+              })()}
 
               {/* Best Day - Only show when data exists */}
               {currentMetrics.best_day_index !== null &&
@@ -405,6 +466,12 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: brand.primary + "15",
     alignItems: "center" as const,
     justifyContent: "center" as const
+  },
+  insightsSummaryText: {
+    fontSize: toRN(tokens.typography.fontSize.sm),
+    fontFamily: fontFamily.groteskRegular,
+    color: colors.text.secondary,
+    marginBottom: toRN(tokens.spacing[3])
   },
   insightItem: {
     flexDirection: "row" as const,
@@ -577,7 +644,9 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
   insightsProgressBarBg: {
     flex: 1,
     height: toRN(8),
-    backgroundColor: colors.border.subtle,
+    backgroundColor: colors.bg.surface,
+    borderWidth: 1,
+    borderColor: colors.border.default,
     borderRadius: toRN(4),
     overflow: "hidden" as const
   },
@@ -605,6 +674,42 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
   },
   loadingText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
+    fontFamily: fontFamily.groteskRegular,
+    color: colors.text.secondary
+  },
+  // AI Coach CTA Styles
+  aiCoachCTA: {
+    marginTop: toRN(tokens.spacing[3]),
+    padding: toRN(tokens.spacing[3]),
+    backgroundColor: brand.primary + "08",
+    borderRadius: toRN(tokens.borderRadius.md),
+    borderWidth: 1,
+    borderColor: brand.primary + "20"
+  },
+  aiCoachCTAContent: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: toRN(tokens.spacing[2])
+  },
+  aiCoachCTAIconWrap: {
+    width: toRN(32),
+    height: toRN(32),
+    borderRadius: toRN(16),
+    backgroundColor: brand.primary + "15",
+    alignItems: "center" as const,
+    justifyContent: "center" as const
+  },
+  aiCoachCTAText: {
+    flex: 1,
+    gap: toRN(tokens.spacing[0.5])
+  },
+  aiCoachCTATitle: {
+    fontSize: toRN(tokens.typography.fontSize.sm),
+    fontFamily: fontFamily.groteskSemiBold,
+    color: colors.text.primary
+  },
+  aiCoachCTASubtitle: {
+    fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.groteskRegular,
     color: colors.text.secondary
   }

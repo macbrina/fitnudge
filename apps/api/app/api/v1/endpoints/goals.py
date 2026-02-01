@@ -957,6 +957,68 @@ async def archive_goal(goal_id: str, current_user: dict = Depends(get_current_us
     return {"message": "Goal archived successfully", "goal": result.data[0]}
 
 
+@router.post("/{goal_id}/complete")
+async def complete_goal(goal_id: str, current_user: dict = Depends(get_current_user)):
+    """
+    Mark a goal as completed (sets status to 'completed').
+    Completed goals cannot be resumed - they represent achieved goals.
+    Different from 'archived' which can be reactivated.
+    """
+    from app.core.database import get_supabase_client
+    from datetime import datetime
+
+    supabase = get_supabase_client()
+    user_id = current_user["id"]
+
+    # Check if goal exists and belongs to user
+    existing_goal = (
+        supabase.table("goals")
+        .select("*")
+        .eq("id", goal_id)
+        .eq("user_id", user_id)
+        .maybe_single()
+        .execute()
+    )
+
+    if not existing_goal or not existing_goal.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Goal not found"
+        )
+
+    goal = existing_goal.data
+
+    if goal.get("status") == "completed":
+        return {"message": "Goal is already completed", "goal": goal}
+
+    # Mark goal as completed
+    result = (
+        supabase.table("goals")
+        .update({"status": "completed", "completed_at": datetime.utcnow().isoformat()})
+        .eq("id", goal_id)
+        .execute()
+    )
+
+    if not result.data:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to complete goal",
+        )
+
+    # Notify partners of completed goal (for real-time updates)
+    try:
+        from app.services.social_accountability_service import (
+            social_accountability_service,
+        )
+
+        await social_accountability_service.notify_partners_of_data_change(
+            user_id, "goal_completed"
+        )
+    except Exception as e:
+        logger.warning(f"Failed to notify partners: {e}")
+
+    return {"message": "Goal marked as completed", "goal": result.data[0]}
+
+
 # =============================================================================
 # STATS ENDPOINTS
 # =============================================================================
@@ -1121,6 +1183,12 @@ class InsightsMetrics(BaseModel):
     worst_day_index: Optional[int] = None
     worst_day_rate: Optional[float] = None
     calculated_at: Optional[str] = None
+    # Additional fields from calculate_goal_metrics function
+    goal_age_days: Optional[int] = None
+    goal_created_at: Optional[str] = None
+    goal_title: Optional[str] = None
+    frequency_type: Optional[str] = None
+    frequency_count: Optional[int] = None
 
 
 class GoalInsightsResponse(BaseModel):
@@ -1245,6 +1313,12 @@ async def get_goal_insights(
             worst_day_index=current_metrics_data.get("worst_day_index"),
             worst_day_rate=current_metrics_data.get("worst_day_rate"),
             calculated_at=current_metrics_data.get("calculated_at"),
+            # Include additional fields from calculate_goal_metrics
+            goal_age_days=current_metrics_data.get("goal_age_days"),
+            goal_created_at=current_metrics_data.get("goal_created_at"),
+            goal_title=current_metrics_data.get("goal_title"),
+            frequency_type=current_metrics_data.get("frequency_type"),
+            frequency_count=current_metrics_data.get("frequency_count"),
         )
 
     previous_metrics_data = (
@@ -1266,6 +1340,12 @@ async def get_goal_insights(
             worst_day_index=previous_metrics_data.get("worst_day_index"),
             worst_day_rate=previous_metrics_data.get("worst_day_rate"),
             calculated_at=previous_metrics_data.get("calculated_at"),
+            # Include additional fields from calculate_goal_metrics
+            goal_age_days=previous_metrics_data.get("goal_age_days"),
+            goal_created_at=previous_metrics_data.get("goal_created_at"),
+            goal_title=previous_metrics_data.get("goal_title"),
+            frequency_type=previous_metrics_data.get("frequency_type"),
+            frequency_count=previous_metrics_data.get("frequency_count"),
         )
 
     return GoalInsightsResponse(

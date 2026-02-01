@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
     DEBUG: bool = os.getenv("DEBUG", "true").lower() == "true"
 
+    # Uvicorn workers: used when ENVIRONMENT != "development" (reload and workers are mutually exclusive).
+    # Multiple workers ensure sync Supabase/DB work in one request doesn't block others—no per-route changes.
+    UVICORN_WORKERS: int = int(os.getenv("UVICORN_WORKERS", "4"))
+
     # Database
     DATABASE_URL: str = os.getenv("DATABASE_URL", "")
     SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
@@ -133,6 +137,23 @@ class Settings(BaseSettings):
     APPLE_KEY_ID: str = os.getenv("APPLE_KEY_ID", "")
     APPLE_PRIVATE_KEY: str = os.getenv("APPLE_PRIVATE_KEY", "")
 
+    # ActivityKit (iOS Live Activities) - APNs Token-based auth (provider)
+    # IMPORTANT: Store private key server-side only (never in mobile app).
+    ACTIVITYKIT_APNS_TEAM_ID: str = os.getenv("ACTIVITYKIT_APNS_TEAM_ID", "")
+    ACTIVITYKIT_APNS_KEY_ID: str = os.getenv("ACTIVITYKIT_APNS_KEY_ID", "")
+    ACTIVITYKIT_APNS_PRIVATE_KEY: str = os.getenv("ACTIVITYKIT_APNS_PRIVATE_KEY", "")
+    # Must be "<bundleId>.push-type.liveactivity", e.g. "com.fitnudge.app.push-type.liveactivity"
+    ACTIVITYKIT_APNS_TOPIC: str = os.getenv("ACTIVITYKIT_APNS_TOPIC", "")
+    # Set true for sandbox (development builds)
+    ACTIVITYKIT_APNS_USE_SANDBOX: bool = (
+        os.getenv("ACTIVITYKIT_APNS_USE_SANDBOX", "false").lower() == "true"
+    )
+
+    # Android Mode B: FCM (server-driven NextUp ongoing notification)
+    # Use a Firebase service account JSON (server-side only).
+    # Recommended: store the full JSON string in secrets.
+    FCM_SERVICE_ACCOUNT_JSON: str = os.getenv("FCM_SERVICE_ACCOUNT_JSON", "")
+
     # Google OAuth
     GOOGLE_CLIENT_IDS: str = os.getenv("GOOGLE_CLIENT_IDS", "")
     GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
@@ -191,10 +212,6 @@ class Settings(BaseSettings):
     FROM_EMAIL: str = os.getenv("FROM_EMAIL", "noreply@fitnudge.app")
     FROM_NAME: str = os.getenv("FROM_NAME", "FitNudge")
     BASE_URL: str = os.getenv("BASE_URL", "https://fitnudge.app")
-
-    # Monitoring
-    NEW_RELIC_LICENSE_KEY: str = os.getenv("NEW_RELIC_LICENSE_KEY", "")
-    NEW_RELIC_APP_NAME: str = os.getenv("NEW_RELIC_APP_NAME", "fitnudge-api")
 
     # PostHog Analytics
     POSTHOG_API_KEY: str = os.getenv("POSTHOG_API_KEY", "")

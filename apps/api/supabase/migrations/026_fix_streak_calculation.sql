@@ -173,7 +173,7 @@ BEGIN
         v_longest_streak := v_current_streak;
     END IF;
 
-    -- Update goal stats
+    -- Update goal stats (include week_start_date for consistency)
     UPDATE goals
     SET 
         total_completions = v_total_completions,
@@ -183,6 +183,7 @@ BEGIN
         last_checkin_date = v_last_checkin_date,
         streak_start_date = v_streak_start_date,
         week_completions = v_week_completions,
+        week_start_date = v_week_start,
         updated_at = NOW()
     WHERE id = target_goal_id;
 
@@ -194,6 +195,12 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Trigger already exists, just updating the function
 COMMENT ON FUNCTION recalculate_goal_stats() IS 
   'Recalculates goal stats (streak, completions) on check-in changes. Handles pending check-ins by treating them as pass-through (like rest_day) to avoid date gaps breaking streaks.';
+
+-- Ensure trigger exists (022 drops it; 023 recreates it; we recreate here so 026 alone fixes streak)
+DROP TRIGGER IF EXISTS trg_checkin_sync_goal_stats ON check_ins;
+CREATE TRIGGER trg_checkin_sync_goal_stats
+    AFTER INSERT OR UPDATE OR DELETE ON check_ins
+    FOR EACH ROW
+    EXECUTE FUNCTION recalculate_goal_stats();

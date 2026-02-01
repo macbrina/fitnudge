@@ -36,6 +36,7 @@
     "next": "Next",
     "finish": "Finish",
     "retry": "Retry",
+    "check_again": "Check again",
     "close": "Close",
     "share": "Share",
     "read_more": "Read more",
@@ -160,7 +161,7 @@
     "unlock_skip": "Identify patterns in missed days",
     "no_skips": "No skipped check-ins!",
     "mood_trend": "Mood Trend",
-    "mood_trend_desc": "How you feel about this goal",
+    "mood_trend_desc": "Your mood over the last 14 days",
     "unlock_mood": "Track your mood patterns",
     "no_mood_data": "No mood data yet. Add mood to your check-ins!",
     "need_more_mood_data": "Check in more days to see your mood trend!",
@@ -759,9 +760,21 @@
     "screen_title": "My Goals",
     "tabs": {
       "active": "Active",
+      "completed": "Completed",
       "archived": "Archived"
     },
     "quick_select": "Quick Select",
+    "goal_templates": {
+      "read_daily": "Read daily",
+      "meditate": "Meditate",
+      "journal": "Journal",
+      "run_or_walk": "Run or walk",
+      "sleep_on_time": "Sleep on time",
+      "eat_healthy": "Eat healthy",
+      "work_out_regularly": "Work out regularly",
+      "drink_more_water": "Drink more water",
+      "no_phone_in_bed": "No phone in bed"
+    },
     "goal_title": "Goal Title",
     "title_placeholder": "e.g., Work out regularly",
     "how_often": "How often?",
@@ -773,6 +786,7 @@
     "select_days_count": "Select {{count}} days ({{selected}}/{{count}})",
     "frequency_locked": "Locked",
     "frequency_locked_hint": "Schedule cannot be changed after completing check-ins. Archive this goal and create a new one to change the schedule.",
+    "schedule_info": "Note: Frequency and target days cannot be changed after your first check-in to maintain accurate historical data and analytics.",
     "reminder_time": "Reminder Time",
     "reminder_times": "Reminder Times",
     "reminder_times_free_limit": "Free plan allows 1 reminder. Upgrade for up to 5.",
@@ -811,6 +825,15 @@
       "success": "Goal activated",
       "error": "Failed to activate goal"
     },
+    "complete": {
+      "action": "Mark as Completed",
+      "title": "Mark Goal as Completed?",
+      "message": "This will mark your goal as completed. Completed goals cannot be resumed afterwards. Are you sure?",
+      "confirm": "Mark Completed",
+      "success": "Goal marked as completed! 🎉",
+      "error": "Failed to complete goal"
+    },
+    "completed_status": "Completed",
     "delete": {
       "title": "Delete Goal?",
       "message": "This will permanently delete this goal and all check-in data. This cannot be undone.",
@@ -829,6 +852,8 @@
     "empty": {
       "active_title": "No Active Goals",
       "active_description": "Create your first goal to start tracking your progress",
+      "completed_title": "No Completed Goals",
+      "completed_description": "Goals you mark as completed will appear here",
       "archived_title": "No Archived Goals",
       "archived_description": "Goals you archive will appear here",
       "create_goal": "Create Goal"
@@ -939,6 +964,8 @@
     "insights_improved": "improved",
     "insights_declined": "declined",
     "insights_days": "days",
+    "insights_ai_coach_cta_title": "Want personalized help?",
+    "insights_ai_coach_cta_subtitle": "Chat with Coach Nudge about this pattern",
     "day_sun": "Sun",
     "day_mon": "Mon",
     "day_tue": "Tue",
@@ -1392,6 +1419,10 @@
       "master_toggle_desc": "Enable or disable all notifications",
       "push": "Push Notifications",
       "push_desc": "Receive notifications on your device",
+      "live_activities": "Live Activities",
+      "live_activities_desc": "Today's focus on Lock Screen",
+      "live_activities_enabled": "Enabled",
+      "live_activities_disabled": "Disabled",
       "email": "Email Notifications",
       "email_desc": "Receive updates via email",
       "categories_title": "Categories",
@@ -2085,8 +2116,12 @@
     "live_chat_desc": "Get instant support from our team",
     "feature_suggestions": "Suggest a Feature",
     "feature_suggestions_desc": "Help us build what you need",
+    "report_bug": "Report a Bug",
+    "report_bug_desc": "Found an issue? Let us know",
     "form_error_title": "Unable to load form",
-    "form_error_message": "Please check your internet connection and try again."
+    "form_error_message": "Please check your internet connection and try again.",
+    "media_permission_denied_title": "Media Permission Required",
+    "media_permission_denied_message": "To upload files in your feedback or bug report, please enable camera and photo library access in your device settings."
   },
   "update": {
     "title": "Update Available",
@@ -2118,6 +2153,8 @@
       "Thinking about that..."
     ],
     "message_failed": "Message failed. Tap to retry.",
+    "copy": "Copy message",
+    "copied": "Copied to clipboard",
     "regenerate": "Regenerate response",
     "no_response": "No response received. Tap to regenerate.",
     "send": "Send",
@@ -2174,14 +2211,15 @@
       "streak": "Tips to protect my streak",
       "goals": "Help me set better goals"
     },
+    "limit_reached": "Limit reached",
     "limit_reached_title": "Daily Limit Reached",
     "limit_reached_desc": "You've used all your free messages for today. Watch a short ad to unlock 1 more message, or upgrade for unlimited access.",
     "premium_limit_title": "Daily Limit Reached",
     "premium_limit_desc": "You've used all 100 messages for today. Your limit resets at midnight. This is to ensure quality service for all users.",
     "limit_resets_at": "Resets at midnight",
-    "watch_ad_unlock": "Watch Ad → +1 Message",
+    "watch_ad_unlock": "Watch Ad",
     "loading_ad": "Loading Ad...",
-    "go_premium_unlimited": "Go Premium → Unlimited Messages",
+    "go_premium_unlimited": "Go Premium",
     "ad_not_ready": "Ad Not Ready",
     "ad_loading": "Please wait a moment while the ad loads and try again.",
     "message_unlocked": "Message Unlocked!",

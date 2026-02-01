@@ -42,6 +42,7 @@ INSERT INTO app_config (key, value, category, description, is_public) VALUES
   ('terms_of_service_url', 'https://fitnudge.app/terms-of-service', 'external_urls', 'Terms of Service page URL', TRUE),
   ('help_center_url', 'https://fitnudge.tawk.help/', 'external_urls', 'Help Center URL (Tawk.to knowledge base)', TRUE),
   ('tally_feedback_url', 'https://tally.so/r/2EaLE9', 'external_urls', 'Tally.so feedback form URL', TRUE),
+  ('tally_bug_url', 'https://tally.so/r/Y54p2J', 'external_urls', 'Tally.so bug form URL', TRUE),
   ('tawk_chat_url', 'https://tawk.to/chat/695732b53a0c9b197f142f94/1jdu9s5a9', 'external_urls', 'Tawk.to live chat widget URL', TRUE),
   ('contact_email', 'mailto:hello@fitnudge.app', 'external_urls', 'Contact email address (mailto link)', TRUE);
 

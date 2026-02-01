@@ -73,7 +73,7 @@ def check_achievements_task(
 
                     try:
                         achievement_id = achievement.get("id")
-                        # Use sync version for Celery consistency
+                        # No goal/partner; push + deepLink enough — don't save to notification_history
                         notification_result = send_push_to_user_sync(
                             user_id=user_id,
                             title="🏆 Achievement Unlocked!",
@@ -88,6 +88,7 @@ def check_achievements_task(
                             notification_type="achievement",
                             entity_type="achievement",
                             entity_id=achievement_id,
+                            save_to_notification_history=False,
                         )
 
                         if notification_result.get("notification_id"):

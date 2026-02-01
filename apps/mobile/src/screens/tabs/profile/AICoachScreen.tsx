@@ -39,6 +39,7 @@ import { useSubscriptionStore } from "@/stores/subscriptionStore";
 import { useStyles, useTheme } from "@/themes";
 import { tokens } from "@/themes/tokens";
 import { formatTimeAgo as formatTimeAgoUtil } from "@/utils/helper";
+import * as Clipboard from "expo-clipboard";
 import { Ionicons } from "@expo/vector-icons";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -156,7 +157,7 @@ export default function AICoachModal({ visible, onClose, goalId }: AICoachModalP
   const { hasFeature, getPlan, openModal: openSubscriptionModal } = useSubscriptionStore();
   const queryClient = useQueryClient();
   const { microphoneStatus } = useMediaPermissions();
-  const { showAlert, showConfirm } = useAlertModal();
+  const { showAlert, showConfirm, showToast } = useAlertModal();
 
   // AI Coach store for persisted preferences
   const { selectedLanguage, setSelectedLanguage } = useAICoachStore();
@@ -195,6 +196,7 @@ export default function AICoachModal({ visible, onClose, goalId }: AICoachModalP
     loadMoreMessages,
     startNewChat,
     clearConversation,
+    clearLocalStateOnly,
     isLoadingConversation,
     hasMoreMessages,
     setFocusedGoalId,
@@ -374,12 +376,11 @@ export default function AICoachModal({ visible, onClose, goalId }: AICoachModalP
     }
   }, [conversations, hasMoreConversations, conversationsOffset]);
 
-  // Set focused goal when modal opens with a goalId
+  // Sync focused goal with modal context (goalId from layout = store's focusedGoalId)
   useEffect(() => {
-    if (visible && goalId) {
-      setFocusedGoalId(goalId);
-    } else if (!visible) {
-      // Clear focused goal when modal closes
+    if (visible) {
+      setFocusedGoalId(goalId ?? null);
+    } else {
       setFocusedGoalId(null);
     }
   }, [visible, goalId, setFocusedGoalId]);
@@ -552,13 +553,13 @@ export default function AICoachModal({ visible, onClose, goalId }: AICoachModalP
     [colors]
   );
 
-  // Load conversation when modal becomes visible for the FIRST time
-  // Skip loading if we already have messages (prevents unnecessary loading spinner)
+  // On open: always clear and load for current context (general vs goal).
+  // General (goalId null): most recent conversation. Goal: goal-scoped thread or empty.
   useEffect(() => {
-    if (visible && hasAccess && messages.length === 0 && !conversationId) {
-      loadConversation();
-    }
-  }, [visible, hasAccess, messages.length, conversationId, loadConversation]);
+    if (!visible || !hasAccess) return;
+    clearLocalStateOnly();
+    loadConversation(undefined, goalId ?? undefined);
+  }, [visible, hasAccess, goalId, loadConversation, clearLocalStateOnly]);
 
   // Voice recording handler
   const handleSpeakPress = async () => {
@@ -732,6 +733,7 @@ export default function AICoachModal({ visible, onClose, goalId }: AICoachModalP
     async (id: string) => {
       setShowDrawer(false);
       if (hasAccess) {
+        setFocusedGoalId(null);
         loadConversation(id);
       } else {
         // Show upgrade prompt for non-premium users
@@ -750,7 +752,7 @@ export default function AICoachModal({ visible, onClose, goalId }: AICoachModalP
         }
       }
     },
-    [loadConversation, hasAccess, showConfirm, t, onClose, openSubscriptionModal]
+    [loadConversation, hasAccess, setFocusedGoalId, showConfirm, t, onClose, openSubscriptionModal]
   );
 
   // Start new chat from drawer - only if user has access
@@ -811,6 +813,18 @@ export default function AICoachModal({ visible, onClose, goalId }: AICoachModalP
     return formatTimeAgoUtil(dateString, { addSuffix: true });
   }, []);
 
+  const handleCopyMessage = useCallback(
+    async (text: string) => {
+      if (!text?.trim()) return;
+      await Clipboard.setStringAsync(text.trim());
+      showToast({
+        title: t("ai_coach.copied") || "Copied to clipboard",
+        variant: "success"
+      });
+    },
+    [showToast, t]
+  );
+
   // Render message bubble
   const renderMessage = useCallback(
     ({ item }: { item: Message }) => {
@@ -853,34 +867,51 @@ export default function AICoachModal({ visible, onClose, goalId }: AICoachModalP
         );
       }
 
+      const canCopy = !isPending && !item.failed && !!item.text?.trim();
+
       return (
         <View style={[styles.messageBubble, isUser ? styles.userBubble : styles.assistantBubble]}>
-          <View
-            style={[
-              styles.messageContent,
-              isUser
-                ? styles.userContent
-                : isPending
-                  ? styles.typingContent
-                  : styles.assistantContent
-            ]}
-          >
-            {isUser ? (
-              <Text style={styles.userMessageText}>{item.text}</Text>
-            ) : isPending ? (
-              <View style={styles.typingIndicator}>
-                <Animated.View
-                  style={[
-                    styles.pulsingDot,
-                    { backgroundColor: brandColors.primary, opacity: pulseAnim }
-                  ]}
-                />
-                <Text style={styles.typingText}>
-                  {currentThinkingMessage || thinkingMessageRef.current || t("ai_coach.typing")}
-                </Text>
-              </View>
-            ) : (
-              <Markdown style={markdownStyles}>{item.text}</Markdown>
+          <View style={styles.messageColumn}>
+            <View
+              style={[
+                styles.messageContent,
+                isUser
+                  ? styles.userContent
+                  : isPending
+                    ? styles.typingContent
+                    : styles.assistantContent
+              ]}
+            >
+              {isUser ? (
+                <Text style={styles.userMessageText}>{item.text}</Text>
+              ) : isPending ? (
+                <View style={styles.typingIndicator}>
+                  <Animated.View
+                    style={[
+                      styles.pulsingDot,
+                      { backgroundColor: brandColors.primary, opacity: pulseAnim }
+                    ]}
+                  />
+                  <Text style={styles.typingText}>
+                    {currentThinkingMessage || thinkingMessageRef.current || t("ai_coach.typing")}
+                  </Text>
+                </View>
+              ) : (
+                <Markdown style={markdownStyles}>{item.text}</Markdown>
+              )}
+            </View>
+            {canCopy && (
+              <TouchableOpacity
+                onPress={() => handleCopyMessage(item.text)}
+                style={[
+                  styles.copyButton,
+                  isUser ? styles.copyButtonUser : styles.copyButtonAssistant
+                ]}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityLabel={t("ai_coach.copy") || "Copy message"}
+              >
+                <Ionicons name="copy-outline" size={16} color={colors.text.tertiary} />
+              </TouchableOpacity>
             )}
           </View>
         </View>
@@ -890,10 +921,12 @@ export default function AICoachModal({ visible, onClose, goalId }: AICoachModalP
       styles,
       markdownStyles,
       brandColors.primary,
+      colors.text.tertiary,
       t,
       retryLastMessage,
       pulseAnim,
-      currentThinkingMessage
+      currentThinkingMessage,
+      handleCopyMessage
     ]
   );
 
@@ -933,8 +966,14 @@ export default function AICoachModal({ visible, onClose, goalId }: AICoachModalP
             rateLimit && (
               <View style={styles.rateLimitBadge}>
                 <Text style={styles.rateLimitText}>
-                  {rateLimit.remaining_messages}/{rateLimit.daily_limit}{" "}
-                  <Text style={styles.rateLimitLabel}>{t("ai_coach.daily")}</Text>
+                  {rateLimit.can_send ? (
+                    <>
+                      {rateLimit.remaining_messages}/{rateLimit.daily_limit}{" "}
+                      <Text style={styles.rateLimitLabel}>{t("ai_coach.daily")}</Text>
+                    </>
+                  ) : (
+                    t("ai_coach.limit_reached")
+                  )}
                 </Text>
               </View>
             )
@@ -1310,7 +1349,7 @@ export default function AICoachModal({ visible, onClose, goalId }: AICoachModalP
                         onPress={handleSend}
                         disabled={isProcessing}
                       >
-                        <Ionicons name="arrow-up" size={18} color="#000000" />
+                        <Ionicons name="arrow-up" size={18} color={colors.text.primary} />
                       </TouchableOpacity>
                     </View>
                   </>
@@ -1709,6 +1748,20 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     padding: toRN(tokens.spacing[3]),
     maxWidth: "100%" as any
   },
+  messageColumn: {
+    flexDirection: "column" as const,
+    maxWidth: "100%" as any
+  },
+  copyButton: {
+    marginTop: toRN(tokens.spacing[2]),
+    padding: toRN(tokens.spacing[1])
+  },
+  copyButtonUser: {
+    alignSelf: "flex-end" as const
+  },
+  copyButtonAssistant: {
+    alignSelf: "flex-start" as const
+  },
   userContent: {
     backgroundColor: colors.bg.muted
   },
@@ -1970,13 +2023,13 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     gap: toRN(tokens.spacing[1.5]),
     width: 44,
     height: 44,
-    backgroundColor: colors.bg.card,
+    backgroundColor: colors.bg.muted,
     borderRadius: toRN(tokens.borderRadius.full),
     borderWidth: 1,
     borderColor: colors.border.subtle
   },
   iconButtonRecording: {
-    backgroundColor: "#EF4444",
+    backgroundColor: colors.bg.destructive,
     borderColor: "#EF4444",
     width: "auto" as const,
     paddingHorizontal: toRN(tokens.spacing[3])
@@ -1986,7 +2039,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     justifyContent: "center" as const,
     width: 44,
     height: 44,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.bg.muted,
     borderRadius: toRN(tokens.borderRadius.full)
   },
   rightActions: {
@@ -2020,13 +2073,13 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     gap: toRN(tokens.spacing[1.5]),
     paddingVertical: toRN(tokens.spacing[2]),
     paddingHorizontal: toRN(tokens.spacing[4]),
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.bg.muted,
     borderRadius: toRN(tokens.borderRadius.full)
   },
   sendButtonPillText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.semiBold,
-    color: "#000000"
+    color: colors.text.secondary
   },
 
   // Language Dropdown Backdrop

@@ -1,6 +1,8 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
+**/__pycache__/
 *.py[codz]
+*.pyc
 *$py.class
 
 # C extensions
@@ -129,6 +131,8 @@ __pypackages__/
 
 # Celery stuff
 celerybeat-schedule
+celerybeat-schedule-wal
+celerybeat-schedule-shm
 celerybeat.pid
 
 # Redis
@@ -214,3 +218,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# AI Insights debug logs
+logs/

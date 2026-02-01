@@ -1,18 +1,12 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.security import HTTPBearer
 from fastapi.responses import JSONResponse
 import uvicorn
-import os
 from dotenv import load_dotenv
-
-# Initialize New Relic before other imports
-if os.getenv("NEW_RELIC_LICENSE_KEY"):
-    import newrelic.agent
-
-    # Initialize with config file
-    newrelic.agent.initialize("newrelic.ini")
 
 from app.core.config import settings
 from app.core.database import create_tables
@@ -28,11 +22,30 @@ from app.core.middleware import (
     SQLInjectionProtectionMiddleware,
     SessionManagementMiddleware,
 )
-from app.core.health import HealthStatus
 from app.api.v1.endpoints.system_health import read_health
 
 # Load environment variables
 load_dotenv()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    await create_tables()
+    if settings.POSTHOG_API_KEY:
+        initialize_posthog()
+        print("📈 PostHog analytics active")
+    print("🚀 FitNudge API started successfully!")
+    yield
+    # Shutdown
+    if settings.POSTHOG_API_KEY:
+        try:
+            shutdown_posthog()
+            print("📈 PostHog analytics shutdown")
+        except Exception as e:
+            print(f"⚠️ PostHog shutdown failed: {e}")
+    print("👋 FitNudge API shutting down...")
+
 
 # Create FastAPI app
 app = FastAPI(
@@ -42,6 +55,7 @@ app = FastAPI(
     docs_url="/docs" if settings.ENVIRONMENT == "development" else None,
     redoc_url="/redoc" if settings.ENVIRONMENT == "development" else None,
     redirect_slashes=False,  # Disable automatic redirects to preserve Authorization header
+    lifespan=lifespan,
 )
 
 # Add CORS middleware
@@ -54,8 +68,13 @@ app.add_middleware(
     expose_headers=["*"],  # Explicitly expose all headers including Authorization
 )
 
-# Add trusted host middleware (skip in development or if wildcard is set)
-if settings.ENVIRONMENT == "production" and "*" not in settings.allowed_hosts_list:
+# TrustedHost: only in production, not DEBUG (local), and explicit ALLOWED_HOSTS.
+# Skip when DEBUG so local multi-worker testing (Expo → localhost / tunnel) doesn't get 400.
+if (
+    settings.ENVIRONMENT == "production"
+    and not settings.DEBUG
+    and "*" not in settings.allowed_hosts_list
+):
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts_list)
 
 # Add security middleware (order matters!)
@@ -66,7 +85,9 @@ app.add_middleware(AccountLockoutMiddleware)
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(AuditLoggingMiddleware)
 app.add_middleware(SessionManagementMiddleware)
-app.add_middleware(UserActivityMiddleware)  # Track user activity for partner suggestions
+app.add_middleware(
+    UserActivityMiddleware
+)  # Track user activity for partner suggestions
 
 # Include API router
 app.include_router(api_router, prefix="/api/v1")
@@ -80,52 +101,16 @@ app.add_api_route(
 )
 
 
-# Startup event
-@app.on_event("startup")
-async def startup_event():
-    # Create database tables
-    await create_tables()
-
-    # Initialize PostHog analytics
-    if settings.POSTHOG_API_KEY:
-        initialize_posthog()
-        print("📈 PostHog analytics active")
-
-    # New Relic is already initialized at module level
-    if settings.NEW_RELIC_LICENSE_KEY:
-        print("📊 New Relic monitoring active")
-
-    print("🚀 FitNudge API started successfully!")
-
-
-# Shutdown event
-@app.on_event("shutdown")
-async def shutdown_event():
-    # Shutdown PostHog analytics
-    if settings.POSTHOG_API_KEY:
-        try:
-            shutdown_posthog()
-            print("📈 PostHog analytics shutdown")
-        except Exception as e:
-            print(f"⚠️ PostHog shutdown failed: {e}")
-
-    # Shutdown New Relic if initialized
-    if settings.NEW_RELIC_LICENSE_KEY:
-        try:
-            import newrelic.agent
-
-            newrelic.agent.shutdown_agent()
-            print("📊 New Relic monitoring shutdown")
-        except Exception as e:
-            print(f"⚠️ New Relic shutdown failed: {e}")
-
-    print("👋 FitNudge API shutting down...")
-
-
 if __name__ == "__main__":
-    uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=settings.ENVIRONMENT == "development",
-    )
+    is_dev = settings.ENVIRONMENT == "development"
+    # Production: multiple workers so sync Supabase in one request doesn't block others.
+    # Dev: single worker only. --reload and --workers > 1 are incompatible; multiple
+    # workers also complicate debugging (which process, breakpoints, interleaved logs).
+    run_kwargs = {
+        "host": "0.0.0.0",
+        "port": 8000,
+        "reload": is_dev,
+    }
+    if not is_dev:
+        run_kwargs["workers"] = settings.UVICORN_WORKERS
+    uvicorn.run("main:app", **run_kwargs)

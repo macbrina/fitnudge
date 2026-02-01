@@ -32,17 +32,17 @@ import { usePricingStore } from "@/stores/pricingStore";
 const FREQUENCY_OPTIONS = [1, 2, 3, 4, 5, 6, 7];
 const DAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 
-// Popular goal templates
-const GOAL_TEMPLATES = [
-  "Read daily",
-  "Meditate",
-  "Journal",
-  "Run or walk",
-  "Sleep on time",
-  "Eat healthy",
-  "Work out regularly",
-  "Drink more water",
-  "No phone in bed"
+// Goal template keys (mapped to translation keys)
+const GOAL_TEMPLATE_KEYS = [
+  "read_daily",
+  "meditate",
+  "journal",
+  "run_or_walk",
+  "sleep_on_time",
+  "eat_healthy",
+  "work_out_regularly",
+  "drink_more_water",
+  "no_phone_in_bed"
 ];
 
 export default function CreateGoalScreen() {
@@ -138,8 +138,9 @@ export default function CreateGoalScreen() {
   };
 
   // Select template
-  const selectTemplate = (template: string) => {
-    setTitle(template);
+  const selectTemplate = (templateKey: string) => {
+    const templateText = t(`goals.goal_templates.${templateKey}`);
+    setTitle(templateText);
   };
 
   // Validation
@@ -244,20 +245,23 @@ export default function CreateGoalScreen() {
           <Card style={styles.section}>
             <Text style={styles.sectionTitle}>{t("goals.quick_select")}</Text>
             <View style={styles.templatesGrid}>
-              {GOAL_TEMPLATES.map((template, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={[
-                    styles.templateItem,
-                    title === template && { borderColor: brandColors.primary }
-                  ]}
-                  onPress={() => selectTemplate(template)}
-                >
-                  <Text style={styles.templateTitle} numberOfLines={2}>
-                    {template}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              {GOAL_TEMPLATE_KEYS.map((templateKey, index) => {
+                const templateText = t(`goals.goal_templates.${templateKey}`);
+                return (
+                  <TouchableOpacity
+                    key={index}
+                    style={[
+                      styles.templateItem,
+                      title === templateText && { borderColor: brandColors.primary }
+                    ]}
+                    onPress={() => selectTemplate(templateKey)}
+                  >
+                    <Text style={styles.templateTitle} numberOfLines={2}>
+                      {templateText}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </Card>
         )}
@@ -293,6 +297,13 @@ export default function CreateGoalScreen() {
           {isFrequencyLocked && (
             <View style={styles.lockedNotice}>
               <Text style={styles.lockedNoticeText}>{t("goals.frequency_locked_hint")}</Text>
+            </View>
+          )}
+
+          {/* Info notice for new goals - explain restriction upfront */}
+          {!isEditMode && !isFrequencyLocked && (
+            <View style={styles.infoNotice}>
+              <Text style={styles.infoNoticeText}>{t("goals.schedule_info")}</Text>
             </View>
           )}
 
@@ -565,6 +576,21 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     fontFamily: fontFamily.groteskRegular,
     color: colors.text.secondary
   },
+  infoNotice: {
+    backgroundColor: colors.bg.muted,
+    paddingHorizontal: toRN(tokens.spacing[3]),
+    paddingVertical: toRN(tokens.spacing[2]),
+    borderRadius: toRN(tokens.borderRadius.md),
+    marginBottom: toRN(tokens.spacing[3]),
+    borderLeftWidth: 3,
+    borderLeftColor: brand.primary
+  },
+  infoNoticeText: {
+    fontSize: toRN(tokens.typography.fontSize.xs),
+    fontFamily: fontFamily.groteskRegular,
+    color: colors.text.secondary,
+    lineHeight: toRN(tokens.typography.fontSize.xs) * 1.4
+  },
   disabledContainer: {
     opacity: 0.6
   },
@@ -595,7 +621,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     justifyContent: "center" as const,
     paddingVertical: toRN(tokens.spacing[3]),
     paddingHorizontal: toRN(tokens.spacing[2]),
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: "transparent"
   },
   templateTitle: {
@@ -612,7 +638,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.groteskMedium,
     color: colors.text.primary,
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: colors.border.subtle
   },
   textArea: {
@@ -623,7 +649,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.groteskRegular,
     color: colors.text.primary,
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: colors.border.subtle,
     minHeight: 80
   },
@@ -643,7 +669,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     borderRadius: toRN(tokens.borderRadius.lg),
     paddingVertical: toRN(tokens.spacing[3]),
     alignItems: "center" as const,
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: colors.border.subtle
   },
   frequencyTypeText: {
@@ -664,7 +690,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: colors.bg.muted,
     alignItems: "center" as const,
     justifyContent: "center" as const,
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: colors.border.subtle
   },
   frequencyText: {

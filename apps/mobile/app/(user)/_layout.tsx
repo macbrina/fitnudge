@@ -15,6 +15,10 @@ import { useRevenueCat } from "@/contexts/RevenueCatContext";
 import { usePricing } from "@/hooks/usePricing";
 import { LoadingOverlay } from "@/components/ui/LoadingOverlay";
 import { storageUtil, STORAGE_KEYS } from "@/utils/storageUtil";
+import { AdminBroadcastModalController } from "@/components/broadcasts";
+import { useNextUpLiveSurface } from "@/features/nextUp/useNextUpLiveSurface";
+import { useLiveActivityRegistration } from "@/features/nextUp/ios/useLiveActivityRegistration";
+import { useAndroidNextUpPushRegistration } from "@/features/nextUp/android/useAndroidNextUpPushRegistration";
 
 // Screens where FloatingAICoachButton and FloatingOfferButton should be displayed
 const FLOATING_BUTTONS_ALLOWED_SEGMENTS = ["(tabs)"];
@@ -22,6 +26,13 @@ const FLOATING_BUTTONS_ALLOWED_SEGMENTS = ["(tabs)"];
 export default function UserLayout() {
   const { isAuthenticated, isLoading } = useAuthStore();
   const segments = useSegments();
+
+  // Persistent "Next up" system surface (Android ongoing notification; iOS stub for now)
+  useNextUpLiveSurface();
+  // Mode B: iOS Live Activities token registration (push-to-start / push-to-update).
+  useLiveActivityRegistration(isAuthenticated);
+  // Mode B: Android server-driven NextUp (FCM -> Notifee ongoing notification).
+  useAndroidNextUpPushRegistration(isAuthenticated);
 
   // AI Coach modal state from store
   const { isModalVisible, openModal, closeModal, focusedGoalId } = useAICoachStore();
@@ -231,6 +242,9 @@ export default function UserLayout() {
 
       {/* Loading Overlay for exit offer purchase */}
       <LoadingOverlay visible={isExitOfferPurchasing} />
+
+      {/* Admin broadcast modal (in-app, one per launch, queue) */}
+      <AdminBroadcastModalController />
     </View>
   );
 }

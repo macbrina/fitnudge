@@ -4,6 +4,7 @@
     "strict": true,
     "baseUrl": ".",
     "paths": {
+      "local:*": ["./modules/*"],
       "@/*": ["src/*"],
       "@components/*": ["src/components/*"],
       "@screens/*": ["src/screens/*"],
@@ -20,7 +21,7 @@
       "@themes/*": ["src/themes/src/*"],
       "@ui/*": ["../../packages/ui/src/*"]
     },
-    "types": ["react-native", "node"],
+    "types": ["react-native", "node", "jest"],
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "jsx": "react-jsx",

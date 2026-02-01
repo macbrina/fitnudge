@@ -411,13 +411,12 @@ export abstract class BaseApiService {
 
     const url = `${this.baseURL}${endpoint}`;
 
-    // For non-public endpoints, proactively refresh token if expiring soon
-    // This prevents 401 errors by refreshing BEFORE the token expires
-    if (!isPublicEndpoint(endpoint)) {
-      await TokenManager.ensureValidToken();
-    }
+    // Do NOT run proactive token refresh here. It serializes all API requests while
+    // refresh is in progress (every request would await the same refresh). That blocks
+    // navigation and parallel calls. Proactive refresh runs on foreground (RealtimeContext);
+    // we still refresh and retry on 401 below. This keeps requests non-blocking.
 
-    // Use global token cache for fast, reliable access (may have been refreshed above)
+    // Use global token cache for fast, reliable access
     // If cache is not initialized, fallback to storage
     const token =
       global.accessToken !== undefined ? global.accessToken : await TokenManager.getAccessToken();
@@ -910,8 +909,10 @@ export async function apiRequestSSE<T = any>(
     return { close: () => {} };
   }
 
-  // Proactively refresh token if expiring soon
-  await TokenManager.ensureValidToken();
+  // Do NOT run proactive token refresh here. It serializes all API requests while
+  // refresh is in progress (every request would await the same refresh). That blocks
+  // navigation and parallel calls. Proactive refresh runs on foreground (RealtimeContext);
+  // we still refresh and retry on 401 below. This keeps requests non-blocking.
 
   // Get token from cache or storage (may have been refreshed above)
   const token =

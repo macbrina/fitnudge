@@ -1,16 +1,15 @@
 """
 AI Coach Chat API Endpoints
 
-Provides streaming chat with AI coach for personalized fitness guidance.
+Provides async (background) chat with AI coach for personalized habit guidance.
 Premium feature with daily message limits for rate control.
+Uses Celery task; user sees message immediately, response via realtime when ready.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime, date, timedelta
-import json
 from app.core.flexible_auth import get_current_user
 from app.core.database import get_supabase_client
 from app.services.ai_coach_service import get_ai_coach_service
@@ -72,6 +71,8 @@ class ConversationsListResponse(BaseModel):
 class MessageItem(BaseModel):
     """Individual message in a conversation."""
 
+    message_id: Optional[str] = None
+    request_id: Optional[str] = None
     role: str  # 'user' or 'assistant'
     content: str
     created_at: Optional[str]
@@ -195,6 +196,9 @@ class AsyncChatResponse(BaseModel):
     conversation_id: Optional[str] = None
     message_status: str = "pending"  # pending, processing, completed, failed
     task_id: Optional[str] = None
+    request_id: Optional[str] = None
+    user_message_id: Optional[str] = None
+    assistant_message_id: Optional[str] = None
     error: Optional[str] = None
 
 
@@ -259,77 +263,9 @@ async def chat_with_coach_async(
         conversation_id=result.get("conversation_id"),
         message_status=result.get("message_status", "pending"),
         task_id=result.get("task_id"),
-    )
-
-
-@router.post("/chat")
-async def chat_with_coach(
-    request: ChatMessageRequest,
-    current_user: dict = Depends(get_current_user),
-):
-    """
-    Send a message to AI Coach and receive streaming response.
-
-    NOTE: For true background processing (ChatGPT-style where you can leave
-    and come back), use POST /chat/async instead.
-
-    Returns Server-Sent Events (SSE) stream with:
-    - {"type": "start", "conversation_id": str}
-    - {"type": "chunk", "content": str}
-    - {"type": "end", "full_response": str, "tokens_used": int}
-    - {"type": "error", "message": str}
-    """
-    user_id = current_user["id"]
-    user_plan = current_user.get("plan", "free")
-
-    # Check feature access
-    has_access, reason = await check_ai_coach_access(user_id)
-    if not has_access:
-        raise HTTPException(status_code=403, detail=reason)
-
-    # Check rate limit (still needs plan for limit calculation)
-    service = get_ai_coach_service()
-    can_send, remaining, limit = await service.check_rate_limit(user_id, user_plan)
-
-    if not can_send:
-        raise HTTPException(
-            status_code=429,
-            detail=f"Daily message limit reached ({limit} messages). Limit resets at midnight UTC.",
-        )
-
-    async def generate():
-        """Generate SSE stream."""
-        chunk_count = 0
-        try:
-            async for event in service.chat_stream(
-                user_id=user_id,
-                message=request.message,
-                conversation_id=request.conversation_id,
-                language=request.language,
-                is_retry=request.is_retry,
-                goal_id=request.goal_id,
-            ):
-                event_type = event.get("type", "unknown")
-                if event_type == "chunk":
-                    chunk_count += 1
-
-                yield f"data: {json.dumps(event)}\n\n"
-
-        except Exception as e:
-            logger.error(
-                f"[AI Coach] Chat stream error for user {user_id[:8]}...: {e}",
-                exc_info=True,
-            )
-            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
-
-    return StreamingResponse(
-        generate(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",  # Disable nginx buffering
-        },
+        request_id=result.get("request_id"),
+        user_message_id=result.get("user_message_id"),
+        assistant_message_id=result.get("assistant_message_id"),
     )
 
 
@@ -376,10 +312,15 @@ async def get_current_conversation(
     message_offset: int = Query(
         0, ge=0, description="Offset from most recent messages"
     ),
+    goal_id: Optional[str] = Query(
+        None,
+        description="When set, return the persistent goal-specific thread (or null if none yet).",
+    ),
     current_user: dict = Depends(get_current_user),
 ):
     """
     Get the user's most recent conversation with paginated messages.
+    When goal_id is provided, returns the goal-specific thread (or null if it doesn't exist yet).
     Returns null if no conversations exist.
 
     NOTE: This route MUST be defined before /conversations/{conversation_id}
@@ -394,7 +335,7 @@ async def get_current_conversation(
 
     service = get_ai_coach_service()
     conversation = await service.get_conversation_history(
-        user_id, limit=message_limit, offset=message_offset
+        user_id, goal_id=goal_id, limit=message_limit, offset=message_offset
     )
 
     if not conversation:
@@ -405,6 +346,8 @@ async def get_current_conversation(
         title=conversation.get("title"),
         messages=[
             MessageItem(
+                message_id=msg.get("message_id"),
+                request_id=msg.get("request_id"),
                 role=msg.get("role", "user"),
                 content=msg.get("content", ""),
                 created_at=msg.get("created_at"),
@@ -459,6 +402,8 @@ async def get_conversation(
         title=conversation.get("title"),
         messages=[
             MessageItem(
+                message_id=msg.get("message_id"),
+                request_id=msg.get("request_id"),
                 role=msg.get("role", "user"),
                 content=msg.get("content", ""),
                 created_at=msg.get("created_at"),

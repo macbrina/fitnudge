@@ -7,21 +7,22 @@ import { useTranslation } from "@/lib/i18n";
 import { MOBILE_ROUTES } from "@/lib/routes";
 import { toRN } from "@/lib/units";
 import { Partner, PartnerTodayGoal } from "@/services/api/partners";
-import { useStyles, useTheme } from "@/themes";
+import { tokens, useStyles, useTheme } from "@/themes";
+import { getActivityColor, getActivityStatus } from "@/utils/helper";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Flame, CheckCircle, Circle } from "lucide-react-native";
 import React, { useCallback, useState } from "react";
+import { UserAvatar } from "@/components/avatars";
 import {
   FlatList,
-  Image,
   NativeScrollEvent,
   NativeSyntheticEvent,
   Text,
   TouchableOpacity,
   View
 } from "react-native";
-
+import { CARD_PADDING_VALUES } from "@/constants/general";
 const CARD_WIDTH = 280;
 const CARD_GAP = 12;
 
@@ -34,7 +35,11 @@ export const PartnersCard: React.FC<PartnersCardProps> = ({ isLoading }) => {
   const { colors, brandColors } = useTheme();
   const { t } = useTranslation();
   const router = useRouter();
-  const { data: partnersData, isLoading: loadingPartners } = usePartnersWithTodayGoals();
+  const {
+    data: partnersData,
+    isLoading: loadingPartners,
+    isPlaceholderData: isPlaceholderPartners
+  } = usePartnersWithTodayGoals();
 
   const {
     hasFeature: hasPartnerFeature,
@@ -75,7 +80,6 @@ export const PartnersCard: React.FC<PartnersCardProps> = ({ isLoading }) => {
       const partnerInfo = partner.partner;
       const streak = partner.overall_streak || 0;
       const todayGoals = partner.today_goals || [];
-      const loggedToday = partner.logged_today || false;
 
       // Filter to show only scheduled goals (max 3 for compact, more for full)
       const maxGoals = isCompact ? 3 : 5;
@@ -87,32 +91,24 @@ export const PartnersCard: React.FC<PartnersCardProps> = ({ isLoading }) => {
           {/* Header: Avatar + Name + Streak */}
           <View style={styles.cardHeader}>
             <View style={styles.avatarContainer}>
-              {partnerInfo?.profile_picture_url ? (
-                <Image
-                  source={{ uri: partnerInfo.profile_picture_url }}
-                  style={isCompact ? styles.avatar : styles.avatarFull}
-                />
-              ) : (
+              <UserAvatar
+                profilePictureUrl={partnerInfo?.profile_picture_url}
+                name={partnerInfo?.name}
+                size={isCompact ? 44 : 56}
+                placeholderColor={brandColors.primary}
+              />
+              {/* Activity indicator */}
+              {partnerInfo?.last_active_at && (
                 <View
                   style={[
-                    isCompact ? styles.avatarPlaceholder : styles.avatarPlaceholderFull,
-                    { backgroundColor: getAvatarColor(index) }
+                    isCompact ? styles.loggedIndicator : styles.loggedIndicatorFull,
+                    {
+                      backgroundColor: getActivityColor(
+                        getActivityStatus(partnerInfo.last_active_at)
+                      )
+                    }
                   ]}
-                >
-                  <Text style={isCompact ? styles.avatarInitial : styles.avatarInitialFull}>
-                    {partnerInfo?.name?.charAt(0)?.toUpperCase() || "?"}
-                  </Text>
-                </View>
-              )}
-              {/* Logged today indicator */}
-              {loggedToday && (
-                <View style={isCompact ? styles.loggedIndicator : styles.loggedIndicatorFull}>
-                  <CheckCircle
-                    size={isCompact ? 14 : 16}
-                    color="#fff"
-                    fill={colors.feedback.success}
-                  />
-                </View>
+                />
               )}
             </View>
 
@@ -130,7 +126,7 @@ export const PartnersCard: React.FC<PartnersCardProps> = ({ isLoading }) => {
               )}
               {streak > 0 && (
                 <View style={styles.streakBadge}>
-                  <Flame size={isCompact ? 12 : 14} color={brandColors.primary} />
+                  <Flame size={isCompact ? 12 : 14} color={colors.feedback.error} />
                   <Text style={isCompact ? styles.streakText : styles.streakTextFull}>
                     {streak} {t("goals.day_streak")}
                   </Text>
@@ -147,21 +143,26 @@ export const PartnersCard: React.FC<PartnersCardProps> = ({ isLoading }) => {
               <Text style={styles.noGoalsText}>{t("social.no_goals_scheduled")}</Text>
             ) : (
               <View style={styles.goalsList}>
-                {scheduledGoals.map((goal: PartnerTodayGoal) => (
-                  <View key={goal.id} style={styles.goalItem}>
-                    {goal.logged_today ? (
-                      <CheckCircle size={14} color={colors.feedback.success} />
-                    ) : (
-                      <Circle size={14} color={colors.text.tertiary} />
-                    )}
-                    <Text
-                      style={[styles.goalTitle, goal.logged_today && styles.goalTitleCompleted]}
-                      numberOfLines={1}
-                    >
-                      {goal.title}
-                    </Text>
-                  </View>
-                ))}
+                {scheduledGoals.map((goal: PartnerTodayGoal) => {
+                  const status = goal.today_checkin_status;
+                  const isLogged = status === "completed" || status === "rest_day";
+
+                  return (
+                    <View key={goal.id} style={styles.goalItem}>
+                      {isLogged ? (
+                        <CheckCircle size={14} color={colors.feedback.success} />
+                      ) : (
+                        <Circle size={14} color={colors.text.tertiary} />
+                      )}
+                      <Text
+                        style={[styles.goalTitle, isLogged && styles.goalTitleCompleted]}
+                        numberOfLines={1}
+                      >
+                        {goal.title}
+                      </Text>
+                    </View>
+                  );
+                })}
                 {totalScheduled > maxGoals && (
                   <Text style={styles.moreGoalsText}>
                     +{totalScheduled - maxGoals} {t("common.more")}
@@ -201,17 +202,9 @@ export const PartnersCard: React.FC<PartnersCardProps> = ({ isLoading }) => {
     [styles, handlePartnerPress, renderPartnerCardContent]
   );
 
-  // Show loading skeleton
-  if (isLoading || loadingPartners) {
-    return (
-      <View style={styles.container}>
-        <Card style={styles.skeletonCard}>
-          <SkeletonBox width={200} height={24} />
-          <SkeletonBox width={150} height={16} style={{ marginTop: 8 }} />
-          <SkeletonBox width="100%" height={60} style={{ marginTop: 16 }} />
-        </Card>
-      </View>
-    );
+  // Show loading skeleton (isPlaceholderData covers case where placeholderData makes isLoading false)
+  if (isLoading || loadingPartners || isPlaceholderPartners) {
+    return <PartnersCardSkeleton />;
   }
 
   // Empty state - no partners
@@ -313,17 +306,88 @@ export const PartnersCard: React.FC<PartnersCardProps> = ({ isLoading }) => {
   );
 };
 
-// Helper function for avatar colors
-const getAvatarColor = (index: number): string => {
-  const colors = [
-    "#6366F1", // Indigo
-    "#8B5CF6", // Violet
-    "#EC4899", // Pink
-    "#F59E0B", // Amber
-    "#10B981" // Emerald
-  ];
-  return colors[index % colors.length];
-};
+export function PartnersCardSkeleton() {
+  const styles = useStyles(makeStyles);
+  const cardPadding = CARD_PADDING_VALUES.SM;
+  return (
+    <View style={styles.container}>
+      {/* Section header - matches loaded state */}
+      <View style={styles.sectionHeader}>
+        <SkeletonBox
+          width={180}
+          height={toRN(tokens.typography.fontSize.base)}
+          borderRadius={toRN(tokens.borderRadius.base)}
+        />
+      </View>
+
+      {/* Partner card - matches renderPartnerCardContent structure */}
+      <SkeletonBox
+        width="100%"
+        height={250}
+        borderRadius={toRN(tokens.borderRadius.xl)}
+        inner
+        innerPadding={cardPadding}
+      >
+        {/* cardHeader: Avatar + Name */}
+        <View style={[styles.cardHeader, { padding: toRN(tokens.spacing[2]) }]}>
+          <View style={styles.avatarContainer}>
+            <SkeletonBox width={56} height={56} borderRadius={28} />
+          </View>
+          <View style={styles.nameContainer}>
+            <SkeletonBox
+              width={120}
+              height={toRN(tokens.typography.fontSize.lg)}
+              borderRadius={toRN(tokens.borderRadius.base)}
+              style={{ marginBottom: toRN(tokens.spacing[1]) }}
+            />
+            <SkeletonBox
+              width={80}
+              height={toRN(tokens.typography.fontSize.sm)}
+              borderRadius={toRN(tokens.borderRadius.base)}
+              style={{ marginBottom: toRN(tokens.spacing[1]) }}
+            />
+            <SkeletonBox width={70} height={14} borderRadius={7} />
+          </View>
+        </View>
+
+        {/* goalsSection: Today + goal items */}
+        <View style={styles.goalsSection}>
+          <SkeletonBox
+            width={50}
+            height={toRN(tokens.typography.fontSize.sm)}
+            borderRadius={toRN(tokens.borderRadius.base)}
+            style={{ marginBottom: toRN(tokens.spacing[2]), marginLeft: toRN(tokens.spacing[2]) }}
+          />
+          <View
+            style={[
+              styles.goalsList,
+              { gap: toRN(tokens.spacing[1]), paddingHorizontal: toRN(tokens.spacing[2]) }
+            ]}
+          >
+            {[1, 2, 3].map((i) => (
+              <View key={i} style={styles.goalItem}>
+                <SkeletonBox width={14} height={14} borderRadius={7} />
+                <SkeletonBox
+                  width={i === 1 ? "70%" : i === 2 ? "85%" : "55%"}
+                  height={toRN(tokens.typography.fontSize.sm)}
+                  borderRadius={toRN(tokens.borderRadius.base)}
+                />
+              </View>
+            ))}
+          </View>
+        </View>
+
+        {/* cheerButton */}
+        <SkeletonBox
+          width="80%"
+          height={40}
+          borderRadius={toRN(tokens.borderRadius.lg)}
+          style={{ alignSelf: "center" }}
+        />
+      </SkeletonBox>
+    </View>
+  );
+}
 
 const makeStyles = (tokens: any, colors: any, brandColors: any) => ({
   container: {
@@ -388,15 +452,15 @@ const makeStyles = (tokens: any, colors: any, brandColors: any) => ({
   },
   loggedIndicator: {
     position: "absolute" as const,
-    bottom: -2,
-    right: -2,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    bottom: 0,
+    right: 0,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
     backgroundColor: colors.feedback.success,
     justifyContent: "center" as const,
     alignItems: "center" as const,
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: colors.bg.card
   },
   avatarInitial: {
@@ -419,15 +483,15 @@ const makeStyles = (tokens: any, colors: any, brandColors: any) => ({
   },
   loggedIndicatorFull: {
     position: "absolute" as const,
-    bottom: -2,
-    right: -2,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    bottom: 0,
+    right: 0,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
     backgroundColor: colors.feedback.success,
     justifyContent: "center" as const,
     alignItems: "center" as const,
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: colors.bg.card
   },
   avatarInitialFull: {
@@ -466,13 +530,13 @@ const makeStyles = (tokens: any, colors: any, brandColors: any) => ({
   streakText: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.medium,
-    color: brandColors.primary
+    color: colors.text.primary
   },
   // Full-width streak text
   streakTextFull: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
-    color: brandColors.primary
+    color: colors.text.primary
   },
 
   // Goals section
@@ -621,11 +685,6 @@ const makeStyles = (tokens: any, colors: any, brandColors: any) => ({
     fontFamily: fontFamily.bold,
     color: "#FFFFFF",
     textTransform: "uppercase" as const
-  },
-
-  // Skeleton styles
-  skeletonCard: {
-    padding: toRN(tokens.spacing[4])
   }
 });
 

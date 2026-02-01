@@ -4,3 +4,4 @@ export { RecapDetailSkeleton } from "./RecapDetailSkeleton";
 export { AchievementsSkeleton } from "./AchievementsSkeleton";
 export { CheckInHistorySkeleton } from "./CheckInHistorySkeleton";
 export { NotificationSettingsSkeleton } from "./NotificationSettingsSkeleton";
+export { WeeklyRecapsSkeleton } from "./WeeklyRecapsSkeleton";

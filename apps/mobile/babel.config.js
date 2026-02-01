@@ -11,10 +11,11 @@ module.exports = function (api) {
           alias: {
             "@ui": "../../packages/ui/src",
             "@assets": "../../packages/assets/src",
-          },
-        },
+            "local:next-up-live-activity": "./modules/next-up-live-activity"
+          }
+        }
       ],
-      "react-native-reanimated/plugin",
-    ],
+      "react-native-reanimated/plugin"
+    ]
   };
 };

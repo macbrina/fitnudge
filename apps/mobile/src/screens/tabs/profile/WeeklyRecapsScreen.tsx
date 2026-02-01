@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from "react";
-import { View, Text, FlatList, TouchableOpacity, RefreshControl, ScrollView } from "react-native";
+import { View, Text, FlatList, TouchableOpacity, RefreshControl } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import Markdown from "react-native-markdown-display";
@@ -12,7 +12,7 @@ import { MOBILE_ROUTES } from "@/lib/routes";
 import { Card } from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import { BackButton } from "@/components/ui/BackButton";
-import { SkeletonBox } from "@/components/ui/SkeletonBox";
+import { WeeklyRecapsSkeleton } from "@/components/skeletons";
 import { useSubscriptionStore } from "@/stores/subscriptionStore";
 import { formatWeekRange } from "@/utils/helper";
 import { useWeeklyRecaps } from "@/hooks/api/useWeeklyRecaps";
@@ -102,7 +102,7 @@ export default function WeeklyRecapsScreen() {
         <Card style={styles.recapCard}>
           <View style={styles.recapHeader}>
             <View style={styles.weekBadge}>
-              <Ionicons name="calendar-outline" size={14} color={brandColors.primary} />
+              <Ionicons name="calendar-outline" size={14} color={colors.text.primary} />
               <Text style={styles.weekBadgeText}>
                 {formatRecapWeekRange(item.week_start, item.week_end)}
               </Text>
@@ -202,7 +202,7 @@ export default function WeeklyRecapsScreen() {
           {/* Achievements Badge */}
           {item.achievements_unlocked && item.achievements_unlocked.length > 0 && (
             <View style={styles.achievementsBadge}>
-              <Ionicons name="trophy" size={14} color="#F59E0B" />
+              <Ionicons name="trophy" size={14} color={colors.text.primary} />
               <Text style={styles.achievementsText}>
                 {item.achievements_unlocked.length} achievement
                 {item.achievements_unlocked.length > 1 ? "s" : ""} unlocked
@@ -255,52 +255,7 @@ export default function WeeklyRecapsScreen() {
 
       {/* Content */}
       {isLoading ? (
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Skeleton Recap Cards */}
-          {[1, 2, 3].map((i) => (
-            <Card key={i} style={styles.recapCard}>
-              {/* Header skeleton */}
-              <View style={styles.recapHeader}>
-                <SkeletonBox width={120} height={24} borderRadius={12} />
-                <SkeletonBox width={60} height={24} borderRadius={12} />
-              </View>
-              {/* Stats grid skeleton */}
-              <View style={styles.statsGrid}>
-                <View style={styles.statItem}>
-                  <SkeletonBox width={40} height={28} borderRadius={4} />
-                  <SkeletonBox width={60} height={12} borderRadius={4} style={{ marginTop: 8 }} />
-                </View>
-                <View style={styles.statItem}>
-                  <SkeletonBox width={40} height={28} borderRadius={4} />
-                  <SkeletonBox width={60} height={12} borderRadius={4} style={{ marginTop: 8 }} />
-                </View>
-                <View style={styles.statItem}>
-                  <SkeletonBox width={40} height={28} borderRadius={4} />
-                  <SkeletonBox width={60} height={12} borderRadius={4} style={{ marginTop: 8 }} />
-                </View>
-              </View>
-              {/* Goal breakdown skeleton */}
-              <View style={{ marginTop: 12, gap: 8 }}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                  <SkeletonBox width={8} height={8} borderRadius={4} />
-                  <SkeletonBox width="60%" height={14} borderRadius={4} />
-                  <SkeletonBox width={30} height={14} borderRadius={4} />
-                </View>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                  <SkeletonBox width={8} height={8} borderRadius={4} />
-                  <SkeletonBox width="50%" height={14} borderRadius={4} />
-                  <SkeletonBox width={30} height={14} borderRadius={4} />
-                </View>
-              </View>
-              {/* Summary skeleton */}
-              <SkeletonBox width="100%" height={36} borderRadius={4} style={{ marginTop: 12 }} />
-            </Card>
-          ))}
-        </ScrollView>
+        <WeeklyRecapsSkeleton />
       ) : showPremiumGate ? (
         renderPremiumGate()
       ) : (
@@ -358,13 +313,13 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     gap: toRN(tokens.spacing[1.5]),
     paddingVertical: toRN(tokens.spacing[1]),
     paddingHorizontal: toRN(tokens.spacing[2]),
-    backgroundColor: `${brand.primary}15`,
+    backgroundColor: colors.bg.muted,
     borderRadius: toRN(tokens.borderRadius.full)
   },
   weekBadgeText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.semiBold,
-    color: brand.primary
+    color: colors.text.primary
   },
   changeBadge: {
     flexDirection: "row" as const,
@@ -448,14 +403,14 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     marginTop: toRN(tokens.spacing[3]),
     paddingVertical: toRN(tokens.spacing[1.5]),
     paddingHorizontal: toRN(tokens.spacing[2]),
-    backgroundColor: "#F59E0B15",
+    backgroundColor: colors.bg.muted,
     borderRadius: toRN(tokens.borderRadius.md),
     alignSelf: "flex-start" as const
   },
   achievementsText: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.semiBold,
-    color: "#F59E0B"
+    color: colors.text.primary
   },
   // Premium Gate
   premiumGate: {

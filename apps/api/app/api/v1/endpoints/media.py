@@ -191,7 +191,7 @@ async def transcribe_audio_whisper(
         return None
 
     try:
-        # Use AsyncOpenAI for proper async operation (matches ai_coach_service.py)
+        # Use AsyncOpenAI for proper async operation in FastAPI handlers
         client = AsyncOpenAI(api_key=api_key)
 
         # Save to temp file (Whisper API requires a file)
@@ -342,21 +342,24 @@ async def upload_media(
             .execute()
         )
 
-        if not checkin_result.data:
+        checkin = (
+            getattr(checkin_result, "data", None) if checkin_result is not None else None
+        )
+        if not checkin:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Check-in not found"
             )
 
-        if checkin_result.data["user_id"] != user_id:
+        if checkin["user_id"] != user_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You can only add voice notes to your own check-ins",
             )
 
-        vn_goal_id = checkin_result.data.get("goal_id")
+        vn_goal_id = checkin.get("goal_id")
 
         # Check if already has a voice note (one per check-in)
-        if checkin_result.data.get("voice_note_url"):
+        if checkin.get("voice_note_url"):
             logger.warning(
                 "[Media] Voice note upload 400: check-in already has a voice note"
             )
@@ -430,6 +433,7 @@ async def upload_media(
     unique_filename = f"{uuid.uuid4()}{file_extension}"
 
     # Voice note: validate actual file duration (recorder can flush 2–3s extra; prevent > max)
+    actual_duration = None
     if media_type == "voice_note":
         actual_duration = get_media_duration(file_content, file_extension)
         if actual_duration is not None and actual_duration > max_duration_seconds:
@@ -529,6 +533,9 @@ async def upload_media(
         update_payload = {
             "voice_note_url": file_url,
             "voice_note_transcript": transcript,
+            "voice_note_duration": (
+                actual_duration if actual_duration is not None else duration
+            ),
             "updated_at": datetime.utcnow().isoformat(),
         }
         if sentiment is not None:

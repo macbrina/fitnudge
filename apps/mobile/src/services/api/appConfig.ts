@@ -33,6 +33,7 @@ export type AppConfigKey =
   | "terms_of_service_url"
   | "help_center_url"
   | "tally_feedback_url"
+  | "tally_bug_url"
   | "tawk_chat_url"
   | "contact_email";
 

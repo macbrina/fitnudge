@@ -79,10 +79,6 @@ FROM_EMAIL=noreply@fitnudge.app
 # Feature Flags
 LAUNCHDARKLY_SDK_KEY=your-launchdarkly-sdk-key
 
-# Monitoring
-NEW_RELIC_LICENSE_KEY=your-newrelic-license-key
-NEW_RELIC_APP_NAME=fitnudge-api
-
 # PostHog Analytics
 POSTHOG_API_KEY=phc_your-posthog-project-api-key
 POSTHOG_HOST=https://us.i.posthog.com
@@ -399,17 +395,13 @@ CLOUDFLARE_PUBLIC_URL=https://your-bucket.your-account.r2.cloudflarestorage.com
    - Create project at [Sentry](https://sentry.io)
    - Get DSN and add to backend `.env`
 
-2. **New Relic** (APM)
-   - Sign up at [New Relic](https://newrelic.com)
-   - Install agent and get license key
-
-3. **PostHog** (Analytics)
+2. **PostHog** (Analytics)
    - Create account at [PostHog](https://posthog.com)
    - Create a new project
    - Get project API key from Project Settings
    - Set `POSTHOG_API_KEY` in your environment variables
 
-4. **LaunchDarkly** (Feature Flags)
+3. **LaunchDarkly** (Feature Flags)
    - Sign up at [LaunchDarkly](https://launchdarkly.com)
    - Create project and get SDK key
 

@@ -91,21 +91,29 @@ export const useCheckAchievements = () => {
   });
 };
 
+/** Theme subset needed for rarity colors */
+export type RarityTheme = {
+  colors: { feedback: { warning: string }; text: { tertiary: string } };
+  brandColors: { primary: string };
+};
+
 /**
- * Helper to get rarity color
+ * Helper to get rarity color. Pass theme from useTheme() – cannot use hooks inside (e.g. in map callbacks).
  */
-export const getRarityColor = (rarity: string): string => {
+export const getRarityColor = (rarity?: string, theme?: RarityTheme): string => {
+  if (!theme) {
+    return "#8B5CF6"; // fallback when theme not passed (e.g. outside component)
+  }
+  const { colors, brandColors } = theme;
   switch (rarity) {
-    case "common":
-      return "#9CA3AF"; // gray
-    case "rare":
-      return "#3B82F6"; // blue
-    case "epic":
-      return "#8B5CF6"; // purple
     case "legendary":
-      return "#F59E0B"; // gold/amber
+      return colors.feedback.warning;
+    case "epic":
+      return brandColors.primary;
+    case "rare":
+      return brandColors.primary;
     default:
-      return "#9CA3AF";
+      return colors.text.tertiary;
   }
 };
 

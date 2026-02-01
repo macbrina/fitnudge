@@ -12,7 +12,7 @@ import { BaseApiService, ApiResponse } from "./base";
 import { ROUTES } from "@/lib/routes";
 
 // Goal status
-export type GoalStatus = "active" | "paused" | "archived";
+export type GoalStatus = "active" | "paused" | "archived" | "completed";
 
 // Frequency type
 export type FrequencyType = "daily" | "weekly";
@@ -104,6 +104,8 @@ export interface InsightsMetrics {
   best_day_rate?: number;
   worst_day_index?: number;
   worst_day_rate?: number;
+  goal_created_at?: string;
+  goal_age_days?: number;
   calculated_at?: string;
 }
 
@@ -349,6 +351,14 @@ export class GoalsService extends BaseApiService {
    */
   async archiveGoal(goalId: string): Promise<ApiResponse<{ message: string; goal: Goal }>> {
     return this.post<{ message: string; goal: Goal }>(ROUTES.GOALS.ARCHIVE(goalId), {});
+  }
+
+  /**
+   * Mark a goal as completed (set status to 'completed')
+   * Completed goals cannot be resumed - they represent achieved goals
+   */
+  async completeGoal(goalId: string): Promise<ApiResponse<{ message: string; goal: Goal }>> {
+    return this.post<{ message: string; goal: Goal }>(ROUTES.GOALS.COMPLETE(goalId), {});
   }
 
   /**

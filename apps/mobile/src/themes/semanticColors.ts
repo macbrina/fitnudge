@@ -7,8 +7,8 @@ export const semanticLight = {
     card: tokens.colors.light.secondary, // #ffffff
     primary: tokens.colors.light.primary, // #2563eb
     secondary: tokens.colors.light.secondary, // #f1f5f9
-    muted: tokens.colors.light.muted, // #f8fafc
-    surface: tokens.colors.light.muted, // #f8fafc
+    muted: tokens.colors.light.muted, // #f1f5f9
+    surface: tokens.colors.light.surface, // #ffffff
     accent: tokens.colors.light.accent, // #f1f5f9
     destructive: tokens.colors.light.destructive, // #ef4444
     success: tokens.colors.light.success, // #10b981
@@ -56,7 +56,7 @@ export const semanticDark = {
     primary: tokens.colors.dark.primary, // #00a3ff - electric blue
     secondary: tokens.colors.dark.secondary, // #121212
     muted: tokens.colors.dark.muted, // #0a0a0a
-    surface: tokens.colors.dark.muted, // #0a0a0a
+    surface: tokens.colors.dark.surface, // #141414
     accent: tokens.colors.dark.accent, // #1a1a1a
     destructive: tokens.colors.dark.destructive, // #ff4757 - vibrant red
     success: tokens.colors.dark.success, // #00d68f - vibrant green

@@ -282,22 +282,27 @@ async def send_push_to_user(
     body: str,
     data: Optional[Dict[str, Any]] = None,
     notification_type: str = "general",
-    sound: str = "default",
+    sound: str = "notification_sound.wav",
     priority: str = "high",
     entity_type: Optional[str] = None,
     entity_id: Optional[str] = None,
     category_id: Optional[str] = None,
     skip_preference_check: bool = False,
+    save_to_notification_history: bool = True,
 ) -> Dict[str, Any]:
     """
-    Persist a notification record and deliver it to all active Expo push tokens for the user.
+    Persist a notification record (optional) and deliver it to all active Expo push tokens for the user.
 
     This function:
-    1. ALWAYS save notification to history (inbox) first
+    1. Optionally save notification to history (inbox) first; skip when save_to_notification_history=False
     2. Check notification preferences and quiet hours for push delivery
     3. Query device_tokens from database (no user auth needed)
     4. Send push notification using Expo SDK
     5. Handle errors and mark invalid tokens as inactive
+
+    Use save_to_notification_history=False for notifications that don't point to a goal or partner
+    (e.g. reengagement, subscription expiry, achievements). Push + deepLinkHandler is enough; inbox
+    persistence is not needed. Admin / goal / partner notifications should keep default True.
 
     Args:
         user_id: User ID to send notification to
@@ -313,64 +318,52 @@ async def send_push_to_user(
         entity_type: Type of entity referenced (goal, achievement, partner_request, etc.)
         entity_id: ID of the referenced entity (no FK - handle deleted at app level)
         skip_preference_check: If True, skip preference/quiet hours check (for critical notifications)
+        save_to_notification_history: If True, persist to notification_history (inbox). Default True.
 
     Returns:
         Dict with notification_id, delivered status, and token info
     """
-    logger.info(
-        f"send_push_to_user called",
-        extra={
-            "user_id": user_id,
-            "notification_type": notification_type,
-            "title": title[:50],
-            "entity_type": entity_type,
-            "entity_id": entity_id,
-        },
-    )
 
     supabase = get_supabase_client()
 
-    # STEP 1: ALWAYS create notification record in database first (for inbox)
-    # Users should see notifications in their inbox regardless of push settings
+    # STEP 1: Optionally create notification record in database (for inbox)
     notification_id = str(uuid4())
     now = datetime.now(timezone.utc).isoformat()
 
-    notification_record = {
-        "id": notification_id,
-        "user_id": user_id,
-        "notification_type": notification_type,
-        "title": title,
-        "body": body,
-        "data": data or {},
-        "sent_at": now,
-    }
-
-    # Add entity reference for tracking (V2: goal, achievement, partner_request, etc.)
-    if entity_type and entity_id:
-        notification_record["entity_type"] = entity_type
-        notification_record["entity_id"] = entity_id
-
-    try:
-        supabase.table("notification_history").insert(notification_record).execute()
-        logger.info(
-            f"Notification history record created",
-            extra={
-                "notification_id": notification_id,
-                "user_id": user_id,
-                "notification_type": notification_type,
-                "entity_type": entity_type,
-                "entity_id": entity_id,
-            },
-        )
-    except Exception as e:
-        logger.error(
-            f"Failed to create notification history record: {e}",
-            extra={
-                "user_id": user_id,
-                "notification_type": notification_type,
-                "error": str(e),
-            },
-        )
+    if save_to_notification_history:
+        notification_record = {
+            "id": notification_id,
+            "user_id": user_id,
+            "notification_type": notification_type,
+            "title": title,
+            "body": body,
+            "data": data or {},
+            "sent_at": now,
+        }
+        if entity_type and entity_id:
+            notification_record["entity_type"] = entity_type
+            notification_record["entity_id"] = entity_id
+        try:
+            supabase.table("notification_history").insert(notification_record).execute()
+            logger.info(
+                f"Notification history record created",
+                extra={
+                    "notification_id": notification_id,
+                    "user_id": user_id,
+                    "notification_type": notification_type,
+                    "entity_type": entity_type,
+                    "entity_id": entity_id,
+                },
+            )
+        except Exception as e:
+            logger.error(
+                f"Failed to create notification history record: {e}",
+                extra={
+                    "user_id": user_id,
+                    "notification_type": notification_type,
+                    "error": str(e),
+                },
+            )
 
     # STEP 2: Check notification preferences for PUSH delivery
     # Even with skip_preference_check, we still respect the push_notifications toggle
@@ -383,7 +376,8 @@ async def send_push_to_user(
 
     if not should_send:
         logger.info(
-            f"Push notification skipped for user {user_id} (saved to inbox)",
+            f"Push notification skipped for user {user_id}"
+            + (" (saved to inbox)" if save_to_notification_history else ""),
             extra={
                 "user_id": user_id,
                 "notification_id": notification_id,
@@ -392,11 +386,11 @@ async def send_push_to_user(
             },
         )
         return {
-            "notification_id": notification_id,  # Return ID since it's saved to inbox
+            "notification_id": notification_id,
             "delivered": False,
             "reason": reason,
             "skipped": True,
-            "saved_to_inbox": True,
+            "saved_to_inbox": save_to_notification_history,
             "tokens_attempted": 0,
             "invalid_tokens": [],
         }
@@ -417,10 +411,14 @@ async def send_push_to_user(
         and is_valid_expo_token(row["fcm_token"])
     ]
 
-    # If no tokens, return early but notification is already saved to history
     if not tokens:
         logger.info(
-            f"No active Expo tokens for user {user_id}, notification saved to history only"
+            f"No active Expo tokens for user {user_id}"
+            + (
+                ", notification saved to history only"
+                if save_to_notification_history
+                else ""
+            )
         )
         return {
             "notification_id": notification_id,
@@ -639,8 +637,7 @@ async def send_push_to_user(
             print(f"⚠️  Failed to check push receipts: {exc}")
             logger.warning(f"Failed to validate push receipts: {exc}")
 
-    # Update notification record with delivery status
-    if delivered:
+    if save_to_notification_history and delivered:
         supabase.table("notification_history").update(
             {"delivered_at": datetime.now(timezone.utc).isoformat()}
         ).eq("id", notification_id).execute()
@@ -666,14 +663,18 @@ def send_push_to_user_sync(
     entity_id: Optional[str] = None,
     category_id: Optional[str] = None,
     skip_preference_check: bool = False,
+    save_to_notification_history: bool = True,
 ) -> Dict[str, Any]:
     """
     Synchronous version of send_push_to_user for Celery tasks.
 
     This function:
-    1. ALWAYS save notification to history (inbox) first
+    1. Optionally save notification to history (inbox) first; skip when save_to_notification_history=False
     2. Check notification preferences and quiet hours for push delivery
     3. Send push notification to all active device tokens
+
+    Use save_to_notification_history=False for notifications that don't point to a goal or partner
+    (e.g. reengagement, subscription expiry, achievements). Push + deepLinkHandler is enough.
 
     Args:
         user_id: User ID to send notification to
@@ -684,6 +685,7 @@ def send_push_to_user_sync(
         entity_type: Type of entity (goal, achievement, partner_request, etc.)
         entity_id: ID of the entity
         skip_preference_check: If True, skip preference/quiet hours check (for critical notifications)
+        save_to_notification_history: If True, persist to notification_history (inbox). Default True.
 
     Returns:
         Dict with success status and delivery count
@@ -691,37 +693,37 @@ def send_push_to_user_sync(
     supabase = get_supabase_client()
 
     try:
-        # STEP 1: ALWAYS create notification history record first (for inbox)
-        # Users should see notifications in their inbox regardless of push settings
         notification_id = str(uuid4())
-        notification_record = {
-            "id": notification_id,
-            "user_id": user_id,
-            "notification_type": notification_type,
-            "title": title,
-            "body": body,
-            "data": data or {},
-            "sent_at": datetime.now(timezone.utc).isoformat(),
-        }
 
-        if entity_type and entity_id:
-            notification_record["entity_type"] = entity_type
-            notification_record["entity_id"] = entity_id
-
-        try:
-            supabase.table("notification_history").insert(notification_record).execute()
-            logger.info(
-                f"Created notification history record",
-                extra={
-                    "notification_id": notification_id,
-                    "user_id": user_id,
-                    "notification_type": notification_type,
-                    "entity_type": entity_type,
-                    "entity_id": entity_id,
-                },
-            )
-        except Exception as e:
-            logger.error(f"Failed to create notification history: {e}")
+        if save_to_notification_history:
+            notification_record = {
+                "id": notification_id,
+                "user_id": user_id,
+                "notification_type": notification_type,
+                "title": title,
+                "body": body,
+                "data": data or {},
+                "sent_at": datetime.now(timezone.utc).isoformat(),
+            }
+            if entity_type and entity_id:
+                notification_record["entity_type"] = entity_type
+                notification_record["entity_id"] = entity_id
+            try:
+                supabase.table("notification_history").insert(
+                    notification_record
+                ).execute()
+                logger.info(
+                    f"Created notification history record",
+                    extra={
+                        "notification_id": notification_id,
+                        "user_id": user_id,
+                        "notification_type": notification_type,
+                        "entity_type": entity_type,
+                        "entity_id": entity_id,
+                    },
+                )
+            except Exception as e:
+                logger.error(f"Failed to create notification history: {e}")
 
         # STEP 2: Check notification preferences for PUSH delivery
         # Even with skip_preference_check, we still respect the push_notifications toggle
@@ -734,7 +736,8 @@ def send_push_to_user_sync(
 
         if not should_send:
             logger.info(
-                f"Push notification skipped for user {user_id} (saved to inbox)",
+                f"Push notification skipped for user {user_id}"
+                + (" (saved to inbox)" if save_to_notification_history else ""),
                 extra={
                     "user_id": user_id,
                     "notification_id": notification_id,
@@ -747,7 +750,7 @@ def send_push_to_user_sync(
                 "delivered": 0,
                 "reason": reason,
                 "skipped": True,
-                "saved_to_inbox": True,
+                "saved_to_inbox": save_to_notification_history,
                 "notification_id": notification_id,
             }
 
@@ -767,10 +770,14 @@ def send_push_to_user_sync(
             and is_valid_expo_token(row["fcm_token"])
         ]
 
-        # If no tokens, return early but notification is already saved to history
         if not tokens:
             logger.info(
-                f"No active push tokens for user {user_id}, notification saved to history only"
+                f"No active push tokens for user {user_id}"
+                + (
+                    ", notification saved to history only"
+                    if save_to_notification_history
+                    else ""
+                )
             )
             return {
                 "success": True,
@@ -836,8 +843,7 @@ def send_push_to_user_sync(
             except Exception as e:
                 logger.warning(f"Failed to deactivate invalid tokens: {e}")
 
-        # Update notification history as delivered
-        if delivered_count > 0:
+        if save_to_notification_history and delivered_count > 0:
             try:
                 supabase.table("notification_history").update(
                     {

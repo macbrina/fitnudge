@@ -6,8 +6,7 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  Modal,
-  FlatList
+  Modal
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { TextInput } from "@/components/ui/TextInput";
@@ -23,6 +22,7 @@ import BackButton from "@/components/ui/BackButton";
 import { useUpdateProfile } from "@/hooks/api/useUser";
 import { useAlertModal } from "@/contexts/AlertModalContext";
 import { ApiError } from "@/services/api/base";
+import { AvatarImage, normalizeAvatarId } from "@/components/avatars";
 import { PROFILE_AVATARS } from "@/constants/general";
 
 export default function ProfileSettingsScreen() {
@@ -49,16 +49,17 @@ export default function ProfileSettingsScreen() {
   const [nameError, setNameError] = useState<string | null>(null);
   const [usernameError, setUsernameError] = useState<string | null>(null);
 
+  const userAvatarId = normalizeAvatarId(user?.profile_picture_url);
+
   useEffect(() => {
-    // Check if any field has changed
     const changed =
       name !== (user?.name || "") ||
       username !== (user?.username || "") ||
       bio !== (user?.bio || "") ||
-      (selectedAvatar !== null && selectedAvatar !== user?.profile_picture_url);
+      (selectedAvatar !== null && selectedAvatar !== userAvatarId);
 
     setHasChanges(changed);
-  }, [name, username, bio, selectedAvatar, user]);
+  }, [name, username, bio, selectedAvatar, user, userAvatarId]);
 
   const validateName = (value: string): boolean => {
     if (!value.trim()) {
@@ -112,7 +113,7 @@ export default function ProfileSettingsScreen() {
       if (bio !== user?.bio) {
         updateData.bio = bio.trim();
       }
-      if (selectedAvatar && selectedAvatar !== user?.profile_picture_url) {
+      if (selectedAvatar && selectedAvatar !== userAvatarId) {
         updateData.profile_picture_url = selectedAvatar;
       }
 
@@ -154,17 +155,7 @@ export default function ProfileSettingsScreen() {
     }
   };
 
-  const getCurrentAvatarDisplay = () => {
-    const avatarId = selectedAvatar || user?.profile_picture_url;
-    const avatar = PROFILE_AVATARS.find((a) => a.id === avatarId);
-    if (avatar) {
-      return avatar;
-    }
-    // Default avatar
-    return { id: "default", icon: "person-circle", color: brandColors.primary };
-  };
-
-  const currentAvatar = getCurrentAvatarDisplay();
+  const currentAvatarId = normalizeAvatarId(selectedAvatar ?? user?.profile_picture_url) ?? "1";
 
   return (
     <View style={styles.container}>
@@ -183,13 +174,13 @@ export default function ProfileSettingsScreen() {
           {/* Profile Photo Section */}
           <View style={styles.avatarSection}>
             <TouchableOpacity
-              style={[styles.avatarContainer, { backgroundColor: `${currentAvatar.color}20` }]}
+              style={[styles.avatarContainer, { backgroundColor: `${colors.border.subtle}` }]}
               onPress={() => setAvatarModalVisible(true)}
               activeOpacity={0.8}
             >
-              <Ionicons name={currentAvatar.icon as any} size={60} color={currentAvatar.color} />
+              <AvatarImage avatarId={currentAvatarId} size={60} />
               <View style={styles.avatarEditBadge}>
-                <Ionicons name="camera" size={14} color="#FFFFFF" />
+                <Ionicons name="camera" size={12} color="#FFFFFF" />
               </View>
             </TouchableOpacity>
             <Text style={styles.avatarHint}>{t("profile_settings.tap_to_change_photo")}</Text>
@@ -272,39 +263,43 @@ export default function ProfileSettingsScreen() {
             <View style={styles.modalCloseButton} />
           </View>
 
-          <FlatList
-            data={PROFILE_AVATARS}
-            numColumns={4}
-            keyExtractor={(item) => item.id}
+          <ScrollView
+            style={styles.avatarGridScroll}
             contentContainerStyle={styles.avatarGrid}
-            columnWrapperStyle={styles.avatarRow}
-            renderItem={({ item }) => {
-              const isSelected =
-                item.id === selectedAvatar ||
-                (selectedAvatar === null && item.id === user?.profile_picture_url);
-              return (
-                <TouchableOpacity
-                  style={[
-                    styles.avatarOption,
-                    { backgroundColor: `${item.color}20` },
-                    isSelected && styles.avatarOptionSelected
-                  ]}
-                  onPress={() => {
-                    setSelectedAvatar(item.id);
-                    setAvatarModalVisible(false);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name={item.icon as any} size={36} color={item.color} />
-                  {isSelected && (
-                    <View style={styles.avatarCheckmark}>
-                      <Ionicons name="checkmark" size={12} color="#FFFFFF" />
-                    </View>
-                  )}
-                </TouchableOpacity>
-              );
-            }}
-          />
+            showsVerticalScrollIndicator={false}
+          >
+            {Array.from({ length: Math.ceil(PROFILE_AVATARS.length / 4) }, (_, rowIndex) =>
+              PROFILE_AVATARS.slice(rowIndex * 4, rowIndex * 4 + 4)
+            ).map((row) => (
+              <View key={row[0].id} style={styles.avatarRow}>
+                {row.map((item) => {
+                  const isSelected = item.id === (selectedAvatar ?? userAvatarId);
+                  return (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={[
+                        styles.avatarOption,
+                        { backgroundColor: `${colors.border.subtle}40` },
+                        isSelected && styles.avatarOptionSelected
+                      ]}
+                      onPress={() => {
+                        setSelectedAvatar(item.id);
+                        setAvatarModalVisible(false);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <AvatarImage avatarId={item.id} size={36} />
+                      {isSelected && (
+                        <View style={styles.avatarCheckmark}>
+                          <Ionicons name="checkmark" size={12} color="#FFFFFF" />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ))}
+          </ScrollView>
         </View>
       </Modal>
     </View>
@@ -464,10 +459,14 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     fontFamily: fontFamily.semiBold,
     color: colors.text.primary
   },
+  avatarGridScroll: {
+    flex: 1
+  },
   avatarGrid: {
     padding: toRN(tokens.spacing[4])
   },
   avatarRow: {
+    flexDirection: "row" as const,
     justifyContent: "space-between" as const,
     marginBottom: toRN(tokens.spacing[3])
   },

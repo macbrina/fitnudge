@@ -54,6 +54,7 @@ export interface CheckIn {
   note?: string;
   voice_note_url?: string; // Premium feature
   voice_note_transcript?: string;
+  voice_note_duration?: number;
   ai_response?: string; // AI's personalized message after check-in
   created_at: string;
 }

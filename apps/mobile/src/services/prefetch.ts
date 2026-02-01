@@ -13,6 +13,7 @@ import { goalsService } from "@/services/api";
 import { dailyMotivationService } from "@/services/api";
 import { notificationsService } from "@/services/api/notifications";
 
+import { useAuthStore } from "@/stores/authStore";
 import { homeDashboardQueryKeys } from "@/hooks/api/useHomeDashboard";
 import { userQueryKeys } from "@/hooks/api/useUser";
 import { achievementsQueryKeys } from "@/hooks/api/useAchievements";
@@ -105,25 +106,38 @@ export async function refreshAuthenticatedData(queryClient: QueryClient): Promis
   ]);
 
   const hasPricing = usePricingStore.getState().plans.length > 0;
+  const isSubscriptionModalVisible = useSubscriptionStore.getState().isModalVisible;
+
+  // Skip prefetch if subscription was just refreshed (within last 5 seconds)
+  // This prevents redundant prefetch after successful subscription purchase
+  const lastSubscriptionRefresh = useSubscriptionStore.getState().lastSubscriptionRefresh;
+  const skipPrefetch = lastSubscriptionRefresh && Date.now() - lastSubscriptionRefresh < 5000;
 
   await Promise.all([
     useSubscriptionStore.getState().fetchSubscription(),
     useSubscriptionStore.getState().fetchFeatures(),
     useSubscriptionStore.getState().fetchHistory(),
     !hasPricing ? usePricingStore.getState().fetchPlans() : Promise.resolve(),
-    prefetchCriticalData(queryClient)
+    !isSubscriptionModalVisible && !skipPrefetch
+      ? prefetchCriticalData(queryClient)
+      : Promise.resolve()
   ]);
 
-  prefetchHighPriorityData(queryClient).catch(() => {
-    // Silently ignore errors - these are not critical
-  });
+  if (!isSubscriptionModalVisible && !skipPrefetch) {
+    prefetchHighPriorityData(queryClient).catch(() => {
+      // Silently ignore errors - these are not critical
+    });
+  }
 }
 
 /**
- * Get user's timezone for API calls
+ * Get user's timezone for API calls.
+ * Prefer user profile timezone (from auth store) if available.
  */
 function getUserTimezone(): string {
   try {
+    const userTz = useAuthStore.getState().user?.timezone;
+    if (userTz) return userTz;
     return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
   } catch {
     return "UTC";
@@ -180,10 +194,9 @@ function getPrefetchConfigs(): PrefetchConfig[] {
     },
     // Motivation card is visible on home screen - must be critical
     {
-      queryKey: dailyMotivationsQueryKeys.today(),
+      queryKey: dailyMotivationsQueryKeys.today(timezone),
       queryFn: async () => {
-        // Must extract .data to match useTodayDailyMotivation
-        const response = await dailyMotivationService.getToday();
+        const response = await dailyMotivationService.getToday(timezone);
         if (response.status !== 200 || !response.data) {
           throw new Error(response.error || "Failed to fetch daily motivation");
         }

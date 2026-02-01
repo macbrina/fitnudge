@@ -8,9 +8,17 @@
  */
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { analyticsService, AnalyticsDashboard } from "@/services/api/analytics";
 import { useSubscriptionStore } from "@/stores/subscriptionStore";
+
+// Track last selected analytics params for background refresh
+let lastAnalyticsParams: { goalId: string; days: number } | null = null;
+
+export const getLastAnalyticsParams = () => lastAnalyticsParams;
+export const setLastAnalyticsParams = (goalId: string, days: number) => {
+  lastAnalyticsParams = { goalId, days };
+};
 
 // Query keys - now include goalId
 export const analyticsQueryKeys = {
@@ -67,6 +75,13 @@ export function useAnalyticsDashboard(goalId: string | null, days: number = 30) 
       return failureCount < 2;
     }
   });
+
+  // Remember last selected analytics params for background refresh
+  useEffect(() => {
+    if (goalId && isPremium) {
+      setLastAnalyticsParams(goalId, days);
+    }
+  }, [goalId, days, isPremium]);
 
   /**
    * Force refresh analytics data, bypassing both React Query and Redis cache.

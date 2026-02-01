@@ -36,8 +36,14 @@ DROP INDEX IF EXISTS idx_pattern_insights_active;
 ALTER TABLE pattern_insights 
   ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending';
 
+ALTER TABLE pattern_insights
+  ADD COLUMN IF NOT EXISTS evidence JSONB;
+
 ALTER TABLE pattern_insights 
   ADD COLUMN IF NOT EXISTS insights JSONB;
+
+ALTER TABLE pattern_insights 
+  ADD COLUMN IF NOT EXISTS summary TEXT;
 
 ALTER TABLE pattern_insights 
   ADD COLUMN IF NOT EXISTS nudge_config JSONB;
@@ -352,6 +358,12 @@ CREATE POLICY "Service can manage pattern insights"
 -- =====================================================
 -- 10. COMMENTS
 -- =====================================================
+
+COMMENT ON COLUMN pattern_insights.summary IS 
+  'AI-generated summary of the pattern insights (1-2 sentences)';
+
+COMMENT ON COLUMN pattern_insights.evidence IS
+  'Deterministically computed evidence block (window, counts, weekday_stats). Stored internally for debugging/validation, not exposed to users.';
 
 COMMENT ON TABLE pattern_insights IS 
   'AI-generated pattern insights for goals. One row per goal, updated weekly or on-demand.';

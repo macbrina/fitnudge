@@ -1,10 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { dailyMotivationService, DailyMotivation } from "@/services/api";
+import { useUserTimezone } from "@/hooks/useUserTimezone";
 
 // Query Keys
 export const dailyMotivationsQueryKeys = {
   all: ["dailyMotivations"] as const,
-  today: () => [...dailyMotivationsQueryKeys.all, "today"] as const,
+  today: (tz?: string) => [...dailyMotivationsQueryKeys.all, "today", tz] as const,
   list: (limit?: number, offset?: number) =>
     [...dailyMotivationsQueryKeys.all, "list", limit, offset] as const,
   detail: (id: string) => [...dailyMotivationsQueryKeys.all, "detail", id] as const
@@ -20,10 +21,11 @@ const getMillisecondsUntilMidnight = () => {
 
 // Daily Motivations Hooks
 export const useTodayDailyMotivation = () => {
+  const tz = useUserTimezone();
   return useQuery({
-    queryKey: dailyMotivationsQueryKeys.today(),
+    queryKey: dailyMotivationsQueryKeys.today(tz),
     queryFn: async () => {
-      const response = await dailyMotivationService.getToday();
+      const response = await dailyMotivationService.getToday(tz);
       if (response.status !== 200 || !response.data) {
         throw new Error(response.error || "Failed to fetch daily motivation");
       }
@@ -66,19 +68,18 @@ export const useDailyMotivation = (motivationId: string) => {
 
 export const useShareDailyMotivation = () => {
   const queryClient = useQueryClient();
+  const tz = useUserTimezone();
 
   return useMutation({
     mutationFn: (motivationId: string) => dailyMotivationService.share(motivationId),
-    // Optimistic update - increment share count instantly
     onMutate: async (motivationId) => {
       await queryClient.cancelQueries({
-        queryKey: dailyMotivationsQueryKeys.today()
+        queryKey: dailyMotivationsQueryKeys.today(tz)
       });
 
-      const previousToday = queryClient.getQueryData(dailyMotivationsQueryKeys.today());
+      const previousToday = queryClient.getQueryData(dailyMotivationsQueryKeys.today(tz));
 
-      // Optimistically increment share count
-      queryClient.setQueryData(dailyMotivationsQueryKeys.today(), (old: any) => {
+      queryClient.setQueryData(dailyMotivationsQueryKeys.today(tz), (old: any) => {
         if (!old) return old;
         return { ...old, share_count: (old.share_count || 0) + 1 };
       });
@@ -87,7 +88,7 @@ export const useShareDailyMotivation = () => {
     },
     onError: (err, motivationId, context) => {
       if (context?.previousToday) {
-        queryClient.setQueryData(dailyMotivationsQueryKeys.today(), context.previousToday);
+        queryClient.setQueryData(dailyMotivationsQueryKeys.today(tz), context.previousToday);
       }
     }
   });
@@ -95,25 +96,19 @@ export const useShareDailyMotivation = () => {
 
 export const useRegenerateDailyMotivation = () => {
   const queryClient = useQueryClient();
+  const tz = useUserTimezone();
 
   return useMutation({
     mutationFn: async () => {
-      const response = await dailyMotivationService.regenerate();
+      const response = await dailyMotivationService.regenerate(tz);
       if (response.status !== 200 || !response.data) {
         throw new Error(response.error || "Failed to regenerate daily motivation");
       }
       return response.data;
     },
     onSuccess: (newMotivation) => {
-      // Update the cache directly with the new motivation
-      queryClient.setQueryData(dailyMotivationsQueryKeys.today(), newMotivation);
-      // Also invalidate to ensure fresh data
-      queryClient.invalidateQueries({
-        queryKey: dailyMotivationsQueryKeys.today()
-      });
-      queryClient.invalidateQueries({
-        queryKey: dailyMotivationsQueryKeys.all
-      });
+      queryClient.setQueryData(dailyMotivationsQueryKeys.today(tz), newMotivation);
+      queryClient.invalidateQueries({ queryKey: dailyMotivationsQueryKeys.all });
     }
   });
 };

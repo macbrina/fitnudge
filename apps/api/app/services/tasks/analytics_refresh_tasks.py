@@ -15,6 +15,8 @@ from app.services.logger import logger
 import json
 from datetime import datetime, timedelta
 
+import pytz
+
 
 # =============================================================================
 # MATERIALIZED VIEW REFRESH (Phase 3)
@@ -67,21 +69,30 @@ ANALYTICS_CACHE_TTL = 3600  # 1 hour
 ANALYTICS_CACHE_PREFIX = "analytics:dashboard"
 
 
+def _user_today_iso(user_timezone: str) -> str:
+    """Today's date (YYYY-MM-DD) in user's timezone. Falls back to UTC on error."""
+    try:
+        tz = pytz.timezone(user_timezone or "UTC")
+        return datetime.now(tz).date().isoformat()
+    except Exception:
+        return datetime.utcnow().date().isoformat()
+
+
 def get_cached_analytics(
-    user_id: str, days: int = 30, goal_id: str = None
+    user_id: str, days: int = 30, goal_id: str = None, end_date: str = None
 ) -> dict | None:
     """
     Get per-goal analytics dashboard from Redis cache.
 
-    V2: Now requires goal_id for per-goal caching.
+    V2: Requires goal_id. end_date (YYYY-MM-DD, user's local today) is part of
+    the cache key so completion_rate stays correct across timezones.
     Returns None if not cached or Redis unavailable.
     """
     redis = get_redis_client()
     if not redis:
         return None
 
-    # V2: Cache key includes goal_id
-    cache_key = f"{ANALYTICS_CACHE_PREFIX}:{user_id}:{goal_id}:{days}"
+    cache_key = f"{ANALYTICS_CACHE_PREFIX}:{user_id}:{goal_id}:{days}:{end_date or ''}"
 
     try:
         cached = redis.get(cache_key)
@@ -96,20 +107,19 @@ def get_cached_analytics(
 
 
 def set_cached_analytics(
-    user_id: str, days: int, data: dict, goal_id: str = None
+    user_id: str, days: int, data: dict, goal_id: str = None, end_date: str = None
 ) -> bool:
     """
     Store per-goal analytics dashboard in Redis cache.
 
-    V2: Now requires goal_id for per-goal caching.
+    V2: Requires goal_id. end_date (YYYY-MM-DD) included in key for timezone correctness.
     Returns True if cached successfully.
     """
     redis = get_redis_client()
     if not redis:
         return False
 
-    # V2: Cache key includes goal_id
-    cache_key = f"{ANALYTICS_CACHE_PREFIX}:{user_id}:{goal_id}:{days}"
+    cache_key = f"{ANALYTICS_CACHE_PREFIX}:{user_id}:{goal_id}:{days}:{end_date or ''}"
 
     try:
         redis.setex(cache_key, ANALYTICS_CACHE_TTL, json.dumps(data))
@@ -124,7 +134,7 @@ def invalidate_user_analytics_cache(user_id: str, goal_id: str = None):
     """
     Invalidate analytics cache for a user.
 
-    V2: If goal_id provided, invalidates only that goal's cache.
+    V2: If goal_id provided, invalidates only that goal's cache (all days/end_date).
         If goal_id is None, invalidates ALL goals for the user.
 
     Call this when user creates a check-in, goal, etc.
@@ -134,15 +144,18 @@ def invalidate_user_analytics_cache(user_id: str, goal_id: str = None):
         return
 
     if goal_id:
-        # Invalidate specific goal's cache for all time ranges
-        for days in [30, 90, 180]:
-            cache_key = f"{ANALYTICS_CACHE_PREFIX}:{user_id}:{goal_id}:{days}"
-            try:
-                redis.delete(cache_key)
-            except Exception:
-                pass
+        pattern = f"{ANALYTICS_CACHE_PREFIX}:{user_id}:{goal_id}:*"
+        try:
+            cursor = 0
+            while True:
+                cursor, keys = redis.scan(cursor, match=pattern, count=100)
+                if keys:
+                    redis.delete(*keys)
+                if cursor == 0:
+                    break
+        except Exception as e:
+            logger.warning(f"Error invalidating analytics cache: {e}")
     else:
-        # Invalidate ALL analytics caches for this user (pattern match)
         pattern = f"{ANALYTICS_CACHE_PREFIX}:{user_id}:*"
         try:
             cursor = 0
@@ -241,7 +254,7 @@ def prewarm_analytics_cache_task(self, user_ids: list[str] = None):
         # =====================================================
         premium_result = (
             supabase.table("users")
-            .select("id")
+            .select("id, timezone")
             .in_("id", users)
             .eq("plan", "premium")
             .eq("status", "active")
@@ -251,6 +264,9 @@ def prewarm_analytics_cache_task(self, user_ids: list[str] = None):
         premium_user_ids = (
             set(u["id"] for u in premium_result.data) if premium_result.data else set()
         )
+        user_tz_map = {
+            u["id"]: (u.get("timezone") or "UTC") for u in (premium_result.data or [])
+        }
 
         if not premium_user_ids:
             return {"status": "no_premium_users", "checked": len(users)}
@@ -286,8 +302,11 @@ def prewarm_analytics_cache_task(self, user_ids: list[str] = None):
         skipped_cached = 0
 
         for user_id, goal_id in goals_to_prewarm:
+            user_tz = user_tz_map.get(user_id) or "UTC"
+            end_date = _user_today_iso(user_tz)
+
             # Check Redis cache first (O(1) lookup)
-            if get_cached_analytics(user_id, 90, goal_id):
+            if get_cached_analytics(user_id, 90, goal_id, end_date):
                 skipped_cached += 1
                 continue
 
@@ -295,11 +314,16 @@ def prewarm_analytics_cache_task(self, user_ids: list[str] = None):
             try:
                 result = supabase.rpc(
                     "get_analytics_dashboard",
-                    {"p_user_id": user_id, "p_goal_id": goal_id, "p_days": 90},
+                    {
+                        "p_user_id": user_id,
+                        "p_goal_id": goal_id,
+                        "p_days": 90,
+                        "p_end_date": end_date,
+                    },
                 ).execute()
 
                 if result.data:
-                    set_cached_analytics(user_id, 90, result.data, goal_id)
+                    set_cached_analytics(user_id, 90, result.data, goal_id, end_date)
                     prewarmed += 1
 
             except Exception as e:

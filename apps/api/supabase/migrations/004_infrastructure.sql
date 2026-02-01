@@ -432,33 +432,6 @@ COMMENT ON COLUMN app_versions.latest_version IS 'The latest available version i
 COMMENT ON COLUMN app_versions.minimum_version IS 'Minimum version required - users below this must update';
 COMMENT ON COLUMN app_versions.force_update IS 'If true, forces update regardless of version comparison';
 
--- System health history (for tracking degraded/critical states)
-CREATE TABLE system_health_history (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc', now()),
-  status TEXT NOT NULL CHECK (status IN ('degraded', 'critical')),
-  environment TEXT NOT NULL,
-  version TEXT,
-  summary_key TEXT NOT NULL,
-  summary_params JSONB NOT NULL DEFAULT '{}'::jsonb,
-  impacted JSONB NOT NULL DEFAULT '[]'::jsonb,
-  report JSONB NOT NULL
-);
-
-CREATE INDEX idx_system_health_history_created ON system_health_history(created_at DESC);
-
--- System health updates (for tracking resolution status)
-CREATE TABLE system_health_updates (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  history_id UUID NOT NULL REFERENCES system_health_history(id) ON DELETE CASCADE,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc', now()),
-  title TEXT NOT NULL,
-  description TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'identified' CHECK (status IN ('identified', 'monitoring', 'resolved'))
-);
-
-CREATE INDEX idx_system_health_updates_history ON system_health_updates(history_id, created_at);
-
 -- =====================================================
 -- WEBHOOK EVENTS (Idempotency & Retry)
 -- =====================================================

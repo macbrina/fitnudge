@@ -5,12 +5,15 @@ import { BackButton } from "@/components/ui/BackButton";
 import { SkeletonBox } from "@/components/ui/SkeletonBox";
 import { useTranslation } from "@/lib/i18n";
 import { toRN } from "@/lib/units";
-import { useStyles, useTheme } from "@/themes";
+import { useStyles } from "@/themes";
+import { tokens } from "@/themes/tokens";
+import { CARD_PADDING_VALUES } from "@/constants/general";
 
 export function PartnerDetailSkeleton() {
   const styles = useStyles(makeStyles);
   const { t } = useTranslation();
   const router = useRouter();
+  const cardPadding = CARD_PADDING_VALUES.SM;
 
   return (
     <View style={styles.container}>
@@ -53,18 +56,39 @@ export function PartnerDetailSkeleton() {
 
         {/* Stats Grid Skeleton */}
         <View style={styles.statsGrid}>
-          <View style={styles.statCard}>
+          <SkeletonBox
+            width="100%"
+            height={90}
+            borderRadius={toRN(tokens.borderRadius.xl)}
+            inner
+            innerPadding={cardPadding}
+            style={styles.statCard}
+          >
             <SkeletonBox width={40} height={28} borderRadius={6} />
             <SkeletonBox width={80} height={12} borderRadius={4} style={{ marginTop: 8 }} />
-          </View>
-          <View style={styles.statCard}>
+          </SkeletonBox>
+          <SkeletonBox
+            width="100%"
+            height={90}
+            borderRadius={toRN(tokens.borderRadius.xl)}
+            inner
+            innerPadding={cardPadding}
+            style={styles.statCard}
+          >
             <SkeletonBox width={50} height={28} borderRadius={6} />
             <SkeletonBox width={70} height={12} borderRadius={4} style={{ marginTop: 8 }} />
-          </View>
-          <View style={styles.statCard}>
+          </SkeletonBox>
+          <SkeletonBox
+            width="100%"
+            height={90}
+            borderRadius={toRN(tokens.borderRadius.xl)}
+            inner
+            innerPadding={cardPadding}
+            style={styles.statCard}
+          >
             <SkeletonBox width={36} height={28} borderRadius={6} />
             <SkeletonBox width={90} height={12} borderRadius={4} style={{ marginTop: 8 }} />
-          </View>
+          </SkeletonBox>
         </View>
 
         {/* Goals Section Skeleton */}
@@ -74,9 +98,16 @@ export function PartnerDetailSkeleton() {
             <SkeletonBox width={24} height={24} borderRadius={12} />
           </View>
           <View style={styles.goalsList}>
-            {/* Goal Card Skeletons */}
             {[1, 2].map((i) => (
-              <View key={i} style={styles.goalCard}>
+              <SkeletonBox
+                key={i}
+                width="100%"
+                height={80}
+                borderRadius={toRN(tokens.borderRadius.xl)}
+                inner
+                innerPadding={cardPadding}
+                style={styles.goalCard}
+              >
                 <View style={styles.goalCardHeader}>
                   <SkeletonBox width={32} height={32} borderRadius={16} />
                   <View style={{ flex: 1, marginLeft: 12 }}>
@@ -90,7 +121,7 @@ export function PartnerDetailSkeleton() {
                   </View>
                   <SkeletonBox width={24} height={24} borderRadius={12} />
                 </View>
-              </View>
+              </SkeletonBox>
             ))}
           </View>
         </View>
@@ -146,9 +177,6 @@ const makeStyles = (tokens: any, colors: any, brandColors: any) => ({
   statCard: {
     flex: 1,
     minWidth: "30%" as const,
-    backgroundColor: colors.bg.card,
-    borderRadius: toRN(tokens.borderRadius.xl),
-    padding: toRN(tokens.spacing[4]),
     alignItems: "center" as const,
     justifyContent: "center" as const
   },
@@ -166,14 +194,11 @@ const makeStyles = (tokens: any, colors: any, brandColors: any) => ({
   goalsList: {
     gap: toRN(tokens.spacing[3])
   },
-  goalCard: {
-    backgroundColor: colors.bg.card,
-    borderRadius: toRN(tokens.borderRadius.xl),
-    padding: toRN(tokens.spacing[4])
-  },
+  goalCard: {},
   goalCardHeader: {
     flexDirection: "row" as const,
-    alignItems: "center" as const
+    alignItems: "center" as const,
+    padding: toRN(tokens.spacing[2])
   }
 });
 

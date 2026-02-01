@@ -357,18 +357,19 @@ ORDER BY frequency DESC;
 
 **Nudge Types:**
 
-| Nudge Type | Celery Task | Schedule |
-| --- | --- | --- |
-| `streak_at_risk` | `check_streak_at_risk` | Hourly (2-8 PM) |
-| `risky_day` | `check_risky_day_warning` | Every 15 min |
-| `missed_days_intervention` | `check_missed_days_intervention` | Daily 10 AM |
-| `milestone_approaching` | `check_approaching_milestone` | Daily 9 AM |
-| `pattern_suggestion` | `check_pattern_suggestion` | Daily 11 AM |
-| `crushing_it` | `check_crushing_it` | Daily 6 PM |
+| Nudge Type                 | Celery Task                      | Schedule        |
+| -------------------------- | -------------------------------- | --------------- |
+| `streak_at_risk`           | `check_streak_at_risk`           | Hourly (2-8 PM) |
+| `risky_day`                | `check_risky_day_warning`        | Every 15 min    |
+| `missed_days_intervention` | `check_missed_days_intervention` | Daily 10 AM     |
+| `milestone_approaching`    | `check_approaching_milestone`    | Daily 9 AM      |
+| `pattern_suggestion`       | `check_pattern_suggestion`       | Daily 11 AM     |
+| `crushing_it`              | `check_crushing_it`              | Daily 6 PM      |
 
 **Deduplication Strategy:**
 
 Each task batch-prefetches existing nudges of its type for today:
+
 ```python
 existing_nudges_result = (
     supabase.table("notification_history")
@@ -380,6 +381,7 @@ existing_nudges_result = (
     .execute()
 )
 ```
+
 Users in the result set are skipped (O(1) lookup via Python set).
 
 ---
@@ -1835,33 +1837,9 @@ CREATE TABLE app_versions (
   UNIQUE(platform, version)
 );
 
--- System health history (for tracking degraded/critical states)
-CREATE TABLE system_health_history (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc', now()),
-  status TEXT NOT NULL CHECK (status IN ('degraded', 'critical')),
-  environment TEXT NOT NULL,
-  version TEXT,
-  summary_key TEXT NOT NULL,
-  summary_params JSONB NOT NULL DEFAULT '{}'::jsonb,
-  impacted JSONB NOT NULL DEFAULT '[]'::jsonb,
-  report JSONB NOT NULL
-);
-
-CREATE INDEX idx_system_health_history_created ON system_health_history(created_at DESC);
-
--- System health updates (for tracking resolution status)
-CREATE TABLE system_health_updates (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  history_id UUID NOT NULL REFERENCES system_health_history(id) ON DELETE CASCADE,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc', now()),
-  title TEXT NOT NULL,
-  description TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'identified' CHECK (status IN ('identified', 'monitoring', 'resolved'))
-);
-
-CREATE INDEX idx_system_health_updates_history ON system_health_updates(history_id, created_at);
-
+-- =====================================================
+-- WEBHOOK EVENTS (Idempotency & Retry)
+-- =====================================================
 CREATE TABLE webhook_events (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   provider TEXT NOT NULL,
@@ -2184,6 +2162,7 @@ Check-ins are now PRE-CREATED with `status='pending'` to enable accurate "missed
 4. **End of Day**: `mark_missed_checkins` runs hourly, marking remaining pending check-ins as 'missed'
 
 **Check-in Status Values:**
+
 - `pending` - Pre-created, awaiting user response
 - `completed` - User marked as done
 - `skipped` - User explicitly skipped (with optional skip_reason)
@@ -2302,6 +2281,7 @@ GET    /api/v1/subscriptions/plans   # Get available plans
 ### Notification Behavior
 
 All notifications use **tap-to-open** behavior:
+
 - User taps notification → App opens via deep link
 - For check-in prompts: Opens goal detail screen which auto-opens `CheckInModal` if:
   - Goal is active
@@ -2312,15 +2292,15 @@ All notifications use **tap-to-open** behavior:
 
 ### Notification Types
 
-| Type               | Trigger                          | Deep Link Target          |
-| ------------------ | -------------------------------- | ------------------------- |
+| Type               | Trigger                          | Deep Link Target           |
+| ------------------ | -------------------------------- | -------------------------- |
 | check_in           | Scheduled (user's reminder time) | Goal detail + CheckInModal |
-| morning_motivation | Scheduled (morning)              | Home screen               |
-| adaptive_nudge     | Pattern-triggered                | Goal detail               |
-| partner_activity   | Partner checks in                | Partner detail screen     |
-| streak_milestone   | On milestone hit                 | Goal detail               |
-| weekly_recap       | Sunday evening                   | Weekly recap screen       |
-| cheer_received     | Partner sends cheer              | Partner detail screen     |
+| morning_motivation | Scheduled (morning)              | Home screen                |
+| adaptive_nudge     | Pattern-triggered                | Goal detail                |
+| partner_activity   | Partner checks in                | Partner detail screen      |
+| streak_milestone   | On milestone hit                 | Goal detail                |
+| weekly_recap       | Sunday evening                   | Weekly recap screen        |
+| cheer_received     | Partner sends cheer              | Partner detail screen      |
 
 ### Backend Notification Service
 
@@ -2553,19 +2533,19 @@ result = send_push_to_user_sync(
 
 #### Notification Types
 
-| Type               | `notification_type` | Deep Link Target              |
-| ------------------ | ------------------- | ----------------------------- |
+| Type               | `notification_type` | Deep Link Target                |
+| ------------------ | ------------------- | ------------------------------- | -------- | --- |
 | Check-in Prompt    | `reminder`          | Goal detail + auto CheckInModal |
 | Check-in Follow-up | `reminder`          | Goal detail + auto CheckInModal |
-| Morning Motivation | `ai_motivation`     | Home screen                   |
-| Adaptive Nudge     | `adaptive_nudge`    | Goal detail                   |
-| Partner Cheer      | `partner_cheer`     | Partner detail                |
-| Partner Nudge      | `partner_nudge`     | Partner detail                |
-| Partner Milestone  | `partner_milestone` | Partner detail                |
-| Streak Milestone   | `streak_milestone`  | Goal detail                   |
-| Weekly Recap       | `weekly_recap`      | Weekly recap screen           |
-| Achievement        | `achievement`       | Achievements screen           |
-| Subscription       | `subscription`      | None               | Tap only                   | Yes             |
+| Morning Motivation | `ai_motivation`     | Home screen                     |
+| Adaptive Nudge     | `adaptive_nudge`    | Goal detail                     |
+| Partner Cheer      | `partner_cheer`     | Partner detail                  |
+| Partner Nudge      | `partner_nudge`     | Partner detail                  |
+| Partner Milestone  | `partner_milestone` | Partner detail                  |
+| Streak Milestone   | `streak_milestone`  | Goal detail                     |
+| Weekly Recap       | `weekly_recap`      | Weekly recap screen             |
+| Achievement        | `achievement`       | Achievements screen             |
+| Subscription       | `subscription`      | None                            | Tap only | Yes |
 
 #### Data Payload Structure
 

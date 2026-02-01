@@ -2,16 +2,18 @@ import React from "react";
 import { ScrollView, View } from "react-native";
 import { useRouter } from "expo-router";
 import { BackButton } from "@/components/ui/BackButton";
-import { Card } from "@/components/ui/Card";
 import { SkeletonBox } from "@/components/ui/SkeletonBox";
 import { useTranslation } from "@/lib/i18n";
 import { toRN } from "@/lib/units";
-import { useStyles, useTheme } from "@/themes";
+import { useStyles } from "@/themes";
+import { tokens } from "@/themes/tokens";
+import { CARD_PADDING_VALUES } from "@/constants/general";
 
 export function AchievementsSkeleton() {
   const styles = useStyles(makeStyles);
   const { t } = useTranslation();
   const router = useRouter();
+  const cardPadding = CARD_PADDING_VALUES.SM;
 
   return (
     <View style={styles.container}>
@@ -58,7 +60,15 @@ export function AchievementsSkeleton() {
 
         {/* Achievement List Items */}
         {[1, 2, 3, 4, 5].map((i) => (
-          <Card key={i} style={styles.achievementCard}>
+          <SkeletonBox
+            key={i}
+            width="100%"
+            height={75}
+            borderRadius={toRN(tokens.borderRadius.xl)}
+            inner
+            innerPadding={cardPadding}
+            style={styles.achievementCard}
+          >
             <View style={styles.achievementContent}>
               <SkeletonBox width={44} height={44} borderRadius={12} />
               <View style={styles.achievementInfo}>
@@ -67,7 +77,7 @@ export function AchievementsSkeleton() {
               </View>
               <SkeletonBox width={32} height={32} borderRadius={16} />
             </View>
-          </Card>
+          </SkeletonBox>
         ))}
       </ScrollView>
     </View>
@@ -122,12 +132,12 @@ const makeStyles = (tokens: any, colors: any, brandColors: any) => ({
 
   // Achievement Card
   achievementCard: {
-    padding: toRN(tokens.spacing[3]),
     marginBottom: toRN(tokens.spacing[2])
   },
   achievementContent: {
     flexDirection: "row" as const,
-    alignItems: "center" as const
+    alignItems: "center" as const,
+    padding: toRN(tokens.spacing[1])
   },
   achievementInfo: {
     flex: 1,

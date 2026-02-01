@@ -66,6 +66,29 @@ def precreate_daily_checkins_task(self) -> Dict[str, Any]:
         inserted_rows = result.data if result.data else []
         inserted_count = len(inserted_rows)
 
+        # Trigger Live Activity refresh (server-driven Mode B) for affected users.
+        # We dedupe by user_id to avoid N per goal.
+        try:
+            from app.services.tasks.live_activity_tasks import (
+                refresh_live_activity_for_user_task,
+            )
+            from app.services.tasks.nextup_fcm_tasks import (
+                refresh_nextup_fcm_for_user_task,
+            )
+
+            affected_user_ids = {
+                row.get("out_user_id")
+                for row in inserted_rows
+                if row.get("out_user_id")
+            }
+            for uid in affected_user_ids:
+                # Fire-and-forget: don't block precreate task on APNs.
+                refresh_live_activity_for_user_task.delay(str(uid))
+                refresh_nextup_fcm_for_user_task.delay(str(uid))
+        except Exception:
+            # Never fail check-in precreation due to live activity errors.
+            pass
+
         # Invalidate analytics cache for each user/goal that got a new check-in
         # This ensures fresh data when they view analytics
         invalidated_count = 0
@@ -408,95 +431,6 @@ def reset_weekly_completions_task(self) -> Dict[str, Any]:
         return {"success": False, "error": str(e)}
 
 
-# =====================================================
-# AI PATTERN INSIGHTS TASK (Premium - Runs Weekly)
-# =====================================================
-
-
-@celery_app.task(
-    name="detect_patterns",
-    bind=True,
-    max_retries=1,
-    default_retry_delay=300,
-)
-def detect_patterns_task(self) -> Dict[str, Any]:
-    """
-    Refreshes AI-generated pattern insights for all premium users.
-    Uses the AI insights service for intelligent pattern detection.
-
-    Runs WEEKLY (Sunday evening).
-    Processes users sequentially to manage API rate limits.
-    """
-    import asyncio
-    from app.services.ai_insights_service import get_ai_insights_service
-
-    async def refresh_all_users():
-        supabase = get_supabase_client()
-        insights_service = get_ai_insights_service()
-
-        # Get all premium users
-        users_result = (
-            supabase.table("users")
-            .select("id")
-            .eq("plan", "premium")
-            .eq("status", "active")
-            .execute()
-        )
-
-        users = users_result.data or []
-        total_refreshed = 0
-        total_skipped = 0
-        total_failed = 0
-        processed_users = 0
-
-        # Process users sequentially (to manage OpenAI rate limits)
-        for user in users:
-            try:
-                result = await insights_service.refresh_all_for_user(user["id"])
-                total_refreshed += result.get("refreshed", 0)
-                total_skipped += result.get("skipped", 0)
-                total_failed += result.get("failed", 0)
-                processed_users += 1
-
-            except Exception as user_error:
-                logger.warning(
-                    f"Failed to refresh insights for user {user['id']}: {user_error}"
-                )
-                total_failed += 1
-                continue
-
-        return {
-            "processed_users": processed_users,
-            "total_refreshed": total_refreshed,
-            "total_skipped": total_skipped,
-            "total_failed": total_failed,
-        }
-
-    try:
-        result = asyncio.run(refresh_all_users())
-
-        logger.info(
-            f"AI pattern insights refresh completed",
-            {
-                "processed_users": result["processed_users"],
-                "total_refreshed": result["total_refreshed"],
-                "total_skipped": result["total_skipped"],
-                "total_failed": result["total_failed"],
-            },
-        )
-
-        return {
-            "success": True,
-            **result,
-        }
-
-    except Exception as e:
-        logger.error(f"Failed to run AI pattern insights refresh: {e}")
-        if self.request.retries < self.max_retries:
-            raise self.retry(exc=e)
-        return {"success": False, "error": str(e)}
-
-
 @celery_app.task(
     name="detect_user_patterns_single",
     bind=True,
@@ -630,155 +564,3 @@ def build_ai_context_task(user_id: str) -> Dict[str, Any]:
 # =====================================================
 # STREAK UPDATE TASK
 # =====================================================
-
-
-@celery_app.task(
-    name="update_goal_streak",
-    bind=True,
-    max_retries=2,
-    default_retry_delay=30,
-)
-def update_goal_streak_task(
-    self,
-    goal_id: str,
-    user_id: str,
-) -> Dict[str, Any]:
-    """
-    Celery task to update streak counts for a goal after a check-in.
-
-    Updates:
-    - current_streak: Consecutive completed check-ins
-    - longest_streak: Best streak ever
-    - total_completions: Total completed check-ins
-
-    Called after each check-in to keep streaks up-to-date.
-    This is EVENT-DRIVEN, not scheduled.
-    """
-    try:
-        supabase = get_supabase_client()
-
-        # V2.1: Get all check-ins using status field (excludes pending)
-        checkins_result = (
-            supabase.table("check_ins")
-            .select("check_in_date, status")
-            .eq("goal_id", goal_id)
-            .eq("user_id", user_id)
-            .neq("status", "pending")  # Exclude pending check-ins
-            .order("check_in_date", desc=True)
-            .execute()
-        )
-
-        checkins = checkins_result.data or []
-
-        if not checkins:
-            return {
-                "success": True,
-                "goal_id": goal_id,
-                "current_streak": 0,
-                "longest_streak": 0,
-                "total_completions": 0,
-            }
-
-        # Calculate total completions using status field
-        total_completions = sum(1 for c in checkins if c.get("status") == "completed")
-
-        # Calculate current streak (consecutive completed/rest_day from most recent)
-        current_streak = 0
-        today = datetime.utcnow().date()
-
-        for i, checkin in enumerate(checkins):
-            checkin_date = datetime.fromisoformat(checkin["check_in_date"]).date()
-            status = checkin.get("status", "missed")
-            is_completed = status == "completed"
-            is_rest_day = status == "rest_day"
-
-            # For current streak, we check from most recent
-            if i == 0:
-                # Most recent check-in
-                if is_completed or is_rest_day:
-                    current_streak = 1
-                else:
-                    break  # Streak broken (missed/skipped)
-            else:
-                # Previous check-ins
-                prev_date = datetime.fromisoformat(
-                    checkins[i - 1]["check_in_date"]
-                ).date()
-                expected_date = prev_date - timedelta(days=1)
-
-                if checkin_date == expected_date:
-                    if is_completed or is_rest_day:
-                        current_streak += 1
-                    else:
-                        break  # Streak broken
-                else:
-                    # Gap in dates - streak broken
-                    break
-
-        # Calculate longest streak (need to scan all checkins)
-        longest_streak = 0
-        temp_streak = 0
-        sorted_checkins = sorted(checkins, key=lambda x: x["check_in_date"])
-
-        for i, checkin in enumerate(sorted_checkins):
-            status = checkin.get("status", "missed")
-            is_completed = status == "completed"
-            is_rest_day = status == "rest_day"
-
-            if is_completed or is_rest_day:
-                if i == 0:
-                    temp_streak = 1
-                else:
-                    prev_date = datetime.fromisoformat(
-                        sorted_checkins[i - 1]["check_in_date"]
-                    ).date()
-                    curr_date = datetime.fromisoformat(checkin["check_in_date"]).date()
-
-                    if (curr_date - prev_date).days == 1:
-                        temp_streak += 1
-                    else:
-                        # Gap - start new streak
-                        longest_streak = max(longest_streak, temp_streak)
-                        temp_streak = 1
-            else:
-                # Not completed (missed/skipped) - end streak
-                longest_streak = max(longest_streak, temp_streak)
-                temp_streak = 0
-
-        longest_streak = max(longest_streak, temp_streak, current_streak)
-
-        # Update goal with new streak values
-        supabase.table("goals").update(
-            {
-                "current_streak": current_streak,
-                "longest_streak": longest_streak,
-                "total_completions": total_completions,
-            }
-        ).eq("id", goal_id).execute()
-
-        logger.info(
-            f"Updated streak for goal {goal_id}",
-            {
-                "goal_id": goal_id,
-                "current_streak": current_streak,
-                "longest_streak": longest_streak,
-                "total_completions": total_completions,
-            },
-        )
-
-        return {
-            "success": True,
-            "goal_id": goal_id,
-            "current_streak": current_streak,
-            "longest_streak": longest_streak,
-            "total_completions": total_completions,
-        }
-
-    except Exception as e:
-        logger.error(
-            f"Failed to update goal streak: {e}",
-            {"goal_id": goal_id, "user_id": user_id, "error": str(e)},
-        )
-        if self.request.retries < self.max_retries:
-            raise self.retry(exc=e)
-        return {"success": False, "error": str(e)}

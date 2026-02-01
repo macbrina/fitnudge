@@ -8,6 +8,7 @@ import { toRN } from "@/lib/units";
 import { logger } from "@/services/logger";
 import { useAuthStore } from "@/stores/authStore";
 import { useStyles, useTheme } from "@/themes";
+import { MOBILE_ROUTES } from "@/lib/routes";
 import { getRedirection, hasCompletedV2Onboarding } from "@/utils/getRedirection";
 import { STORAGE_KEYS, storageUtil } from "@/utils/storageUtil";
 import { Ionicons } from "@expo/vector-icons";
@@ -30,49 +31,38 @@ export default function NotificationPermissionScreen() {
     try {
       setIsLoading(true);
 
-      // Track event
-      capture("notification_permission_requested", {
-        source: "onboarding",
-        screen: "notification_permission"
-      });
-
-      // Request permissions
       const granted = await requestPermissionsWithSoftPrompt();
 
       if (granted) {
-        // Track success
         capture("notification_permission_granted", {
           source: "onboarding",
           screen: "notification_permission"
         });
-
-        // Permission granted - tracked via PostHog above
       } else {
-        // Track denial
         capture("notification_permission_denied", {
           source: "onboarding",
           screen: "notification_permission"
         });
-
-        // Permission denied - tracked via PostHog above
       }
 
-      // Mark step as seen
-      await storageUtil.setItem(STORAGE_KEYS.HAS_SEEN_NOTIFICATION_PERMISSION, true);
+      const completedOnboarding = hasCompletedV2Onboarding(user);
 
-      // Use getRedirection to determine where to go next
-      // It handles: personalization check, onboarding_completed_at from API
-      const destination = await getRedirection({
-        hasCompletedOnboarding: hasCompletedV2Onboarding(user)
-      });
-      router.replace(destination);
+      if (completedOnboarding) {
+        // Fast path: navigate immediately, storage in background
+        storageUtil.setItem(STORAGE_KEYS.HAS_SEEN_NOTIFICATION_PERMISSION, true).catch(() => {});
+        storageUtil.setItem(STORAGE_KEYS.HAS_SEEN_PERSONALIZATION, true).catch(() => {});
+        router.replace(MOBILE_ROUTES.MAIN.HOME);
+      } else {
+        // Need getRedirection to check personalization step
+        await storageUtil.setItem(STORAGE_KEYS.HAS_SEEN_NOTIFICATION_PERMISSION, true);
+        const destination = await getRedirection({ hasCompletedOnboarding: false });
+        router.replace(destination);
+      }
     } catch (error) {
       logger.error("Error requesting notification permissions", {
         error: error instanceof Error ? error.message : String(error),
         screen: "notification_permission"
       });
-
-      // On error, use getRedirection to determine where to go
       const destination = await getRedirection({
         hasCompletedOnboarding: hasCompletedV2Onboarding(user)
       });
@@ -83,20 +73,22 @@ export default function NotificationPermissionScreen() {
   };
 
   const handleMaybeLater = async () => {
-    // Track skip
     capture("notification_permission_skipped", {
       source: "onboarding",
       screen: "notification_permission"
     });
 
-    // Mark step as seen
-    await storageUtil.setItem(STORAGE_KEYS.HAS_SEEN_NOTIFICATION_PERMISSION, true);
+    const completedOnboarding = hasCompletedV2Onboarding(user);
 
-    // Use getRedirection to determine where to go next
-    const destination = await getRedirection({
-      hasCompletedOnboarding: hasCompletedV2Onboarding(user)
-    });
-    router.replace(destination);
+    if (completedOnboarding) {
+      storageUtil.setItem(STORAGE_KEYS.HAS_SEEN_NOTIFICATION_PERMISSION, true).catch(() => {});
+      storageUtil.setItem(STORAGE_KEYS.HAS_SEEN_PERSONALIZATION, true).catch(() => {});
+      router.replace(MOBILE_ROUTES.MAIN.HOME);
+    } else {
+      await storageUtil.setItem(STORAGE_KEYS.HAS_SEEN_NOTIFICATION_PERMISSION, true);
+      const destination = await getRedirection({ hasCompletedOnboarding: false });
+      router.replace(destination);
+    }
   };
 
   return (

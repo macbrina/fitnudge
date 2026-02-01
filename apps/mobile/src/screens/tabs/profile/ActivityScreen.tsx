@@ -17,6 +17,7 @@ import { Nudge } from "@/services/api/nudges";
 import { formatTimeAgo } from "@/utils/helper";
 import Button from "@/components/ui/Button";
 import { NudgeIcon, NudgeEmojiType, NUDGE_EMOJI_LIST } from "@/components/icons/NudgeIcons";
+import { CARD_PADDING_VALUES } from "@/constants/general";
 
 const NUDGE_TYPE_CONFIG = {
   nudge: {
@@ -209,8 +210,23 @@ export const ActivityScreen: React.FC = () => {
       {isLoading ? (
         <View style={styles.listContent}>
           {[1, 2, 3, 4].map((i) => (
-            <Card key={i} style={styles.nudgeSkeleton}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <SkeletonBox
+              key={i}
+              width="100%"
+              height={75}
+              borderRadius={toRN(tokens.borderRadius.xl)}
+              inner
+              innerPadding={CARD_PADDING_VALUES.SM}
+              style={styles.nudgeSkeleton}
+            >
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 12,
+                  padding: toRN(tokens.spacing[2])
+                }}
+              >
                 <SkeletonBox width={40} height={40} borderRadius={20} />
                 <View style={{ flex: 1, gap: 6 }}>
                   <SkeletonBox width="70%" height={14} borderRadius={4} />
@@ -218,7 +234,7 @@ export const ActivityScreen: React.FC = () => {
                 </View>
                 <SkeletonBox width={40} height={12} borderRadius={4} />
               </View>
-            </Card>
+            </SkeletonBox>
           ))}
         </View>
       ) : (

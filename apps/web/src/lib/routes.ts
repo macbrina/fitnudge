@@ -14,7 +14,7 @@ export const ROUTES = {
   TERMS: "/terms-of-service",
   WHY_FITNUDGE: "/why-fitnudge",
   ABOUT: "/about-us",
-  HEALTH: "/health",
+  HEALTH: "https://status.fitnudge.app/",
 
   // App download links
   APP_STORE: "https://apps.apple.com/app/fitnudge",

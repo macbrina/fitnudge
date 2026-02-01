@@ -141,7 +141,7 @@ export default function HomeScreen() {
         <HeroSection userName={user?.name} />
 
         <View style={styles.content}>
-          {/* AI Coach Card */}
+          {/* AI Coach Card — open general chat (no goal); focusedGoalId = null, show last conversation */}
           <AICoachCard onPress={() => openAICoach()} />
 
           {/* Today's Goals Section */}

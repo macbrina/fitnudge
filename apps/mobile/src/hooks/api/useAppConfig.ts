@@ -8,9 +8,12 @@
  * - Aggressive caching (24 hours stale time)
  * - Fallback values for offline/error scenarios
  * - Type-safe config access
+ * - Realtime subscription for app_config (maintenance toggle, etc.)
  */
 
-import { useQuery, QueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, QueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 import { Platform } from "react-native";
 import { appConfigService, AppConfigResponse, AppConfigKey } from "@/services/api/appConfig";
 import { FALLBACK_APP_STORE_URLS, FALLBACK_EXTERNAL_URLS } from "@/constants/general";
@@ -103,6 +106,7 @@ export function useExternalUrls() {
       "tally_feedback_url",
       FALLBACK_EXTERNAL_URLS.TALLY_SO
     ),
+    tallyBug: getConfigValue(data?.config, "tally_bug_url", FALLBACK_EXTERNAL_URLS.TALLY_BUG),
     tawkChat: getConfigValue(data?.config, "tawk_chat_url", FALLBACK_EXTERNAL_URLS.TAWK_TO_CHAT),
     contact: getConfigValue(data?.config, "contact_email", FALLBACK_EXTERNAL_URLS.CONTACT),
     isLoading,
@@ -120,4 +124,29 @@ export async function prefetchAppConfig(queryClient: QueryClient): Promise<void>
     queryFn: () => appConfigService.getPublicConfig(),
     staleTime: STALE_TIME
   });
+}
+
+/**
+ * Subscribe to app_config realtime changes (e.g. maintenance toggle).
+ * Invalidates app config query on any change. Runs regardless of auth.
+ * Use once in root layout.
+ */
+export function useAppConfigRealtime() {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const client = supabase;
+    if (!client) return;
+
+    const channel = client
+      .channel("app-config")
+      .on("postgres_changes", { event: "*", schema: "public", table: "app_config" }, () => {
+        queryClient.invalidateQueries({ queryKey: appConfigQueryKeys.all });
+      })
+      .subscribe();
+
+    return () => {
+      client.removeChannel(channel);
+    };
+  }, [queryClient]);
 }

@@ -26,7 +26,6 @@ alembic = "^1.17.0"
 sqlalchemy = "^2.0.44"
 psycopg2-binary = "^2.9.11"
 python-dotenv = "^1.2.1"
-newrelic = "^11.0.1"
 posthog = "^6.7.10"
 python-magic = "^0.4.27" # File type detection
 pillow = "^10.0.0" # Image processing

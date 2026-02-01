@@ -41,6 +41,7 @@ export const ROUTES = {
     ACTIVATE: (id: string) => `/goals/${id}/activate`,
     DEACTIVATE: (id: string) => `/goals/${id}/deactivate`,
     ARCHIVE: (id: string) => `/goals/${id}/archive`,
+    COMPLETE: (id: string) => `/goals/${id}/complete`,
     // Stats
     GET_STATS: (id: string) => `/goals/${id}/stats`,
     STATS_SUMMARY: "/goals/stats/summary",
@@ -221,6 +222,20 @@ export const ROUTES = {
     MOOD_TRENDS: "/check-ins/mood-trends"
   },
 
+  // iOS Live Activities (ActivityKit)
+  LIVE_ACTIVITY: {
+    PUSH_TO_START_TOKEN: "/live-activity/push-to-start-token",
+    ACTIVITY_PUSH_TOKEN: "/live-activity/activity-push-token",
+    UNREGISTER: "/live-activity/unregister",
+    DEBUG_REFRESH: "/live-activity/debug/refresh"
+  },
+
+  // Android Mode B: server-driven NextUp ongoing notification (FCM)
+  NEXT_UP_PUSH: {
+    FCM_TOKEN: "/next-up/fcm-token",
+    DEBUG_REFRESH: "/next-up/debug/refresh"
+  },
+
   // Media routes
   MEDIA: {
     UPLOAD: "/media/upload",
@@ -249,7 +264,9 @@ export const ROUTES = {
     UNREGISTER_DEVICE: "/notifications/register-device",
     TEST: "/notifications/test",
     HISTORY: "/notifications/history",
-    ANALYTICS: "/notifications/analytics"
+    ANALYTICS: "/notifications/analytics",
+    BROADCASTS_ACTIVE: "/notifications/broadcasts/active",
+    BROADCAST_MARK_SEEN: (id: string) => `/notifications/broadcasts/${id}/mark-seen`
   },
 
   // Onboarding routes
@@ -269,7 +286,6 @@ export const ROUTES = {
   AI_COACH: {
     ACCESS: "/ai-coach/access",
     RATE_LIMIT: "/ai-coach/rate-limit",
-    CHAT: "/ai-coach/chat",
     CHAT_ASYNC: "/ai-coach/chat/async",
     CONVERSATIONS: "/ai-coach/conversations",
     CONVERSATION: (id: string) => `/ai-coach/conversations/${id}`,

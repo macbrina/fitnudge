@@ -20,13 +20,21 @@
       "usesAppleSignIn": true,
       "supportsTablet": true,
       "bundleIdentifier": "com.fitnudge.app",
+      "buildNumber": "1",
+
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "entitlements": {
+        "com.apple.security.application-groups": ["group.com.fitnudge.app"]
+      },
       "infoPlist": {
         "UIBackgroundModes": ["remote-notification", "remote-notification"],
         "ITSAppUsesNonExemptEncryption": false,
-        "NSCameraUsageDescription": "We need access to your camera to take progress photos for your fitness goals.",
-        "NSPhotoLibraryUsageDescription": "We need access to your photo library to select progress photos for your fitness goals.",
+        "NSSupportsLiveActivities": true,
+        "NSLocalNetworkUsageDescription": "We need access to your local network to enable live activities for your habits and goals.",
+        "NSCameraUsageDescription": "We need access to your camera to take progress photos for your habits and goals.",
+        "NSPhotoLibraryUsageDescription": "We need access to your photo library to select progress photos for your habits and goals.",
         "NSPhotoLibraryAddUsageDescription": "We need access to save progress photos to your photo library.",
-        "NSMicrophoneUsageDescription": "We need access to your microphone to enable voice input for AI chat and fitness coaching."
+        "NSMicrophoneUsageDescription": "We need access to your microphone to enable voice input for AI chat and habits and goals coaching."
       },
       "associatedDomains": ["applinks:fitnudge.app"]
     },
@@ -37,7 +45,9 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
+      "googleServicesFile": "./google-services.json",
       "package": "com.fitnudge.app",
+      "versionCode": 1,
       "permissions": [
         "POST_NOTIFICATIONS",
         "RECEIVE_BOOT_COMPLETED",
@@ -72,11 +82,18 @@
       "blogUrl": "https://fitnudge.app/blog",
       "router": {},
       "eas": {
-        "projectId": "c3c6f292-99b6-4d63-8e88-ee8c94048e19"
+        "projectId": "c3c6f292-99b6-4d63-8e88-ee8c94048e19",
+        "build": {}
       }
     },
     "owner": "fitnudge",
     "plugins": [
+      [
+        "@bacons/apple-targets",
+        {
+          "appleTeamId": "AUBNC6893W"
+        }
+      ],
       [
         "expo-build-properties",
         {
@@ -84,10 +101,16 @@
             "enableProguardInReleaseBuilds": true,
             "extraProguardRules": "-keep class com.google.android.gms.** { *; }"
           },
-          "ios": { "useFrameworks": "static" }
+          "ios": {
+            "useFrameworks": "static",
+            "deploymentTarget": "17.2",
+            "buildReactNativeFromSource": true
+          }
         }
       ],
       "expo-apple-authentication",
+      "@react-native-firebase/app",
+      "@react-native-firebase/messaging",
       "expo-router",
       [
         "expo-font",
@@ -206,8 +229,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "We need access to your photo library to select progress photos for your fitness goals.",
-          "cameraPermission": "We need access to your camera to take progress photos for your fitness goals."
+          "photosPermission": "We need access to your photo library to select progress photos for your habits and goals.",
+          "cameraPermission": "We need access to your camera to take progress photos for your habits and goals."
         }
       ],
       [

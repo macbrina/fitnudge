@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text, TouchableOpacity } from "react-native";
 import { useRouter } from "expo-router";
 import { Card } from "@/components/ui/Card";
+import { SkeletonBox } from "@/components/ui/SkeletonBox";
 import { useStyles } from "@/themes";
 import { useTheme } from "@/themes";
 import { tokens } from "@/themes/tokens";
@@ -10,9 +11,9 @@ import { fontFamily } from "@/lib/fonts";
 import { useTranslation } from "@/lib/i18n";
 import { MOBILE_ROUTES } from "@/lib/routes";
 import { EmptyState } from "./EmptyState";
-import { SkeletonBox } from "@/components/ui/SkeletonBox";
 import { useMyAchievements, getRarityColor, getBadgeIcon } from "@/hooks/api/useAchievements";
 import { UserAchievement } from "@/services/api";
+import { CARD_PADDING_VALUES } from "@/constants/general";
 
 export function AchievementsSection() {
   const styles = useStyles(makeAchievementsSectionStyles);
@@ -27,29 +28,7 @@ export function AchievementsSection() {
   };
 
   if (isLoading) {
-    return (
-      <Card shadow="md" style={styles.card}>
-        <SkeletonBox
-          width="50%"
-          height={toRN(tokens.typography.fontSize.xl)}
-          borderRadius={toRN(tokens.borderRadius.base)}
-          style={{ marginBottom: toRN(tokens.spacing[4]) }}
-        />
-        <View style={styles.badgeGrid}>
-          {[1, 2, 3].map((i) => (
-            <View key={i} style={styles.badgeItem}>
-              <SkeletonBox width={48} height={48} borderRadius={toRN(tokens.borderRadius.full)} />
-              <SkeletonBox
-                width="80%"
-                height={toRN(tokens.typography.fontSize.xs)}
-                borderRadius={toRN(tokens.borderRadius.base)}
-                style={{ marginTop: toRN(tokens.spacing[1]) }}
-              />
-            </View>
-          ))}
-        </View>
-      </Card>
-    );
+    return <AchievementsSectionSkeleton />;
   }
 
   // Show latest 3 achievements
@@ -104,7 +83,8 @@ export function AchievementsSection() {
 
 function AchievementBadge({ achievement }: { achievement: UserAchievement }) {
   const styles = useStyles(makeAchievementsSectionStyles);
-  const rarityColor = getRarityColor(achievement.rarity);
+  const { colors, brandColors } = useTheme();
+  const rarityColor = getRarityColor(achievement.rarity, { colors, brandColors });
   const badgeIcon = getBadgeIcon(achievement.badge_key);
 
   return (
@@ -117,6 +97,46 @@ function AchievementBadge({ achievement }: { achievement: UserAchievement }) {
       </Text>
       <Text style={[styles.badgeRarity, { color: rarityColor }]}>{achievement.rarity}</Text>
     </View>
+  );
+}
+
+export function AchievementsSectionSkeleton() {
+  const cardPadding = CARD_PADDING_VALUES.SM;
+  const styles = useStyles(makeAchievementsSectionStyles);
+
+  return (
+    <SkeletonBox
+      width="100%"
+      height={150}
+      borderRadius={toRN(tokens.borderRadius.xl)}
+      inner
+      innerPadding={cardPadding}
+      style={styles.card}
+    >
+      <SkeletonBox
+        width="50%"
+        height={toRN(tokens.typography.fontSize.xl)}
+        borderRadius={toRN(tokens.borderRadius.base)}
+        style={{
+          marginBottom: toRN(tokens.spacing[4]),
+          marginTop: toRN(tokens.spacing[2]),
+          marginLeft: toRN(tokens.spacing[2])
+        }}
+      />
+      <View style={styles.badgeGrid}>
+        {[1, 2, 3].map((i) => (
+          <View key={i} style={styles.badgeItem}>
+            <SkeletonBox width={48} height={48} borderRadius={toRN(tokens.borderRadius.full)} />
+            <SkeletonBox
+              width="80%"
+              height={toRN(tokens.typography.fontSize.xs)}
+              borderRadius={toRN(tokens.borderRadius.base)}
+              style={{ marginTop: toRN(tokens.spacing[1]) }}
+            />
+          </View>
+        ))}
+      </View>
+    </SkeletonBox>
   );
 }
 

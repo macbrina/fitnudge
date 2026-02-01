@@ -159,6 +159,35 @@ CREATE TABLE daily_checkin_summaries (
 
 CREATE INDEX idx_checkin_summaries_user_date ON daily_checkin_summaries(user_id, summary_date DESC);
 CREATE INDEX idx_checkin_summaries_goal ON daily_checkin_summaries(goal_id);
+-- Helps weekly recap / goal-range queries without partitions
+CREATE INDEX idx_checkin_summaries_user_goal_date ON daily_checkin_summaries(user_id, goal_id, summary_date DESC);
+
+-- =====================================================
+-- OPTIONAL MAINTENANCE: Retention cleanup (run monthly)
+-- =====================================================
+-- Suggested retention: keep last 24 months of daily_checkin_summaries.
+-- Run this block manually in Supabase SQL editor (or schedule it via cron).
+DO $$
+DECLARE
+  cutoff DATE := (CURRENT_DATE - INTERVAL '24 months')::date;
+  rows_deleted INT;
+BEGIN
+  LOOP
+    WITH doomed AS (
+      SELECT ctid
+      FROM daily_checkin_summaries
+      WHERE summary_date < cutoff
+      LIMIT 5000
+    )
+    DELETE FROM daily_checkin_summaries d
+    USING doomed
+    WHERE d.ctid = doomed.ctid;
+
+    GET DIAGNOSTICS rows_deleted = ROW_COUNT;
+    EXIT WHEN rows_deleted = 0;
+  END LOOP;
+END $$;
+
 
 -- =====================================================
 -- TRIGGERS: Update timestamps

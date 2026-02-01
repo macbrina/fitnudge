@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "983919404313",
+    "project_id": "fitnudge-476400",
+    "storage_bucket": "fitnudge-476400.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:983919404313:android:90839ca8ae8040bed21188",
+        "android_client_info": {
+          "package_name": "com.fitnudge.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "983919404313-c8jerlaht010velr9negkehobeqt4ede.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBNW26YAvx3oJEEgHrpGNUqRfe0ea58I-c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "983919404313-c8jerlaht010velr9negkehobeqt4ede.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "983919404313-l97q49qesata6rgt2ev9bnsrk4hgcm3s.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.fitnudge.app"
+              }
+            }
+          ]
+        }
+      },
+      "admob_app_id": "ca-app-pub-6576776260143449~4841622854"
+    }
+  ],
+  "configuration_version": "1"
+}

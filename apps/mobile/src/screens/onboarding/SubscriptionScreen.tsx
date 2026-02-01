@@ -57,11 +57,18 @@ export default function SubscriptionScreen({
   const insets = useSafeAreaInsets();
   const { colors, brandColors } = useTheme();
   const { capture } = usePostHog();
-  const { plans, isLoading: plansLoading } = usePricing();
+  const { plans, isLoading: plansLoading, fetchPlans } = usePricing();
   const { showAlert } = useAlertModal();
   const { getPlan } = useSubscriptionStore();
   const currentPlan = getPlan();
   const externalUrls = useExternalUrls();
+
+  // sometimes plans are not loaded yet, so fetch them if not loaded
+  // useEffect(() => {
+  //   if (!plansLoading && plans.length === 0) {
+  //     fetchPlans();
+  //   }
+  // }, [plansLoading, plans]);
 
   const hasActiveSubscription = currentPlan !== "free";
   const { setExitOffer, markAsSubscribed, showExitIntentModal, openExitIntentModal } =
@@ -999,8 +1006,8 @@ const makeSubscriptionScreenStyles = (tokens: any, colors: any, brand: any) => {
     pricingCard: {
       paddingVertical: toRN(tokens.spacing[5]),
       paddingHorizontal: toRN(tokens.spacing[5]),
-      borderWidth: 2,
-      borderColor: brand.primary,
+      borderWidth: 1,
+      borderColor: brand.primary + "12",
       backgroundColor: brand.primary + "06"
     },
     planHeaderRow: {

@@ -212,6 +212,9 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
   dangerOutlineDisabledText: {
     color: colors.feedback.error
   },
+  secondaryDisabledText: {
+    color: colors.text.secondary
+  },
   ghostDisabledText: {
     color: brand.primary
   },
@@ -362,13 +365,15 @@ export default function Button({
     isDisabled &&
       (variant === "outline"
         ? styles.outlineDisabledText
-        : variant === "ghost"
-          ? styles.ghostDisabledText
-          : variant === "text"
-            ? styles.textDisabledText
-            : variant === "dangerOutline"
-              ? styles.dangerOutlineDisabledText
-              : styles.disabledText),
+        : variant === "secondary"
+          ? styles.secondaryDisabledText
+          : variant === "ghost"
+            ? styles.ghostDisabledText
+            : variant === "text"
+              ? styles.textDisabledText
+              : variant === "dangerOutline"
+                ? styles.dangerOutlineDisabledText
+                : styles.disabledText),
     textStyle
   ];
 
@@ -463,7 +468,8 @@ function getIconColor(
     variant !== "outline" &&
     variant !== "ghost" &&
     variant !== "text" &&
-    variant !== "dangerOutline"
+    variant !== "dangerOutline" &&
+    variant !== "secondary"
   )
     return brandColors.onPrimary;
 

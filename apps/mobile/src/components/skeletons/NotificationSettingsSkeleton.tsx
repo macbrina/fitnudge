@@ -2,16 +2,18 @@ import React from "react";
 import { ScrollView, View } from "react-native";
 import { useRouter } from "expo-router";
 import { BackButton } from "@/components/ui/BackButton";
-import { Card } from "@/components/ui/Card";
 import { SkeletonBox } from "@/components/ui/SkeletonBox";
 import { useTranslation } from "@/lib/i18n";
 import { toRN } from "@/lib/units";
-import { useStyles, useTheme } from "@/themes";
+import { useStyles } from "@/themes";
+import { tokens } from "@/themes/tokens";
+import { CARD_PADDING_VALUES } from "@/constants/general";
 
 export function NotificationSettingsSkeleton() {
   const styles = useStyles(makeStyles);
   const { t } = useTranslation();
   const router = useRouter();
+  const cardPadding = CARD_PADDING_VALUES.SM;
 
   const renderToggleRow = (key: number, hasSubText: boolean = true) => (
     <View key={key} style={styles.settingRow}>
@@ -35,7 +37,14 @@ export function NotificationSettingsSkeleton() {
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         {/* Master Toggle Card */}
-        <Card style={styles.card}>
+        <SkeletonBox
+          width="100%"
+          height={90}
+          borderRadius={toRN(tokens.borderRadius.xl)}
+          inner
+          innerPadding={cardPadding}
+          style={styles.card}
+        >
           <View style={styles.masterRow}>
             <View style={{ flex: 1 }}>
               <SkeletonBox width={140} height={18} borderRadius={6} />
@@ -43,30 +52,51 @@ export function NotificationSettingsSkeleton() {
             </View>
             <SkeletonBox width={50} height={30} borderRadius={15} />
           </View>
-        </Card>
+        </SkeletonBox>
 
         {/* Delivery Section */}
         <SkeletonBox width={80} height={14} borderRadius={4} style={styles.sectionTitle} />
-        <Card style={styles.card}>
+        <SkeletonBox
+          width="100%"
+          height={160}
+          borderRadius={toRN(tokens.borderRadius.xl)}
+          inner
+          innerPadding={cardPadding}
+          style={styles.card}
+        >
           {renderToggleRow(1)}
           <View style={styles.divider} />
           {renderToggleRow(2)}
-        </Card>
+        </SkeletonBox>
 
         {/* Categories Section */}
         <SkeletonBox width={90} height={14} borderRadius={4} style={styles.sectionTitle} />
-        <Card style={styles.card}>
+        <SkeletonBox
+          width="100%"
+          height={450}
+          borderRadius={toRN(tokens.borderRadius.xl)}
+          inner
+          innerPadding={cardPadding}
+          style={styles.card}
+        >
           {[1, 2, 3, 4, 5, 6].map((i, index) => (
             <React.Fragment key={i}>
               {renderToggleRow(i)}
               {index < 5 && <View style={styles.divider} />}
             </React.Fragment>
           ))}
-        </Card>
+        </SkeletonBox>
 
         {/* Quiet Hours Section */}
         <SkeletonBox width={100} height={14} borderRadius={4} style={styles.sectionTitle} />
-        <Card style={styles.card}>
+        <SkeletonBox
+          width="100%"
+          height={220}
+          borderRadius={toRN(tokens.borderRadius.xl)}
+          inner
+          innerPadding={cardPadding}
+          style={styles.card}
+        >
           {renderToggleRow(1, false)}
           <View style={styles.divider} />
           <View style={styles.timeRow}>
@@ -77,7 +107,7 @@ export function NotificationSettingsSkeleton() {
             <SkeletonBox width={80} height={14} borderRadius={4} />
             <SkeletonBox width={70} height={36} borderRadius={8} />
           </View>
-        </Card>
+        </SkeletonBox>
       </ScrollView>
     </View>
   );
@@ -96,13 +126,13 @@ const makeStyles = (tokens: any, colors: any, brandColors: any) => ({
     paddingBottom: toRN(tokens.spacing[8])
   },
   card: {
-    padding: toRN(tokens.spacing[4]),
     marginBottom: toRN(tokens.spacing[4])
   },
   masterRow: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    justifyContent: "space-between" as const
+    justifyContent: "space-between" as const,
+    padding: toRN(tokens.spacing[2])
   },
   sectionTitle: {
     marginBottom: toRN(tokens.spacing[3]),
@@ -111,7 +141,7 @@ const makeStyles = (tokens: any, colors: any, brandColors: any) => ({
   settingRow: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    paddingVertical: toRN(tokens.spacing[2])
+    padding: toRN(tokens.spacing[2])
   },
   settingContent: {
     flex: 1,
@@ -126,7 +156,7 @@ const makeStyles = (tokens: any, colors: any, brandColors: any) => ({
     flexDirection: "row" as const,
     alignItems: "center" as const,
     justifyContent: "space-between" as const,
-    paddingVertical: toRN(tokens.spacing[3])
+    padding: toRN(tokens.spacing[2])
   }
 });
 

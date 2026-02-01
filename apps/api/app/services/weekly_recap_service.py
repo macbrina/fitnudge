@@ -37,8 +37,9 @@ class WeeklyRecapService:
         """
         supabase = get_supabase_client()
         today = date.today()
-        # Week starts on Monday
+        # Week starts on Monday; we generate a recap for this week-to-date.
         week_start = today - timedelta(days=today.weekday())
+        week_end = today
 
         if not force_regenerate:
             # Try to get cached recap first
@@ -48,6 +49,7 @@ class WeeklyRecapService:
                     .select("*")
                     .eq("user_id", user_id)
                     .eq("week_start", week_start.isoformat())
+                    .eq("week_end", week_end.isoformat())
                     .maybe_single()
                     .execute()
                 )
@@ -59,7 +61,9 @@ class WeeklyRecapService:
                 logger.warning(f"Failed to fetch cached recap: {e}")
 
         # Generate fresh recap
-        recap = await self.generate_weekly_recap(user_id, goal_id=None)
+        recap = await self.generate_weekly_recap(
+            user_id, goal_id=None, week_start=week_start, week_end=week_end
+        )
 
         # Store in cache for future requests
         if recap:
@@ -113,7 +117,11 @@ class WeeklyRecapService:
         return recap
 
     async def generate_weekly_recap(
-        self, user_id: str, goal_id: Optional[str] = None
+        self,
+        user_id: str,
+        goal_id: Optional[str] = None,
+        week_start: Optional[date] = None,
+        week_end: Optional[date] = None,
     ) -> Optional[Dict[str, Any]]:
         """
         Generate a weekly recap for a user.
@@ -125,13 +133,43 @@ class WeeklyRecapService:
         supabase = get_supabase_client()
 
         try:
-            # Get date range for last week
             today = date.today()
-            week_start = today - timedelta(days=7)
-            week_end = today
+            # Default to week-to-date (Mon → today) unless explicitly provided.
+            week_start = week_start or (today - timedelta(days=today.weekday()))
+            week_end = week_end or today
 
             # =========================================
-            # 1. Get check-ins for the week
+            # 0. Get user's active goals (ONLY)
+            # =========================================
+            if goal_id:
+                goal_result = (
+                    supabase.table("goals")
+                    .select("*")
+                    .eq("id", goal_id)
+                    .eq("user_id", user_id)
+                    .eq("status", "active")
+                    .maybe_single()
+                    .execute()
+                )
+                personal_goals = [goal_result.data] if goal_result.data else []
+            else:
+                goal_result = (
+                    supabase.table("goals")
+                    .select("*")
+                    .eq("user_id", user_id)
+                    .eq("status", "active")
+                    .execute()
+                )
+                personal_goals = goal_result.data or []
+
+            if not personal_goals:
+                logger.warning(f"No active goals found for user {user_id}")
+                return None
+
+            active_goal_ids = [g.get("id") for g in personal_goals if g.get("id")]
+
+            # =========================================
+            # 1. Get check-ins for the week (active goals only)
             # =========================================
             checkins_query = (
                 supabase.table("check_ins")
@@ -143,6 +181,8 @@ class WeeklyRecapService:
 
             if goal_id:
                 checkins_query = checkins_query.eq("goal_id", goal_id)
+            else:
+                checkins_query = checkins_query.in_("goal_id", active_goal_ids)
 
             checkins_result = checkins_query.execute()
             check_ins = checkins_result.data or []
@@ -164,6 +204,8 @@ class WeeklyRecapService:
 
                 if goal_id:
                     summary_query = summary_query.eq("goal_id", goal_id)
+                else:
+                    summary_query = summary_query.in_("goal_id", active_goal_ids)
 
                 summary_result = summary_query.execute()
                 summaries = summary_result.data or []
@@ -171,33 +213,8 @@ class WeeklyRecapService:
                 logger.warning(f"Failed to fetch summaries: {e}")
 
             # =========================================
-            # 3. Get user's active goals with streak info
+            # 3. Check if we have any check-in data for the week
             # =========================================
-            if goal_id:
-                goal_result = (
-                    supabase.table("goals")
-                    .select("*")
-                    .eq("id", goal_id)
-                    .eq("user_id", user_id)
-                    .maybe_single()
-                    .execute()
-                )
-                personal_goals = [goal_result.data] if goal_result.data else []
-            else:
-                goal_result = (
-                    supabase.table("goals")
-                    .select("*")
-                    .eq("user_id", user_id)
-                    .eq("status", "active")
-                    .execute()
-                )
-                personal_goals = goal_result.data or []
-
-            if not personal_goals:
-                logger.warning(f"No active goals found for user {user_id}")
-                return None
-
-            # Check if we have any check-in data for the week
             if not check_ins:
                 logger.info(f"No check-ins found for user {user_id} this week")
                 return None
@@ -232,11 +249,16 @@ class WeeklyRecapService:
                 supabase.table("check_ins")
                 .select("id")
                 .eq("user_id", user_id)
-                .eq("status", "completed")
                 .gte("check_in_date", previous_week_start.isoformat())
                 .lte("check_in_date", previous_week_end.isoformat())
-                .execute()
             )
+            # Match app definition: rest_day counts as a successful completion
+            prev_checkins = prev_checkins.in_("status", ["completed", "rest_day"])
+            if goal_id:
+                prev_checkins = prev_checkins.eq("goal_id", goal_id)
+            else:
+                prev_checkins = prev_checkins.in_("goal_id", active_goal_ids)
+            prev_checkins = prev_checkins.execute()
             previous_week_count = len(prev_checkins.data or [])
             stats["previous_week_checkins"] = previous_week_count
             stats["week_over_week_change"] = (
@@ -264,7 +286,7 @@ class WeeklyRecapService:
             # 10. Get historical trend (4 weeks)
             # =========================================
             completion_rate_trend = self._get_historical_trend(
-                supabase, user_id, week_start, goal_id
+                supabase, user_id, week_start, goal_id, active_goal_ids=active_goal_ids
             )
 
             # =========================================
@@ -293,11 +315,9 @@ class WeeklyRecapService:
                 "week_start": week_start.isoformat(),
                 "week_end": week_end.isoformat(),
                 "goal_id": goal_id,
-                "goal_title": (
-                    personal_goals[0].get("title")
-                    if personal_goals
-                    else "Multiple Goals"
-                ),
+                "goal_title": personal_goals[0].get("title")
+                if goal_id and personal_goals
+                else "Multiple Goals",
                 # DB columns
                 "goals_hit": goals_hit,
                 "goals_total": goals_total,
@@ -338,43 +358,39 @@ class WeeklyRecapService:
         Uses pre-aggregated summaries when available for faster calculation,
         falls back to counting raw check-ins when summaries are empty.
         """
-        # Use summaries for aggregate counts if available (faster)
+        # Scheduled opportunities for this week (across goals):
+        # - include pending (e.g. today, before user checks in)
+        # - rest_day is still a scheduled day; it just counts as "met"
+        total_scheduled = len([c for c in check_ins if c.get("status") is not None])
+
+        # Use summaries for aggregate counts if available (faster) BUT compute completion% against
+        # scheduled opportunities (multi-goal safe).
         if summaries:
-            completed_count = sum(s.get("completed_count", 0) for s in summaries)
-            rest_day_count = sum(s.get("rest_day_count", 0) for s in summaries)
-            total_check_ins = sum(s.get("total_check_ins", 0) for s in summaries)
-            # Peak streak during the week (highest streak_at_date)
-            peak_streak_this_week = max(
-                (s.get("streak_at_date", 0) for s in summaries), default=0
+            completed_only_count = sum(
+                int(s.get("completed_count", 0) or 0) for s in summaries
             )
-            # Days with any check-ins
-            days_with_checkins = len(
-                set(
-                    s.get("summary_date")
-                    for s in summaries
-                    if s.get("completed_count", 0) > 0
-                )
+            rest_day_count = sum(int(s.get("rest_day_count", 0) or 0) for s in summaries)
+            completed_count = completed_only_count + rest_day_count
+            total_check_ins = sum(int(s.get("total_check_ins", 0) or 0) for s in summaries)
+            peak_streak_this_week = max(
+                (int(s.get("streak_at_date", 0) or 0) for s in summaries), default=0
             )
         else:
-            # Fall back to counting raw check-ins
-            # V2.1: Use status instead of completed boolean
+            # Match app definition: rest_day counts as a successful completion
             completed_count = len(
-                [c for c in check_ins if c.get("status") == "completed"]
+                [c for c in check_ins if c.get("status") in ("completed", "rest_day")]
             )
-            rest_day_count = len(
-                [c for c in check_ins if c.get("status") == "rest_day"]
-            )
-            total_check_ins = len(
-                [c for c in check_ins if c.get("status") != "pending"]
-            )
+            rest_day_count = len([c for c in check_ins if c.get("status") == "rest_day"])
+            total_check_ins = len([c for c in check_ins if c.get("status") != "pending"])
             peak_streak_this_week = 0
-            days_with_checkins = len(
-                set(
-                    c.get("check_in_date")
-                    for c in check_ins
-                    if c.get("status") == "completed"
-                )
+
+        days_with_checkins = len(
+            set(
+                c.get("check_in_date")
+                for c in check_ins
+                if c.get("status") in ("completed", "rest_day") and c.get("check_in_date")
             )
+        )
 
         # Get current/longest streak from goals (V2 stores streaks on goals table)
         current_streak = max(
@@ -388,13 +404,7 @@ class WeeklyRecapService:
         moods = [c.get("mood") for c in check_ins if c.get("mood")]
         mood_distribution = Counter(moods)
 
-        # Calculate completion rate
-        total_scheduled = 7  # Default to 7 days
-        completion_rate = (
-            round((completed_count / total_scheduled) * 100, 1)
-            if total_scheduled > 0
-            else 0
-        )
+        completion_rate = round((completed_count / total_scheduled) * 100, 1) if total_scheduled > 0 else 0
 
         # Analyze day patterns (still needs raw check-ins)
         strongest_day, weakest_day = self._analyze_day_patterns(check_ins)
@@ -458,9 +468,11 @@ class WeeklyRecapService:
                 continue
             # V2.1: Use status instead of completed boolean
             checkin_status = checkin.get("status", "pending")
-            if checkin_status != "pending":
+            # Scheduled opportunities for this goal (include pending; rest_day is still scheduled)
+            if checkin_status is not None:
                 goal_stats[goal_id]["total"] += 1
-            if checkin_status == "completed":
+            # Match app definition: rest_day counts as a successful completion
+            if checkin_status in ("completed", "rest_day"):
                 goal_stats[goal_id]["completed"] += 1
                 goal_stats[goal_id]["days"].add(checkin.get("check_in_date"))
             if checkin.get("mood"):
@@ -469,10 +481,8 @@ class WeeklyRecapService:
         breakdown = []
         for gid, stats in goal_stats.items():
             goal_info = goal_lookup.get(gid, {})
-            scheduled = stats["total"] or 7
-            completion_rate = (
-                round((stats["completed"] / scheduled) * 100, 1) if scheduled > 0 else 0
-            )
+            scheduled = int(stats.get("total", 0) or 0)
+            completion_rate = round((stats["completed"] / scheduled) * 100, 1) if scheduled > 0 else 0
 
             status = (
                 "excellent"
@@ -485,7 +495,7 @@ class WeeklyRecapService:
                     "goal_id": gid,
                     "title": goal_info.get("title", "Unknown Goal"),
                     "completed": stats["completed"],
-                    "total": stats["total"],
+                    "total": scheduled,
                     "days_active": len(stats["days"]),
                     "completion_rate": completion_rate,
                     "status": status,
@@ -590,7 +600,12 @@ class WeeklyRecapService:
             return None
 
     def _get_historical_trend(
-        self, supabase, user_id: str, current_week_start: date, goal_id: Optional[str]
+        self,
+        supabase,
+        user_id: str,
+        current_week_start: date,
+        goal_id: Optional[str],
+        active_goal_ids: Optional[List[str]] = None,
     ) -> List[Dict[str, Any]]:
         """Get completion rate trend for the last 4 weeks using check_ins table."""
         trend = []
@@ -611,23 +626,30 @@ class WeeklyRecapService:
 
                 if goal_id:
                     query = query.eq("goal_id", goal_id)
+                elif active_goal_ids:
+                    query = query.in_("goal_id", active_goal_ids)
 
                 result = query.execute()
                 check_ins = result.data or []
 
                 # V2.1: Count by status instead of completed boolean
+                # Match app definition: rest_day counts as a successful completion
                 completed = len(
-                    [c for c in check_ins if c.get("status") == "completed"]
+                    [c for c in check_ins if c.get("status") in ("completed", "rest_day")]
                 )
-                total = len([c for c in check_ins if c.get("status") != "pending"]) or 7
-                completion_rate = round((completed / 7) * 100, 1) if total > 0 else 0
+                total_scheduled = len([c for c in check_ins if c.get("status") is not None])
+                completion_rate = (
+                    round((completed / total_scheduled) * 100, 1)
+                    if total_scheduled > 0
+                    else 0
+                )
 
                 trend.append(
                     {
                         "week_start": week_start.isoformat(),
                         "week_label": f"Week {4 - weeks_ago}",
                         "completed": completed,
-                        "total": total,
+                        "total": total_scheduled,
                         "completion_rate": completion_rate,
                         "is_current": weeks_ago == 0,
                     }
