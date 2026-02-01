@@ -33,7 +33,11 @@ export function Footer() {
         external: true,
       },
       { name: t("footer.contact"), href: ROUTES.CONTACT },
-      { name: t("footer.system_status"), href: ROUTES.HEALTH },
+      {
+        name: t("footer.system_status"),
+        href: ROUTES.HEALTH,
+        external: true,
+      },
     ],
     legal: [
       { name: t("footer.privacy"), href: ROUTES.PRIVACY },

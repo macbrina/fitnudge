@@ -1,5 +1,6 @@
 import { BaseApiService, ApiResponse } from "./base";
 import { ROUTES } from "@/lib/routes";
+import type { TodayCheckinStatus } from "@/services/api/goals";
 
 export type PartnershipStatus = "pending" | "accepted" | "rejected";
 
@@ -10,6 +11,7 @@ export interface PartnerUserInfo {
   profile_picture_url?: string;
   has_partner_feature?: boolean; // Whether partner has accountability_partner_limit feature
   is_active?: boolean; // Whether partner's account is active
+  last_active_at?: string;
 }
 
 export interface PartnerTodayGoal {
@@ -17,6 +19,7 @@ export interface PartnerTodayGoal {
   title: string;
   logged_today: boolean;
   is_scheduled_today: boolean;
+  today_checkin_status?: TodayCheckinStatus;
 }
 
 export interface Partner {
@@ -44,6 +47,7 @@ export interface PartnerGoalSummary {
   frequency_type: "daily" | "weekly";
   current_streak: number;
   logged_today: boolean;
+  today_checkin_status?: TodayCheckinStatus;
 }
 
 export interface PartnerDashboard {

@@ -12,6 +12,7 @@ export const tokens = {
       secondary: "#ffffff",
       secondaryForeground: "#0f172a",
       muted: "#f1f5f9",
+      surface: "#ffffff",
       mutedForeground: "#64748b",
       accent: "#f1f5f9",
       accentForeground: "#0f172a",
@@ -35,6 +36,7 @@ export const tokens = {
       secondary: "#121212", // Near-black cards/elevated surfaces
       secondaryForeground: "#ffffff",
       muted: "#0a0a0a", // Slightly elevated from pure black
+      surface: "#141414",
       mutedForeground: "#8e8e8e", // Neutral gray for muted text
       accent: "#1a1a1a", // Subtle accent areas
       accentForeground: "#ffffff",

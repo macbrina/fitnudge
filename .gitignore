@@ -38,5 +38,6 @@ yarn-error.log*
 .DS_Store
 *.pem
 
-# Expo
+# Expo (machine-specific device history, dev server settings)
 .expo/
+**/.expo/

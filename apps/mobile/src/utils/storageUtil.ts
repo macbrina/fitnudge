@@ -26,7 +26,10 @@ export const STORAGE_KEYS = {
   NOTIFICATION_SOFT_PROMPT_SHOWN: "notification_soft_prompt_shown",
 
   // App Updates
-  DISMISSED_UPDATE_VERSION: "dismissed_update_version"
+  DISMISSED_UPDATE_VERSION: "dismissed_update_version",
+
+  // Rating prompt (first check-in)
+  HAS_REQUESTED_RATING: "has_requested_rating"
 } as const;
 
 class StorageUtil {
@@ -117,7 +120,10 @@ class StorageUtil {
         STORAGE_KEYS.HAS_DISMISSED_EXIT_INTENT,
 
         // App updates
-        STORAGE_KEYS.DISMISSED_UPDATE_VERSION
+        STORAGE_KEYS.DISMISSED_UPDATE_VERSION,
+
+        // Rating prompt
+        STORAGE_KEYS.HAS_REQUESTED_RATING
       ];
 
       await AsyncStorage.multiRemove(keysToRemove);
@@ -170,7 +176,10 @@ class StorageUtil {
         STORAGE_KEYS.EXIT_OFFER_SHOW_COUNT,
         STORAGE_KEYS.EXIT_OFFER_EXPIRY_TIME,
         STORAGE_KEYS.HAS_EVER_SUBSCRIBED,
-        STORAGE_KEYS.HAS_DISMISSED_EXIT_INTENT
+        STORAGE_KEYS.HAS_DISMISSED_EXIT_INTENT,
+
+        // Rating prompt (user-specific)
+        STORAGE_KEYS.HAS_REQUESTED_RATING
       ];
 
       await AsyncStorage.multiRemove(keysToRemove);

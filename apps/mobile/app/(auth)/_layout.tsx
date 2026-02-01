@@ -1,13 +1,29 @@
 import { useAuthStore } from "@/stores/authStore";
-import { Stack, Redirect } from "expo-router";
-import { MOBILE_ROUTES } from "@/lib/routes";
+import { Stack, Redirect, useSegments } from "expo-router";
+import { useEffect, useState } from "react";
+import { getRedirection, hasCompletedV2Onboarding } from "@/utils/getRedirection";
 
 export default function AuthLayout() {
-  const { isAuthenticated, isLoading } = useAuthStore();
+  const { isAuthenticated, isLoading, user } = useAuthStore();
+  const [destination, setDestination] = useState<string | null>(null);
+  const segments = useSegments();
 
-  // Redirect authenticated users to home
-  if (!isLoading && isAuthenticated) {
-    return <Redirect href={MOBILE_ROUTES.MAIN.HOME} />;
+  useEffect(() => {
+    if (isLoading || !isAuthenticated) return;
+    // Let login/signup screens handle their own redirect after prefetch — avoid double navigation
+    const onLoginOrSignup =
+      segments.includes("login") ||
+      segments.includes("signup") ||
+      segments.includes("verify-email") ||
+      segments.includes("reset-password");
+    if (onLoginOrSignup) return;
+
+    const hasCompletedOnboarding = hasCompletedV2Onboarding(user);
+    getRedirection({ hasCompletedOnboarding }).then(setDestination);
+  }, [isLoading, isAuthenticated, user, segments]);
+
+  if (!isLoading && isAuthenticated && destination) {
+    return <Redirect href={destination} />;
   }
 
   return (

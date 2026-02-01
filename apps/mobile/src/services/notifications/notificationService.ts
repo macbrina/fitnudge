@@ -445,7 +445,7 @@ class NotificationService {
         title: notification.title,
         body: notification.body,
         data: notification.data,
-        sound: "default", // Always play sound
+        sound: "notification_sound.wav", // Always play sound
         categoryIdentifier: notification.category
       };
 

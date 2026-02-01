@@ -120,7 +120,9 @@ $$ LANGUAGE plpgsql;
 
 -- =====================================================
 -- 3. UPDATE: get_users_with_missed_days (from 009)
--- Count consecutive days with status = 'missed'
+-- At least min_days consecutive calendar days with status = 'missed'.
+-- Schedule-aware via check_ins (only created for scheduled days).
+-- Excludes users who checked in today (completed/skipped/rest_day).
 -- =====================================================
 
 CREATE OR REPLACE FUNCTION get_users_with_missed_days(min_days INT DEFAULT 2)
@@ -131,32 +133,51 @@ RETURNS TABLE (
   push_token TEXT,
   days_missed INT
 ) AS $$
-DECLARE
-  cutoff_date DATE := CURRENT_DATE - min_days;
 BEGIN
   RETURN QUERY
+  WITH missed_dates AS (
+    SELECT DISTINCT ci.user_id, ci.check_in_date AS d
+    FROM check_ins ci
+    WHERE ci.status = 'missed'
+      AND ci.check_in_date > CURRENT_DATE - INTERVAL '7 days'
+      AND ci.check_in_date < CURRENT_DATE
+  ),
+  with_gap AS (
+    SELECT user_id, d,
+           d - LAG(d) OVER (PARTITION BY user_id ORDER BY d) AS gap
+    FROM missed_dates
+  ),
+  run_groups AS (
+    SELECT user_id, d,
+           SUM(CASE WHEN gap IS NULL OR gap > 1 THEN 1 ELSE 0 END) OVER (PARTITION BY user_id ORDER BY d) AS run_id
+    FROM with_gap
+  ),
+  run_lengths AS (
+    SELECT user_id, COUNT(*)::INT AS run_len
+    FROM run_groups
+    GROUP BY user_id, run_id
+  ),
+  eligible AS (
+    SELECT user_id, MAX(run_len)::INT AS max_consecutive
+    FROM run_lengths
+    GROUP BY user_id
+    HAVING MAX(run_len) >= min_days
+  )
   SELECT DISTINCT ON (u.id)
-    u.id as user_id,
+    u.id AS user_id,
     u.name,
     u.timezone,
-    dt.fcm_token as push_token,
-    (SELECT COUNT(*)::INT 
-     FROM check_ins ci2 
-     WHERE ci2.user_id = u.id 
-       AND ci2.status = 'missed'
-       AND ci2.check_in_date > CURRENT_DATE - INTERVAL '7 days'
-    ) as days_missed
+    dt.fcm_token AS push_token,
+    e.max_consecutive AS days_missed
   FROM users u
-  JOIN goals g ON u.id = g.user_id AND g.status = 'active'
-  LEFT JOIN device_tokens dt ON u.id = dt.user_id AND dt.is_active = true
-  WHERE EXISTS (
-    -- Has at least min_days missed check-ins in last 7 days
+  JOIN goals g ON g.user_id = u.id AND g.status = 'active'
+  JOIN eligible e ON e.user_id = u.id
+  LEFT JOIN device_tokens dt ON dt.user_id = u.id AND dt.is_active = true
+  WHERE NOT EXISTS (
     SELECT 1 FROM check_ins ci
     WHERE ci.user_id = u.id
-      AND ci.status = 'missed'
-      AND ci.check_in_date > CURRENT_DATE - INTERVAL '7 days'
-    GROUP BY ci.user_id
-    HAVING COUNT(*) >= min_days
+      AND ci.check_in_date >= CURRENT_DATE
+      AND ci.status IN ('completed', 'skipped', 'rest_day')
   )
   ORDER BY u.id;
 END;

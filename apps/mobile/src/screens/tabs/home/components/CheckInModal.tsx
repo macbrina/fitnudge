@@ -31,7 +31,7 @@ import { toRN } from "@/lib/units";
 import { fontFamily } from "@/lib/fonts";
 import { useTranslation } from "@/lib/i18n";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useCreateCheckIn } from "@/hooks/api/useCheckIns";
+import { useCreateCheckIn, useCheckInStats } from "@/hooks/api/useCheckIns";
 import { useAlertModal } from "@/contexts/AlertModalContext";
 import { CheckInMood, MOODS, SKIP_REASONS, SkipReason } from "@/services/api/checkins";
 import Button from "@/components/ui/Button";
@@ -42,6 +42,8 @@ import { VoiceNoteRecorder } from "@/components/ui/VoiceNoteRecorder";
 import { useSubscriptionStore } from "@/stores/subscriptionStore";
 import { voiceNotesService } from "@/services/api/voiceNotes";
 import { useAudioPlayer, setAudioModeAsync } from "expo-audio";
+import { formatLocalDate } from "@/utils/helper";
+import { requestRatingIfFirstCheckIn } from "@/utils/rateApp";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -92,8 +94,9 @@ export function CheckInModal({ isVisible, goal, onClose, onSuccess }: CheckInMod
   // Playback for the recorded voice note preview (play before submitting)
   const voiceNotePlayer = useAudioPlayer(voiceNoteUri ?? undefined);
 
-  // Mutations
+  // Mutations and stats (for first-check-in rating prompt)
   const createCheckIn = useCreateCheckIn();
+  const { data: stats } = useCheckInStats();
 
   // Scroll ref for auto-scrolling to note input
   const scrollViewRef = useRef<ScrollView>(null);
@@ -220,7 +223,7 @@ export function CheckInModal({ isVisible, goal, onClose, onSuccess }: CheckInMod
 
     const checkInPayload = {
       goal_id: goal.id,
-      check_in_date: new Date().toISOString().split("T")[0],
+      check_in_date: formatLocalDate(new Date()),
       completed: response === "yes",
       is_rest_day: response === "rest_day",
       mood: mood || undefined,
@@ -232,6 +235,9 @@ export function CheckInModal({ isVisible, goal, onClose, onSuccess }: CheckInMod
     onClose();
     onSuccess?.();
 
+    const totalBefore = stats?.data?.total_check_ins ?? 0;
+    const completed = response === "yes";
+
     const attemptSubmit = (retryCount: number) => {
       createCheckIn.mutate(checkInPayload, {
         onSuccess: (res) => {
@@ -241,6 +247,10 @@ export function CheckInModal({ isVisible, goal, onClose, onSuccess }: CheckInMod
               console.warn("[CheckInModal] Voice note upload failed:", msg);
             });
           }
+          requestRatingIfFirstCheckIn({
+            totalCheckInsBeforeCreate: totalBefore,
+            completed
+          }).catch(() => {});
         },
         onError: () => {
           if (retryCount < 1) setTimeout(() => attemptSubmit(retryCount + 1), 1000);
@@ -261,7 +271,8 @@ export function CheckInModal({ isVisible, goal, onClose, onSuccess }: CheckInMod
     showVoiceRecorder,
     createCheckIn,
     onClose,
-    onSuccess
+    onSuccess,
+    stats?.data?.total_check_ins
   ]);
 
   // Can submit?

@@ -6,6 +6,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { recapsService, WeeklyRecap, WeeklyRecapsListResponse } from "@/services/api/recaps";
+import { ApiError } from "@/services/api/base";
 import { weeklyRecapsQueryKeys } from "./queryKeys";
 
 // Re-export query keys for convenience
@@ -66,16 +67,27 @@ export const useCurrentWeekRecap = (enabled: boolean = true) => {
 export const useWeeklyRecapDetail = (recapId: string, enabled: boolean = true) => {
   return useQuery({
     queryKey: weeklyRecapsQueryKeys.detail(recapId),
-    queryFn: async (): Promise<WeeklyRecap> => {
-      const response = await recapsService.getById(recapId);
-      if (response.status !== 200 || !response.data) {
-        throw new Error(response.error || "Failed to fetch weekly recap");
+    queryFn: async (): Promise<WeeklyRecap | null> => {
+      try {
+        const response = await recapsService.getById(recapId);
+        if (response.status !== 200 || !response.data) {
+          throw new Error(response.error || "Failed to fetch weekly recap");
+        }
+        return response.data;
+      } catch (err) {
+        // BaseApiService throws ApiError on non-2xx.
+        // For a true 404, return null so the UI can render NotFoundState
+        // and React Query clears the previous cached data.
+        if (err instanceof ApiError && err.status === 404) {
+          return null;
+        }
+        throw err;
       }
-      return response.data;
     },
     enabled: enabled && !!recapId,
     staleTime: 10 * 60 * 1000, // 10 minutes
-    gcTime: 60 * 60 * 1000 // 1 hour
+    gcTime: 60 * 60 * 1000, // 1 hour
+    retry: false
   });
 };
 

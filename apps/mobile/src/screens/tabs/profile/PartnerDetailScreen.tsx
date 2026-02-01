@@ -18,10 +18,12 @@ import { toRN } from "@/lib/units";
 import type { PartnerGoalSummary } from "@/services/api/partners";
 import { usePartnerAccess } from "@/hooks/api/usePartners";
 import { useStyles, useTheme } from "@/themes";
+import { getActivityColor, getActivityStatus } from "@/utils/helper";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { UserAvatar } from "@/components/avatars";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Image, RefreshControl, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import Svg, {
   Defs,
   Rect,
@@ -45,48 +47,6 @@ const GradientBackground = ({ colors, style }: { colors: string[]; style?: any }
     <Rect x="0" y="0" width="100%" height="100%" fill="url(#bgGradient)" />
   </Svg>
 );
-
-// Circular progress ring component
-const ProgressRing = ({
-  progress,
-  size,
-  strokeWidth,
-  color
-}: {
-  progress: number;
-  size: number;
-  strokeWidth: number;
-  color: string;
-}) => {
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference * (1 - Math.min(progress, 1));
-
-  return (
-    <Svg width={size} height={size}>
-      <SvgCircle
-        cx={size / 2}
-        cy={size / 2}
-        r={radius}
-        stroke={`${color}20`}
-        strokeWidth={strokeWidth}
-        fill="none"
-      />
-      <SvgCircle
-        cx={size / 2}
-        cy={size / 2}
-        r={radius}
-        stroke={color}
-        strokeWidth={strokeWidth}
-        fill="none"
-        strokeDasharray={`${circumference} ${circumference}`}
-        strokeDashoffset={strokeDashoffset}
-        strokeLinecap="round"
-        transform={`rotate(-90 ${size / 2} ${size / 2})`}
-      />
-    </Svg>
-  );
-};
 
 export function PartnerDetailScreen() {
   const params = useLocalSearchParams<{
@@ -254,7 +214,26 @@ export function PartnerDetailScreen() {
   // Render goal card - premium style
   const renderGoalCard = (goal: PartnerGoalSummary, index: number) => {
     const goalColor = DEFAULT_GOAL_COLOR;
-    const isLogged = goal.logged_today;
+    const todayStatus = goal.today_checkin_status;
+    // const isLogged = todayStatus === "completed" || todayStatus === "rest_day";
+
+    const statusColor =
+      todayStatus === "completed"
+        ? colors.feedback.success
+        : todayStatus === "rest_day"
+          ? brandColors.primary
+          : todayStatus === "skipped"
+            ? colors.feedback.error
+            : colors.feedback.warning;
+
+    const statusIcon =
+      todayStatus === "completed"
+        ? "checkmark"
+        : todayStatus === "rest_day"
+          ? "moon"
+          : todayStatus === "skipped"
+            ? "close"
+            : "time";
 
     return (
       <TouchableOpacity
@@ -301,11 +280,11 @@ export function PartnerDetailScreen() {
             style={[
               styles.statusDot,
               {
-                backgroundColor: isLogged ? colors.feedback.success : colors.feedback.warning
+                backgroundColor: statusColor
               }
             ]}
           >
-            <Ionicons name={isLogged ? "checkmark" : "time"} size={12} color="#FFFFFF" />
+            <Ionicons name={statusIcon} size={12} color="#FFFFFF" />
           </View>
         </View>
       </TouchableOpacity>
@@ -423,22 +402,23 @@ export function PartnerDetailScreen() {
           {/* Avatar with glow effect */}
           <View style={styles.avatarWrapper}>
             <View style={[styles.avatarGlow, { backgroundColor: `${brandColors.primary}20` }]} />
-            {partner.profile_picture_url ? (
-              <Image source={{ uri: partner.profile_picture_url }} style={styles.avatar} />
-            ) : (
-              <View style={[styles.avatarPlaceholder, { backgroundColor: brandColors.primary }]}>
-                <Text style={styles.avatarInitial}>
-                  {partner.name?.charAt(0)?.toUpperCase() ||
-                    partner.username?.charAt(0)?.toUpperCase() ||
-                    "?"}
-                </Text>
-              </View>
-            )}
+            <UserAvatar
+              profilePictureUrl={partner.profile_picture_url}
+              name={partner.name || partner.username}
+              size={100}
+              placeholderColor={brandColors.primary}
+              style={styles.avatar}
+            />
             {/* Activity indicator */}
-            {logged_today && (
-              <View style={styles.activityBadge}>
-                <Ionicons name="checkmark" size={10} color="#FFFFFF" />
-              </View>
+            {partner.last_active_at && (
+              <View
+                style={[
+                  styles.activityBadge,
+                  {
+                    backgroundColor: getActivityColor(getActivityStatus(partner.last_active_at))
+                  }
+                ]}
+              />
             )}
           </View>
 
@@ -668,15 +648,15 @@ const makePartnerDetailStyles = (tokens: any, colors: any, brand: any) => ({
   },
   activityBadge: {
     position: "absolute" as const,
-    bottom: 4,
-    right: 4,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    bottom: 2,
+    right: 2,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
     backgroundColor: colors.feedback.success,
     justifyContent: "center" as const,
     alignItems: "center" as const,
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: colors.bg.canvas
   },
   profileUsername: {

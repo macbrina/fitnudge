@@ -8,14 +8,14 @@ import { fontFamily } from "@/lib/fonts";
 import { useTranslation } from "@/lib/i18n";
 import { MOBILE_ROUTES } from "@/lib/routes";
 import { toRN } from "@/lib/units";
-import { useStyles, useTheme } from "@/themes";
+import { tokens, useStyles, useTheme } from "@/themes";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useState, useEffect } from "react";
+import { UserAvatar } from "@/components/avatars";
 import {
   ActivityIndicator,
   FlatList,
-  Image,
   RefreshControl,
   Text,
   TouchableOpacity,
@@ -35,6 +35,7 @@ import {
   useSentPartnerRequests
 } from "@/hooks/api/usePartners";
 import { Partner } from "@/services/api/partners";
+import { CARD_PADDING_VALUES } from "@/constants/general";
 
 type PartnerSubTab = "partners" | "received" | "sent";
 
@@ -259,16 +260,13 @@ export default function PartnersScreen() {
     <TouchableOpacity onPress={() => handlePartnerPress(item)} activeOpacity={0.7}>
       <Card style={styles.partnerCard}>
         <View style={styles.partnerRow}>
-          {/* Avatar */}
-          {item.partner?.profile_picture_url ? (
-            <Image source={{ uri: item.partner.profile_picture_url }} style={styles.avatar} />
-          ) : (
-            <View style={styles.avatarPlaceholder}>
-              <Text style={styles.avatarInitial}>
-                {item.partner?.name?.charAt(0)?.toUpperCase() || "?"}
-              </Text>
-            </View>
-          )}
+          <UserAvatar
+            profilePictureUrl={item.partner?.profile_picture_url}
+            name={item.partner?.name}
+            size={48}
+            placeholderColor={brandColors.primary}
+            style={styles.avatar}
+          />
 
           {/* Info */}
           <View style={styles.partnerInfo}>
@@ -288,7 +286,7 @@ export default function PartnersScreen() {
           {item.has_active_items && (
             <TouchableOpacity style={styles.nudgeButton} onPress={() => handleNudge(item)}>
               <Ionicons name="hand-right" size={14} color={brandColors.primary} />
-              <Text style={styles.nudgeButtonText}>{t("partners.nudge") || "Nudge"}</Text>
+              {/* <Text style={styles.nudgeButtonText}>{t("partners.nudge") || "Nudge"}</Text> */}
             </TouchableOpacity>
           )}
 
@@ -308,16 +306,13 @@ export default function PartnersScreen() {
   const renderReceivedCard = ({ item }: { item: Partner }) => (
     <Card style={styles.requestCard}>
       <View style={styles.requestRow}>
-        {/* Avatar */}
-        {item.partner?.profile_picture_url ? (
-          <Image source={{ uri: item.partner.profile_picture_url }} style={styles.avatar} />
-        ) : (
-          <View style={styles.avatarPlaceholder}>
-            <Text style={styles.avatarInitial}>
-              {item.partner?.name?.charAt(0)?.toUpperCase() || "?"}
-            </Text>
-          </View>
-        )}
+        <UserAvatar
+          profilePictureUrl={item.partner?.profile_picture_url}
+          name={item.partner?.name}
+          size={48}
+          placeholderColor={brandColors.primary}
+          style={styles.avatar}
+        />
 
         {/* Info */}
         <View style={styles.requestInfo}>
@@ -373,16 +368,13 @@ export default function PartnersScreen() {
   const renderSentCard = ({ item }: { item: Partner }) => (
     <Card style={styles.requestCard}>
       <View style={styles.requestRow}>
-        {/* Avatar */}
-        {item.partner?.profile_picture_url ? (
-          <Image source={{ uri: item.partner.profile_picture_url }} style={styles.avatar} />
-        ) : (
-          <View style={styles.avatarPlaceholder}>
-            <Text style={styles.avatarInitial}>
-              {item.partner?.name?.charAt(0)?.toUpperCase() || "?"}
-            </Text>
-          </View>
-        )}
+        <UserAvatar
+          profilePictureUrl={item.partner?.profile_picture_url}
+          name={item.partner?.name}
+          size={48}
+          placeholderColor={brandColors.primary}
+          style={styles.avatar}
+        />
 
         {/* Info */}
         <View style={styles.requestInfo}>
@@ -532,15 +524,30 @@ export default function PartnersScreen() {
           {isLoading ? (
             <View style={styles.listContent}>
               {[1, 2, 3].map((i) => (
-                <Card key={i} style={styles.cardSkeleton}>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                <SkeletonBox
+                  key={i}
+                  width="100%"
+                  height={78}
+                  borderRadius={toRN(tokens.borderRadius.xl)}
+                  inner
+                  innerPadding={CARD_PADDING_VALUES.SM}
+                  style={styles.cardSkeleton}
+                >
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 12,
+                      padding: toRN(tokens.spacing[2])
+                    }}
+                  >
                     <SkeletonBox width={48} height={48} borderRadius={24} />
                     <View style={{ flex: 1, gap: 8 }}>
                       <SkeletonBox width="60%" height={16} borderRadius={4} />
                       <SkeletonBox width="40%" height={12} borderRadius={4} />
                     </View>
                   </View>
-                </Card>
+                </SkeletonBox>
               ))}
             </View>
           ) : (

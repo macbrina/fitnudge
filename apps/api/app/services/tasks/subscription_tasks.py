@@ -79,6 +79,7 @@ def check_expiring_subscriptions_task(self) -> dict:
             try:
                 from app.services.expo_push_service import send_push_to_user_sync
 
+                # No goal/partner; push + deepLink enough — don't save to notification_history
                 result = send_push_to_user_sync(
                     user_id=user_id,
                     title=f"Your {plan.title()} subscription expires in 3 days",
@@ -91,6 +92,7 @@ def check_expiring_subscriptions_task(self) -> dict:
                     },
                     notification_type="subscription",
                     skip_preference_check=True,  # Critical - always send
+                    save_to_notification_history=False,
                 )
                 if result.get("delivered"):
                     warned_count += 1

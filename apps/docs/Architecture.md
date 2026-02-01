@@ -3837,19 +3837,6 @@ sentry_sdk.init(
 
 ### 📈 Application Performance Monitoring (APM)
 
-**New Relic Configuration:**
-
-```python
-# newrelic.ini
-[newrelic]
-app_name = FitNudge API
-license_key = your-license-key
-environment = production
-
-[application_settings]
-browser_monitoring.auto_instrument = false
-```
-
 **Key Metrics:**
 
 - **Response Time**: p50, p95, p99 percentiles

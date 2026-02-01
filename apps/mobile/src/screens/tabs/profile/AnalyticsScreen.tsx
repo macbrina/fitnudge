@@ -210,8 +210,52 @@ export default function AnalyticsScreen() {
     return DUMMY_MOOD_TREND;
   }, [isPremium, dashboardData]);
 
+  // Calculate streak chart Y-axis bounds
+  const streakMaxValue = useMemo(() => {
+    if (!isPremium || !streakData.length) return 1;
+    const maxStreak = Math.max(...streakData.map((d) => d.streak || 0));
+    return Math.max(maxStreak, 1); // At least 1 to avoid duplicate 0s
+  }, [isPremium, streakData]);
+
+  // Prepare streak data - only actual values, no padding
+  const streakChartData = useMemo(() => {
+    return streakData.map((d) => d.streak || 0);
+  }, [streakData]);
+
+  // Prepare streak labels - only actual data points
+  const streakChartLabels = useMemo(() => {
+    // Show all labels when there are 2 or fewer data points, otherwise show every other
+    const showAllLabels = streakData.length <= 2;
+    return streakData.map((d, i) => (showAllLabels || i % 2 === 0 ? d.week : ""));
+  }, [streakData]);
+
+  // Mood chart: visible data only (no padding) so the line stops at the last date.
+  const moodChartData = useMemo(() => {
+    return moodData.map((d: { mood_score: number }) => d.mood_score);
+  }, [moodData]);
+
+  // Scale-only dataset: same length as moodChartData, first=1 last=3 so Y-axis 1–3.
+  // 1=bottom (Tough), 2=middle (Good), 3=top (Amazing). Rendered invisible.
+  const moodChartScaleData = useMemo(() => {
+    const n = moodData.length;
+    if (n < 2) return [1, 3];
+    const arr = new Array<number>(n).fill(2);
+    arr[0] = 1;
+    arr[n - 1] = 3;
+    return arr;
+  }, [moodData.length]);
+
+  // Mood labels: only actual data points (no padding slots).
+  const moodChartLabels = useMemo(() => {
+    return moodData.map((d: { label: string; mood_score: number }, i: number) =>
+      i % Math.ceil(Math.max(1, moodData.length / 6)) === 0 ? d.label : ""
+    );
+  }, [moodData]);
+
   // Check if we have actual data to show (for premium empty states)
   const hasWeeklyData = weeklyData.length > 0;
+  // When the week is all zeros, show "No data yet" overlay instead of the chart (UX win)
+  const isWeeklyAllZeros = hasWeeklyData && weeklyData.every((d) => d.percentage === 0);
   const hasStreakData = streakData.some((d) => d.streak > 0);
   const hasMonthlyData = monthlyData.some((d) => d.percentage > 0);
   const hasSkipData = skipData.length > 0;
@@ -446,7 +490,11 @@ export default function AnalyticsScreen() {
               <View style={styles.statsGrid}>
                 <View style={styles.statItem}>
                   <Text style={styles.statValue}>
-                    {isPremium && dashboardData ? dashboardData.completion_rate.toFixed(1) : "78.5"}
+                    {isPremium && dashboardData
+                      ? dashboardData.completion_rate === 0
+                        ? "0"
+                        : dashboardData.completion_rate.toFixed(1)
+                      : "78.5"}
                     %
                   </Text>
                   <Text style={styles.statLabel}>
@@ -511,6 +559,11 @@ export default function AnalyticsScreen() {
                     "Complete check-ins to see your weekly patterns"}
                 </Text>
               </View>
+            ) : isWeeklyAllZeros ? (
+              <View style={styles.emptyChartContainer}>
+                <Ionicons name="bar-chart-outline" size={48} color={colors.text.tertiary} />
+                <Text style={styles.emptyChartText}>{t("analytics.no_data") || "No data yet"}</Text>
+              </View>
             ) : (
               <View style={styles.chartWrapper}>
                 <BarChart
@@ -567,9 +620,9 @@ export default function AnalyticsScreen() {
               <View style={styles.chartWrapper}>
                 <LineChart
                   data={{
-                    // Show every other label to avoid cramping with 12+ weeks
-                    labels: streakData.map((d, i) => (i % 2 === 0 ? d.week : "")),
-                    datasets: [{ data: streakData.map((d) => d.streak || 0) }]
+                    // Labels must match data length (including padding values)
+                    labels: streakChartLabels,
+                    datasets: [{ data: streakChartData }]
                   }}
                   width={screenWidth - toRN(tokens.spacing[8]) - 32}
                   height={180}
@@ -580,7 +633,10 @@ export default function AnalyticsScreen() {
                   style={styles.chart}
                   bezier
                   withInnerLines={false}
+                  withShadow={false}
                   withDots
+                  fromZero
+                  segments={streakMaxValue}
                 />
               </View>
             )}
@@ -594,7 +650,7 @@ export default function AnalyticsScreen() {
             <Text style={styles.sectionTitle}>{t("analytics.mood_trend") || "Mood Trend"}</Text>
           </View>
           <Text style={styles.sectionSubtitle}>
-            {t("analytics.mood_trend_desc") || "How you feel about this goal"}
+            {t("analytics.mood_trend_desc") || "Your mood over the last 14 days"}
           </Text>
 
           <PremiumChartOverlay
@@ -626,51 +682,49 @@ export default function AnalyticsScreen() {
                 </Text>
               </View>
             ) : (
-              <View style={styles.moodChartWrapper}>
-                {/* Mood Y-axis legend (left side) - using same icons as CheckInModal */}
-                <View style={styles.moodYAxis}>
-                  <View style={styles.moodYAxisItem}>
-                    <MoodIcons mood="amazing" size={24} />
-                  </View>
-                  <View style={styles.moodYAxisItem}>
-                    <MoodIcons mood="good" size={24} />
-                  </View>
-                  <View style={styles.moodYAxisItem}>
-                    <MoodIcons mood="tough" size={24} />
-                  </View>
-                </View>
-                <View style={styles.moodChartContainer}>
-                  <LineChart
-                    data={{
-                      labels: moodData.map((d: { label: string; mood_score: number }, i: number) =>
-                        i % Math.ceil(moodData.length / 6) === 0 ? d.label : ""
-                      ),
-                      datasets: [
-                        {
-                          data: moodData.map((d: { mood_score: number }) => d.mood_score)
-                        }
-                      ]
-                    }}
-                    width={screenWidth - toRN(tokens.spacing[8]) - 72}
-                    height={160}
-                    chartConfig={{
-                      ...chartConfig,
-                      color: (opacity = 1) => `rgba(236, 72, 153, ${opacity})`,
-                      propsForDots: {
-                        r: "5",
-                        strokeWidth: "2",
-                        stroke: "#EC4899"
+              <View style={styles.chartWrapper}>
+                <LineChart
+                  data={{
+                    labels: moodChartLabels,
+                    datasets: [
+                      {
+                        data: moodChartScaleData,
+                        color: () => "rgba(0, 0, 0, 0)",
+                        withDots: false,
+                        strokeWidth: 0
+                      },
+                      {
+                        data: moodChartData,
+                        color: (opacity = 1) => `rgba(236, 72, 153, ${opacity})`,
+                        strokeWidth: 2
                       }
-                    }}
-                    style={styles.chart}
-                    bezier
-                    withInnerLines={false}
-                    withDots
-                    fromZero
-                    segments={3}
-                    formatYLabel={() => ""}
-                  />
-                </View>
+                    ]
+                  }}
+                  width={screenWidth - toRN(tokens.spacing[8]) - 32}
+                  height={180}
+                  chartConfig={{
+                    ...chartConfig,
+                    color: (opacity = 1) => `rgba(236, 72, 153, ${opacity})`,
+                    propsForDots: {
+                      r: "5",
+                      strokeWidth: "2",
+                      stroke: "#EC4899"
+                    }
+                  }}
+                  style={styles.chart}
+                  bezier
+                  withInnerLines={false}
+                  withShadow={false}
+                  withDots
+                  segments={2}
+                  formatYLabel={(v) => {
+                    const num = Number(v);
+                    // With range 1-3 and segments=2, labels appear at: 1, 2, 3 (perfect alignment!)
+                    if (num <= 1.5) return t("checkin.mood.tough");
+                    if (num >= 2.5) return t("checkin.mood.amazing");
+                    return t("checkin.mood.good");
+                  }}
+                />
               </View>
             )}
           </PremiumChartOverlay>
@@ -1117,7 +1171,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
   statValue: {
     fontSize: toRN(tokens.typography.fontSize["2xl"]),
     fontFamily: fontFamily.bold,
-    color: brand.primary
+    color: colors.text.primary
   },
   statLabel: {
     fontSize: toRN(tokens.typography.fontSize.xs),
@@ -1150,13 +1204,6 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
   chartWrapper: {
     alignItems: "center" as const,
     marginHorizontal: -toRN(tokens.spacing[2])
-  },
-  // Mood chart wrapper with horizontal layout for emoji Y-axis
-  moodChartWrapper: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    marginLeft: toRN(tokens.spacing[1]),
-    marginRight: -toRN(tokens.spacing[2])
   },
   chart: {
     borderRadius: toRN(tokens.borderRadius.lg)
@@ -1196,26 +1243,5 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     fontSize: toRN(tokens.typography.fontSize.base),
     fontFamily: fontFamily.medium,
     color: colors.text.primary
-  },
-  // Mood chart with Y-axis emojis
-  moodChartContainer: {
-    flex: 1
-  },
-  moodYAxis: {
-    width: 32,
-    height: 140,
-    justifyContent: "space-between" as const,
-    alignItems: "center" as const,
-    paddingTop: toRN(tokens.spacing[2]),
-    paddingBottom: toRN(tokens.spacing[2])
-  },
-  moodYAxisItem: {
-    alignItems: "center" as const,
-    justifyContent: "center" as const
-  },
-  moodLegendText: {
-    fontSize: toRN(tokens.typography.fontSize.xs),
-    fontFamily: fontFamily.medium,
-    color: colors.text.secondary
   }
 });

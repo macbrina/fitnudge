@@ -24,6 +24,7 @@ import {
   useRegenerateDailyMotivation
 } from "@/hooks/api/useDailyMotivations";
 import { useSubscriptionStore } from "@/stores/subscriptionStore";
+import Button from "@/components/ui/Button";
 
 interface DailyMotivationModalProps {
   visible: boolean;
@@ -102,10 +103,7 @@ export function DailyMotivationModal({
   const { mutate: regenerateMotivation, isPending: isRegenerating } =
     useRegenerateDailyMotivation();
 
-  // Check if user has unlimited_text_motivation feature
-  const hasUnlimitedMotivation = useSubscriptionStore((state) =>
-    state.hasFeature("unlimited_text_motivation")
-  );
+  const isPremium = useSubscriptionStore((state) => state.getPlan() === "premium");
 
   // Animation values - starts off-screen at the bottom
   const translateY = useMemo(() => new Animated.Value(screenHeight), [screenHeight]);
@@ -243,42 +241,30 @@ export function DailyMotivationModal({
             }
           ]}
         >
-          {hasUnlimitedMotivation && (
-            <TouchableOpacity
-              style={[
-                styles.actionButton,
-                {
-                  backgroundColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)"
-                },
-                isRegenerating && styles.actionButtonDisabled
-              ]}
+          {isPremium && (
+            <Button
+              title={
+                isRegenerating
+                  ? t("home.generating_motivation")
+                  : t("home.generate_another_motivation")
+              }
               onPress={handleRegenerate}
               disabled={isRegenerating}
               accessibilityLabel={t("home.generate_another_motivation")}
-              accessibilityRole="button"
-            >
-              <RefreshCw
-                size={18}
-                color={brandColors.primary}
-                strokeWidth={2}
-                style={isRegenerating ? { opacity: 0.5 } : undefined}
-              />
-              <Text style={[styles.actionButtonText, { color: colors.text.primary }]}>
-                {isRegenerating
-                  ? t("home.generating_motivation")
-                  : t("home.generate_another_motivation")}
-              </Text>
-            </TouchableOpacity>
+              leftIcon="refresh"
+              size="md"
+              variant="secondary"
+            />
           )}
-          <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: brandColors.primary }]}
+          <Button
+            title={t("common.share")}
             onPress={handleShare}
             accessibilityLabel={t("common.share")}
-            accessibilityRole="button"
-          >
-            <Share2 size={18} color="#ffffff" strokeWidth={2} />
-            <Text style={[styles.actionButtonText, { color: "#ffffff" }]}>{t("common.share")}</Text>
-          </TouchableOpacity>
+            leftIcon="share-outline"
+            size="md"
+            disabled={isRegenerating}
+            variant="secondary"
+          />
         </View>
       </Animated.View>
     </Modal>

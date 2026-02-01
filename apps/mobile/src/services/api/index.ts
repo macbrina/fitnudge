@@ -68,6 +68,16 @@ export {
 } from "./partners";
 export { homeService, type PendingCheckIn, type HomeDashboardResponse } from "./home";
 
+// Live Activities (iOS ActivityKit)
+export {
+  liveActivityService,
+  type RegisterPushToStartTokenRequest,
+  type RegisterActivityPushTokenRequest
+} from "./liveActivity";
+
+// Android Mode B (FCM → ongoing NextUp)
+export { nextUpPushService, type RegisterFcmTokenRequest } from "./nextUpPush";
+
 // Notifications
 export {
   notificationsService,

@@ -109,16 +109,38 @@ export const convertTimeToDeviceTimezone = (
 };
 
 /**
+ * Format a Date as YYYY-MM-DD in the device's local timezone.
+ * Use for "today", date ranges, and check-in dates so app and backend stay consistent.
+ */
+export const formatLocalDate = (date: Date): string => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
+
+/**
  * Format a date string or Date object to a readable format (e.g., "Jan 15, 2024")
  * @param date - Date string or Date object
  * @param format - Format type: "short" (Jan 15, 2024) or "long" (January 15, 2024)
+ * @param includeWeekday - Whether to include the day of the week (e.g., "Mon, Jan 15, 2024")
  * @returns Formatted date string
  */
-export const formatDate = (date: string | Date, format: "short" | "long" = "short"): string => {
+export const formatDate = (
+  date: string | Date | null | undefined,
+  format: "short" | "long" = "short",
+  includeWeekday: boolean = false
+): string => {
   try {
+    // Handle null/undefined dates
+    if (!date) {
+      return ""; // Invalid date
+    }
+
     const dateObj = typeof date === "string" ? new Date(date) : date;
 
-    if (isNaN(dateObj.getTime())) {
+    // Check if dateObj is valid
+    if (!dateObj || isNaN(dateObj.getTime())) {
       return ""; // Invalid date
     }
 
@@ -127,12 +149,14 @@ export const formatDate = (date: string | Date, format: "short" | "long" = "shor
         ? {
             year: "numeric",
             month: "short",
-            day: "numeric"
+            day: "numeric",
+            ...(includeWeekday && { weekday: "short" })
           }
         : {
             year: "numeric",
             month: "long",
-            day: "numeric"
+            day: "numeric",
+            ...(includeWeekday && { weekday: "long" })
           };
 
     return new Intl.DateTimeFormat("en-US", options).format(dateObj);
@@ -297,5 +321,30 @@ export const formatReminderTime = (timeString: string): string => {
   } catch (error) {
     console.error("Error formatting reminder time:", error);
     return timeString; // Return original on error
+  }
+};
+
+export type ActivityStatus = "active" | "recent" | "inactive";
+
+export const getActivityStatus = (lastActiveAt?: string): ActivityStatus => {
+  if (!lastActiveAt) return "inactive";
+
+  const lastActive = new Date(lastActiveAt);
+  const now = new Date();
+  const diffHours = (now.getTime() - lastActive.getTime()) / (1000 * 60 * 60);
+
+  if (diffHours <= 24) return "active";
+  if (diffHours <= 168) return "recent";
+  return "inactive";
+};
+
+export const getActivityColor = (status: ActivityStatus): string => {
+  switch (status) {
+    case "active":
+      return "#22C55E";
+    case "recent":
+      return "#F59E0B";
+    case "inactive":
+      return "#9CA3AF";
   }
 };

@@ -127,7 +127,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
   badge: {
     position: "absolute" as const,
     top: -4,
-    right: -8,
+    right: -1,
     minWidth: 18,
     height: 18,
     borderRadius: 9,

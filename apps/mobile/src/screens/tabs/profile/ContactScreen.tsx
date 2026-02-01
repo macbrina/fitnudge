@@ -1,18 +1,20 @@
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useRef, useMemo } from "react";
 import {
   View,
   Text,
   Linking,
   TouchableOpacity,
   Modal as RNModal,
-  ActivityIndicator
+  ActivityIndicator,
+  Platform
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView, WebViewNavigation } from "react-native-webview";
-import { useRouter } from "expo-router";
+import { useRouter, usePathname } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "@/lib/i18n";
 import { useStyles, useTheme } from "@/themes";
+import { tokens } from "@/themes/tokens";
 import { toRN } from "@/lib/units";
 import { fontFamily } from "@/lib/fonts";
 import { BackButton } from "@/components/ui/BackButton";
@@ -20,19 +22,37 @@ import { Card } from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import { useExternalUrls } from "@/hooks/api/useAppConfig";
 import { MOBILE_ROUTES } from "@/lib/routes";
+import Constants from "expo-constants";
+import * as Device from "expo-device";
+import { getLocales } from "expo-localization";
+import { useAuthStore } from "@/stores/authStore";
+import { useMediaPermissions } from "@/hooks/media/useMediaPermissions";
+import { useAlertModal, AlertOverlay } from "@/contexts/AlertModalContext";
 
 export default function ContactScreen() {
   const router = useRouter();
+  const pathname = usePathname();
   const styles = useStyles(makeStyles);
   const { colors, brandColors } = useTheme();
   const { t } = useTranslation();
   const externalUrls = useExternalUrls();
+  const insets = useSafeAreaInsets();
+  const { user } = useAuthStore();
+  const { showConfirm } = useAlertModal();
+  const { requestAllPermissions, hasAnyPermission, libraryStatus, cameraStatus, checkPermissions } =
+    useMediaPermissions();
 
   // Feature suggestions modal state
   const [showSuggestionsModal, setShowSuggestionsModal] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const webViewRef = useRef<WebView>(null);
+
+  // Bug report modal state
+  const [showBugReportModal, setShowBugReportModal] = useState(false);
+  const [isBugLoading, setIsBugLoading] = useState(true);
+  const [hasBugError, setHasBugError] = useState(false);
+  const bugWebViewRef = useRef<WebView>(null);
 
   const handleEmailPress = () => {
     Linking.openURL(externalUrls.contact);
@@ -42,16 +62,72 @@ export default function ContactScreen() {
     router.push(MOBILE_ROUTES.PROFILE.LIVE_CHAT as any);
   };
 
-  const handleFeatureSuggestionsPress = () => {
+  const handleFeatureSuggestionsPress = async () => {
+    // Request media permissions for file uploads
+    const granted = await requestAllPermissions();
+    if (!granted) {
+      // Check if permissions are denied (can't ask again)
+      await checkPermissions();
+      const isDenied = libraryStatus === "denied" || cameraStatus === "denied";
+      if (isDenied) {
+        // Show confirm dialog with option to open settings
+        const openSettings = await showConfirm({
+          title: t("contact.media_permission_denied_title") || "Media Permission Required",
+          message:
+            t("contact.media_permission_denied_message") ||
+            "To upload files, please enable camera and photo library access in Settings.",
+          variant: "warning",
+          confirmLabel: t("common.open_settings") || "Open Settings",
+          cancelLabel: t("common.cancel") || "Cancel"
+        });
+        if (openSettings) {
+          Linking.openSettings().catch(() => {});
+        }
+      }
+    }
     setShowSuggestionsModal(true);
     setIsLoading(true);
     setHasError(false);
+  };
+
+  const handleBugReportPress = async () => {
+    // Request media permissions for file uploads
+    const granted = await requestAllPermissions();
+    if (!granted) {
+      // Check if permissions are denied (can't ask again)
+      await checkPermissions();
+      const isDenied = libraryStatus === "denied" || cameraStatus === "denied";
+      if (isDenied) {
+        // Show confirm dialog with option to open settings
+        const openSettings = await showConfirm({
+          title: t("contact.media_permission_denied_title") || "Media Permission Required",
+          message:
+            t("contact.media_permission_denied_message") ||
+            "To upload files, please enable camera and photo library access in Settings.",
+          variant: "warning",
+          confirmLabel: t("common.open_settings") || "Open Settings",
+          cancelLabel: t("common.cancel") || "Cancel"
+        });
+        if (openSettings) {
+          Linking.openSettings().catch(() => {});
+        }
+      }
+    }
+    setShowBugReportModal(true);
+    setIsBugLoading(true);
+    setHasBugError(false);
   };
 
   const handleCloseModal = () => {
     setShowSuggestionsModal(false);
     setIsLoading(true);
     setHasError(false);
+  };
+
+  const handleCloseBugModal = () => {
+    setShowBugReportModal(false);
+    setIsBugLoading(true);
+    setHasBugError(false);
   };
 
   const handleLoadEnd = useCallback(() => {
@@ -68,6 +144,82 @@ export default function ContactScreen() {
     setIsLoading(true);
     webViewRef.current?.reload();
   }, []);
+
+  const handleBugRetry = useCallback(() => {
+    setHasBugError(false);
+    setIsBugLoading(true);
+    bugWebViewRef.current?.reload();
+  }, []);
+
+  const handleBugLoadEnd = useCallback(() => {
+    setIsBugLoading(false);
+  }, []);
+
+  const handleBugError = useCallback(() => {
+    setIsBugLoading(false);
+    setHasBugError(true);
+  }, []);
+
+  // Build Tally bug report URL with device info
+  const bugReportUrl = useMemo(() => {
+    if (!externalUrls.tallyBug) return "";
+    try {
+      const params = new URLSearchParams();
+
+      // App version
+      const appVersion = Constants.expoConfig?.version || "1.0.0";
+      params.append("appVersion", appVersion);
+
+      // OS (iOS/Android)
+      const os = Platform.OS === "ios" ? "iOS" : "Android";
+      params.append("os", os);
+
+      // OS version
+      const osVersion = Platform.Version.toString();
+      params.append("osVersion", osVersion);
+
+      // Device model
+      const deviceModel = Device.modelName || Device.modelId || "Unknown";
+      params.append("deviceModel", deviceModel);
+
+      // Locale
+      const locales = getLocales();
+      const locale = locales?.[0]?.languageTag || locales?.[0]?.languageCode || "en";
+      params.append("locale", locale);
+
+      // User ID (if authenticated)
+      if (user?.id) {
+        params.append("userId", user.id);
+      }
+
+      // Current screen/route
+      params.append("screen", pathname || "unknown");
+
+      // Build number (iOS) / Version code (Android)
+      // Priority: expoConfig > nativeBuildVersion > empty
+      let buildNumber = "";
+      if (Platform.OS === "ios") {
+        buildNumber = Constants.expoConfig?.ios?.buildNumber || Constants.nativeBuildVersion || "";
+      } else {
+        buildNumber =
+          Constants.expoConfig?.android?.versionCode?.toString() ||
+          Constants.nativeBuildVersion ||
+          "";
+      }
+      if (buildNumber) {
+        params.append("buildNumber", buildNumber);
+      }
+
+      // Timezone
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      params.append("timezone", timezone);
+
+      return `${externalUrls.tallyBug}?${params.toString()}`;
+    } catch (error) {
+      console.warn("[ContactScreen] Error building Tally URL:", error);
+      return externalUrls.tallyBug; // Return base URL if something fails
+    }
+  }, [externalUrls.tallyBug, user?.id, pathname]);
 
   const handleShouldStartLoad = useCallback((event: WebViewNavigation) => {
     const { url } = event;
@@ -154,6 +306,26 @@ export default function ContactScreen() {
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.text.tertiary} />
           </TouchableOpacity>
+
+          <View style={styles.divider} />
+
+          {/* Report a Bug Option */}
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={handleBugReportPress}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.menuIcon, { backgroundColor: `${colors.feedback.error}15` }]}>
+              <Ionicons name="bug-outline" size={22} color={colors.feedback.error} />
+            </View>
+            <View style={styles.menuContent}>
+              <Text style={styles.menuLabel}>{t("contact.report_bug") || "Report a Bug"}</Text>
+              <Text style={styles.menuDescription}>
+                {t("contact.report_bug_desc") || "Found an issue? Let us know"}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.text.tertiary} />
+          </TouchableOpacity>
         </Card>
       </View>
 
@@ -162,9 +334,10 @@ export default function ContactScreen() {
         visible={showSuggestionsModal}
         animationType="slide"
         presentationStyle="fullScreen"
+        statusBarTranslucent
         onRequestClose={handleCloseModal}
       >
-        <SafeAreaView style={styles.modalContainer}>
+        <SafeAreaView style={styles.modalContainer} edges={["top", "bottom"]}>
           {/* Modal Header */}
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>
@@ -216,6 +389,69 @@ export default function ContactScreen() {
               />
             )}
           </View>
+          <AlertOverlay visible={showSuggestionsModal} />
+        </SafeAreaView>
+      </RNModal>
+
+      {/* Full-screen Bug Report Modal */}
+      <RNModal
+        visible={showBugReportModal}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        statusBarTranslucent
+        onRequestClose={handleCloseBugModal}
+      >
+        <SafeAreaView style={styles.modalContainer} edges={["top", "bottom"]}>
+          {/* Modal Header */}
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>{t("contact.report_bug") || "Report a Bug"}</Text>
+            <TouchableOpacity onPress={handleCloseBugModal} style={styles.modalCloseButton}>
+              <Ionicons name="close" size={24} color={colors.text.primary} />
+            </TouchableOpacity>
+          </View>
+
+          {/* WebView Container */}
+          <View style={styles.webViewContainer}>
+            {isBugLoading && (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={brandColors.primary} />
+              </View>
+            )}
+
+            {hasBugError ? (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorTitle}>
+                  {t("contact.form_error_title") || "Unable to load form"}
+                </Text>
+                <Text style={styles.errorMessage}>
+                  {t("contact.form_error_message") ||
+                    "Please check your internet connection and try again."}
+                </Text>
+                <Button
+                  title={t("common.retry") || "Retry"}
+                  onPress={handleBugRetry}
+                  variant="primary"
+                  style={styles.retryButton}
+                />
+              </View>
+            ) : (
+              <WebView
+                ref={bugWebViewRef}
+                source={{ uri: bugReportUrl }}
+                style={styles.webView}
+                onLoadStart={() => setIsBugLoading(true)}
+                onLoadEnd={handleBugLoadEnd}
+                onError={handleBugError}
+                onHttpError={handleBugError}
+                onShouldStartLoadWithRequest={handleShouldStartLoad}
+                javaScriptEnabled
+                domStorageEnabled
+                startInLoadingState
+                allowsInlineMediaPlayback
+              />
+            )}
+          </View>
+          <AlertOverlay visible={showBugReportModal} />
         </SafeAreaView>
       </RNModal>
     </View>

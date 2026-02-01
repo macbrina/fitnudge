@@ -18,8 +18,9 @@ Flow:
 """
 
 import json
+from collections import defaultdict
 from datetime import date, datetime, timedelta
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from openai import AsyncOpenAI
 
@@ -58,73 +59,225 @@ FRESHNESS_HOURS = 24
 # OpenAI model for insights
 INSIGHTS_MODEL = "gpt-4o-mini"
 
-# System prompt for insight generation
-INSIGHTS_SYSTEM_PROMPT = """You are a data-driven behavioral analyst for a habit tracking app. Analyze check-in data to find REAL patterns - not generic advice.
+# System prompt for insight generation (evidence-first approach)
+# Evidence is computed deterministically in code, AI only generates insights
+INSIGHTS_SYSTEM_PROMPT = """You are a supportive habit coach. Your role is to help users understand their patterns and improve.
 
-## CRITICAL RULES
-1. Only mention patterns you can PROVE from the data
-2. Never state the obvious (user knows their completion count)
-3. No generic motivational fluff - be specific and data-backed
-4. If there's no clear pattern, say so honestly
+CRITICAL RULES
+- The evidence block below is VERIFIED and computed by the system. Do NOT recalculate or contradict it.
+- Only reference data explicitly shown in the evidence or metrics.
+- Never guess or make up numbers. If something isn't in the evidence, don't mention it.
+- Be supportive and encouraging, not judgmental.
 
-## RESPONSE FORMAT
-Respond with valid JSON:
+TASK
+Generate 1–3 insights that help the user understand their patterns and improve. Use the evidence to support your insights.
+
+INSIGHT TYPES
+- "pattern": Observations about their behavior (e.g., "Mondays have been challenging")
+- "encouragement": Positive reinforcement (e.g., "You're building consistency")
+- "warning": Areas needing attention (e.g., "You've missed 3 in a row")
+- "tip": Actionable advice (e.g., "Try setting a reminder earlier on Mondays")
+
+WARNING RULE (STRICT)
+- The system provides "warning_flags" in the context.
+- If warning_flags.should_warn is true: include EXACTLY ONE insight with type="warning".
+- If warning_flags.should_warn is false: include ZERO warning insights.
+- A warning must reference which flag triggered it (recent_streak_risk / stagnation_risk / chronic_low_consistency) in plain language.
+- Warnings must be supportive and actionable (no shame).
+
+WEEKDAY CLAIMS (STRICT)
+- You may only call out a specific weekday as a pattern if evidence.weekday_stats[day].total >= 2.
+- If total == 1, you can mention it only as "a single data point" or avoid naming the day.
+- Do NOT say "particularly Tuesday, Thursday, and Friday" if each only has 1 sample.
+
+OUTPUT
+Return valid JSON:
 {
   "insights": [
-    {
-      "type": "pattern|encouragement|warning|tip",
-      "text": "Specific, data-backed insight (1-2 sentences)",
-      "priority": 1
-    }
+    {"type":"pattern|encouragement|warning|tip","text":"...","priority":1}
   ],
   "nudge_config": {
-    "risky_days": [4, 5],
     "risk_level": "low|medium|high",
-    "best_nudge_time": "09:00",
+    "best_nudge_time": null,
     "needs_extra_motivation": true|false
   },
-  "summary": "One sentence pattern summary"
+  "summary": "One to two sentence summary"
 }
 
-## INSIGHT TYPES
-- **pattern**: Specific behavioral patterns with data (e.g., "You complete 90% on mornings, 30% on evenings")
-- **encouragement**: Data-backed positive reinforcement (e.g., "Tuesdays are your power day - 100% completion")
-- **warning**: Data-backed risk patterns (e.g., "3 of your last 4 skips were on Fridays")
-- **tip**: Actionable suggestion based on THEIR specific pattern
-
-## WHAT MAKES A GOOD INSIGHT
-✓ "You've missed 5 of 7 Fridays - that's your weakest day"
-✓ "When you skip once, you skip 2 more days 80% of the time"
-✓ "Your morning check-ins have 85% success vs 40% evenings"
-✓ "'Tired' was your skip reason 6 times - consider a rest day routine"
-✓ "Your best streak started after a skip - bouncing back is your strength"
-✓ "You've completed 8 days in a row - that's your longest streak yet!"
-✓ "Mondays are your strongest day with 90% completion"
-
-## WHAT TO AVOID
-✗ "You're doing great!" (empty encouragement)
-✗ "Keep up the good work!" (generic)
-✗ "Your completion rate is 60%" (they can see this in stats)
-✗ "Consider setting reminders" (generic advice)
-✗ "You checked in on Monday" (stating the obvious)
-
-## NUDGE CONFIG EXPLANATION
-- **risky_days**: Days where user historically skips or has <60% completion. Format: 0=Sunday, 1=Monday, ..., 6=Saturday. Example: [4, 5] means Thursday and Friday are risky.
-- **risk_level**: Overall consistency - "high" if <50% completion, "medium" if 50-75%, "low" if >75%
-- **best_nudge_time**: When to send reminder based on their successful check-in times (HH:MM format)
-- **needs_extra_motivation**: true if user has consecutive skips or declining trend
-
-## VOICE NOTES (when present)
-Some check-ins include a voice note: **transcript** (what they said) and **sentiment** (tone, matches_mood).
-- Use this for pattern/tip/warning insights when relevant (e.g. "Your last 3 voice notes sounded 'tired but pushing'—consider a lighter day mid‑week").
-- If **matches_mood** is false, they picked a mood (e.g. "amazing") but their words sounded different (e.g. down). You MAY mention this gently as a **tip** or **warning** only when it fits a pattern (e.g. often saying they're fine while sounding stressed). Never be judgmental.
-
-## GUIDELINES
-1. Generate 1-3 insights MAX (only if data supports them)
-2. Reference specific numbers, days, patterns
-3. If data is insufficient for patterns, return fewer insights
-4. Priority 1 = most actionable insight
+NOTES
+- risky_days is computed by the system (not your job).
+- risk_level: high < 0.50, medium 0.50–0.75, low > 0.75 (use completion_rate_30d from metrics if available).
+- needs_extra_motivation: true if most recent check-ins show >=2 consecutive misses.
+- best_nudge_time: null if no time-of-day data exists (do not default).
+- Always include at least one "tip" if there are any missed check-ins.
+- Rest days are intentional breaks, not failures - treat them positively.
+- When mentioning completion rates, specify the time period (7-day vs 30-day).
+- The goal was created on: [GOAL_CREATED_DATE]
 """
+
+
+def compute_evidence(checkins: List[Dict]) -> Dict:
+    """
+    Deterministically compute evidence from check-ins.
+    Assumes checkins are ordered MOST RECENT first.
+    """
+    N = len(checkins)
+
+    # Overall counts
+    counts = {
+        "completed": 0,
+        "missed": 0,
+        "rest_day": 0,
+        "total": N,
+    }
+
+    # Per-weekday accumulator
+    weekday_raw = defaultdict(
+        lambda: {
+            "total": 0,
+            "completed": 0,
+            "missed": 0,
+            "rest_day": 0,
+        }
+    )
+
+    for ci in checkins:
+        status = ci.get("status")
+        day = ci.get("day_of_week")  # 0=Sun .. 6=Sat
+
+        if day is None:
+            continue
+
+        weekday_raw[day]["total"] += 1
+
+        if status == "completed":
+            counts["completed"] += 1
+            weekday_raw[day]["completed"] += 1
+        elif status == "rest_day":
+            counts["rest_day"] += 1
+            weekday_raw[day]["rest_day"] += 1
+        else:  # missed / skipped
+            counts["missed"] += 1
+            weekday_raw[day]["missed"] += 1
+
+    # Final weekday stats with completion_rate
+    weekday_stats = {}
+    for day, stats in weekday_raw.items():
+        total = stats["total"]
+        completed = stats["completed"]
+
+        completion_rate = round(completed / total, 3) if total > 0 else 0.0
+
+        weekday_stats[str(day)] = {
+            **stats,
+            "completion_rate": completion_rate,
+        }
+
+    return {
+        "window": {
+            "checkins_used": N,
+            "lines_used": f"[1]-[{N}]",
+        },
+        "counts": counts,
+        "weekday_stats": weekday_stats,
+    }
+
+
+def compute_risky_days(weekday_stats: Dict) -> List[int]:
+    """
+    Deterministically compute risky_days from weekday_stats.
+    Day is risky if: total >= 2 AND completion_rate < 0.60
+    """
+    risky = []
+
+    for day_str, stats in weekday_stats.items():
+        if isinstance(stats, dict):
+            total = stats.get("total", 0)
+            completion_rate = stats.get("completion_rate", 1.0)
+            if total >= 2 and completion_rate < 0.60:
+                risky.append(int(day_str))
+
+    return sorted(risky)
+
+
+def compute_needs_extra_motivation(checkins: List[Dict]) -> bool:
+    """
+    Determine if user needs extra motivation.
+    Returns true if most recent check-ins contain >=2 consecutive misses.
+    """
+    consecutive_misses = 0
+    for ci in checkins[:5]:  # Check most recent 5
+        status = ci.get("status")
+        if status in ("missed", "skipped"):
+            consecutive_misses += 1
+        elif status in ("completed", "rest_day"):
+            consecutive_misses = 0  # Reset on any completion/rest_day
+        if consecutive_misses >= 2:
+            return True
+    return False
+
+
+def compute_best_nudge_time(checkins: List[Dict]) -> Optional[str]:
+    """
+    Compute best nudge time from successful check-in times.
+    Returns null if no time-of-day data exists.
+    """
+    successful_times = []
+    for ci in checkins:
+        if ci.get("status") == "completed":
+            created_at = ci.get("created_at")
+            if created_at:
+                try:
+                    # Parse timestamp and extract hour
+                    if isinstance(created_at, str):
+                        dt = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+                    else:
+                        dt = created_at
+                    hour = dt.hour
+                    successful_times.append(hour)
+                except (ValueError, AttributeError):
+                    continue
+
+    if not successful_times:
+        return None
+
+    # Use most common hour
+    hour_counts = defaultdict(int)
+    for hour in successful_times:
+        hour_counts[hour] += 1
+    most_common_hour = max(hour_counts.items(), key=lambda x: x[1])[0]
+    return f"{most_common_hour:02d}:00"
+
+
+def compute_warning_flags(checkins: List[Dict], metrics: Dict) -> Dict:
+    """
+    Deterministically compute warning flags based on product rules.
+    Returns dict with boolean flags indicating warning-worthy conditions.
+    """
+    # Recent streak risk: 2+ misses in the last 3 check-ins
+    last3 = checkins[:3]
+    misses_last3 = sum(1 for ci in last3 if ci.get("status") in ("missed", "skipped"))
+    recent_streak_risk = misses_last3 >= 2
+
+    # Stagnation risk: goal is at least 14 days old and 7d completion < 30d completion
+    # Note: goal_age_days might not be in metrics, we'll compute from goal creation if needed
+    goal_age = metrics.get("goal_age_days", 0) or 0
+    cr7 = (metrics.get("completion_rate_7d", 0) or 0) / 100.0
+    cr30 = (metrics.get("completion_rate_30d", 0) or 0) / 100.0
+    stagnation_risk = goal_age >= 14 and cr7 < cr30
+
+    # Chronic low consistency: enough samples AND very low 30d completion
+    total30 = metrics.get("total_checkins_30d", 0) or 0
+    chronic_low_consistency = total30 >= 14 and cr30 < 0.40
+
+    should_warn = recent_streak_risk or stagnation_risk or chronic_low_consistency
+
+    return {
+        "recent_streak_risk": recent_streak_risk,
+        "stagnation_risk": stagnation_risk,
+        "chronic_low_consistency": chronic_low_consistency,
+        "should_warn": should_warn,
+    }
 
 
 class AIInsightsService:
@@ -160,12 +313,31 @@ class AIInsightsService:
             if existing:
                 # If already generating, return status immediately
                 if existing["status"] == "generating":
-                    return {"status": "generating", "data": existing}
+                    # Calculate min_required for response (not stored in DB)
+                    frequency_count = await self._get_goal_frequency(goal_id)
+                    min_required = calculate_min_checkins_required(frequency_count)
+                    return {
+                        "status": "generating",
+                        "data": existing,
+                        "checkins_count": existing.get("checkins_analyzed"),
+                        "min_required": min_required,
+                    }
 
-                # If completed and fresh, return cached
+                # If completed and fresh, return cached (skip queue). When force_refresh
+                # (e.g. check-in), we do not skip — we proceed to queue to regenerate
+                # with the new check-in data.
                 if existing["status"] == "completed" and not force_refresh:
-                    if self._is_fresh(existing.get("generated_at")):
-                        return {"status": "completed", "data": existing}
+                    is_fresh = self._is_fresh(existing.get("generated_at"))
+                    if is_fresh:
+                        # Calculate min_required for response (not stored in DB)
+                        frequency_count = await self._get_goal_frequency(goal_id)
+                        min_required = calculate_min_checkins_required(frequency_count)
+                        return {
+                            "status": "completed",
+                            "data": existing,
+                            "checkins_count": existing.get("checkins_analyzed"),
+                            "min_required": min_required,
+                        }
 
                 # If failed, don't auto-retry - require explicit force_refresh
                 # This prevents infinite retry loops
@@ -194,6 +366,17 @@ class AIInsightsService:
                     "data": existing,  # Return existing data if any
                 }
 
+            # Re-fetch right before queuing: another request may have already set
+            # status='generating'. Skip queue to avoid duplicate tasks.
+            current = await self._get_existing_insight(goal_id)
+            if current and current.get("status") == "generating":
+                return {
+                    "status": "generating",
+                    "data": current,
+                    "checkins_count": checkin_count,
+                    "min_required": min_required,
+                }
+
             # Mark as generating
             await self._upsert_insight(
                 goal_id=goal_id,
@@ -208,8 +391,13 @@ class AIInsightsService:
 
             generate_goal_insights_task.delay(goal_id, user_id)
 
-            # Return immediately with generating status
-            return {"status": "generating", "data": None}
+            # Return immediately with generating status (include min_required for frontend)
+            return {
+                "status": "generating",
+                "data": None,
+                "checkins_count": checkin_count,
+                "min_required": min_required,
+            }
 
         except Exception as e:
             logger.error(f"Error in get_or_generate_insights: {e}")
@@ -375,6 +563,8 @@ class AIInsightsService:
         current_metrics: Optional[Dict] = None,
         previous_metrics: Optional[Dict] = None,
         error_message: Optional[str] = None,
+        summary: Optional[str] = None,
+        evidence: Optional[Dict] = None,
     ) -> Dict:
         """Insert or update insight row."""
         data = {
@@ -394,6 +584,10 @@ class AIInsightsService:
             data["previous_metrics"] = previous_metrics
         if error_message is not None:
             data["error_message"] = error_message
+        if summary is not None:
+            data["summary"] = summary
+        if evidence is not None:
+            data["evidence"] = evidence  # Store evidence internally (JSONB column)
         if status == "completed":
             data["generated_at"] = datetime.utcnow().isoformat()
 
@@ -403,7 +597,9 @@ class AIInsightsService:
             .execute()
         )
 
-        return result.data[0] if result and result.data else {}
+        upserted_data = result.data[0] if result and result.data else {}
+
+        return upserted_data
 
     async def _generate_insights(
         self,
@@ -413,17 +609,33 @@ class AIInsightsService:
     ) -> Dict:
         """Generate insights using AI."""
         try:
+            # Get goal creation date
+            goal_result = (
+                self.supabase.table("goals")
+                .select("created_at")
+                .eq("id", goal_id)
+                .single()
+                .execute()
+            )
+            goal_created_at = None
+            if goal_result and goal_result.data:
+                goal_created_at = goal_result.data.get("created_at")
+
             # Get metrics using the PostgreSQL function
             metrics_result = self.supabase.rpc(
                 "calculate_goal_metrics", {"p_goal_id": goal_id}
             ).execute()
             current_metrics = (metrics_result.data or {}) if metrics_result else {}
 
+            print("current_metrics", current_metrics)
+
             # Get recent check-ins for AI context
             checkins_result = self.supabase.rpc(
                 "get_checkins_for_ai", {"p_goal_id": goal_id, "p_limit": 30}
             ).execute()
             recent_checkins = (checkins_result.data or []) if checkins_result else []
+
+            print("recent_checkins", recent_checkins)
 
             # Get skip reasons summary
             skip_result = self.supabase.rpc(
@@ -434,30 +646,126 @@ class AIInsightsService:
             # Previous metrics for trend comparison
             previous_metrics = existing.get("current_metrics") if existing else None
 
-            # Build context for AI
+            # Compute goal_age_days if not in metrics
+            goal_age_days = current_metrics.get("goal_age_days", 0)
+            if not goal_age_days and goal_created_at:
+                try:
+                    if isinstance(goal_created_at, str):
+                        created_dt = datetime.fromisoformat(
+                            goal_created_at.replace("Z", "+00:00")
+                        )
+                    else:
+                        created_dt = goal_created_at
+                    goal_age_days = (date.today() - created_dt.date()).days
+                except Exception:
+                    goal_age_days = 0
+            # Add to metrics for warning computation
+            current_metrics["goal_age_days"] = goal_age_days
+
+            # DETERMINISTIC COMPUTATION: Compute evidence first
+            evidence = compute_evidence(recent_checkins)
+
+            # DETERMINISTIC COMPUTATION: Compute warning flags
+            warning_flags = compute_warning_flags(recent_checkins, current_metrics)
+
+            # DETERMINISTIC COMPUTATION: Compute risky_days, needs_extra_motivation, best_nudge_time
+            risky_days = compute_risky_days(evidence["weekday_stats"])
+            needs_extra_motivation = compute_needs_extra_motivation(recent_checkins)
+            best_nudge_time = compute_best_nudge_time(recent_checkins)
+
+            # Compute risk_level from metrics
+            completion_rate_30d = (
+                current_metrics.get("completion_rate_30d", 0) / 100.0
+            )  # Convert % to decimal
+            if completion_rate_30d < 0.50:
+                risk_level = "high"
+            elif completion_rate_30d < 0.75:
+                risk_level = "medium"
+            else:
+                risk_level = "low"
+
+            # Build context for AI (includes evidence and warning flags)
             context = self._build_ai_context(
-                current_metrics, recent_checkins, skip_reasons, previous_metrics
+                current_metrics,
+                recent_checkins,
+                skip_reasons,
+                previous_metrics,
+                goal_created_at,
+                evidence,  # Pass evidence to context builder
+                warning_flags,  # Pass warning flags
             )
 
-            # Call AI
-            ai_response = await self._call_ai(context)
+            # Call AI (pass raw data for logging)
+            ai_response = await self._call_ai(
+                context,
+                goal_id,
+                current_metrics,
+                recent_checkins,
+                skip_reasons,
+                previous_metrics,
+            )
 
-            # Parse response
+            # Parse response - trust AI format, just normalize field names
             insights_data = self._parse_ai_response(ai_response)
 
-            # Update database
+            # ENFORCE WARNING RULES (post-parse validation)
+            insights = insights_data.get("insights", [])
+            if not warning_flags["should_warn"]:
+                # Remove all warnings if should_warn is false
+                insights = [i for i in insights if i.get("type") != "warning"]
+            else:
+                # Ensure exactly one warning if should_warn is true
+                warnings = [i for i in insights if i.get("type") == "warning"]
+                if len(warnings) == 0:
+                    # Fallback: insert a templated warning (deterministic)
+                    insights.insert(
+                        0,
+                        {
+                            "type": "warning",
+                            "text": "You've had a rough patch in your most recent check-ins—let's make it easier to succeed with a smaller target for the next 2 days.",
+                            "priority": 1,
+                        },
+                    )
+                elif len(warnings) > 1:
+                    # Keep only the highest priority warning (first one)
+                    first_warning = warnings[0]
+                    insights = [i for i in insights if i.get("type") != "warning"]
+                    insights.insert(0, first_warning)
+            insights_data["insights"] = insights
+
+            # Merge deterministic nudge_config with AI response
+            nudge_config = insights_data.get("nudge_config", {})
+            nudge_config["risky_days"] = risky_days  # Use computed value
+            nudge_config["risk_level"] = risk_level  # Use computed value
+            nudge_config["needs_extra_motivation"] = (
+                needs_extra_motivation  # Use computed value
+            )
+            nudge_config["best_nudge_time"] = best_nudge_time  # Use computed value
+
+            # Update database (store evidence internally)
             result = await self._upsert_insight(
                 goal_id=goal_id,
                 user_id=user_id,
                 status="completed",
                 checkins_analyzed=current_metrics.get("total_checkins_30d", 0),
                 insights=insights_data.get("insights", []),
-                nudge_config=insights_data.get("nudge_config", {}),
+                nudge_config=nudge_config,
                 current_metrics=current_metrics,
                 previous_metrics=previous_metrics,
+                summary=insights_data.get("summary"),
+                evidence=evidence,  # Store evidence internally
             )
 
-            return result
+            # Calculate min_required for response (not stored in DB)
+            frequency_count = await self._get_goal_frequency(goal_id)
+            min_required = calculate_min_checkins_required(frequency_count)
+
+            return {
+                "status": "completed",
+                "data": result,
+                "checkins_count": result.get("checkins_analyzed"),
+                "min_required": min_required,
+            }
 
         except Exception as e:
             logger.error(f"Error generating insights: {e}")
@@ -475,8 +783,11 @@ class AIInsightsService:
         checkins: list,
         skip_reasons: list,
         previous_metrics: Optional[Dict],
+        goal_created_at: Optional[str] = None,
+        evidence: Optional[Dict] = None,
+        warning_flags: Optional[Dict] = None,
     ) -> str:
-        """Build context string for AI."""
+        """Build context string for AI. Evidence and warning_flags are computed deterministically and passed here."""
         day_names = [
             "Sunday",
             "Monday",
@@ -487,38 +798,59 @@ class AIInsightsService:
             "Saturday",
         ]
 
+        # Format goal creation date for AI context
+        goal_created_str = "Unknown"
+        if goal_created_at:
+            try:
+                from datetime import datetime
+
+                if isinstance(goal_created_at, str):
+                    created_dt = datetime.fromisoformat(
+                        goal_created_at.replace("Z", "+00:00")
+                    )
+                else:
+                    created_dt = goal_created_at
+                goal_created_str = created_dt.strftime("%Y-%m-%d")
+            except Exception:
+                goal_created_str = str(goal_created_at)[:10]  # Just date part
+
         context_parts = [
-            f"## Goal: {metrics.get('goal_title', 'Unknown')}",
-            f"- Frequency: {metrics.get('frequency_type', 'daily')} ({metrics.get('frequency_count', 7)}x/week)",
-            "",
-            "## Current Metrics (Last 30 Days)",
-            f"- Completion Rate: {metrics.get('completion_rate_30d', 0)}%",
-            f"- Check-ins: {metrics.get('completed_checkins_30d', 0)}/{metrics.get('total_checkins_30d', 0)}",
-            f"- Current Streak: {metrics.get('current_streak', 0)} days",
-            f"- Longest Streak: {metrics.get('longest_streak', 0)} days",
+            "## Metrics (authoritative if present)",
+            f"Goal: {metrics.get('goal_title', 'Unknown')}",
+            f"Created: {goal_created_str}",
+            f"Frequency: {metrics.get('frequency_type', 'daily')} ({metrics.get('frequency_count', 7)}x/week)",
+            f"30-Day Completion Rate: {metrics.get('completion_rate_30d', 0)}%",
+            f"7-Day Completion Rate: {metrics.get('completion_rate_7d', 0)}%",
+            f"Check-ins (30 days): {metrics.get('completed_checkins_30d', 0)}/{metrics.get('total_checkins_30d', 0)}",
+            f"Current Streak: {metrics.get('current_streak', 0)} days",
+            f"Longest Streak: {metrics.get('longest_streak', 0)} days",
         ]
 
         # Best/worst days
         best_day = metrics.get("best_day_index")
         if best_day is not None:
+            best_rate = metrics.get("best_day_rate", 0)
             context_parts.append(
-                f"- Best Day: {day_names[best_day]} ({metrics.get('best_day_rate', 0)}% completion)"
+                f"- Best Day: {day_names[best_day]} ({best_rate}% completion, minimum 2 samples required)"
             )
 
         worst_day = metrics.get("worst_day_index")
         if worst_day is not None:
+            worst_rate = metrics.get("worst_day_rate", 0)
             context_parts.append(
-                f"- Challenging Day: {day_names[worst_day]} ({metrics.get('worst_day_rate', 0)}% completion)"
+                f"- Challenging Day: {day_names[worst_day]} ({worst_rate}% completion, minimum 2 samples required)"
             )
 
-        # Previous metrics for trend
+        # Previous metrics for trend (only if available)
         if previous_metrics:
             context_parts.extend(
                 [
                     "",
-                    "## Previous Week Comparison",
-                    f"- Previous Completion Rate: {previous_metrics.get('completion_rate_30d', 0)}%",
+                    "## Previous Period Comparison (if available)",
+                    f"- Previous 30-Day Completion Rate: {previous_metrics.get('completion_rate_30d', 0)}%",
                     f"- Previous Streak: {previous_metrics.get('current_streak', 0)} days",
+                    "",
+                    "NOTE: Only use this comparison data if it's present above. If this section doesn't exist, do NOT make comparisons to previous periods.",
                 ]
             )
 
@@ -530,10 +862,54 @@ class AIInsightsService:
                     f"- \"{reason.get('reason', 'Unknown')}\": {reason.get('count', 0)} times"
                 )
 
-        # Recent check-ins sample (V2: use status, mood, note, voice note)
+        # EVIDENCE BLOCK (computed deterministically - AI must use this)
+        if evidence:
+            context_parts.extend(
+                [
+                    "",
+                    "## Evidence (VERIFIED - Do NOT recalculate)",
+                    "This evidence was computed by the system. Use it as your source of truth.",
+                    "",
+                    json.dumps(evidence, indent=2),
+                ]
+            )
+
+        # WARNING FLAGS (computed deterministically - AI must follow these rules)
+        if warning_flags:
+            context_parts.extend(
+                [
+                    "",
+                    "## Warning Flags (VERIFIED - computed by system)",
+                    json.dumps(warning_flags, indent=2),
+                ]
+            )
+
+        # Recent check-ins sample (for reference, but evidence is authoritative)
         if checkins:
-            context_parts.extend(["", "## Recent Check-ins (Last 10)"])
-            for ci in checkins[:10]:
+            checkins_to_show = checkins[:10]
+            actual_count = len(checkins_to_show)
+            # Count rest days for context
+            rest_day_count = sum(
+                1 for ci in checkins_to_show if ci.get("status") == "rest_day"
+            )
+            context_parts.extend(
+                [
+                    "",
+                    "## Check-ins (authoritative list for per-day patterns)",
+                    f"The list below contains EXACTLY {actual_count} check-ins.",
+                    "Ordered MOST RECENT first: [1] is most recent.",
+                    "",
+                    f"N = {actual_count}",
+                    "Status symbols: ✓ = completed, 💤 = rest day (intentional break, preserves streak), ✗ = skipped/missed",
+                    "",
+                ]
+            )
+            if rest_day_count > 0:
+                context_parts.append(
+                    f"Note: {rest_day_count} rest day(s) in recent check-ins - these are intentional breaks, not failures."
+                )
+            # Number each check-in explicitly (1 = most recent, N = oldest)
+            for idx, ci in enumerate(checkins_to_show, start=1):
                 ci_status = ci.get("status", "pending")
                 status = (
                     "✓"
@@ -550,9 +926,8 @@ class AIInsightsService:
                         if len(ci.get("note", "")) > 80
                         else f' note="{ci.get("note", "")}"'
                     )
-                line = (
-                    f"- {ci.get('date')} ({day}): {status}{reason}{mood_str}{note_str}"
-                )
+                # Format: [Line Number] Date (Day): Status (no time-of-day data available)
+                line = f"[{idx}] {ci.get('date')} ({day}): {status}{reason}{mood_str}{note_str}"
                 context_parts.append(line)
                 vn = ci.get("voice_note_transcript")
                 sn = ci.get("voice_note_sentiment")
@@ -569,55 +944,199 @@ class AIInsightsService:
                     context_parts.append(
                         f'  voice_note: transcript="{vn_preview}"{sn_str}'
                     )
+            # Add rules reminder
+            context_parts.extend(
+                [
+                    "",
+                    "Rules reminder:",
+                    "- risky_days require >=2 samples for that weekday and completion_rate < 0.60",
+                    "- If no time-of-day exists, best_nudge_time must be null",
+                ]
+            )
 
         return "\n".join(context_parts)
 
-    async def _call_ai(self, context: str) -> str:
+    async def _call_ai(
+        self,
+        context: str,
+        goal_id: str = None,
+        current_metrics: Dict = None,
+        recent_checkins: list = None,
+        skip_reasons: list = None,
+        previous_metrics: Dict = None,
+    ) -> str:
         """Call OpenAI API for insight generation."""
+        # Replace placeholder in system prompt with actual goal creation date
+        system_prompt = INSIGHTS_SYSTEM_PROMPT
+        if "[GOAL_CREATED_DATE]" in system_prompt:
+            # Extract goal creation date from context
+            import re
+
+            match = re.search(r"Created: ([^\n]+)", context)
+            if match:
+                goal_date = match.group(1)
+                system_prompt = system_prompt.replace("[GOAL_CREATED_DATE]", goal_date)
+            else:
+                system_prompt = system_prompt.replace("[GOAL_CREATED_DATE]", "Unknown")
+
+        user_message = f"Analyze these check-ins and metrics.\n\n{context}"
+
         response = await self.client.chat.completions.create(
             model=INSIGHTS_MODEL,
             messages=[
-                {"role": "system", "content": INSIGHTS_SYSTEM_PROMPT},
-                {
-                    "role": "user",
-                    "content": f"Analyze this check-in data and generate insights:\n\n{context}",
-                },
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message},
             ],
-            temperature=0.7,
-            max_tokens=800,
+            temperature=0.1,  # Very low temperature for accurate computation
+            max_tokens=1100,  # Increased to accommodate evidence block
             response_format={"type": "json_object"},
         )
 
-        return response.choices[0].message.content or "{}"
+        ai_response = response.choices[0].message.content or "{}"
+
+        # Log full interaction to file for debugging
+        # if goal_id:
+        #     self._log_ai_interaction(
+        #         goal_id,
+        #         system_prompt,
+        #         user_message,
+        #         ai_response,
+        #         current_metrics,
+        #         recent_checkins,
+        #         skip_reasons,
+        #         previous_metrics,
+        #     )
+
+        return ai_response
+
+    def _log_ai_interaction(
+        self,
+        goal_id: str,
+        system_prompt: str,
+        user_message: str,
+        ai_response: str,
+        current_metrics: Dict = None,
+        recent_checkins: list = None,
+        skip_reasons: list = None,
+        previous_metrics: Dict = None,
+    ):
+        """Log full AI interaction to file for debugging."""
+        try:
+            import os
+            import json
+            from datetime import datetime
+
+            # Create logs directory if it doesn't exist
+            logs_dir = os.path.join(
+                os.path.dirname(__file__), "..", "..", "logs", "ai_insights"
+            )
+            os.makedirs(logs_dir, exist_ok=True)
+
+            # Create filename with timestamp and goal_id
+            timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+            filename = f"ai_insights_{goal_id[:8]}_{timestamp}.txt"
+            filepath = os.path.join(logs_dir, filename)
+
+            # Write full interaction to file
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write("=" * 80 + "\n")
+                f.write(f"AI INSIGHTS INTERACTION LOG\n")
+                f.write(f"Goal ID: {goal_id}\n")
+                f.write(f"Timestamp: {datetime.utcnow().isoformat()}\n")
+                f.write("=" * 80 + "\n\n")
+
+                f.write("RAW DATA PASSED TO AI:\n")
+                f.write("-" * 80 + "\n")
+                f.write("CURRENT METRICS:\n")
+                f.write(json.dumps(current_metrics, indent=2, default=str))
+                f.write("\n\n")
+                f.write("RECENT CHECK-INS:\n")
+                f.write(json.dumps(recent_checkins, indent=2, default=str))
+                f.write("\n\n")
+                if skip_reasons:
+                    f.write("SKIP REASONS:\n")
+                    f.write(json.dumps(skip_reasons, indent=2, default=str))
+                    f.write("\n\n")
+                if previous_metrics:
+                    f.write("PREVIOUS METRICS:\n")
+                    f.write(json.dumps(previous_metrics, indent=2, default=str))
+                    f.write("\n\n")
+                f.write("-" * 80 + "\n\n")
+
+                f.write("SYSTEM PROMPT:\n")
+                f.write("-" * 80 + "\n")
+                f.write(system_prompt)
+                f.write("\n\n")
+
+                f.write("USER MESSAGE (CONTEXT):\n")
+                f.write("-" * 80 + "\n")
+                f.write(user_message)
+                f.write("\n\n")
+
+                f.write("AI RESPONSE:\n")
+                f.write("-" * 80 + "\n")
+                f.write(ai_response)
+                f.write("\n\n")
+
+                f.write("=" * 80 + "\n")
+                f.write("END OF LOG\n")
+                f.write("=" * 80 + "\n")
+
+            logger.info(f"Logged AI interaction to {filepath}")
+
+        except Exception as e:
+            logger.warning(f"Failed to log AI interaction: {e}")
 
     def _parse_ai_response(self, response: str) -> Dict:
-        """Parse and validate AI response."""
+        """Parse AI response - trust the format, just normalize field names."""
         try:
             data = json.loads(response)
 
-            # Validate structure
+            # Normalize insights - handle both "text" and "message" fields
             insights = data.get("insights", [])
             if not isinstance(insights, list):
                 insights = []
 
+            normalized_insights = []
+            for insight in insights:
+                if not isinstance(insight, dict):
+                    continue
+
+                # Handle both "text" and "message" fields
+                text = insight.get("text") or insight.get("message", "")
+                if not text:
+                    continue
+
+                normalized_insights.append(
+                    {
+                        "type": insight.get("type", "pattern"),
+                        "text": text,
+                        "priority": insight.get("priority", 1),
+                    }
+                )
+
+            # Ensure nudge_config structure
+            # Note: risky_days, risk_level, needs_extra_motivation, best_nudge_time
+            # are now computed deterministically in _generate_insights, so we just
+            # ensure defaults here (they'll be overwritten by computed values)
             nudge_config = data.get("nudge_config", {})
             if not isinstance(nudge_config, dict):
                 nudge_config = {}
 
-            # Ensure required nudge_config fields
             nudge_config.setdefault("risky_days", [])
             nudge_config.setdefault("risk_level", "medium")
-            nudge_config.setdefault("best_nudge_time", "09:00")
+            nudge_config.setdefault("best_nudge_time", None)
             nudge_config.setdefault("needs_extra_motivation", False)
 
             return {
-                "insights": insights,
+                "insights": normalized_insights,
                 "nudge_config": nudge_config,
                 "summary": data.get("summary", ""),
             }
 
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse AI response: {e}")
+            logger.error(f"Response was: {response[:500]}")
             return {
                 "insights": [
                     {

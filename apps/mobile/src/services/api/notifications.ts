@@ -72,9 +72,21 @@ export interface NotificationHistoryItem {
   sent_at: string;
   delivered_at?: string | null;
   opened_at?: string | null;
+  dismissed_at?: string | null;
   entity_type?: string | null;
   entity_id?: string | null;
   created_at: string;
+}
+
+/** Admin broadcast (in-app modal) */
+export interface Broadcast {
+  id: string;
+  title: string;
+  body: string;
+  image_url?: string | null;
+  cta_label?: string | null;
+  cta_url?: string | null;
+  deeplink?: string | null;
 }
 
 class NotificationsService extends BaseApiService {
@@ -156,6 +168,25 @@ class NotificationsService extends BaseApiService {
     return this.delete<{ success: boolean }>(
       `${ROUTES.NOTIFICATIONS.UNREGISTER_DEVICE}?fcm_token=${encodeURIComponent(fcmToken)}`
     );
+  }
+
+  /**
+   * List active admin broadcasts for current user (in-app modal).
+   */
+  async getActiveBroadcasts(): Promise<ApiResponse<Broadcast[]>> {
+    return this.get<Broadcast[]>(ROUTES.NOTIFICATIONS.BROADCASTS_ACTIVE);
+  }
+
+  /**
+   * Mark broadcast as seen/dismissed (fire-and-forget).
+   */
+  async markBroadcastSeen(
+    broadcastId: string,
+    dismissed: boolean = false
+  ): Promise<ApiResponse<{ success: boolean }>> {
+    return this.post<{ success: boolean }>(ROUTES.NOTIFICATIONS.BROADCAST_MARK_SEEN(broadcastId), {
+      dismissed
+    });
   }
 }
 

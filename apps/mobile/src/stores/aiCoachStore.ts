@@ -49,6 +49,7 @@ interface AICoachState {
   closeModal: () => void;
   setSelectedLanguage: (language: string) => void;
   setCurrentConversationId: (id: string | null) => void;
+  setFocusedGoalId: (id: string | null) => void;
 
   // Streaming actions
   setPendingAIResponse: (response: PendingAIResponse | null) => void;
@@ -85,6 +86,10 @@ export const useAICoachStore = create<AICoachState>()(
 
       setCurrentConversationId: (id: string | null) => {
         set({ currentConversationId: id });
+      },
+
+      setFocusedGoalId: (id: string | null) => {
+        set({ focusedGoalId: id });
       },
 
       setPendingAIResponse: (response: PendingAIResponse | null) => {

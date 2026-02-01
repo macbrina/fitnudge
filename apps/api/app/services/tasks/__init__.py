@@ -27,10 +27,8 @@ from app.services.tasks.goal_tasks import (
     precreate_daily_checkins_task,  # Hourly: pre-create pending check-ins
     mark_missed_checkins_task,  # Hourly: mark pending as missed at EOD
     catchup_missing_checkins_task,  # Manual: backfill missing check-ins after maintenance
-    update_goal_streak_task,  # Legacy: kept for manual recalculation
     reset_missed_streaks_task,  # Hourly: reset streaks for missed days
     reset_weekly_completions_task,  # Monday: reset week_completions counter
-    detect_patterns_task,  # Weekly: detect user patterns for AI context
     detect_user_patterns_single_task,  # On-demand: single user pattern detection
     generate_goal_insights_task,  # On-demand: single goal insights (background)
     build_ai_context_task,  # On-demand: build AI context for chat
@@ -96,6 +94,16 @@ from app.services.tasks.motivation_tasks import (
     send_morning_motivations,
 )
 
+# Live Activities (ActivityKit)
+from app.services.tasks.live_activity_tasks import (
+    refresh_live_activity_for_user_task,
+)
+
+# Android NextUp Mode B (FCM)
+from app.services.tasks.nextup_fcm_tasks import (
+    refresh_nextup_fcm_for_user_task,
+)
+
 # Adaptive Nudging tasks (V2 Premium)
 # - Smart notifications based on user patterns
 from app.services.tasks.adaptive_nudging_tasks import (
@@ -119,10 +127,8 @@ __all__ = [
     "precreate_daily_checkins_task",
     "mark_missed_checkins_task",
     "catchup_missing_checkins_task",
-    "update_goal_streak_task",
     "reset_missed_streaks_task",
     "reset_weekly_completions_task",
-    "detect_patterns_task",
     "detect_user_patterns_single_task",
     "generate_goal_insights_task",
     "build_ai_context_task",
@@ -156,6 +162,10 @@ __all__ = [
     # Motivation tasks (V2)
     "generate_checkin_ai_response",
     "send_morning_motivations",
+    # Live Activities (ActivityKit)
+    "refresh_live_activity_for_user_task",
+    # Android NextUp Mode B (FCM)
+    "refresh_nextup_fcm_for_user_task",
     # Adaptive Nudging tasks (V2 Premium)
     "check_streak_at_risk_task",
     "check_risky_day_warning_task",

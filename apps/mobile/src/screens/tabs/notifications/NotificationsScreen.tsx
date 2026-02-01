@@ -5,10 +5,13 @@ import {
   FlatList,
   TouchableOpacity,
   RefreshControl,
-  ActivityIndicator
+  ActivityIndicator,
+  useWindowDimensions
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import RenderHtml from "react-native-render-html";
+import type { StylesConfig } from "react-native-render-html";
 import { useTranslation } from "@/lib/i18n";
 import { useStyles, useTheme } from "@/themes";
 import { tokens } from "@/themes/tokens";
@@ -30,8 +33,25 @@ import {
   categorizeNotificationType,
   getNotificationIcon
 } from "@/hooks/api/useNotificationHistory";
+import { useMarkBroadcastSeen } from "@/hooks/api/useBroadcasts";
+import { BroadcastModal } from "@/components/broadcasts";
+import type { Broadcast } from "@/services/api/notifications";
+import { CARD_PADDING_VALUES } from "@/constants/general";
 
 type NotificationTab = "all" | "activity" | "requests" | "system";
+
+function wrapBodyAsHtml(body: string): string {
+  const raw = body?.trim() || "";
+  if (!raw) return "<p></p>";
+  const looksLikeHtml = /<[a-z][^>]*>/i.test(raw);
+  if (looksLikeHtml) return raw;
+  const escaped = raw
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+  return `<p>${escaped}</p>`;
+}
 
 export default function NotificationsScreen() {
   const styles = useStyles(makeStyles);
@@ -39,10 +59,75 @@ export default function NotificationsScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const tabBarInsets = useTabBarInsets();
+  const { width } = useWindowDimensions();
+
+  const cardHtmlContentWidth = width - toRN(tokens.spacing[4]) * 4 - 44 - toRN(tokens.spacing[3]);
+  const cardBodyLineHeight = toRN(tokens.typography.fontSize.sm) * 1.4;
+  const cardBodyMaxHeight = cardBodyLineHeight * 3;
+
+  const cardHtmlTagsStyles: StylesConfig["tagsStyles"] = useMemo(
+    () => ({
+      p: {
+        color: colors.text.secondary,
+        fontSize: toRN(tokens.typography.fontSize.sm),
+        fontFamily: fontFamily.regular,
+        lineHeight: cardBodyLineHeight,
+        marginTop: 0,
+        marginBottom: toRN(4)
+      },
+      strong: { fontFamily: fontFamily.bold, color: colors.text.primary },
+      b: { fontFamily: fontFamily.bold, color: colors.text.primary },
+      em: { fontFamily: fontFamily.regular, fontStyle: "italic", color: colors.text.secondary },
+      i: { fontFamily: fontFamily.regular, fontStyle: "italic", color: colors.text.secondary },
+      a: { color: brandColors.primary, textDecorationLine: "underline" },
+      ul: { marginTop: 0, marginBottom: toRN(4), paddingLeft: toRN(20) },
+      ol: { marginTop: 0, marginBottom: toRN(4), paddingLeft: toRN(20) },
+      li: {
+        color: colors.text.secondary,
+        fontSize: toRN(tokens.typography.fontSize.sm),
+        fontFamily: fontFamily.regular,
+        lineHeight: cardBodyLineHeight,
+        marginBottom: toRN(2)
+      },
+      img: {
+        maxWidth: "100%",
+        width: "100%"
+      }
+    }),
+    [colors.text.primary, colors.text.secondary, brandColors.primary, cardBodyLineHeight]
+  );
+  const cardHtmlBaseStyle = useMemo(
+    () => ({ color: colors.text.secondary }),
+    [colors.text.secondary]
+  );
+  const cardHtmlSystemFonts = useMemo(
+    () => [fontFamily.regular, fontFamily.medium, fontFamily.bold],
+    []
+  );
+  const cardHtmlRenderersProps = useMemo(
+    () => ({
+      img: {
+        enableExperimentalPercentWidth: true,
+        containerProps: {
+          style: {
+            borderRadius: toRN(8),
+            overflow: "hidden",
+            marginTop: toRN(4),
+            marginBottom: toRN(4)
+          }
+        }
+      }
+    }),
+    []
+  );
 
   const [activeTab, setActiveTab] = useState<NotificationTab>("all");
   const [refreshing, setRefreshing] = useState(false);
   const [, setTimeTick] = useState(0);
+  const [adminBroadcastModalItem, setAdminBroadcastModalItem] =
+    useState<NotificationHistoryItem | null>(null);
+
+  const markBroadcastSeen = useMarkBroadcastSeen();
 
   // Update relative times every minute
   useEffect(() => {
@@ -141,7 +226,22 @@ export default function NotificationsScreen() {
   // Handle notification press
   const handleNotificationPress = useCallback(
     (notification: NotificationHistoryItem) => {
-      // Mark as opened
+      const isAdminBroadcast =
+        notification.notification_type === "general" &&
+        notification.entity_type === "admin_broadcast";
+
+      if (isAdminBroadcast) {
+        if (!notification.opened_at && notification.entity_id) {
+          markBroadcastSeen.mutate(
+            { broadcastId: notification.entity_id, dismissed: false },
+            { onSettled: () => {} }
+          );
+        }
+        setAdminBroadcastModalItem(notification);
+        return;
+      }
+
+      // Mark as opened (non–admin-broadcast)
       if (!notification.opened_at) {
         markOpenedMutation.mutate(notification.id);
       }
@@ -229,13 +329,57 @@ export default function NotificationsScreen() {
           break;
       }
     },
-    [router, markOpenedMutation]
+    [router, markOpenedMutation, markBroadcastSeen]
   );
+
+  const handleAdminBroadcastModalClose = useCallback(() => {
+    const item = adminBroadcastModalItem;
+    setAdminBroadcastModalItem(null);
+    if (item?.entity_id) {
+      markBroadcastSeen.mutate(
+        { broadcastId: item.entity_id, dismissed: true },
+        { onSettled: () => {} }
+      );
+    }
+  }, [adminBroadcastModalItem, markBroadcastSeen]);
+
+  const adminBroadcastForModal: Broadcast | null = useMemo(() => {
+    if (!adminBroadcastModalItem) return null;
+    const d = adminBroadcastModalItem.data as Record<string, unknown> | undefined;
+    return {
+      id: adminBroadcastModalItem.entity_id ?? "",
+      title: adminBroadcastModalItem.title,
+      body: adminBroadcastModalItem.body,
+      image_url: (d?.image_url as string) ?? null,
+      cta_label: (d?.cta_label as string) ?? null,
+      cta_url: (d?.cta_url as string) ?? null,
+      deeplink: (d?.deeplink as string) ?? null
+    };
+  }, [adminBroadcastModalItem]);
 
   // Render notification card
   const renderNotificationCard = ({ item }: { item: NotificationHistoryItem }) => {
     const icon = getNotificationIcon(item.notification_type);
     const isUnread = !item.opened_at;
+    const isAdminBroadcast =
+      item.notification_type === "general" && item.entity_type === "admin_broadcast";
+
+    const bodyContent = isAdminBroadcast ? (
+      <View style={[styles.cardBodyWrap, { maxHeight: cardBodyMaxHeight }]}>
+        <RenderHtml
+          contentWidth={cardHtmlContentWidth}
+          source={{ html: wrapBodyAsHtml(item.body ?? "") }}
+          tagsStyles={cardHtmlTagsStyles}
+          systemFonts={cardHtmlSystemFonts}
+          renderersProps={cardHtmlRenderersProps}
+          baseStyle={cardHtmlBaseStyle}
+        />
+      </View>
+    ) : (
+      <Text style={styles.cardBody} numberOfLines={3}>
+        {item.body}
+      </Text>
+    );
 
     return (
       <TouchableOpacity onPress={() => handleNotificationPress(item)} activeOpacity={0.7}>
@@ -258,9 +402,7 @@ export default function NotificationsScreen() {
                 {isUnread && <View style={styles.unreadDot} />}
               </View>
 
-              <Text style={styles.cardBody} numberOfLines={3}>
-                {item.body}
-              </Text>
+              {bodyContent}
 
               <Text style={styles.cardTime}>{formatRelativeTime(item.sent_at)}</Text>
             </View>
@@ -296,8 +438,16 @@ export default function NotificationsScreen() {
 
   // Render skeleton loading state
   const renderSkeletonCard = (index: number) => (
-    <Card key={`skeleton-${index}`} style={styles.notificationCard}>
-      <View style={styles.cardRow}>
+    <SkeletonBox
+      key={`skeleton-${index}`}
+      width="100%"
+      height={85}
+      borderRadius={toRN(tokens.borderRadius.xl)}
+      inner
+      innerPadding={CARD_PADDING_VALUES.SM}
+      style={styles.notificationCard}
+    >
+      <View style={[styles.cardRow, { padding: toRN(tokens.spacing[2]) }]}>
         {/* Icon skeleton */}
         <SkeletonBox width={44} height={44} borderRadius={22} style={{ marginRight: 12 }} />
 
@@ -309,7 +459,7 @@ export default function NotificationsScreen() {
           <SkeletonBox width={60} height={12} borderRadius={4} />
         </View>
       </View>
-    </Card>
+    </SkeletonBox>
   );
 
   const renderSkeletonLoading = () => (
@@ -403,6 +553,13 @@ export default function NotificationsScreen() {
 
       {/* Loading State - Skeleton */}
       {isLoading && filteredNotifications.length === 0 && renderSkeletonLoading()}
+
+      {/* Admin broadcast modal (System tab tap) */}
+      <BroadcastModal
+        visible={!!adminBroadcastModalItem}
+        broadcast={adminBroadcastForModal}
+        onClose={handleAdminBroadcastModalClose}
+      />
     </View>
   );
 }
@@ -512,6 +669,10 @@ const makeStyles = (tokens: any, colors: any, brandColors: any) => ({
     color: colors.text.secondary,
     marginBottom: toRN(tokens.spacing[2]),
     lineHeight: toRN(tokens.typography.fontSize.sm) * 1.4
+  },
+  cardBodyWrap: {
+    overflow: "hidden" as const,
+    marginBottom: toRN(tokens.spacing[2])
   },
   cardTime: {
     fontSize: toRN(tokens.typography.fontSize.xs),

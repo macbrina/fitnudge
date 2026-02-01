@@ -5,8 +5,9 @@ from passlib.context import CryptContext
 from fastapi import HTTPException, status
 from app.core.config import settings
 from app.core.database import get_supabase_client
-import secrets
 import hashlib
+import random
+import secrets
 
 # Password hashing: prefer pbkdf2_sha256 for portability, still verify bcrypt
 pwd_context = CryptContext(
@@ -301,6 +302,10 @@ async def create_user(user_data: Dict[str, Any]) -> Dict[str, Any]:
     # Set default timezone to UTC if not provided
     if "timezone" not in user_data or not user_data.get("timezone"):
         user_data["timezone"] = "UTC"
+
+    # Default profile avatar (1–32) when none provided (e.g. email signup, Apple OAuth)
+    if not user_data.get("profile_picture_url"):
+        user_data["profile_picture_url"] = str(random.randint(1, 32))
 
     email = user_data.get("email")
 

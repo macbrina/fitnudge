@@ -1,5 +1,36 @@
 import "dotenv/config";
 import { ConfigContext, ExpoConfig } from "expo/config";
+import { withPodfile } from "expo/config-plugins";
+
+const RNFB_PODFILE_SNIPPET = `
+  # --- RNFirebase non-modular header fix (Expo SDK 54 + use_frameworks) ---
+  installer.pods_project.targets.each do |target|
+    if target.name.start_with?("RNFB")
+      target.build_configurations.each do |config|
+        config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+      end
+    end
+  end
+  # --- end fix ---
+`;
+
+function withRNFBNonModularHeadersFix(config: ExpoConfig): ExpoConfig {
+  return withPodfile(config, (c) => {
+    const contents = c.modResults.contents ?? "";
+    if (contents.includes("RNFirebase non-modular header fix")) return c;
+    let next: string;
+    if (contents.match(/post_install do \|installer\|/)) {
+      next = contents.replace(
+        /post_install do \|installer\|\n/,
+        (m) => m + RNFB_PODFILE_SNIPPET + "\n"
+      );
+    } else {
+      next = contents + `\npost_install do |installer|\n` + RNFB_PODFILE_SNIPPET + `\nend\n`;
+    }
+    c.modResults.contents = next;
+    return c;
+  });
+}
 
 const reverseClientId = (clientId: string): string => {
   return clientId.split(".").reverse().join(".");
@@ -29,8 +60,11 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     return entry !== googlePluginName;
   });
 
-  const plugins: NonNullable<ExpoConfig["plugins"]> = [
+  // Expo's config plugin type supports functions, but ExpoConfig TS types are narrower.
+  // Use `any` here so `tsc --noEmit` passes.
+  const plugins: any[] = [
     ...filteredPlugins,
+    withRNFBNonModularHeadersFix,
     [
       googlePluginName,
       {

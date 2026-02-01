@@ -80,6 +80,9 @@ cp .env.example .env
 
 # Start development server
 poetry run uvicorn main:app --reload --host 0.0.0.0 --port 8000
+
+# Production: run via python main.py (or uvicorn with --workers N). With ENVIRONMENT=production,
+# main.py uses UVICORN_WORKERS (default 4) so sync Supabase work in one request doesn't block others.
 ```
 
 ### Running Celery Worker for Background Tasks
@@ -241,16 +244,6 @@ WHERE user_id = 'your-user-id';
 For production, you'll want to run the worker as a service. See the [Deployment Guide](docs/Deployment.md) for details.
 
 ## 📊 Monitoring
-
-### New Relic APM
-
-New Relic monitoring is automatically enabled when `NEW_RELIC_LICENSE_KEY` is set in your environment variables. The monitoring includes:
-
-- **Application Performance Monitoring (APM)**
-- **Error tracking and alerting**
-- **Database query monitoring**
-- **Custom metrics and dashboards**
-- **Distributed tracing**
 
 ### PostHog Analytics
 
@@ -482,8 +475,7 @@ pytest tests/test_auth.py
 ## 📊 Monitoring
 
 - **Health Checks**: `/health` endpoint for monitoring
-- **Error Tracking**: Sentry integration
-- **Performance**: New Relic APM
+- **Error Tracking**: Sentry integration (when configured)
 - **Logging**: Structured JSON logging
 - **Metrics**: Custom business metrics
 

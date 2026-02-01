@@ -590,6 +590,9 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
           setOptimisticPlan(purchasedTier);
         }
 
+        // Set timestamp BEFORE refresh to prevent prefetch on AppState changes
+        useSubscriptionStore.getState().setLastSubscriptionRefresh();
+
         // Mark user as subscribed so they don't see exit offers again
         await markAsSubscribed();
 

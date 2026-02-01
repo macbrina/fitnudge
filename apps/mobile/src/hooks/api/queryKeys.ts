@@ -14,6 +14,8 @@ export const goalsQueryKeys = {
   active: () => [...goalsQueryKeys.all, "active"] as const,
   // Archived goals only
   archived: () => [...goalsQueryKeys.all, "archived"] as const,
+  // Completed goals only
+  completed: () => [...goalsQueryKeys.all, "completed"] as const,
   // Single goal detail
   detail: (id: string) => [...goalsQueryKeys.all, "detail", id] as const,
   // Goal stats (single goal)

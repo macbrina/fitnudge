@@ -20,6 +20,8 @@ from fastapi import APIRouter, HTTPException, status, Depends, Query
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
+import pytz
+
 from app.core.flexible_auth import get_current_user
 from app.services.subscription_service import has_user_feature
 from app.services.tasks.analytics_refresh_tasks import (
@@ -205,6 +207,9 @@ async def get_analytics_dashboard(
             detail="Analytics are only available for active goals",
         )
 
+    user_tz = current_user.get("timezone", "UTC")
+    end_date = _user_today_iso(user_tz)
+
     # ==========================================================================
     # Defensive: Pre-create today's check-in if it doesn't exist
     # This ensures accurate "today" status in heatmap/this_week_summary
@@ -212,7 +217,6 @@ async def get_analytics_dashboard(
     # ==========================================================================
     checkin_created = False
     try:
-        user_tz = current_user.get("timezone", "UTC")
         result = supabase.rpc(
             "precreate_checkin_for_goal",
             {
@@ -238,10 +242,10 @@ async def get_analytics_dashboard(
         invalidate_user_analytics_cache(user_id, goal_id)
 
     # ==========================================================================
-    # Check Redis cache first (key now includes goal_id)
+    # Check Redis cache first (key includes goal_id and end_date for timezone correctness)
     # ==========================================================================
     if not skip_cache:
-        cached_data = get_cached_analytics(user_id, days, goal_id)
+        cached_data = get_cached_analytics(user_id, days, goal_id, end_date)
         if cached_data:
             return _transform_to_response(cached_data, cache_hit=True)
 
@@ -249,10 +253,15 @@ async def get_analytics_dashboard(
     # Cache miss - fetch from database
     # ==========================================================================
     try:
-        # Call RPC function with goal_id
+        # Call RPC with user's local "today" so completion_rate matches SingleGoalScreen
         result = supabase.rpc(
             "get_analytics_dashboard",
-            {"p_user_id": user_id, "p_goal_id": goal_id, "p_days": days},
+            {
+                "p_user_id": user_id,
+                "p_goal_id": goal_id,
+                "p_days": days,
+                "p_end_date": end_date,
+            },
         ).execute()
 
         if not result.data:
@@ -281,7 +290,7 @@ async def get_analytics_dashboard(
         # ==========================================================================
         # Store in Redis cache for next request
         # ==========================================================================
-        set_cached_analytics(user_id, days, data, goal_id)
+        set_cached_analytics(user_id, days, data, goal_id, end_date)
 
         return _transform_to_response(data, cache_hit=False)
 
@@ -318,17 +327,19 @@ async def get_analytics_cache_status(
             "message": "Redis not configured",
         }
 
-    # Check if cached for common time ranges
-    cache_status = {}
-    for days in [7, 30, 90, 365]:
-        cache_key = f"analytics:dashboard:{user_id}:{days}"
-        try:
-            cached = redis.get(cache_key)
-            cache_status[f"{days}_days"] = cached is not None
-        except Exception:
-            cache_status[f"{days}_days"] = False
+    # Keys are analytics:dashboard:{user_id}:{goal_id}:{days}:{end_date}
+    pattern = f"analytics:dashboard:{user_id}:*"
+    cached_count = 0
+    try:
+        cursor = 0
+        while True:
+            cursor, keys = redis.scan(cursor, match=pattern, count=100)
+            cached_count += len(keys)
+            if cursor == 0:
+                break
+    except Exception:
+        pass
 
-    # Get last refresh time
     try:
         last_refresh = redis.get("analytics:last_refresh")
         last_refresh_str = last_refresh.decode() if last_refresh else None
@@ -338,7 +349,8 @@ async def get_analytics_cache_status(
     return {
         "redis_available": True,
         "user_id": user_id,
-        "cache_status": cache_status,
+        "cached_any": cached_count > 0,
+        "cached_keys_count": cached_count,
         "last_mv_refresh": last_refresh_str,
     }
 
@@ -346,6 +358,15 @@ async def get_analytics_cache_status(
 # =============================================================================
 # HELPER FUNCTIONS
 # =============================================================================
+
+
+def _user_today_iso(user_timezone: str) -> str:
+    """Today's date (YYYY-MM-DD) in user's timezone. Falls back to UTC on error."""
+    try:
+        tz = pytz.timezone(user_timezone or "UTC")
+        return datetime.now(tz).date().isoformat()
+    except Exception:
+        return datetime.utcnow().date().isoformat()
 
 
 def _transform_to_response(data: dict, cache_hit: bool) -> AnalyticsDashboardResponse:

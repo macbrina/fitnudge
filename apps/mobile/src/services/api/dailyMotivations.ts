@@ -16,8 +16,9 @@ export interface DailyMotivation {
 
 // Daily Motivation Service
 export class DailyMotivationService extends BaseApiService {
-  async getToday(): Promise<ApiResponse<DailyMotivation>> {
-    return this.get<DailyMotivation>(ROUTES.DAILY_MOTIVATIONS.TODAY);
+  async getToday(timezone?: string): Promise<ApiResponse<DailyMotivation>> {
+    const params = timezone ? `?timezone=${encodeURIComponent(timezone)}` : "";
+    return this.get<DailyMotivation>(`${ROUTES.DAILY_MOTIVATIONS.TODAY}${params}`);
   }
 
   async getList(limit: number = 30, offset: number = 0): Promise<ApiResponse<DailyMotivation[]>> {
@@ -37,8 +38,9 @@ export class DailyMotivationService extends BaseApiService {
     );
   }
 
-  async regenerate(): Promise<ApiResponse<DailyMotivation>> {
-    return this.post<DailyMotivation>(ROUTES.DAILY_MOTIVATIONS.REGENERATE, {});
+  async regenerate(timezone?: string): Promise<ApiResponse<DailyMotivation>> {
+    const params = timezone ? `?timezone=${encodeURIComponent(timezone)}` : "";
+    return this.post<DailyMotivation>(`${ROUTES.DAILY_MOTIVATIONS.REGENERATE}${params}`, {});
   }
 }
 

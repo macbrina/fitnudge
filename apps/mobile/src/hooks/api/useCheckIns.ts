@@ -12,6 +12,7 @@ import { homeDashboardQueryKeys } from "./useHomeDashboard";
 // trackingStatsQueryKeys removed in V2
 // Import from shared queryKeys to avoid circular dependency
 import { checkInsQueryKeys, goalsQueryKeys } from "./queryKeys";
+import { liveSurfaceManager } from "@/features/nextUp/LiveSurfaceManager";
 
 // Re-export for backward compatibility
 export { checkInsQueryKeys };
@@ -20,14 +21,19 @@ export { checkInsQueryKeys };
 const EMPTY_CHECKINS_RESPONSE = { data: [], status: 200 };
 
 // Check-ins Hooks
-export const useCheckIns = (goalId?: string, options?: { limit?: number; enabled?: boolean }) => {
+export const useCheckIns = (
+  goalId?: string,
+  options?: { limit?: number; enabled?: boolean; staleTime?: number }
+) => {
   return useQuery({
     queryKey: checkInsQueryKeys.list(goalId),
     queryFn: () => checkInsService.getCheckIns(goalId, { limit: options?.limit ?? 30 }),
     // Enabled: if goalId provided, always enabled; if no goalId, check options.enabled (defaults to false)
     enabled: goalId ? true : (options?.enabled ?? false),
-    staleTime: 0, // Refetch immediately when invalidated (realtime updates)
-    refetchOnMount: true, // Always check for fresh data on mount
+    // Short staleTime to avoid refetch-on-mount spam when screen remounts (e.g. navigation).
+    // Realtime invalidate still triggers immediate refetch. 30s is enough to dedupe rapid remounts.
+    staleTime: options?.staleTime ?? 30 * 1000,
+    refetchOnMount: true, // Refetch when stale (e.g. after 30s or when invalidated)
     placeholderData: EMPTY_CHECKINS_RESPONSE
   });
 };
@@ -73,6 +79,12 @@ export const useCreateCheckIn = () => {
         checkInsQueryKeys.list(newCheckIn.goal_id)
       );
       const previousDashboard = queryClient.getQueryData(homeDashboardQueryKeys.dashboard());
+      const previousDateRangeQueries = newCheckIn.goal_id
+        ? queryClient.getQueriesData({ queryKey: checkInsQueryKeys.all })
+        : [];
+      const previousInsights = newCheckIn.goal_id
+        ? queryClient.getQueryData(goalsQueryKeys.insights(newCheckIn.goal_id))
+        : undefined;
 
       // Snapshot progress data for rollback
       let previousProgressData: ProgressOptimisticContext | undefined;
@@ -80,10 +92,17 @@ export const useCreateCheckIn = () => {
         previousProgressData = snapshotProgressData(queryClient, newCheckIn.goal_id, today);
       }
 
+      const optimisticStatus = newCheckIn.is_rest_day
+        ? "rest_day"
+        : newCheckIn.completed
+          ? "completed"
+          : "skipped";
+
       // Create optimistic check-in
       const optimisticCheckIn = {
         id: `temp-${Date.now()}`,
         ...newCheckIn,
+        status: optimisticStatus,
         check_in_date: newCheckIn.check_in_date || today,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -92,12 +111,32 @@ export const useCreateCheckIn = () => {
       // Add to today's check-ins
       queryClient.setQueryData(checkInsQueryKeys.today(), (old: any) => {
         if (!old?.data) return old;
+        const existingIdx = old.data.findIndex(
+          (c: any) =>
+            c.goal_id === optimisticCheckIn.goal_id &&
+            c.check_in_date === optimisticCheckIn.check_in_date
+        );
+        if (existingIdx >= 0) {
+          const next = [...old.data];
+          next[existingIdx] = optimisticCheckIn;
+          return { ...old, data: next };
+        }
         return { ...old, data: [...old.data, optimisticCheckIn] };
       });
 
       // Add to goal's check-ins
       queryClient.setQueryData(checkInsQueryKeys.list(newCheckIn.goal_id), (old: any) => {
         if (!old?.data) return old;
+        const existingIdx = old.data.findIndex(
+          (c: any) =>
+            c.goal_id === optimisticCheckIn.goal_id &&
+            c.check_in_date === optimisticCheckIn.check_in_date
+        );
+        if (existingIdx >= 0) {
+          const next = [...old.data];
+          next[existingIdx] = optimisticCheckIn;
+          return { ...old, data: next };
+        }
         return { ...old, data: [...old.data, optimisticCheckIn] };
       });
 
@@ -123,11 +162,113 @@ export const useCreateCheckIn = () => {
         );
       }
 
+      // Optimistically bump insights checkins_count (insufficient_data UI)
+      // AND set status to "generating" only if we have enough check-ins (>= min_required)
+      if (newCheckIn.goal_id) {
+        queryClient.setQueryData(goalsQueryKeys.insights(newCheckIn.goal_id), (old: any) => {
+          if (!old) {
+            // Query hasn't been fetched yet - create optimistic entry
+            // Don't set to generating if we don't know min_required yet
+            return {
+              data: {
+                goal_id: newCheckIn.goal_id,
+                status: "insufficient_data",
+                insights: [],
+                checkins_count: 1
+              },
+              status: 200
+            };
+          }
+
+          if (!old.data) {
+            // Data doesn't exist yet - create optimistic entry
+            // Don't set to generating if we don't know min_required yet
+            return {
+              ...old,
+              data: {
+                goal_id: newCheckIn.goal_id,
+                status: "insufficient_data",
+                insights: [],
+                checkins_count: 1
+              }
+            };
+          }
+
+          // Calculate new checkins_count
+          const newCheckinsCount =
+            typeof old.data.checkins_count === "number" ? old.data.checkins_count + 1 : 1;
+
+          // Get min_required - try to calculate if not available
+          let minRequired = old.data.min_required;
+          if (minRequired === null || minRequired === undefined) {
+            // Try to get from goal data if available
+            const goalData = queryClient.getQueryData(
+              goalsQueryKeys.detail(newCheckIn.goal_id)
+            ) as any;
+            const frequencyCount = goalData?.data?.frequency_count ?? 7;
+            // Calculate using same formula as backend: max(3, min(7, frequency_count * 2))
+            const twoWeeksWorth = frequencyCount * 2;
+            minRequired = Math.max(3, Math.min(7, twoWeeksWorth));
+          }
+
+          // Only set to "generating" if we have enough check-ins
+          const shouldGenerate = newCheckinsCount >= minRequired;
+
+          // Update existing insights data
+          const updatedData = {
+            ...old.data,
+            status: shouldGenerate
+              ? ("generating" as const) // Set to generating only if enough check-ins
+              : ("insufficient_data" as const), // Keep as insufficient_data if not enough
+            checkins_count: newCheckinsCount,
+            // Preserve min_required so it's available for future check-ins
+            min_required: minRequired
+          };
+
+          return {
+            ...old,
+            data: updatedData
+          };
+        });
+      }
+
+      // Optimistically update any cached dateRange queries (used by SingleGoalScreen stats)
+      if (newCheckIn.goal_id) {
+        const optimisticDate = optimisticCheckIn.check_in_date;
+        const dateRangeQueries = queryClient.getQueriesData({ queryKey: checkInsQueryKeys.all });
+        for (const [key] of dateRangeQueries) {
+          const k = key as unknown as (string | undefined)[];
+          if (k[0] !== "checkIns" || k[1] !== "dateRange") continue;
+          const start = k[2] as string | undefined;
+          const end = k[3] as string | undefined;
+          const goalId = k[4] as string | undefined;
+          if (!start || !end || goalId !== newCheckIn.goal_id) continue;
+          if (optimisticDate < start || optimisticDate > end) continue;
+
+          queryClient.setQueryData(key, (old: any) => {
+            if (!old?.data) return old;
+            const existingIdx = old.data.findIndex(
+              (c: any) =>
+                c.goal_id === optimisticCheckIn.goal_id &&
+                c.check_in_date === optimisticCheckIn.check_in_date
+            );
+            if (existingIdx >= 0) {
+              const next = [...old.data];
+              next[existingIdx] = optimisticCheckIn;
+              return { ...old, data: next };
+            }
+            return { ...old, data: [...old.data, optimisticCheckIn] };
+          });
+        }
+      }
+
       return {
         previousTodayCheckIns,
         previousGoalCheckIns,
         previousDashboard,
         previousProgressData,
+        previousDateRangeQueries,
+        previousInsights,
         goalId: newCheckIn.goal_id
       };
     },
@@ -149,6 +290,18 @@ export const useCreateCheckIn = () => {
       if (context?.previousProgressData) {
         rollbackProgressData(queryClient, context.previousProgressData);
       }
+      if (context?.goalId && context?.previousInsights !== undefined) {
+        queryClient.setQueryData(goalsQueryKeys.insights(context.goalId), context.previousInsights);
+      }
+      if (context?.previousDateRangeQueries?.length) {
+        for (const [key, data] of context.previousDateRangeQueries) {
+          queryClient.setQueryData(key, data);
+        }
+      }
+      // Refresh persistent "Next up" surface after rollback.
+      liveSurfaceManager
+        .updateFromQueryClient(queryClient)
+        .catch((e) => console.warn("[NextUp] update failed:", e));
     },
     onSuccess: (response, variables) => {
       // Replace optimistic with real data
@@ -156,25 +309,81 @@ export const useCreateCheckIn = () => {
       if (realCheckIn) {
         queryClient.setQueryData(checkInsQueryKeys.today(), (old: any) => {
           if (!old?.data) return old;
-          // Filter out temp IDs AND the real ID (in case realtime already added it)
-          const filtered = old.data.filter(
-            (c: any) => !c.id?.startsWith?.("temp-") && c.id !== realCheckIn.id
+          const idx = old.data.findIndex((c: any) => c.id?.startsWith?.("temp-"));
+          if (idx >= 0) {
+            const next = [...old.data];
+            next[idx] = realCheckIn;
+            return { ...old, data: next };
+          }
+          const existingIdx = old.data.findIndex(
+            (c: any) =>
+              c.goal_id === realCheckIn.goal_id && c.check_in_date === realCheckIn.check_in_date
           );
+          if (existingIdx >= 0) {
+            const next = [...old.data];
+            next[existingIdx] = realCheckIn;
+            return { ...old, data: next };
+          }
+
+          const filtered = old.data.filter((c: any) => c.id !== realCheckIn.id);
           return { ...old, data: [...filtered, realCheckIn] };
         });
 
         queryClient.setQueryData(checkInsQueryKeys.list(variables.goal_id), (old: any) => {
           if (!old?.data) return old;
-          // Filter out temp IDs AND the real ID (in case realtime already added it)
-          const filtered = old.data.filter(
-            (c: any) => !c.id?.startsWith?.("temp-") && c.id !== realCheckIn.id
+          const idx = old.data.findIndex((c: any) => c.id?.startsWith?.("temp-"));
+          if (idx >= 0) {
+            const next = [...old.data];
+            next[idx] = realCheckIn;
+            return { ...old, data: next };
+          }
+          const existingIdx = old.data.findIndex(
+            (c: any) =>
+              c.goal_id === realCheckIn.goal_id && c.check_in_date === realCheckIn.check_in_date
           );
+          if (existingIdx >= 0) {
+            const next = [...old.data];
+            next[existingIdx] = realCheckIn;
+            return { ...old, data: next };
+          }
+          const filtered = old.data.filter((c: any) => c.id !== realCheckIn.id);
           return { ...old, data: [...filtered, realCheckIn] };
         });
 
-        // Note: No need to update insights checkins_count here.
-        // With pre-created pending check-ins, the count already includes today's check-in.
-        // User responding updates the existing check-in, not creating a new one.
+        // Replace optimistic in any cached dateRange queries
+        const dateRangeQueries = queryClient.getQueriesData({ queryKey: checkInsQueryKeys.all });
+        for (const [key] of dateRangeQueries) {
+          const k = key as unknown as (string | undefined)[];
+          if (k[0] !== "checkIns" || k[1] !== "dateRange") continue;
+          const start = k[2] as string | undefined;
+          const end = k[3] as string | undefined;
+          const goalId = k[4] as string | undefined;
+          if (!start || !end || goalId !== variables.goal_id) continue;
+          if (realCheckIn.check_in_date < start || realCheckIn.check_in_date > end) continue;
+
+          queryClient.setQueryData(key, (old: any) => {
+            if (!old?.data) return old;
+            const idx = old.data.findIndex((c: any) => c.id?.startsWith?.("temp-"));
+            if (idx >= 0) {
+              const next = [...old.data];
+              next[idx] = realCheckIn;
+              return { ...old, data: next };
+            }
+            const existingIdx = old.data.findIndex(
+              (c: any) =>
+                c.goal_id === realCheckIn.goal_id && c.check_in_date === realCheckIn.check_in_date
+            );
+            if (existingIdx >= 0) {
+              const next = [...old.data];
+              next[existingIdx] = realCheckIn;
+              return { ...old, data: next };
+            }
+            const filtered = old.data.filter((c: any) => c.id !== realCheckIn.id);
+            return { ...old, data: [...filtered, realCheckIn] };
+          });
+        }
+
+        // Insights checkins_count already updated optimistically in onMutate.
       }
 
       // Invalidate home dashboard
@@ -187,7 +396,24 @@ export const useCreateCheckIn = () => {
       if (variables.goal_id) {
         queryClient.invalidateQueries({ queryKey: checkInsQueryKeys.streak(variables.goal_id) });
         queryClient.invalidateQueries({ queryKey: goalsQueryKeys.detail(variables.goal_id) });
+        // Invalidate dateRange (last-30) so SingleGoalScreen completion rate refetches and includes new check-in
+        queryClient.invalidateQueries({
+          predicate: (query) => {
+            const k = query.queryKey as unknown[];
+            return (
+              Array.isArray(k) &&
+              k[0] === "checkIns" &&
+              k[1] === "dateRange" &&
+              k[4] === variables.goal_id
+            );
+          }
+        });
       }
+
+      // Event-driven: update persistent "Next up" surface immediately from cache.
+      liveSurfaceManager
+        .updateFromQueryClient(queryClient)
+        .catch((e) => console.warn("[NextUp] update failed:", e));
     }
   });
 };
@@ -285,6 +511,9 @@ export const useUpdateCheckIn = () => {
       if (context?.previousProgressData) {
         rollbackProgressData(queryClient, context.previousProgressData);
       }
+      liveSurfaceManager
+        .updateFromQueryClient(queryClient)
+        .catch((e) => console.warn("[NextUp] update failed:", e));
     },
     onSuccess: (response, { checkInId }, context) => {
       const goalId = context?.goalId;
@@ -322,6 +551,10 @@ export const useUpdateCheckIn = () => {
         queryClient.invalidateQueries({ queryKey: checkInsQueryKeys.list(goalId) });
         queryClient.invalidateQueries({ queryKey: goalsQueryKeys.detail(goalId) });
       }
+
+      liveSurfaceManager
+        .updateFromQueryClient(queryClient)
+        .catch((e) => console.warn("[NextUp] update failed:", e));
     }
   });
 };
@@ -390,6 +623,9 @@ export const useDeleteCheckIn = () => {
       if (context?.previousTodayCheckIns) {
         queryClient.setQueryData(checkInsQueryKeys.today(), context.previousTodayCheckIns);
       }
+      liveSurfaceManager
+        .updateFromQueryClient(queryClient)
+        .catch((e) => console.warn("[NextUp] update failed:", e));
     },
     onSuccess: (_, __, context) => {
       const goalId = context?.goalId;
@@ -412,6 +648,10 @@ export const useDeleteCheckIn = () => {
         queryClient.invalidateQueries({ queryKey: checkInsQueryKeys.list(goalId) });
         queryClient.invalidateQueries({ queryKey: goalsQueryKeys.detail(goalId) });
       }
+
+      liveSurfaceManager
+        .updateFromQueryClient(queryClient)
+        .catch((e) => console.warn("[NextUp] update failed:", e));
     }
   });
 };

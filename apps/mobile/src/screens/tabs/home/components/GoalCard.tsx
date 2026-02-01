@@ -29,6 +29,7 @@ import Animated, {
   FadeIn,
   LinearTransition
 } from "react-native-reanimated";
+import { CARD_PADDING_VALUES } from "@/constants/general";
 
 interface GoalCardProps {
   goal: {
@@ -189,8 +190,8 @@ export function GoalCard({ goal, compact = false, onPress, onTalkToBuddy, style 
 
               {/* Streak */}
               <View style={styles.compactDetailRow}>
-                <Flame size={14} color={brandColors.primary} />
-                <Text style={[styles.compactDetailText, { color: brandColors.primary }]}>
+                <Flame size={14} color={colors.feedback.error} />
+                <Text style={styles.compactDetailText}>
                   {currentStreak} {t("goals.day_streak")}
                 </Text>
               </View>
@@ -234,17 +235,15 @@ export function GoalCard({ goal, compact = false, onPress, onTalkToBuddy, style 
           <View style={styles.statItem}>
             <Flame
               size={16}
-              color={currentStreak > 0 ? brandColors.primary : colors.text.tertiary}
+              color={currentStreak > 0 ? colors.feedback.error : colors.text.tertiary}
             />
-            <Text style={[styles.statValue, currentStreak > 0 && { color: brandColors.primary }]}>
-              {currentStreak}
-            </Text>
+            <Text style={styles.statValue}>{currentStreak}</Text>
             <Text style={styles.statLabel}>{t("goals.stats.streak")}</Text>
           </View>
 
           {/* Completions */}
           <View style={styles.statItem}>
-            <CheckCircle size={16} color={colors.feedback.success} />
+            <CheckCircle size={16} color={colors.text.secondary} />
             <Text style={styles.statValue}>{totalCompletions}</Text>
             <Text style={styles.statLabel}>{t("goals.stats.done")}</Text>
           </View>
@@ -289,15 +288,23 @@ interface GoalCardSkeletonProps {
 
 export function GoalCardSkeleton({ style }: GoalCardSkeletonProps) {
   const styles = useStyles(makeStyles);
+  const cardPadding = CARD_PADDING_VALUES.SM;
 
   return (
-    <Card style={[styles.compactContainer, style]}>
-      <View style={styles.compactMainRow}>
+    <SkeletonBox
+      width="100%"
+      height={75}
+      borderRadius={toRN(tokens.borderRadius.xl)}
+      inner
+      innerPadding={cardPadding}
+      style={style}
+    >
+      <View style={[styles.compactMainRow, { padding: toRN(tokens.spacing[2]) }]}>
         {/* Status icon skeleton */}
         <SkeletonBox width={20} height={20} borderRadius={10} />
 
         {/* Title section skeleton */}
-        <View style={styles.compactTitleSection}>
+        <View style={[styles.compactTitleSection, { gap: toRN(tokens.spacing[1]) }]}>
           <SkeletonBox
             width={160}
             height={toRN(tokens.typography.fontSize.base)}
@@ -316,7 +323,7 @@ export function GoalCardSkeleton({ style }: GoalCardSkeletonProps) {
           <SkeletonBox width={34} height={34} borderRadius={17} />
         </View>
       </View>
-    </Card>
+    </SkeletonBox>
   );
 }
 

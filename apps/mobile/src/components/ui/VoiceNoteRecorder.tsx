@@ -23,8 +23,8 @@ import { useMediaPermissions } from "@/hooks/media/useMediaPermissions";
 
 // Constants
 const DEFAULT_MAX_DURATION_SECONDS = 30;
-/** Stop recording this many seconds before max to avoid native buffer flush exceeding max. */
-const RECORDING_STOP_HEADROOM_SEC = 2;
+/** Stop recording this many seconds before max (0 = stop exactly at max). */
+const RECORDING_STOP_HEADROOM_SEC = 0;
 const BAR_COUNT = 20;
 const METERING_UPDATE_INTERVAL = 50; // ms
 
@@ -157,6 +157,10 @@ export function VoiceNoteRecorder({
   const hasStartedImmediatelyRef = useRef(false);
   const elapsedMsRef = useRef(0);
   const lastRecordedUrlRef = useRef<string | null>(null);
+  const autoStopTriggeredRef = useRef(false);
+  const stopRecordingRef = useRef<(() => Promise<{ uri: string | null; duration: number }>) | null>(
+    null
+  );
 
   const hasPremium = hasFeature("voice_notes");
 
@@ -173,13 +177,13 @@ export function VoiceNoteRecorder({
     isLoading: isPermissionLoading
   } = useMediaPermissions();
 
+  const stopAtSeconds = Math.max(1, maxDurationSeconds - RECORDING_STOP_HEADROOM_SEC);
+  const stopAtMs = stopAtSeconds * 1000;
+
   // Status listener: capture url when available (before stop disposes native object)
-  const handleRecordingStatusUpdate = useCallback(
-    (status: { url?: string | null; isFinished?: boolean }) => {
-      if (status.url) lastRecordedUrlRef.current = status.url;
-    },
-    []
-  );
+  const handleRecordingStatusUpdate = useCallback((status: { url?: string | null }) => {
+    if (status.url) lastRecordedUrlRef.current = status.url;
+  }, []);
 
   // expo-audio: HIGH_QUALITY preset uses platform-specific android/ios/web options (RecordingOptions)
   const audioRecorder = useAudioRecorder(
@@ -236,15 +240,6 @@ export function VoiceNoteRecorder({
     }
   }, [startImmediately, hasPremium, recordingState]);
 
-  const stopAtSeconds = Math.max(1, maxDurationSeconds - RECORDING_STOP_HEADROOM_SEC);
-
-  // Auto-stop at (max - headroom) to avoid buffer flush exceeding max
-  useEffect(() => {
-    if (duration >= stopAtSeconds && recordingState === "recording") {
-      stopRecording();
-    }
-  }, [duration, recordingState, stopAtSeconds]);
-
   // Metering for audio visualization
   const startMetering = useCallback(() => {
     meteringRef.current = setInterval(() => {
@@ -287,23 +282,23 @@ export function VoiceNoteRecorder({
       setDuration(0);
       progressAnim.setValue(0);
       elapsedMsRef.current = 0;
-
-      const TICK_MS = 50;
-      const stopAtMs = Math.max(1, maxDurationSeconds - RECORDING_STOP_HEADROOM_SEC) * 1000;
-
+      autoStopTriggeredRef.current = false;
+      if (timerRef.current) clearInterval(timerRef.current);
       timerRef.current = setInterval(() => {
-        elapsedMsRef.current = Math.min(elapsedMsRef.current + TICK_MS, stopAtMs);
-        const progress = elapsedMsRef.current / stopAtMs;
-        progressAnim.setValue(progress);
-        setDuration(Math.floor(elapsedMsRef.current / 1000));
-        if (elapsedMsRef.current >= stopAtMs) {
-          if (timerRef.current) {
-            clearInterval(timerRef.current);
-            timerRef.current = null;
-          }
-          stopRecording();
+        const status = (
+          audioRecorder as { getStatus?: () => { durationMillis?: number } }
+        )?.getStatus?.();
+        // console.log("status", status);
+        const durationMs = status?.durationMillis ?? Math.min(elapsedMsRef.current + 50, stopAtMs);
+        const clampedMs = Math.min(durationMs, stopAtMs);
+        elapsedMsRef.current = clampedMs;
+        setDuration(Math.floor(clampedMs / 1000));
+        progressAnim.setValue(clampedMs / stopAtMs);
+        if (durationMs >= stopAtMs && !autoStopTriggeredRef.current) {
+          autoStopTriggeredRef.current = true;
+          stopRecordingRef.current?.();
         }
-      }, TICK_MS);
+      }, 50);
 
       startMetering();
     } catch (err) {
@@ -312,10 +307,6 @@ export function VoiceNoteRecorder({
   };
 
   const pauseRecording = async () => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
     stopMetering();
 
     try {
@@ -330,23 +321,22 @@ export function VoiceNoteRecorder({
     try {
       audioRecorder.record();
       setRecordingState("recording");
-
-      const TICK_MS = 50;
-      const stopAtMs = Math.max(1, maxDurationSeconds - RECORDING_STOP_HEADROOM_SEC) * 1000;
-
+      autoStopTriggeredRef.current = false;
+      if (timerRef.current) clearInterval(timerRef.current);
       timerRef.current = setInterval(() => {
-        elapsedMsRef.current = Math.min(elapsedMsRef.current + TICK_MS, stopAtMs);
-        const progress = elapsedMsRef.current / stopAtMs;
-        progressAnim.setValue(progress);
-        setDuration(Math.floor(elapsedMsRef.current / 1000));
-        if (elapsedMsRef.current >= stopAtMs) {
-          if (timerRef.current) {
-            clearInterval(timerRef.current);
-            timerRef.current = null;
-          }
-          stopRecording();
+        const status = (
+          audioRecorder as { getStatus?: () => { durationMillis?: number } }
+        )?.getStatus?.();
+        const durationMs = status?.durationMillis ?? Math.min(elapsedMsRef.current + 50, stopAtMs);
+        const clampedMs = Math.min(durationMs, stopAtMs);
+        elapsedMsRef.current = clampedMs;
+        setDuration(Math.floor(clampedMs / 1000));
+        progressAnim.setValue(clampedMs / stopAtMs);
+        if (durationMs >= stopAtMs && !autoStopTriggeredRef.current) {
+          autoStopTriggeredRef.current = true;
+          stopRecordingRef.current?.();
         }
-      }, TICK_MS);
+      }, 50);
 
       startMetering();
     } catch (err) {
@@ -355,17 +345,23 @@ export function VoiceNoteRecorder({
   };
 
   const stopRecording = async (): Promise<{ uri: string | null; duration: number }> => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
     stopMetering();
 
     const noResult = { uri: null as string | null, duration: 0 };
     try {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
       await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
       let uri: string | null = null;
+      let statusDurationMs: number | null = null;
       try {
+        const status = (
+          audioRecorder as { getStatus?: () => { durationMillis?: number } }
+        )?.getStatus?.();
+        console.log("status", status);
+        statusDurationMs = status?.durationMillis ?? null;
         uri =
           lastRecordedUrlRef.current ??
           (audioRecorder as { getStatus?: () => { url?: string | null } })?.getStatus?.()?.url ??
@@ -374,9 +370,18 @@ export function VoiceNoteRecorder({
       } catch {
         uri = lastRecordedUrlRef.current;
       }
+
       await audioRecorder.stop();
       lastRecordedUrlRef.current = null;
-      const finalDuration = Math.floor(elapsedMsRef.current / 1000);
+      const durationMs = statusDurationMs ?? elapsedMsRef.current;
+      elapsedMsRef.current = durationMs;
+      const finalDuration = Math.floor(durationMs / 1000);
+      console.log("[VoiceNoteRecorder] stopRecording", {
+        elapsedMs: durationMs,
+        finalDuration,
+        statusDurationMs,
+        uri
+      });
       setRecordedUri(uri || null);
       setDuration(finalDuration);
       if (startImmediately && uri) {
@@ -391,13 +396,13 @@ export function VoiceNoteRecorder({
     }
   };
 
+  useEffect(() => {
+    stopRecordingRef.current = stopRecording;
+  }, [stopRecording]);
+
   const deleteRecording = async () => {
     // If currently recording or paused, stop first
     if (recordingState === "recording" || recordingState === "paused") {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
       stopMetering();
       try {
         await audioRecorder.stop();

@@ -8,6 +8,7 @@ Celery tasks for sending push notifications:
 
 """
 
+import random
 from typing import Dict, Any
 from app.services.tasks.base import (
     celery_app,
@@ -343,16 +344,6 @@ def send_scheduled_ai_motivations_task(self) -> Dict[str, Any]:
 
                 if notification_result.get("notification_id"):
                     sent_count += 1
-                    logger.info(
-                        f"Sent goal notification to {user_name} for '{goal_title}'",
-                        {
-                            "user_id": user_id,
-                            "goal_id": goal_id,
-                            "time": current_time,
-                            "streak": current_streak,
-                            "style": motivation_style,
-                        },
-                    )
                 else:
                     skipped_reasons["no_push_token"] += 1
                     skipped_count += 1
@@ -391,41 +382,6 @@ def send_scheduled_ai_motivations_task(self) -> Dict[str, Any]:
             raise self.retry(exc=e)
         return {"success": False, "error": str(e)}
 
-
-def _get_scheduled_days_in_range(
-    frequency_type: str,
-    target_days: list,
-    start_date,
-    end_date,
-) -> list:
-    """
-    Get all scheduled check-in dates in a date range based on goal schedule.
-
-    Args:
-        frequency_type: "daily" or "weekly"
-        target_days: List of day numbers (0=Sunday, 1=Monday, ..., 6=Saturday)
-        start_date: Start of range (inclusive)
-        end_date: End of range (inclusive)
-
-    Returns:
-        List of date objects that are scheduled check-in days
-    """
-    from datetime import timedelta
-
-    scheduled_dates = []
-    current = start_date
-
-    # Python weekday to our format: Python 0=Monday, Our 0=Sunday
-    python_to_our_weekday = {
-        0: 1,  # Monday -> 1
-        1: 2,  # Tuesday -> 2
-        2: 3,  # Wednesday -> 3
-        3: 4,  # Thursday -> 4
-        4: 5,  # Friday -> 5
-        5: 6,  # Saturday -> 6
-        6: 0,  # Sunday -> 0
-    }
-
     while current <= end_date:
         if frequency_type == "daily":
             scheduled_dates.append(current)
@@ -443,6 +399,35 @@ def _get_scheduled_days_in_range(
     return scheduled_dates
 
 
+REENGAGEMENT_INACTIVE_DAYS = (
+    7  # User has not opened app (no API call) for this many days
+)
+
+# Re-engagement messages; {user_name} is replaced per user. One chosen randomly per send.
+REENGAGEMENT_MESSAGES = [
+    {
+        "title": "We miss you, {user_name}! 💪",
+        "body": "Your goals are waiting for you. Let's get back on track!",
+    },
+    {
+        "title": "Hey {user_name}, you've got this! 🔥",
+        "body": "A little progress each day adds up. Ready to jump back in?",
+    },
+    {
+        "title": "Don't forget about your goals, {user_name} 👋",
+        "body": "Your streak is just a tap away. We're here when you're ready.",
+    },
+    {
+        "title": "{user_name}, your goals miss you! 💙",
+        "body": "Life gets busy. Whenever you're ready, we'll be here.",
+    },
+    {
+        "title": "Quick check-in, {user_name}? ⏰",
+        "body": "Just a minute a day can keep you on track. We believe in you!",
+    },
+]
+
+
 @celery_app.task(
     name="send_reengagement_notifications",
     bind=True,
@@ -451,16 +436,19 @@ def _get_scheduled_days_in_range(
 )
 def send_reengagement_notifications_task(self) -> Dict[str, Any]:
     """
-    Send re-engagement notifications to users who have missed scheduled check-ins.
+    Send re-engagement notifications to users who have not opened the app for 7+ days.
+
+    Distinct from check_missed_days_intervention (adaptive_nudging_tasks.py), which
+    targets users who *have* been in the app but missed 2+ scheduled check-in days.
 
     Logic:
-    - Only considers SCHEDULED check-in days based on goal frequency/target_days
-    - Sends notification if user has missed 2+ scheduled check-in days
-    - Only sends on days that ARE scheduled check-in days for the user
-    - Respects notification preferences (enabled, reengagement)
+    - Query users table: onboarding_completed_at is not null.
+    - Uses users.last_active_at (updated by API middleware on any authenticated request).
+    - Sends only if last_active_at is older than 7 days (or null and onboarding was 7+ days ago).
+    - Preference check (enabled, push_notifications, reengagement, quiet hours) is done inside
+      send_push_to_user_sync via should_send_notification when skip_preference_check=False.
     """
-    from datetime import datetime, timedelta
-    from zoneinfo import ZoneInfo
+    from datetime import datetime, timedelta, timezone
     from app.services.expo_push_service import send_push_to_user_sync
 
     try:
@@ -468,163 +456,64 @@ def send_reengagement_notifications_task(self) -> Dict[str, Any]:
         sent_count = 0
         skipped_count = 0
         skipped_reasons = {
-            "not_scheduled_today": 0,
-            "not_enough_missed": 0,
             "prefs_disabled": 0,
+            "app_active_recently": 0,
             "too_new": 0,
         }
 
-        # Get all active goals with schedule info and user data
-        active_goals_result = (
-            supabase.table("goals")
-            .select(
-                "id, user_id, title, frequency_type, target_days, created_at, "
-                "users!inner(name, timezone, onboarding_completed_at)"
-            )
-            .eq("status", "active")
-            .not_.is_("users.onboarding_completed_at", "null")
+        now_utc = datetime.now(timezone.utc)
+        cutoff = now_utc - timedelta(days=REENGAGEMENT_INACTIVE_DAYS)
+
+        # Get users who have completed onboarding (last_active_at lives on users)
+        users_result = (
+            supabase.table("users")
+            .select("id, name, onboarding_completed_at, last_active_at")
+            .not_.is_("onboarding_completed_at", "null")
             .execute()
         )
 
-        if not active_goals_result.data:
+        if not users_result.data:
             return {"success": True, "sent": 0, "skipped": 0}
 
-        # Group goals by user
-        goals_by_user = {}
-        user_info_map = {}
-        for goal in active_goals_result.data:
-            user_id = goal["user_id"]
-            if user_id not in goals_by_user:
-                goals_by_user[user_id] = []
-                user_info_map[user_id] = {
-                    "name": goal.get("users", {}).get("name", "Champion"),
-                    "timezone": goal.get("users", {}).get("timezone", "UTC"),
-                }
-            goals_by_user[user_id].append(goal)
-
-        user_ids = list(goals_by_user.keys())
-
-        if not user_ids:
-            return {"success": True, "sent": 0, "skipped": 0}
-
-        # Batch fetch: Check-ins from the last 14 days for all users
-        lookback_date = (datetime.now().date() - timedelta(days=14)).isoformat()
-        all_checkins_result = (
-            supabase.table("check_ins")
-            .select("user_id, goal_id, check_in_date")
-            .in_("user_id", user_ids)
-            .gte("check_in_date", lookback_date)
-            .execute()
-        )
-
-        # Build map of (user_id, goal_id, date) -> has_checkin
-        checkins_set = set()
-        for checkin in all_checkins_result.data or []:
-            key = (checkin["user_id"], checkin["goal_id"], checkin["check_in_date"])
-            checkins_set.add(key)
-
-        # Batch fetch: Notification preferences
-        prefs_result = (
-            supabase.table("notification_preferences")
-            .select("user_id, enabled, reengagement")
-            .in_("user_id", user_ids)
-            .execute()
-        )
-        prefs_by_user = {p["user_id"]: p for p in prefs_result.data or []}
-
-        # Process each user
-        for user_id, goals in goals_by_user.items():
-            try:
-                user_info = user_info_map[user_id]
-                user_tz_str = user_info.get("timezone", "UTC")
-
+        # Filter to those inactive 7+ days: last_active_at < cutoff, or (last_active_at null and onboarded 7+ days ago)
+        inactive_users = []
+        for u in users_result.data:
+            last_at = u.get("last_active_at")
+            ob_at = u.get("onboarding_completed_at")
+            is_inactive = False
+            if last_at:
                 try:
-                    user_tz = ZoneInfo(user_tz_str)
+                    dt = datetime.fromisoformat(last_at.replace("Z", "+00:00"))
+                    if dt.tzinfo is None:
+                        dt = dt.replace(tzinfo=timezone.utc)
+                    is_inactive = dt < cutoff
                 except Exception:
-                    user_tz = ZoneInfo("UTC")
+                    pass
+            else:
+                try:
+                    dt = datetime.fromisoformat(ob_at.replace("Z", "+00:00"))
+                    if dt.tzinfo is None:
+                        dt = dt.replace(tzinfo=timezone.utc)
+                    is_inactive = dt < cutoff
+                except Exception:
+                    pass
+            if is_inactive:
+                inactive_users.append(u)
 
-                user_now = datetime.now(user_tz)
-                user_today = user_now.date()
+        if not inactive_users:
+            return {"success": True, "sent": 0, "skipped": 0}
 
-                # Check notification preferences first
-                prefs = prefs_by_user.get(user_id, {})
-                if not prefs.get("enabled", True) or not prefs.get(
-                    "reengagement", True
-                ):
-                    skipped_count += 1
-                    skipped_reasons["prefs_disabled"] += 1
-                    continue
+        # send_push_to_user_sync (with skip_preference_check=False) runs
+        # should_send_notification(user_id, "reengagement") which checks
+        # enabled, push_notifications, reengagement, and quiet hours. No need to check prefs here.
+        for user_info in inactive_users:
+            user_id = user_info["id"]
+            try:
+                user_name = user_info.get("name", "Champion")
+                msg = random.choice(REENGAGEMENT_MESSAGES)
+                title = msg["title"].format(user_name=user_name)
+                body = msg["body"].format(user_name=user_name)
 
-                # Check if today is a scheduled day for ANY of their goals
-                is_scheduled_today = False
-                for goal in goals:
-                    freq = goal.get("frequency_type", "daily")
-                    target = goal.get("target_days") or []
-                    if is_today_a_work_day(freq, target, user_today.weekday()):
-                        is_scheduled_today = True
-                        break
-
-                if not is_scheduled_today:
-                    skipped_count += 1
-                    skipped_reasons["not_scheduled_today"] += 1
-                    continue
-
-                # Calculate missed scheduled days across all goals
-                # Look back 14 days, but only count days AFTER the goal was created
-                total_missed_scheduled_days = 0
-
-                for goal in goals:
-                    goal_id = goal["id"]
-                    freq = goal.get("frequency_type", "daily")
-                    target = goal.get("target_days") or []
-                    created_at_str = goal.get("created_at", "")
-
-                    # Parse goal creation date
-                    try:
-                        goal_created = datetime.fromisoformat(
-                            created_at_str.replace("Z", "+00:00")
-                        ).date()
-                    except Exception:
-                        goal_created = user_today - timedelta(days=1)
-
-                    # Only look at days from goal creation to yesterday (not today)
-                    range_start = max(goal_created, user_today - timedelta(days=14))
-                    range_end = user_today - timedelta(days=1)  # Yesterday
-
-                    if range_start > range_end:
-                        # Goal is too new (created today or yesterday)
-                        continue
-
-                    # Get scheduled days in this range
-                    scheduled_days = _get_scheduled_days_in_range(
-                        freq, target, range_start, range_end
-                    )
-
-                    # Count how many scheduled days had no check-in
-                    for scheduled_date in scheduled_days:
-                        key = (user_id, goal_id, scheduled_date.isoformat())
-                        if key not in checkins_set:
-                            total_missed_scheduled_days += 1
-
-                # Send re-engagement if 2+ scheduled days were missed
-                if total_missed_scheduled_days < 2:
-                    skipped_count += 1
-                    skipped_reasons["not_enough_missed"] += 1
-                    continue
-
-                # Personalize message based on missed days
-                user_name = user_info["name"]
-                if total_missed_scheduled_days >= 7:
-                    title = f"We miss you, {user_name}! 💪"
-                    body = "Your goals are waiting for you. Let's get back on track!"
-                elif total_missed_scheduled_days >= 3:
-                    title = f"Hey {user_name}, don't break the chain! 🔥"
-                    body = "You've got this! Get back to crushing your goals."
-                else:
-                    title = f"Quick reminder, {user_name}! ⏰"
-                    body = "Don't forget to check in today and keep your streak alive!"
-
-                # Send push notification (skip pref check - already checked above)
                 notification_result = send_push_to_user_sync(
                     user_id=user_id,
                     title=title,
@@ -634,17 +523,17 @@ def send_reengagement_notifications_task(self) -> Dict[str, Any]:
                         "deepLink": "/(user)/(tabs)",
                     },
                     notification_type="reengagement",
-                    skip_preference_check=True,
+                    save_to_notification_history=False,
                 )
 
-                if notification_result.get("notification_id"):
+                if notification_result.get("skipped"):
+                    skipped_count += 1
+                    skipped_reasons["prefs_disabled"] += 1
+                else:
                     sent_count += 1
                     logger.info(
-                        f"Sent re-engagement to user {user_id} "
-                        f"({total_missed_scheduled_days} scheduled days missed)"
+                        f"Sent re-engagement to user {user_id} (app inactive 7+ days)"
                     )
-                else:
-                    skipped_count += 1
 
             except Exception as e:
                 logger.warning(
@@ -652,15 +541,6 @@ def send_reengagement_notifications_task(self) -> Dict[str, Any]:
                     {"error": str(e), "user_id": user_id},
                 )
                 continue
-
-        logger.info(
-            f"Re-engagement: sent={sent_count}, skipped={skipped_count}",
-            {
-                "sent": sent_count,
-                "skipped": skipped_count,
-                "reasons": skipped_reasons,
-            },
-        )
 
         return {
             "success": True,
@@ -714,10 +594,10 @@ def send_checkin_prompts_task(self) -> Dict[str, Any]:
         skipped_already_prompted = 0
         skipped_no_reminders = 0
 
-        # Get all active goals with reminder times and user timezone
+        # Get all active goals with reminder times
         active_goals_result = (
             supabase.table("goals")
-            .select("id, user_id, title, reminder_times, users!inner(timezone, name)")
+            .select("id, user_id, title, reminder_times")
             .eq("status", "active")
             .execute()
         )
@@ -734,6 +614,15 @@ def send_checkin_prompts_task(self) -> Dict[str, Any]:
         goals = active_goals_result.data
         goal_ids = [g["id"] for g in goals]
         user_ids = list(set(g["user_id"] for g in goals))
+
+        # Batch fetch user profiles (avoid PostgREST embed ambiguity)
+        users_result = (
+            supabase.table("users")
+            .select("id, name, timezone")
+            .in_("id", user_ids)
+            .execute()
+        )
+        users_by_id = {u["id"]: u for u in (users_result.data or []) if u.get("id")}
 
         # SCALABILITY: Batch prefetch check-ins for last 2 days (covers all timezones)
         # We filter precisely by user's local "today" in-memory
@@ -784,7 +673,8 @@ def send_checkin_prompts_task(self) -> Dict[str, Any]:
             user_id = goal["user_id"]
             goal_title = goal["title"]
             reminder_times = goal.get("reminder_times") or []
-            user_name = goal.get("users", {}).get("name") or "Champion"
+            user = users_by_id.get(user_id) or {}
+            user_name = user.get("name") or "Champion"
 
             # Skip if no reminder times set
             if not reminder_times or not isinstance(reminder_times, list):
@@ -792,7 +682,7 @@ def send_checkin_prompts_task(self) -> Dict[str, Any]:
                 continue
 
             # Get user's timezone
-            user_timezone_str = goal.get("users", {}).get("timezone") or "UTC"
+            user_timezone_str = user.get("timezone") or "UTC"
 
             try:
                 user_tz = pytz.timezone(user_timezone_str)
@@ -972,10 +862,10 @@ def send_checkin_followups_task(self) -> Dict[str, Any]:
         skipped_already_followed_up = 0
         skipped_not_time_yet = 0
 
-        # Get all active goals with reminder times and user timezone
+        # Get all active goals with reminder times
         active_goals_result = (
             supabase.table("goals")
-            .select("id, user_id, title, reminder_times, users!inner(timezone, name)")
+            .select("id, user_id, title, reminder_times")
             .eq("status", "active")
             .execute()
         )
@@ -992,6 +882,15 @@ def send_checkin_followups_task(self) -> Dict[str, Any]:
         goals = active_goals_result.data
         goal_ids = [g["id"] for g in goals]
         user_ids = list(set(g["user_id"] for g in goals))
+
+        # Batch fetch user profiles (avoid PostgREST embed ambiguity)
+        users_result = (
+            supabase.table("users")
+            .select("id, name, timezone")
+            .in_("id", user_ids)
+            .execute()
+        )
+        users_by_id = {u["id"]: u for u in (users_result.data or []) if u.get("id")}
 
         # SCALABILITY: Batch prefetch check-ins for last 2 days (covers all timezones)
         utc_now = datetime.utcnow()
@@ -1040,12 +939,13 @@ def send_checkin_followups_task(self) -> Dict[str, Any]:
             user_id = goal["user_id"]
             goal_title = goal["title"]
             reminder_times = goal.get("reminder_times") or []
-            user_name = goal.get("users", {}).get("name") or "there"
+            user = users_by_id.get(user_id) or {}
+            user_name = user.get("name") or "there"
 
             if not reminder_times or not isinstance(reminder_times, list):
                 continue
 
-            user_timezone_str = goal.get("users", {}).get("timezone") or "UTC"
+            user_timezone_str = user.get("timezone") or "UTC"
 
             try:
                 user_tz = pytz.timezone(user_timezone_str)

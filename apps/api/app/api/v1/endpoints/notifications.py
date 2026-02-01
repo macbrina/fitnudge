@@ -1,11 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
-from datetime import datetime, time
+from datetime import datetime, time, timezone
+import json
 import uuid
 
 from app.core.database import get_supabase_client
 from app.core.flexible_auth import get_current_user
+from app.core.subscriptions import get_user_effective_plan
 from postgrest.exceptions import APIError
 
 router = APIRouter(
@@ -81,9 +83,26 @@ class NotificationHistoryResponse(BaseModel):
     sent_at: datetime
     delivered_at: Optional[datetime]
     opened_at: Optional[datetime]
+    dismissed_at: Optional[datetime] = None
     entity_type: Optional[str] = None
     entity_id: Optional[str] = None
     created_at: datetime
+
+
+class BroadcastResponse(BaseModel):
+    """Admin broadcast (notifications table row) for in-app modal."""
+
+    id: str
+    title: str
+    body: str
+    image_url: Optional[str] = None
+    cta_label: Optional[str] = None
+    cta_url: Optional[str] = None
+    deeplink: Optional[str] = None
+
+
+class MarkBroadcastSeenRequest(BaseModel):
+    dismissed: bool = False
 
 
 @router.get("/preferences", response_model=NotificationPreferencesResponse)
@@ -308,7 +327,6 @@ async def get_notification_history(
     """
     try:
         supabase = get_supabase_client()
-        import json
 
         query = (
             supabase.table("notification_history")
@@ -362,6 +380,13 @@ async def get_notification_history(
                         if row["opened_at"]
                         else None
                     ),
+                    dismissed_at=(
+                        datetime.fromisoformat(
+                            row["dismissed_at"].replace("Z", "+00:00")
+                        )
+                        if row.get("dismissed_at")
+                        else None
+                    ),
                     entity_type=row.get("entity_type"),
                     entity_id=str(row["entity_id"]) if row.get("entity_id") else None,
                     created_at=datetime.fromisoformat(
@@ -389,7 +414,7 @@ async def mark_notification_opened(
 
         result = (
             supabase.table("notification_history")
-            .update({"opened_at": datetime.utcnow().isoformat()})
+            .update({"opened_at": datetime.now(timezone.utc).isoformat()})
             .eq("id", notification_id)
             .eq("user_id", current_user["id"])
             .execute()
@@ -430,7 +455,7 @@ async def mark_all_notifications_opened(
         # Following SCALABILITY.md: Use batch operations instead of loops
         result = (
             supabase.table("notification_history")
-            .update({"opened_at": datetime.utcnow().isoformat()})
+            .update({"opened_at": datetime.now(timezone.utc).isoformat()})
             .eq("user_id", user_id)
             .is_("opened_at", "null")  # Only update those not yet opened
             .execute()
@@ -511,4 +536,249 @@ async def get_notification_analytics(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get notification analytics: {str(e)}",
+        )
+
+
+# =====================================================
+# Admin broadcasts (in-app modal, system tab)
+# =====================================================
+
+# Supported locales for broadcast translations (match LANGUAGES in mobile)
+BROADCAST_LOCALES = ("en", "es", "fr", "de", "pt", "it", "nl")
+
+
+def _resolve_broadcast_localization(
+    row: Dict[str, Any], user_lang: str
+) -> tuple[str, str, Optional[str]]:
+    """
+    Resolve localized title, body, cta_label from broadcast row.
+    Fallback: translations[user_lang] -> translations[source_lang] -> translations["en"] -> top-level.
+    """
+    trans = row.get("translations")
+    if isinstance(trans, str):
+        try:
+            trans = json.loads(trans) if trans.strip() else None
+        except (json.JSONDecodeError, AttributeError):
+            trans = None
+    source = (row.get("source_lang") or "en").lower()
+    lang = (user_lang or "en").lower() if user_lang else "en"
+    if lang not in BROADCAST_LOCALES:
+        lang = "en"
+
+    def get_locale_block(loc: str) -> Optional[Dict[str, Any]]:
+        if not trans or not isinstance(trans, dict):
+            return None
+        b = trans.get(loc)
+        return b if isinstance(b, dict) else None
+
+    for loc in (lang, source, "en"):
+        block = get_locale_block(loc)
+        if block:
+            t = block.get("title")
+            b = block.get("body")
+            c = block.get("cta_label")
+            if t is not None and b is not None:
+                return (str(t), str(b), str(c) if c is not None else None)
+
+    cta = row.get("cta_label")
+    return (
+        str(row.get("title") or ""),
+        str(row.get("body") or ""),
+        str(cta) if cta is not None else None,
+    )
+
+
+@router.get("/broadcasts/active", response_model=List[BroadcastResponse])
+async def list_active_broadcasts(
+    current_user: Dict[str, Any] = Depends(get_current_user),
+):
+    """
+    List active admin broadcasts for the current user.
+
+    - Filter by is_active, starts_at/ends_at (server time).
+    - Exclude broadcasts already in notification_history for this user
+      (entity_type=admin_broadcast, entity_id=broadcast id).
+    - Audience: all, free, premium; filter by user's effective plan.
+    """
+    try:
+        supabase = get_supabase_client()
+        user_id = current_user["id"]
+        now_utc = datetime.now(timezone.utc)
+
+        user_lang = (current_user.get("language") or "en").strip() or "en"
+
+        # Fetch active broadcasts; filter starts_at/ends_at in Python (server time)
+        n_result = (
+            supabase.table("notifications")
+            .select(
+                "id, title, body, image_url, cta_label, cta_url, deeplink, "
+                "source_lang, translations, audience, delivery, starts_at, ends_at"
+            )
+            .eq("is_active", True)
+            .execute()
+        )
+        rows = n_result.data or []
+
+        def in_schedule(r: dict) -> bool:
+            try:
+                s = r.get("starts_at")
+                e = r.get("ends_at")
+                if s:
+                    start = datetime.fromisoformat(s.replace("Z", "+00:00"))
+                    if now_utc < start:
+                        return False
+                if e:
+                    end = datetime.fromisoformat(e.replace("Z", "+00:00"))
+                    if now_utc > end:
+                        return False
+                return True
+            except Exception:
+                return True
+
+        rows = [r for r in rows if in_schedule(r)]
+
+        # Filter by audience (user plan)
+        plan = get_user_effective_plan(user_id, supabase=supabase)
+        filtered = []
+        for r in rows:
+            aud = (r.get("audience") or "all").lower()
+            if aud == "all":
+                filtered.append(r)
+            elif aud == "free" and plan == "free":
+                filtered.append(r)
+            elif aud == "premium" and plan == "premium":
+                filtered.append(r)
+
+        # Exclude already-seen (notification_history with entity_type admin_broadcast, entity_id)
+        hist = (
+            supabase.table("notification_history")
+            .select("entity_id")
+            .eq("user_id", user_id)
+            .eq("entity_type", "admin_broadcast")
+            .not_.is_("opened_at", "null")
+            .execute()
+        )
+        seen_ids = {
+            str(h["entity_id"]) for h in (hist.data or []) if h.get("entity_id")
+        }
+
+        out = []
+        for r in filtered:
+            bid = str(r["id"])
+            if bid in seen_ids:
+                continue
+            title, body, cta_label = _resolve_broadcast_localization(r, user_lang)
+            out.append(
+                BroadcastResponse(
+                    id=bid,
+                    title=title,
+                    body=body,
+                    image_url=r.get("image_url") or None,
+                    cta_label=cta_label,
+                    cta_url=r.get("cta_url") or None,
+                    deeplink=r.get("deeplink") or None,
+                )
+            )
+        return out
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to list active broadcasts: {str(e)}",
+        )
+
+
+@router.post("/broadcasts/{broadcast_id}/mark-seen")
+async def mark_broadcast_seen(
+    broadcast_id: str,
+    body: Optional[MarkBroadcastSeenRequest] = None,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+):
+    """
+    Upsert notification_history for this user + broadcast.
+    Set opened_at when shown; set dismissed_at when user dismisses.
+    Fire-and-forget friendly: client can close UI immediately.
+    """
+    try:
+        supabase = get_supabase_client()
+        user_id = current_user["id"]
+        user_lang = (current_user.get("language") or "en").strip() or "en"
+        now_iso = datetime.now(timezone.utc).isoformat()
+        dismissed = body.dismissed if body else False
+
+        # Get broadcast for title, body, image, CTA (for modal in System tab)
+        b = (
+            supabase.table("notifications")
+            .select(
+                "id, title, body, image_url, cta_label, cta_url, deeplink, "
+                "source_lang, translations"
+            )
+            .eq("id", broadcast_id)
+            .maybe_single()
+            .execute()
+        )
+        if not b or not getattr(b, "data", None):
+            return {"success": True}
+
+        row = b.data
+        title, body_resolved, cta_label = _resolve_broadcast_localization(
+            row, user_lang
+        )
+
+        data_json = json.dumps(
+            {
+                "broadcast_id": broadcast_id,
+                "image_url": row.get("image_url"),
+                "cta_label": cta_label,
+                "cta_url": row.get("cta_url"),
+                "deeplink": row.get("deeplink"),
+            }
+        )
+
+        # Find existing history row (user + admin_broadcast + entity_id)
+        existing = (
+            supabase.table("notification_history")
+            .select("id")
+            .eq("user_id", user_id)
+            .eq("entity_type", "admin_broadcast")
+            .eq("entity_id", broadcast_id)
+            .maybe_single()
+            .execute()
+        )
+        existing_data = getattr(existing, "data", None) if existing else None
+
+        payload = {
+            "opened_at": now_iso,
+            "dismissed_at": now_iso if dismissed else None,
+            "title": title,
+            "body": body_resolved,
+            "data": data_json,
+        }
+
+        if existing_data:
+            supabase.table("notification_history").update(payload).eq(
+                "id", existing_data["id"]
+            ).execute()
+        else:
+            supabase.table("notification_history").insert(
+                {
+                    "user_id": user_id,
+                    "notification_type": "general",
+                    "entity_type": "admin_broadcast",
+                    "entity_id": broadcast_id,
+                    "title": title,
+                    "body": body_resolved,
+                    "data": data_json,
+                    "opened_at": now_iso,
+                    "dismissed_at": now_iso if dismissed else None,
+                }
+            ).execute()
+
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Failed to mark broadcast seen: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to mark broadcast seen: {str(e)}",
         )

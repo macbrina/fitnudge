@@ -81,11 +81,12 @@ async def check_app_version(
             supabase.table("app_versions")
             .select("*")
             .eq("platform", platform)
-            .single()
+            .maybe_single()
             .execute()
         )
 
-        if not result.data:
+        data = getattr(result, "data", None) if result is not None else None
+        if not data:
             logger.warning(f"No app version found for platform: {platform}")
             # Return current version as latest if no record exists
             return AppVersionResponse(
@@ -93,8 +94,6 @@ async def check_app_version(
                 minimum_version=current_version,
                 force_update=False,
             )
-
-        data = result.data
 
         # Check if force_update should be true based on minimum_version
         needs_force_update = data.get("force_update", False)
@@ -137,17 +136,17 @@ async def get_app_version(
             supabase.table("app_versions")
             .select("*")
             .eq("platform", platform)
-            .single()
+            .maybe_single()
             .execute()
         )
 
-        if not result.data:
+        data = getattr(result, "data", None) if result is not None else None
+        if not data:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"No version info found for platform: {platform}",
             )
 
-        data = result.data
         return AppVersionResponse(
             latest_version=data.get("latest_version", "1.0.0"),
             minimum_version=data.get("minimum_version", "1.0.0"),

@@ -35,9 +35,6 @@ export function CheckInHistorySkeleton() {
                 <SkeletonBox width={40} height={14} borderRadius={6} style={{ marginLeft: 8 }} />
               </View>
             </View>
-
-            {/* Chevron */}
-            <SkeletonBox width={20} height={20} borderRadius={4} />
           </View>
         ))}
       </View>

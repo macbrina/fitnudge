@@ -408,11 +408,12 @@ Rules:
 async def generate_daily_motivation(
     user_name: str,
     motivation_style: str = "supportive",
-    current_streaks: Optional[List[dict]] = None,
-    goals: Optional[List[dict]] = None,
+    goals_scheduled_today: Optional[List[dict]] = None,
 ) -> dict:
     """
     Generate daily motivation message for MotivationCard.
+
+    Focus: goals scheduled for check-in today. If none, general motivation about goals.
 
     Returns:
         {
@@ -421,23 +422,28 @@ async def generate_daily_motivation(
             "background_colors": ["#FF9A9E", "#FECFEF", "#FECFEF"]
         }
     """
-    # Build context
-    context_parts = []
-    if goals:
-        goal_names = [g.get("title", "") for g in goals[:3]]
-        if goal_names:
-            context_parts.append(f"Active goals: {', '.join(goal_names)}")
+    goals_scheduled_today = goals_scheduled_today or []
 
-    if current_streaks:
+    if goals_scheduled_today:
+        goal_names = [g.get("title", "") for g in goals_scheduled_today[:5] if g.get("title")]
         best_streak = max(
-            (s.get("current_streak", 0) for s in current_streaks), default=0
+            (g.get("current_streak", 0) or 0 for g in goals_scheduled_today),
+            default=0,
         )
+        context_parts = [f"Goals scheduled for check-in today: {', '.join(goal_names)}"]
         if best_streak > 0:
             context_parts.append(f"Current best streak: {best_streak} days")
-
-    context = (
-        "\n".join(context_parts) if context_parts else "New user, just getting started"
-    )
+        context = "\n".join(context_parts)
+        focus_instruction = (
+            "Focus the motivation on these specific goals they have scheduled for check-in today. "
+            "Make it specific and relevant to these goals."
+        )
+    else:
+        context = "No specific goals scheduled for check-in today (rest day or weekly schedule)."
+        focus_instruction = (
+            "Give a general motivation about their goals, consistency, staying on track, "
+            "or preparing for their next check-in day. Keep it encouraging and time-neutral."
+        )
 
     # Style mapping
     style_prompts = {
@@ -459,9 +465,11 @@ Generate a SHORT daily motivation message (2-3 sentences max, ~50 words).
 
 Style: {style_instruction}
 
+{focus_instruction}
+
 Rules:
 - Address the user by name ({user_name})
-- Reference their goals/progress if provided
+- Reference their goals/progress when relevant
 - Be specific, not generic
 - End with energy and action
 - No hashtags or emojis in the message itself

@@ -30,6 +30,7 @@ import {
   NativeAssetType,
   NativeMediaView
 } from "react-native-google-mobile-ads";
+import { useTranslation } from "@/lib/i18n";
 
 type NativeAdVariant = "default" | "compact" | "horizontal";
 
@@ -52,6 +53,7 @@ export function NativeAdCard({
   const openModal = useSubscriptionStore((state) => state.openModal);
   const { colors, brandColors } = useTheme();
   const styles = useStyles(makeStyles);
+  const { t } = useTranslation();
 
   const [nativeAd, setNativeAd] = useState<NativeAd | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -187,42 +189,46 @@ export function NativeAdCard({
   }
 
   // Horizontal variant - list card style (thumbnail left, content right)
+  // Match default structure exactly: outer View (container) > NativeAdView > MediaView direct (no wrapper), content View, badge.
   if (isHorizontal) {
     return (
-      <NativeAdView nativeAd={nativeAd} style={[styles.horizontalContainer, style]}>
-        {/* Thumbnail on left */}
-        <View style={styles.horizontalMediaWrapper}>
+      <View style={[styles.container, styles.horizontalOuter, style]}>
+        <NativeAdView nativeAd={nativeAd} style={styles.horizontalAdView}>
+          {/* Media - direct child, same as default (no View wrapper) */}
           <NativeMediaView style={styles.horizontalMediaView} resizeMode="cover" />
-          <View style={styles.horizontalAdBadge}>
-            <Text style={styles.horizontalAdBadgeText}>Ad</Text>
-          </View>
-        </View>
 
-        {/* Content on right */}
-        <View style={styles.horizontalContent}>
-          <NativeAsset assetType={NativeAssetType.HEADLINE}>
-            <Text style={styles.horizontalHeadline} numberOfLines={2}>
-              {nativeAd.headline}
-            </Text>
-          </NativeAsset>
-
-          {nativeAd.advertiser && (
-            <NativeAsset assetType={NativeAssetType.ADVERTISER}>
-              <Text style={styles.horizontalAdvertiser} numberOfLines={1}>
-                {nativeAd.advertiser}
+          {/* Content on right */}
+          <View style={styles.horizontalContent}>
+            <NativeAsset assetType={NativeAssetType.HEADLINE}>
+              <Text style={styles.horizontalHeadline} numberOfLines={2}>
+                {nativeAd.headline}
               </Text>
             </NativeAsset>
-          )}
 
-          {nativeAd.callToAction && (
-            <NativeAsset assetType={NativeAssetType.CALL_TO_ACTION}>
-              <View style={[styles.horizontalCta, { backgroundColor: brandColors.primary }]}>
-                <Text style={styles.horizontalCtaText}>{nativeAd.callToAction}</Text>
-              </View>
-            </NativeAsset>
-          )}
-        </View>
-      </NativeAdView>
+            {nativeAd.advertiser && (
+              <NativeAsset assetType={NativeAssetType.ADVERTISER}>
+                <Text style={styles.horizontalAdvertiser} numberOfLines={1}>
+                  {nativeAd.advertiser}
+                </Text>
+              </NativeAsset>
+            )}
+
+            {nativeAd.callToAction && (
+              <NativeAsset assetType={NativeAssetType.CALL_TO_ACTION}>
+                <View style={[styles.horizontalCta, { backgroundColor: brandColors.primary }]}>
+                  <Text style={styles.horizontalCtaText}>{nativeAd.callToAction}</Text>
+                </View>
+              </NativeAsset>
+            )}
+          </View>
+
+          {/* Ad attribution badge - direct child, same as default */}
+          <View style={styles.horizontalAdBadge}>
+            <Ionicons name="megaphone-outline" size={10} color={colors.text.tertiary} />
+            <Text style={styles.horizontalAdBadgeText}>Ad</Text>
+          </View>
+        </NativeAdView>
+      </View>
     );
   }
 
@@ -230,12 +236,6 @@ export function NativeAdCard({
   return (
     <View style={[styles.container, style]}>
       <NativeAdView nativeAd={nativeAd} style={styles.adView}>
-        {/* Sponsored label */}
-        <View style={styles.sponsoredBadge}>
-          <Ionicons name="megaphone-outline" size={10} color={colors.text.tertiary} />
-          <Text style={styles.sponsoredText}>Sponsored</Text>
-        </View>
-
         {/* Media/Image */}
         <NativeMediaView style={styles.mediaView} resizeMode="cover" />
 
@@ -286,9 +286,15 @@ export function NativeAdCard({
             </NativeAsset>
           )}
         </View>
+
+        {/* Sponsored badge last so it paints on top; AdMob ad attribution required */}
+        <View style={styles.sponsoredBadge}>
+          <Ionicons name="megaphone-outline" size={10} color={colors.text.tertiary} />
+          <Text style={styles.sponsoredText}>Ad</Text>
+        </View>
       </NativeAdView>
 
-      {/* Optional upgrade CTA */}
+      {/* Optional upgrade CTA - outside NativeAdView (not an advertiser asset) */}
       {showUpgradeCTA && (
         <TouchableOpacity
           style={[styles.upgradeCTA, { backgroundColor: `${brandColors.primary}10` }]}
@@ -297,7 +303,7 @@ export function NativeAdCard({
         >
           <Ionicons name="sparkles" size={12} color={brandColors.primary} />
           <Text style={[styles.upgradeText, { color: brandColors.primary }]}>
-            Go Premium to remove ads
+            {t("ads.remove_ads") || "Go Premium to remove ads"}
           </Text>
         </TouchableOpacity>
       )}
@@ -316,7 +322,10 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     borderColor: colors.border.subtle
   },
   adView: {
-    flex: 1
+    width: "100%" as const,
+    minWidth: toRN(120),
+    minHeight: toRN(120),
+    overflow: "hidden" as const
   },
   sponsoredBadge: {
     position: "absolute" as const,
@@ -326,10 +335,15 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     flexDirection: "row" as const,
     alignItems: "center" as const,
     gap: 4,
-    backgroundColor: "rgba(255,255,255,0.9)",
+    backgroundColor: "#FFFFFF",
     paddingHorizontal: toRN(tokens.spacing[2]),
-    paddingVertical: 2,
-    borderRadius: toRN(tokens.borderRadius.sm)
+    paddingVertical: toRN(3),
+    borderRadius: toRN(tokens.borderRadius.sm),
+    maxWidth: "90%" as const,
+    minHeight: toRN(15),
+    minWidth: toRN(15),
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.08)"
   },
   sponsoredText: {
     fontSize: toRN(tokens.typography.fontSize.xs),
@@ -339,11 +353,14 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
   mediaView: {
     width: "100%" as const,
     aspectRatio: 16 / 9,
+    minWidth: toRN(120),
+    minHeight: toRN(120),
     backgroundColor: colors.bg.subtle
   },
   content: {
     padding: toRN(tokens.spacing[3]),
-    gap: toRN(tokens.spacing[2])
+    gap: toRN(tokens.spacing[2]),
+    overflow: "hidden" as const
   },
   headerRow: {
     flexDirection: "row" as const,
@@ -433,7 +450,11 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
   compactContainer: {
     borderRadius: toRN(tokens.borderRadius.xl),
     overflow: "hidden" as const,
-    height: 180 // Match grid card height
+    height: 180, // Match grid card height
+    minWidth: toRN(120),
+    minHeight: toRN(120),
+    position: "relative" as const,
+    width: "100%" as const
   },
   compactMediaView: {
     position: "absolute" as const,
@@ -441,6 +462,8 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     left: 0,
     right: 0,
     bottom: 0,
+    minWidth: toRN(120),
+    minHeight: toRN(120),
     backgroundColor: colors.bg.subtle
   },
   compactSponsoredBadge: {
@@ -453,8 +476,11 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     gap: 2,
     backgroundColor: "rgba(255,255,255,0.9)",
     paddingHorizontal: toRN(tokens.spacing[1.5]),
-    paddingVertical: 2,
-    borderRadius: toRN(tokens.borderRadius.sm)
+    paddingVertical: toRN(3), // Minimum 15px height: icon (8px) + padding (3px top + 3px bottom) = 14px, but minHeight ensures 15px
+    borderRadius: toRN(tokens.borderRadius.sm),
+    maxWidth: "90%" as const,
+    minHeight: toRN(15), // AdMob requirement: minimum 15px
+    minWidth: toRN(15) // AdMob requirement: minimum 15px
   },
   compactSponsoredText: {
     fontSize: 9,
@@ -469,7 +495,9 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     padding: toRN(tokens.spacing[2]),
     paddingTop: toRN(tokens.spacing[6]),
     background: "linear-gradient(transparent, rgba(0,0,0,0.8))",
-    backgroundColor: "rgba(0,0,0,0.6)"
+    backgroundColor: "rgba(0,0,0,0.6)",
+    overflow: "hidden" as const,
+    maxWidth: "100%" as const
   },
   compactHeadline: {
     fontSize: toRN(tokens.typography.fontSize.sm),
@@ -495,46 +523,66 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     borderRadius: toRN(tokens.borderRadius.xl)
   },
 
-  // Horizontal variant styles (for list view - matches blog list cards)
+  // Horizontal variant - same structure as default: container > NativeAdView > MediaView direct, content, badge
+  horizontalOuter: {
+    marginVertical: toRN(tokens.spacing[2])
+  },
   horizontalContainer: {
     flexDirection: "row" as const,
     marginVertical: toRN(tokens.spacing[2]),
-    // marginHorizontal: toRN(tokens.spacing[4]),
     borderRadius: toRN(tokens.borderRadius.xl),
     backgroundColor: colors.bg.elevated,
     overflow: "hidden" as const,
     borderWidth: 1,
-    borderColor: colors.border.subtle
+    borderColor: colors.border.subtle,
+    minWidth: toRN(120),
+    minHeight: toRN(120),
+    width: "100%" as const
   },
-  horizontalMediaWrapper: {
-    width: 100,
-    height: 100,
+  horizontalAdView: {
+    flexDirection: "row" as const,
+    width: "100%" as const,
+    minWidth: toRN(120),
+    minHeight: toRN(120),
+    overflow: "hidden" as const,
     position: "relative" as const
   },
   horizontalMediaView: {
-    width: 100,
-    height: 100,
-    backgroundColor: colors.bg.subtle
+    width: 120,
+    height: 120,
+    minWidth: toRN(120),
+    minHeight: toRN(120),
+    backgroundColor: colors.bg.subtle,
+    borderTopLeftRadius: toRN(tokens.borderRadius.xl),
+    borderBottomLeftRadius: toRN(tokens.borderRadius.xl)
   },
   horizontalAdBadge: {
     position: "absolute" as const,
-    top: toRN(tokens.spacing[1]),
-    left: toRN(tokens.spacing[1]),
-    backgroundColor: "rgba(0,0,0,0.6)",
-    paddingHorizontal: toRN(tokens.spacing[1.5]),
-    paddingVertical: 2,
-    borderRadius: toRN(tokens.borderRadius.sm)
+    top: toRN(tokens.spacing[2]),
+    left: toRN(tokens.spacing[2]),
+    zIndex: 10,
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 4,
+    backgroundColor: "rgba(255,255,255,0.95)",
+    paddingHorizontal: toRN(tokens.spacing[2]),
+    paddingVertical: toRN(3),
+    borderRadius: toRN(tokens.borderRadius.sm),
+    maxWidth: "90%" as const,
+    minHeight: toRN(15),
+    minWidth: toRN(15)
   },
   horizontalAdBadgeText: {
-    fontSize: 9,
-    fontFamily: fontFamily.semiBold,
-    color: "#FFFFFF"
+    fontSize: toRN(tokens.typography.fontSize.xs),
+    fontFamily: fontFamily.medium,
+    color: colors.text.tertiary
   },
   horizontalContent: {
     flex: 1,
     padding: toRN(tokens.spacing[3]),
     justifyContent: "center" as const,
-    gap: toRN(tokens.spacing[1])
+    gap: toRN(tokens.spacing[1]),
+    overflow: "hidden" as const
   },
   horizontalHeadline: {
     fontSize: toRN(tokens.typography.fontSize.sm),
@@ -560,8 +608,8 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     color: "#FFFFFF"
   },
   horizontalLoadingImage: {
-    width: 100,
-    height: 100,
+    width: 120,
+    height: 120,
     backgroundColor: colors.bg.subtle,
     borderTopLeftRadius: toRN(tokens.borderRadius.xl),
     borderBottomLeftRadius: toRN(tokens.borderRadius.xl)

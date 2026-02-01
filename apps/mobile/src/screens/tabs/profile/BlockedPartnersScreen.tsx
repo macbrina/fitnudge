@@ -23,6 +23,7 @@ import { tokens } from "@/themes/tokens";
 // Hooks
 import { useBlockedPartners, useUnblockPartner } from "@/hooks/api/usePartners";
 import { Partner } from "@/services/api/partners";
+import { CARD_PADDING_VALUES } from "@/constants/general";
 
 export default function BlockedPartnersScreen() {
   const router = useRouter();
@@ -149,8 +150,16 @@ export default function BlockedPartnersScreen() {
     () => (
       <View style={styles.skeletonContainer}>
         {[1, 2, 3, 4, 5].map((i) => (
-          <Card key={i} style={styles.partnerCard}>
-            <View style={styles.partnerRow}>
+          <SkeletonBox
+            key={i}
+            width="100%"
+            height={75}
+            borderRadius={toRN(tokens.borderRadius.xl)}
+            inner
+            innerPadding={CARD_PADDING_VALUES.SM}
+            style={styles.partnerCard}
+          >
+            <View style={[styles.partnerRow, { padding: toRN(tokens.spacing[2]) }]}>
               <SkeletonBox width={48} height={48} borderRadius={24} />
               <View style={styles.skeletonInfo}>
                 <SkeletonBox width={120} height={16} borderRadius={4} />
@@ -158,7 +167,7 @@ export default function BlockedPartnersScreen() {
               </View>
               <SkeletonBox width={80} height={36} borderRadius={18} />
             </View>
-          </Card>
+          </SkeletonBox>
         ))}
       </View>
     ),
@@ -247,7 +256,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
 
   // Partner Card
   partnerCard: {
-    padding: toRN(tokens.spacing[4])
+    marginBottom: toRN(tokens.spacing[3])
   },
   partnerRow: {
     flexDirection: "row" as const,

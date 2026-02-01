@@ -9,6 +9,7 @@ import { RealtimeProvider } from "@/contexts/RealtimeContext";
 import { RevenueCatProvider } from "@/contexts/RevenueCatContext";
 import { useBackendHealthMonitor } from "@/hooks/useBackendHealthMonitor";
 import { prefetchAppConfig } from "@/hooks/api/useAppConfig";
+import { MaintenanceGate } from "@/components/maintenance";
 import { PostHogProvider } from "@/providers/PostHogProvider";
 import { LaunchDarklyProvider } from "@/services/launchDarklyProvider";
 import { logger } from "@/services/logger";
@@ -32,6 +33,7 @@ import { useAdMobStore } from "@/stores/adMobStore";
 import { useAuthStore } from "@/stores/authStore";
 import { initializeAuthenticatedData, refreshAuthenticatedData } from "@/services/prefetch";
 import { TokenManager } from "@/services/api/base";
+import { useSubscriptionStore } from "@/stores/subscriptionStore";
 
 // Initialize Sentry with error handling
 try {
@@ -276,9 +278,11 @@ function RootLayout(): ReactElement {
                       <AlertModalProvider>
                         <RevenueCatProvider>
                           <AppUpdateProvider autoShow showDelay={3000}>
-                            <StatusBarWrapper />
-                            <SafeAreaWrapper />
-                            <SystemStatusListener />
+                            <MaintenanceGate>
+                              <StatusBarWrapper />
+                              <SafeAreaWrapper />
+                              <SystemStatusListener />
+                            </MaintenanceGate>
                           </AppUpdateProvider>
                         </RevenueCatProvider>
                       </AlertModalProvider>

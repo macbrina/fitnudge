@@ -173,6 +173,8 @@ function BadgesTab({
                 index={index}
                 totalBadges={featuredBadges.length}
                 styles={styles}
+                colors={colors}
+                brandColors={brandColors}
               />
             ))}
           </View>
@@ -249,13 +251,29 @@ function EarnedTab({
               rarity="common"
               count={stats.rarity_breakdown.common || 0}
               styles={styles}
+              colors={colors}
+              brandColors={brandColors}
             />
-            <RarityBadge rarity="rare" count={stats.rarity_breakdown.rare || 0} styles={styles} />
-            <RarityBadge rarity="epic" count={stats.rarity_breakdown.epic || 0} styles={styles} />
+            <RarityBadge
+              rarity="rare"
+              count={stats.rarity_breakdown.rare || 0}
+              styles={styles}
+              colors={colors}
+              brandColors={brandColors}
+            />
+            <RarityBadge
+              rarity="epic"
+              count={stats.rarity_breakdown.epic || 0}
+              styles={styles}
+              colors={colors}
+              brandColors={brandColors}
+            />
             <RarityBadge
               rarity="legendary"
               count={stats.rarity_breakdown.legendary || 0}
               styles={styles}
+              colors={colors}
+              brandColors={brandColors}
             />
           </View>
         )}
@@ -272,6 +290,7 @@ function EarnedTab({
                 achievement={achievement}
                 styles={styles}
                 colors={colors}
+                brandColors={brandColors}
               />
             ))}
           </View>
@@ -292,16 +311,20 @@ function FeaturedBadge({
   badge,
   index,
   totalBadges,
-  styles
+  styles,
+  colors,
+  brandColors
 }: {
   badge: UserAchievement;
   index: number;
   totalBadges: number;
   styles: any;
+  colors: any;
+  brandColors: any;
 }) {
   const { t } = useTranslation();
   const badgeIcon = getBadgeIcon(badge.badge_key);
-  const rarityColor = getRarityColor(badge.rarity);
+  const rarityColor = getRarityColor(badge.rarity, { colors, brandColors });
   const earnedDate = formatDate(badge.unlocked_at, "short");
   const badgeName = t(`achievements.badge_list.${badge.badge_key}.name`, {
     defaultValue: badge.badge_name
@@ -354,7 +377,7 @@ function AchievementListItem({
 }) {
   const { t } = useTranslation();
   const badgeIcon = getBadgeIcon(achievement.badge_key);
-  const rarityColor = getRarityColor(achievement.rarity);
+  const rarityColor = getRarityColor(achievement.rarity, { colors, brandColors });
   const badgeName = t(`achievements.badge_list.${achievement.badge_key}.name`, {
     defaultValue: achievement.badge_name
   });
@@ -413,15 +436,17 @@ function AchievementListItem({
 function EarnedBadgeItem({
   achievement,
   styles,
-  colors
+  colors,
+  brandColors
 }: {
   achievement: UserAchievement;
   styles: any;
   colors: any;
+  brandColors: any;
 }) {
   const { t } = useTranslation();
   const badgeIcon = getBadgeIcon(achievement.badge_key);
-  const rarityColor = getRarityColor(achievement.rarity);
+  const rarityColor = getRarityColor(achievement.rarity, { colors, brandColors });
   const earnedDate = formatDate(achievement.unlocked_at, "short");
   const badgeName = t(`achievements.badge_list.${achievement.badge_key}.name`, {
     defaultValue: achievement.badge_name
@@ -458,8 +483,20 @@ function EarnedBadgeItem({
 }
 
 // Rarity Badge Component
-function RarityBadge({ rarity, count, styles }: { rarity: string; count: number; styles: any }) {
-  const color = getRarityColor(rarity);
+function RarityBadge({
+  rarity,
+  count,
+  styles,
+  colors,
+  brandColors
+}: {
+  rarity: string;
+  count: number;
+  styles: any;
+  colors: any;
+  brandColors: any;
+}) {
+  const color = getRarityColor(rarity, { colors, brandColors });
 
   return (
     <View style={styles.rarityItem}>

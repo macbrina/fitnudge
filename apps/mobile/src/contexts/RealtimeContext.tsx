@@ -9,6 +9,7 @@
 import React, { createContext, useContext, useEffect, useState, useRef } from "react";
 import { AppState, AppStateStatus } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
+import { scheduleInvalidate } from "@/services/realtime/realtimeCoalescedInvalidation";
 import { realtimeService } from "@/services/realtime/realtimeService";
 import { useAuthStore } from "@/stores/authStore";
 import { setLoggingOut, TokenManager } from "@/services/api/base";
@@ -80,15 +81,15 @@ export function RealtimeProvider({ children }: RealtimeProviderProps) {
         // Don't invalidate dailyMotivations, weeklyRecaps, achievements - they rarely change
         // and already have proper staleTime/gcTime caching
         console.log(
-          "[RealtimeContext] 📱 Invalidating goals, checkIns, user, partners, nudges, home, notificationHistory"
+          "[RealtimeContext] 📱 Scheduling coalesced invalidate: goals, checkIns, user, partners, nudges, home, notificationHistory"
         );
-        queryClient.invalidateQueries({ queryKey: ["goals"] }); // goalsQueryKeys.all
-        queryClient.invalidateQueries({ queryKey: ["checkIns"] }); // checkInsQueryKeys.all
-        queryClient.invalidateQueries({ queryKey: ["user"] }); // userQueryKeys
-        queryClient.invalidateQueries({ queryKey: ["partners"] }); // partnersQueryKeys.all
-        queryClient.invalidateQueries({ queryKey: ["nudges"] }); // nudgesQueryKeys.all
-        queryClient.invalidateQueries({ queryKey: ["home"] }); // homeDashboardQueryKeys.all
-        queryClient.invalidateQueries({ queryKey: ["notificationHistory"] }); // notificationHistoryQueryKeys.all
+        scheduleInvalidate(["goals"]);
+        scheduleInvalidate(["checkIns"]);
+        scheduleInvalidate(["user"]);
+        scheduleInvalidate(["partners"]);
+        scheduleInvalidate(["nudges"]);
+        scheduleInvalidate(["home"]);
+        scheduleInvalidate(["notificationHistory"]);
       }
 
       appStateRef.current = nextAppState;

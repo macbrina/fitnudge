@@ -59,70 +59,141 @@ def _get_colors_for_style(style: str) -> List[str]:
 # =============================================================================
 
 
+def _get_user_today(timezone: str) -> date:
+    """Get today's date in user's timezone."""
+    import pytz
+
+    try:
+        user_tz = pytz.timezone(timezone or "UTC")
+        return datetime.now(user_tz).date()
+    except Exception:
+        return date.today()
+
+
+def _was_generated_today_utc(generated_at: str | None) -> bool:
+    """
+    Check if generated_at falls within today in UTC.
+    One motivation per UTC day — consistent regardless of user timezone.
+    If generated_at is missing or invalid, returns False.
+    """
+    import pytz
+
+    if not generated_at:
+        return False
+    try:
+        # Parse generated_at (ISO format, may or may not have TZ)
+        dt = datetime.fromisoformat(generated_at.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = pytz.UTC.localize(dt)
+        gen_date_utc = dt.astimezone(pytz.UTC).date()
+        today_utc = datetime.now(pytz.UTC).date()
+        return gen_date_utc == today_utc
+    except Exception:
+        return False
+
+
+def _get_goals_scheduled_today(
+    user_id: str, today: date, supabase
+) -> list:
+    """
+    Get goals scheduled for check-in today (same logic as home.py).
+    Returns list of goal dicts with title, current_streak, etc.
+    """
+    goals_result = (
+        supabase.table("goals")
+        .select("id, title, current_streak, frequency_type, target_days, last_checkin_date")
+        .eq("user_id", user_id)
+        .eq("status", "active")
+        .execute()
+    )
+    active_goals = goals_result.data or []
+    today_str = today.isoformat()
+    today_day_of_week = today.weekday()  # 0=Monday, 6=Sunday
+
+    scheduled_today = []
+    for goal in active_goals:
+        is_scheduled = False
+        frequency_type = goal.get("frequency_type", "daily")
+        target_days = goal.get("target_days", [])
+
+        if frequency_type == "daily":
+            is_scheduled = True
+        elif frequency_type == "weekly" and target_days:
+            today_day_adjusted = (today_day_of_week + 1) % 7
+            is_scheduled = today_day_adjusted in target_days
+
+        if not is_scheduled:
+            continue
+        if goal.get("last_checkin_date") == today_str:
+            continue
+
+        scheduled_today.append(goal)
+
+    return scheduled_today
+
+
 @router.get("/today", response_model=DailyMotivationResponse)
-async def get_today_motivation(current_user: dict = Depends(get_current_user)):
+async def get_today_motivation(
+    current_user: dict = Depends(get_current_user),
+    timezone: str = Query("UTC", description="User's timezone"),
+):
     """
     Get today's daily motivation for the user.
 
-    If no motivation exists for today, generate one on-the-fly.
-    (Normally Celery generates these in the morning via scheduled task)
+    If no motivation exists for today (in user's timezone), or if the stored
+    motivation is not for today, delete it and generate a new one.
+    Focus: motivation is for goals scheduled for check-in today; if none, general.
     """
     from app.core.database import get_supabase_client
 
     supabase = get_supabase_client()
     user_id = current_user["id"]
-    today = date.today().isoformat()
+    user_today = _get_user_today(timezone)
+    today_str = user_today.isoformat()
 
     # Try to get today's motivation
     result = (
         supabase.table("daily_motivations")
         .select("*")
         .eq("user_id", user_id)
-        .eq("date", today)
+        .eq("date", today_str)
         .limit(1)
         .execute()
     )
 
     if result and result.data and len(result.data) > 0:
         motivation = result.data[0]
-        # Add background_colors if not present
-        if not motivation.get("background_colors"):
-            motivation["background_colors"] = _get_colors_for_style(
-                motivation.get("background_style", "gradient_sunset")
-            )
-        return motivation
+        # Validate: was it generated today in UTC? (one motivation per UTC day, consistent for all timezones)
+        if not _was_generated_today_utc(motivation.get("generated_at")):
+            supabase.table("daily_motivations").delete().eq("id", motivation["id"]).execute()
+        else:
+            if not motivation.get("background_colors"):
+                motivation["background_colors"] = _get_colors_for_style(
+                    motivation.get("background_style", "gradient_sunset")
+                )
+            return motivation
 
-    # No motivation for today - generate one on-the-fly
+    # No valid motivation for today - generate one on-the-fly
     try:
         from app.services.motivation_service import generate_daily_motivation
 
-        # Get user's goals for context
-        goals = (
-            supabase.table("goals")
-            .select("title, current_streak")
-            .eq("user_id", user_id)
-            .eq("status", "active")
-            .limit(3)
-            .execute()
-        )
+        goals_scheduled_today = _get_goals_scheduled_today(user_id, user_today, supabase)
 
         motivation_data = await generate_daily_motivation(
             user_name=current_user.get("name", "there"),
             motivation_style=current_user.get("motivation_style", "supportive"),
-            current_streaks=goals.data if goals.data else None,
-            goals=goals.data if goals.data else None,
+            goals_scheduled_today=goals_scheduled_today,
         )
 
-        # Delete ALL existing motivations for this user (only one at a time)
+        # Delete ALL existing motivations for this user
         supabase.table("daily_motivations").delete().eq("user_id", user_id).execute()
 
-        # Save new motivation to database
         new_motivation = {
             "user_id": user_id,
             "message": motivation_data["message"],
             "background_style": motivation_data["background_style"],
             "background_colors": motivation_data["background_colors"],
-            "date": today,
+            "date": today_str,
             "generated_at": datetime.utcnow().isoformat(),
         }
 
@@ -136,14 +207,13 @@ async def get_today_motivation(current_user: dict = Depends(get_current_user)):
     except Exception as e:
         logger.error(f"Failed to generate daily motivation: {e}")
 
-    # Return a fallback (time-neutral - no "good morning" etc.)
     fallback = {
         "id": "fallback",
         "user_id": user_id,
         "message": f"Hey {current_user.get('name', 'there')}! Today is full of possibilities. Make it count!",
         "background_style": "gradient_sunset",
         "background_colors": ["#FF9A9E", "#FECFEF", "#FECFEF"],
-        "date": today,
+        "date": today_str,
         "generated_at": datetime.utcnow().isoformat(),
         "share_count": 0,
         "sent_at": None,
@@ -251,41 +321,40 @@ async def share_motivation(
 
 
 @router.post("/regenerate", response_model=DailyMotivationResponse)
-async def regenerate_motivation(current_user: dict = Depends(get_current_user)):
+async def regenerate_motivation(
+    current_user: dict = Depends(get_current_user),
+    timezone: str = Query("UTC", description="User's timezone"),
+):
     """
-    Regenerate today's daily motivation.
-
-    This allows users to get a new motivation if they don't like the current one.
-    Could be limited to premium users or rate-limited.
+    Regenerate today's daily motivation (Premium only).
+    Uses same goal-focused logic as get_today.
     """
     from app.core.database import get_supabase_client
+    from app.core.subscriptions import get_user_effective_plan
     from app.services.motivation_service import generate_daily_motivation
 
     supabase = get_supabase_client()
     user_id = current_user["id"]
-    today = date.today().isoformat()
+    user_today = _get_user_today(timezone)
+    today_str = user_today.isoformat()
 
-    # Get user's goals for context
-    goals = (
-        supabase.table("goals")
-        .select("title, current_streak")
-        .eq("user_id", user_id)
-        .eq("status", "active")
-        .limit(3)
-        .execute()
-    )
+    plan = get_user_effective_plan(user_id, supabase=supabase)
+    if plan != "premium":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Premium subscription required",
+        )
+
+    goals_scheduled_today = _get_goals_scheduled_today(user_id, user_today, supabase)
 
     motivation_data = await generate_daily_motivation(
         user_name=current_user.get("name", "there"),
         motivation_style=current_user.get("motivation_style", "supportive"),
-        current_streaks=goals.data if goals.data else None,
-        goals=goals.data if goals.data else None,
+        goals_scheduled_today=goals_scheduled_today,
     )
 
-    # Delete ALL existing motivations for this user (only one at a time)
     supabase.table("daily_motivations").delete().eq("user_id", user_id).execute()
 
-    # Insert new motivation
     result = (
         supabase.table("daily_motivations")
         .insert(
@@ -294,7 +363,7 @@ async def regenerate_motivation(current_user: dict = Depends(get_current_user)):
                 "message": motivation_data["message"],
                 "background_style": motivation_data["background_style"],
                 "background_colors": motivation_data["background_colors"],
-                "date": today,
+                "date": today_str,
                 "generated_at": datetime.utcnow().isoformat(),
             }
         )

@@ -10,22 +10,14 @@
  * - Optimistic UI updates with proper React Query patterns
  */
 
-import { useState, useCallback, useRef, useEffect } from "react";
-import { AppState, AppStateStatus } from "react-native";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiRequestSSE, SSEConnection } from "@/services/api/base";
-import {
-  aiCoachService,
-  ConversationDetail,
-  ConversationSummary,
-  ConversationsListResponse,
-  StreamEvent
-} from "@/services/api/aiCoach";
-import { aiCoachQueryKeys } from "./queryKeys";
-import { useSubscriptionStore } from "@/stores/subscriptionStore";
-import { useAICoachStore } from "@/stores/aiCoachStore";
+import { aiCoachService, ConversationDetail, ConversationSummary } from "@/services/api/aiCoach";
 import { logger } from "@/services/logger";
-import { ROUTES } from "@/lib/routes";
+import { useAICoachStore } from "@/stores/aiCoachStore";
+import { useSubscriptionStore } from "@/stores/subscriptionStore";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { AppState, AppStateStatus } from "react-native";
+import { aiCoachQueryKeys } from "./queryKeys";
 
 // =====================================================
 // TYPES
@@ -43,15 +35,17 @@ export interface Message {
   pending?: boolean;
   failed?: boolean;
   errorMessage?: string;
+  status?: "pending" | "completed" | "failed" | "generating";
+  requestId?: string;
 }
 
 // Re-export types from service for convenience
 export type {
-  ConversationSummary,
   ConversationDetail,
   ConversationsListResponse,
-  RateLimitStatus,
+  ConversationSummary,
   FeatureAccessResponse,
+  RateLimitStatus,
   StreamEvent
 } from "@/services/api/aiCoach";
 
@@ -142,6 +136,8 @@ export function useAICoachChat() {
     selectedLanguage,
     currentConversationId: storeConversationId,
     setCurrentConversationId: setStoreConversationId,
+    focusedGoalId,
+    setFocusedGoalId,
     pendingAIResponse,
     clearPendingAIResponse
   } = useAICoachStore();
@@ -153,7 +149,12 @@ export function useAICoachChat() {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoadingConversation, setIsLoadingConversation] = useState(false);
-  const [isWaitingForResponse, setIsWaitingForResponse] = useState(false);
+  // Track in-flight processing per conversation (so one thread doesn't block others)
+  const [waitingByConversationId, setWaitingByConversationId] = useState<Record<string, boolean>>(
+    {}
+  );
+  const activeConversationKey = conversationId || "__new__";
+  const isWaitingForResponse = !!waitingByConversationId[activeConversationKey];
 
   // Pagination state for messages
   const [hasMoreMessages, setHasMoreMessages] = useState(false);
@@ -183,13 +184,17 @@ export function useAICoachChat() {
     (apiMessages: ConversationDetail["messages"]): Message[] => {
       return apiMessages
         .map((msg, index) => ({
-          _id: `msg-${index}-${msg.created_at || Date.now()}`,
-          text: msg.content,
+          _id: msg.message_id || `msg-${index}-${msg.created_at || Date.now()}`,
+          text: msg.content || "",
           createdAt: msg.created_at ? new Date(msg.created_at) : new Date(),
           user: {
             _id: msg.role === "user" ? 1 : 2,
             name: msg.role === "user" ? "You" : "Coach Nudge"
-          }
+          },
+          status: (msg.status as any) || "completed",
+          requestId: msg.request_id,
+          pending: msg.status === "pending" || msg.status === "generating",
+          failed: msg.status === "failed"
         }))
         .reverse(); // GiftedChat expects newest first
     },
@@ -223,7 +228,7 @@ export function useAICoachChat() {
             console.log("[AI Coach] ✅ Recovery found AI response, updating UI");
             const freshMessages = convertToGiftedMessages(msgs);
             setMessages(freshMessages);
-            setIsWaitingForResponse(false);
+            setWaitingByConversationId((prev) => ({ ...prev, [convId]: false }));
             setError(null);
             pendingAssistantMessageIdRef.current = null;
             failedMessageRef.current = null;
@@ -254,7 +259,7 @@ export function useAICoachChat() {
         if (!found) {
           console.log("[AI Coach] ⚠️ Recovery timeout - no AI response found, showing error");
           setError("Response taking too long. Please try again.");
-          setIsWaitingForResponse(false);
+          setWaitingByConversationId((prev) => ({ ...prev, [convId]: false }));
           // Mark message as failed
           setMessages((prev) =>
             prev.map((msg) =>
@@ -335,7 +340,7 @@ export function useAICoachChat() {
               if (lastMessage?.role === "assistant") {
                 console.log("[AI Coach] ✅ Found AI response, updating messages");
                 setMessages(freshMessages);
-                setIsWaitingForResponse(false);
+                setWaitingByConversationId((prev) => ({ ...prev, [conversationId]: false }));
                 setError(null); // Clear any previous error
 
                 // Remove pending message ref
@@ -386,14 +391,23 @@ export function useAICoachChat() {
       prev.map((msg) => {
         // Find the pending assistant message and replace it with the actual response
         if (msg.pending && msg.user._id !== 1) {
-          return { ...msg, text: fullText, pending: false };
+          return { ...msg, text: fullText, pending: false, failed: false, status: "completed" };
+        }
+        // Mark the most recent pending user message as completed too
+        if (msg.pending && msg.user._id === 1) {
+          return { ...msg, pending: false, status: "completed" };
         }
         return msg;
       })
     );
 
     // Clear waiting states and recovery timeout
-    setIsWaitingForResponse(false);
+    if (pendingAIResponse.conversationId) {
+      setWaitingByConversationId((prev) => ({
+        ...prev,
+        [pendingAIResponse.conversationId]: false
+      }));
+    }
     setIsStreaming(false);
     setStreamingText("");
     pendingAssistantMessageIdRef.current = null;
@@ -417,10 +431,10 @@ export function useAICoachChat() {
     clearRecoveryTimeout
   ]);
 
-  // Load conversation history (most recent or by ID)
-  // Uses React Query cache for specific conversations
+  // Load conversation history (most recent, by ID, or goal-scoped thread)
+  // When goalId is set and no specificId: load persistent goal thread (or empty if none yet).
   const loadConversation = useCallback(
-    async (specificConversationId?: string) => {
+    async (specificConversationId?: string, goalId?: string | null) => {
       // Don't fetch if user doesn't have access
       if (!hasAccess) {
         setConversationId(null);
@@ -466,19 +480,33 @@ export function useAICoachChat() {
             }
           }
         } else {
-          // Load most recent conversation (always fetch to get latest)
-          const response = await aiCoachService.getCurrentConversation(MESSAGES_PER_PAGE, 0);
+          // Load current: most recent, or goal-scoped thread when goalId provided
+          const response = await aiCoachService.getCurrentConversation(
+            MESSAGES_PER_PAGE,
+            0,
+            goalId ?? undefined
+          );
           conversation = response.data ?? null;
         }
 
         if (conversation) {
           setConversationId(conversation.id);
           setMessages(convertToGiftedMessages(conversation.messages));
+          // Derive "busy" from persisted message statuses so reopen is stable even if realtime lags.
+          const lastMsg = conversation.messages?.[conversation.messages.length - 1];
+          const isBusy =
+            (lastMsg?.role === "assistant" &&
+              (lastMsg as any)?.status &&
+              ((lastMsg as any).status === "generating" ||
+                (lastMsg as any).status === "pending")) ||
+            conversation.messages?.some((m: any) => m.status === "pending") ||
+            false;
+          setWaitingByConversationId((prev) => ({ ...prev, [conversation.id]: isBusy }));
           setHasMoreMessages(conversation.has_more_messages ?? false);
           setTotalMessages(conversation.total_messages ?? conversation.messages.length);
           messageOffsetRef.current = conversation.messages.length;
         } else {
-          // No conversation found, reset state
+          // No conversation found (or no goal thread yet) — reset state, show empty
           setConversationId(null);
           setMessages([]);
           setHasMoreMessages(false);
@@ -540,11 +568,8 @@ export function useAICoachChat() {
     convertToGiftedMessages
   ]);
 
-  // Start a new conversation (local only - no API call)
-  // Conversation is created by backend when first message is sent
-  const startNewChat = useCallback(() => {
-    // Just reset local state - don't create in DB yet
-    // The conversation will be created when the first message is sent
+  // Clear local conversation state only (no API delete). Use when switching context (general vs goal).
+  const clearLocalStateOnly = useCallback(() => {
     setConversationId(null);
     setMessages([]);
     setError(null);
@@ -552,15 +577,22 @@ export function useAICoachChat() {
     setHasMoreMessages(false);
     setTotalMessages(0);
     messageOffsetRef.current = 0;
-    // Mark that next message should force a new conversation
-    forceNewChatRef.current = true;
   }, []);
 
-  // Reference to SSE connection for cleanup (legacy streaming, kept for fallback)
-  const sseConnectionRef = useRef<SSEConnection | null>(null);
-
-  // Goal ID for focused conversations (when opened from a specific goal)
-  const [focusedGoalId, setFocusedGoalId] = useState<string | null>(null);
+  // Start a new conversation (local only - no API call)
+  // Conversation is created by backend when first message is sent.
+  // Clears goal focus so the new thread is general (goal_id=null).
+  const startNewChat = useCallback(() => {
+    setFocusedGoalId(null);
+    setConversationId(null);
+    setMessages([]);
+    setError(null);
+    setStreamingText("");
+    setHasMoreMessages(false);
+    setTotalMessages(0);
+    messageOffsetRef.current = 0;
+    forceNewChatRef.current = true;
+  }, [setFocusedGoalId]);
 
   // Send message using async endpoint (background processing via Celery)
   // Response arrives via realtime subscription, then manual streaming is triggered
@@ -569,7 +601,8 @@ export function useAICoachChat() {
       if (!text.trim() || isStreaming || isWaitingForResponse) return;
 
       setError(null);
-      setIsWaitingForResponse(true);
+      const currentKey = conversationId || "__new__";
+      setWaitingByConversationId((prev) => ({ ...prev, [currentKey]: true }));
 
       const userMessageId = `user-${Date.now()}`;
 
@@ -579,7 +612,9 @@ export function useAICoachChat() {
           _id: userMessageId,
           text: text.trim(),
           createdAt: new Date(),
-          user: { _id: 1, name: "You" }
+          user: { _id: 1, name: "You" },
+          pending: true,
+          status: "pending"
         };
         setMessages((prev) => [userMessage, ...prev]);
       }
@@ -602,7 +637,8 @@ export function useAICoachChat() {
           _id: 2,
           name: "Coach Nudge"
         },
-        pending: true
+        pending: true,
+        status: "generating"
       };
       setMessages((prev) => [pendingMessage, ...prev]);
 
@@ -638,12 +674,20 @@ export function useAICoachChat() {
 
           console.log("[AI Coach] ✅ Message queued for processing", {
             conversationId: newConversationId?.substring(0, 8),
-            messageIndex: response.data.message_index
+            requestId: response.data.request_id
           });
 
           // Update conversation ID if this was a new conversation
           if (newConversationId && newConversationId !== conversationId) {
             setConversationId(newConversationId);
+            // Move waiting flag from the old key (or "__new__") to the real conversation id
+            setWaitingByConversationId((prev) => {
+              const next = { ...prev };
+              if (conversationId) delete next[conversationId];
+              delete next["__new__"];
+              next[newConversationId] = true;
+              return next;
+            });
             // Invalidate conversations list to show new chat in sidebar
             queryClient.invalidateQueries({
               queryKey: aiCoachQueryKeys.conversations()
@@ -707,7 +751,8 @@ export function useAICoachChat() {
         // Message was not processed, show the error
         console.error("[AI Coach] 💥 Async send failed", err);
         setError(err.message || "Failed to send message");
-        setIsWaitingForResponse(false);
+        const currentKey = conversationId || "__new__";
+        setWaitingByConversationId((prev) => ({ ...prev, [currentKey]: false }));
 
         // Update pending message to show failed state
         setMessages((prev) =>
@@ -765,17 +810,12 @@ export function useAICoachChat() {
       streamingIntervalRef.current = null;
     }
 
-    // Close SSE connection if active (legacy fallback)
-    if (sseConnectionRef.current) {
-      sseConnectionRef.current.close();
-      sseConnectionRef.current = null;
-    }
-
     // Clear recovery timeout
     clearRecoveryTimeout();
 
     setIsStreaming(false);
-    setIsWaitingForResponse(false);
+    const currentKey = conversationId || "__new__";
+    setWaitingByConversationId((prev) => ({ ...prev, [currentKey]: false }));
     setStreamingText("");
 
     // Remove the pending message
@@ -837,7 +877,7 @@ export function useAICoachChat() {
     // State
     messages,
     isStreaming,
-    isWaitingForResponse, // True when message sent but AI hasn't responded yet
+    isWaitingForResponse, // True for the active conversation only
     streamingText,
     conversationId,
     error,
@@ -861,6 +901,7 @@ export function useAICoachChat() {
     loadMoreMessages, // Load older messages (for infinite scroll)
     startNewChat,
     clearConversation,
+    clearLocalStateOnly,
     setMessages
   };
 }

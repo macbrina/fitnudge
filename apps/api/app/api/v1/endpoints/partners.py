@@ -101,6 +101,7 @@ class PartnerUserInfo(BaseModel):
         False  # Whether partner has accountability_partner_limit feature
     )
     is_active: bool = True  # Whether partner's account is active
+    last_active_at: Optional[str] = None  # ISO timestamp for activity indicator
 
 
 class PartnerTodayGoal(BaseModel):
@@ -110,6 +111,7 @@ class PartnerTodayGoal(BaseModel):
     title: str
     logged_today: bool = False
     is_scheduled_today: bool = True
+    today_checkin_status: Optional[str] = None
 
 
 class PartnerResponse(BaseModel):
@@ -294,8 +296,8 @@ async def get_partners(
                 initiated_by_user_id,
                 created_at,
                 accepted_at,
-                user:users!accountability_partners_user_id_fkey(id, name, username, profile_picture_url, status),
-                partner:users!accountability_partners_partner_user_id_fkey(id, name, username, profile_picture_url, status)
+                user:users!accountability_partners_user_id_fkey(id, name, username, profile_picture_url, status, last_active_at),
+                partner:users!accountability_partners_partner_user_id_fkey(id, name, username, profile_picture_url, status, last_active_at)
             """
             )
             .eq("status", "accepted")
@@ -364,7 +366,7 @@ async def get_partners(
                         active_goals_map[uid] = active_goals_map.get(uid, 0) + 1
 
         # Batch query: Get today's check-ins for all partners (only if include_today_goals)
-        checkins_by_goal: Dict[str, bool] = {}
+        checkins_by_goal: Dict[str, Optional[str]] = {}
         if include_today_goals and partner_user_ids:
             # Get all goal IDs first
             all_goal_ids = []
@@ -383,8 +385,8 @@ async def get_partners(
                 for ci in checkins_result.data or []:
                     goal_id = ci.get("goal_id")
                     if goal_id:
-                        # V2: Use status field - completed if status is 'completed'
-                        checkins_by_goal[goal_id] = ci.get("status") == "completed"
+                        # V2: Use status field directly (completed, skipped, rest_day)
+                        checkins_by_goal[goal_id] = ci.get("status")
 
         # Build response with has_active_items and optional today_goals
         partners = []
@@ -406,6 +408,7 @@ async def get_partners(
                     "name": partner_info.get("name"),
                     "username": partner_info.get("username"),
                     "profile_picture_url": partner_info.get("profile_picture_url"),
+                    "last_active_at": partner_info.get("last_active_at"),
                     "is_active": data["partner_status"] == "active",
                 },
                 "status": row["status"],
@@ -431,7 +434,8 @@ async def get_partners(
                 partner_logged_today = False
                 for g in partner_goals:
                     goal_id = g["id"]
-                    logged = checkins_by_goal.get(goal_id, False)
+                    status = checkins_by_goal.get(goal_id)
+                    logged = status in ("completed", "rest_day")
                     if logged:
                         partner_logged_today = True
 
@@ -446,6 +450,7 @@ async def get_partners(
                             "title": g["title"],
                             "logged_today": logged,
                             "is_scheduled_today": scheduled,
+                            "today_checkin_status": status,
                         }
                     )
 
@@ -853,9 +858,8 @@ async def get_suggested_partners(
             .execute()
         )
 
-        user_timezone = (
-            user_profile.data.get("timezone", "UTC") if user_profile.data else "UTC"
-        )
+        profile = getattr(user_profile, "data", None) if user_profile is not None else None
+        user_timezone = profile.get("timezone", "UTC") if profile else "UTC"
 
         # Get current user's active goals
         user_goals_result = (
@@ -1574,6 +1578,7 @@ class PartnerGoalSummary(BaseModel):
     current_streak: int = 0
     logged_today: bool = False
     frequency_type: str = "daily"  # "daily" or "weekly"
+    today_checkin_status: Optional[str] = None
 
 
 class PartnerDashboard(BaseModel):
@@ -1679,7 +1684,7 @@ async def get_partner_dashboard(
         # Get partner's user info (include status to check if active)
         partner_info = (
             supabase.table("users")
-            .select("id, name, username, profile_picture_url, status")
+            .select("id, name, username, profile_picture_url, status, last_active_at")
             .eq("id", partner_user_id)
             .maybe_single()
             .execute()
@@ -1738,7 +1743,7 @@ async def get_partner_dashboard(
         # V2: All active goals are shown (no actionable_plans in V2)
         goals_data = goals_result.data or []
         goal_ids = [g["id"] for g in goals_data]
-        today_checkins: Dict[str, bool] = {}
+        today_checkins: Dict[str, Optional[str]] = {}
 
         if goal_ids:
             # Batch fetch: today's check-ins
@@ -1753,14 +1758,15 @@ async def get_partner_dashboard(
 
             for ci in checkins_result.data or []:
                 if ci.get("goal_id"):
-                    # V2: Use status field - completed if status is 'completed'
-                    today_checkins[ci["goal_id"]] = ci.get("status") == "completed"
+                    # V2: Use status field directly (completed, skipped, rest_day)
+                    today_checkins[ci["goal_id"]] = ci.get("status")
 
         # Build goal summaries (V2: goals only)
         goal_summaries = []
         for goal in goals_data:
             goal_id = goal["id"]
-            logged_today = today_checkins.get(goal_id, False)
+            status = today_checkins.get(goal_id)
+            logged_today = status in ("completed", "rest_day")
 
             goal_summaries.append(
                 PartnerGoalSummary(
@@ -1770,6 +1776,7 @@ async def get_partner_dashboard(
                     current_streak=goal.get("current_streak", 0) or 0,
                     logged_today=logged_today,
                     frequency_type=goal.get("frequency_type", "daily"),
+                    today_checkin_status=status,
                 )
             )
 
@@ -1794,6 +1801,7 @@ async def get_partner_dashboard(
                 name=partner_info.data.get("name"),
                 username=partner_info.data.get("username"),
                 profile_picture_url=partner_info.data.get("profile_picture_url"),
+                last_active_at=partner_info.data.get("last_active_at"),
                 has_partner_feature=partner_has_feature,
                 is_active=partner_is_active,
             ),

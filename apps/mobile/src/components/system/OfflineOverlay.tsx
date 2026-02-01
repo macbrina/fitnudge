@@ -1,26 +1,39 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { View, Text, Modal } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import NetInfo from "@react-native-community/netinfo";
 import { useStyles, useTheme } from "@/themes";
 import { toRN } from "@/lib/units";
 import { fontFamily } from "@/lib/fonts";
 import Button from "@/components/ui/Button";
 import { useSystemStatusStore, useIsOffline } from "@/stores/systemStatusStore";
+import { useSubscriptionStore } from "@/stores/subscriptionStore";
+import { usePricingStore } from "@/stores/pricingStore";
 import { fetchBackendHealth } from "@/services/system/systemStatusService";
+
+const BACKEND_POLL_INTERVAL_MS = 10_000; // 10s when offline due to backend only
 
 /**
  * Full-screen overlay that appears when the app is offline.
  * Shows when either network connectivity is lost or the backend is unreachable.
- * Provides a retry button that:
+ *
+ * Retry (manual or auto):
  * 1. Re-checks network status
  * 2. Re-checks backend health
- * 3. Refetches all failed React Query queries
+ * 3. Refetches failed React Query queries and invalidates stale ones
+ * 4. Refetches Zustand stores (subscription, pricing)
+ *
+ * Auto-retry:
+ * - Network: Listens to NetInfo; when connectivity returns, retries automatically.
+ * - Backend: Polls health every 10s when offline due to backend only; when backend
+ *   is back, refetches data and overlay dismisses.
  */
 export function OfflineOverlay() {
   const isOffline = useIsOffline();
   const isNetworkConnected = useSystemStatusStore((s) => s.isNetworkConnected);
+  const backendStatus = useSystemStatusStore((s) => s.backendStatus);
   const setNetworkConnected = useSystemStatusStore((s) => s.setNetworkConnected);
   const queryClient = useQueryClient();
   const { t } = useTranslation();
@@ -28,37 +41,84 @@ export function OfflineOverlay() {
   const { colors } = useTheme();
 
   const [isRetrying, setIsRetrying] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const retryingRef = useRef(false);
 
   const isNetworkIssue = isNetworkConnected === false;
+  const isBackendIssue = isNetworkConnected !== false && backendStatus === "offline";
+
+  const performDataRefetch = useCallback(async () => {
+    await queryClient.refetchQueries({
+      predicate: (query) => query.state.status === "error"
+    });
+    await queryClient.invalidateQueries();
+    const sub = useSubscriptionStore.getState();
+    const pricing = usePricingStore.getState();
+    sub.clearFetchCache();
+    await Promise.all([sub.refresh(), pricing.fetchPlans(true)]);
+  }, [queryClient]);
 
   const handleRetry = useCallback(async () => {
+    if (retryingRef.current) return;
+    retryingRef.current = true;
     setIsRetrying(true);
 
     try {
-      // 1. Re-check network connectivity
-      const NetInfo = await import("@react-native-community/netinfo");
-      const state = await NetInfo.default.fetch();
+      const state = await NetInfo.fetch();
       setNetworkConnected(state.isConnected ?? true);
 
-      // If network is back, check backend health
       if (state.isConnected) {
-        // 2. Re-check backend health
         await fetchBackendHealth({ force: true });
-
-        // 3. Refetch all failed queries
-        await queryClient.refetchQueries({
-          predicate: (query) => query.state.status === "error"
-        });
-
-        // Also invalidate queries that might be stale
-        await queryClient.invalidateQueries();
+        await performDataRefetch();
       }
     } catch (error) {
       console.warn("[OfflineOverlay] Retry failed:", error);
     } finally {
+      retryingRef.current = false;
       setIsRetrying(false);
     }
-  }, [setNetworkConnected, queryClient]);
+  }, [setNetworkConnected, performDataRefetch]);
+
+  // Auto-retry when network comes back (offline due to network)
+  useEffect(() => {
+    if (!isOffline || isNetworkConnected !== false) return;
+
+    const unsubscribe = NetInfo.addEventListener((state) => {
+      if (state.isConnected === true) handleRetry();
+    });
+    return () => unsubscribe();
+  }, [isOffline, isNetworkConnected, handleRetry]);
+
+  // Auto-retry when backend comes back (offline due to backend only; poll health)
+  useEffect(() => {
+    if (!isOffline || !isBackendIssue) {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+      return;
+    }
+
+    const poll = async () => {
+      await fetchBackendHealth({ force: true });
+      if (useSystemStatusStore.getState().backendStatus === "online") {
+        if (pollRef.current) {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+        }
+        await performDataRefetch();
+      }
+    };
+
+    poll();
+    pollRef.current = setInterval(poll, BACKEND_POLL_INTERVAL_MS);
+    return () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
+  }, [isOffline, isBackendIssue, performDataRefetch]);
 
   // Don't show if we're online
   if (!isOffline) {
@@ -83,7 +143,7 @@ export function OfflineOverlay() {
           <View style={styles.iconContainer}>
             <Ionicons
               name={isNetworkIssue ? "cloud-offline-outline" : "server-outline"}
-              size={80}
+              size={60}
               color={colors.text.tertiary}
             />
           </View>
@@ -140,8 +200,8 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     maxWidth: 320
   },
   iconContainer: {
-    width: 140,
-    height: 140,
+    width: 120,
+    height: 120,
     borderRadius: 70,
     backgroundColor: `${colors.text.tertiary}10`,
     justifyContent: "center" as const,

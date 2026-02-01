@@ -35,6 +35,7 @@ interface SubscriptionState {
   lastFetchedFeatures: number | null;
   lastFetchedHistory: number | null;
   lastFetched: number | null; // Combined last fetched for backward compatibility
+  lastSubscriptionRefresh: number | null; // Timestamp when subscription was refreshed (used to skip prefetch)
 
   // Actions
   fetchSubscription: () => Promise<void>;
@@ -45,6 +46,7 @@ interface SubscriptionState {
   // Optimistic update for immediate UI feedback after purchase
   setOptimisticPlan: (plan: SubscriptionTier) => void;
   clearOptimisticPlan: () => void;
+  setLastSubscriptionRefresh: () => void; // Set timestamp to skip prefetch after purchase
 
   // Helper methods
   getPlan: () => string; // 'free' or 'premium'
@@ -65,6 +67,9 @@ interface SubscriptionState {
 
   clearError: () => void;
   reset: () => void;
+
+  /** Clear fetch cache so next refresh/fetch will run. Used after offline retry. */
+  clearFetchCache: () => void;
 }
 
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
@@ -190,6 +195,7 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   lastFetchedFeatures: null,
   lastFetchedHistory: null,
   lastFetched: null,
+  lastSubscriptionRefresh: null, // Timestamp when subscription was refreshed (used to skip prefetch)
 
   // Modal actions
   openModal: () => set({ isModalVisible: true }),
@@ -386,7 +392,8 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
           lastFetchedSubscription: now,
           lastFetchedFeatures: now,
           lastFetchedHistory: historyResponse.data ? now : null,
-          lastFetched: now
+          lastFetched: now,
+          lastSubscriptionRefresh: now // Track when subscription was refreshed
         });
       } else {
         // Handle partial success or failure
@@ -445,6 +452,11 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
 
   clearOptimisticPlan: () => {
     set({ optimisticPlan: null });
+  },
+
+  // Set timestamp to skip prefetch after subscription purchase
+  setLastSubscriptionRefresh: () => {
+    set({ lastSubscriptionRefresh: Date.now() });
   },
 
   // Helper methods
@@ -653,6 +665,15 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
       lastFetchedSubscription: null,
       lastFetchedFeatures: null,
       lastFetchedHistory: null
+    });
+  },
+
+  clearFetchCache: () => {
+    set({
+      lastFetchedSubscription: null,
+      lastFetchedFeatures: null,
+      lastFetchedHistory: null,
+      lastFetched: null
     });
   }
 }));

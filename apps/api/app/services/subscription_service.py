@@ -12,7 +12,7 @@ This service is used by:
 - Celery tasks (for scheduled expiry checks)
 """
 
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional, Dict, Any
 from app.services.logger import logger
 
@@ -153,6 +153,45 @@ async def handle_subscription_expiry_deactivation(
     except Exception as e:
         logger.error(f"Error handling subscription expiry for user {user_id}: {e}")
         raise
+
+
+async def reset_ai_coach_daily_usage_on_downgrade(supabase, user_id: str) -> bool:
+    """
+    Reset AI Coach daily usage for today when user downgrades to free (same day).
+
+    Use when: webhook expiry, webhook product_change downgrade, or /sync downgrade.
+    Gives them a fresh free-tier limit (e.g. 3 messages) for the rest of the day
+    instead of counting premium usage against free.
+
+    Returns True if a row was updated, False otherwise.
+    """
+    try:
+        today = date.today().isoformat()
+        r = (
+            supabase.table("ai_coach_daily_usage")
+            .select("id, message_count, tokens_used, bonus_messages")
+            .eq("user_id", user_id)
+            .eq("usage_date", today)
+            .execute()
+        )
+        if not r.data or len(r.data) == 0:
+            return False
+        row = r.data[0]
+        supabase.table("ai_coach_daily_usage").update(
+            {
+                "message_count": 0,
+                "tokens_used": 0,
+                "bonus_messages": 0,
+                "updated_at": datetime.utcnow().isoformat(),
+            }
+        ).eq("id", row["id"]).execute()
+        logger.info(
+            f"Reset AI Coach daily usage for user {user_id} (downgrade to free, same day)"
+        )
+        return True
+    except Exception as e:
+        logger.warning(f"Failed to reset AI Coach daily usage for user {user_id}: {e}")
+        return False
 
 
 async def check_user_feature_limit(

@@ -17,7 +17,8 @@
 CREATE OR REPLACE FUNCTION get_analytics_dashboard(
     p_user_id UUID,
     p_goal_id UUID,
-    p_days INT DEFAULT 30
+    p_days INT DEFAULT 30,
+    p_end_date DATE DEFAULT NULL
 )
 RETURNS JSON
 LANGUAGE sql
@@ -26,13 +27,16 @@ STABLE
 PARALLEL SAFE
 AS $$
 WITH
+effective_end AS (
+    SELECT COALESCE(p_end_date, CURRENT_DATE)::DATE as end_date
+),
 date_range AS (
     SELECT 
         GREATEST(
             (SELECT created_at::DATE FROM goals WHERE id = p_goal_id),
-            CURRENT_DATE - p_days
+            (SELECT end_date FROM effective_end) - p_days
         ) as start_date,
-        CURRENT_DATE as end_date
+        (SELECT end_date FROM effective_end) as end_date
 ),
 
 goal_info AS (
@@ -128,8 +132,8 @@ heatmap_data AS (
 
 this_week_days AS (
     SELECT generate_series(
-        CURRENT_DATE - 6,
-        CURRENT_DATE,
+        (SELECT end_date FROM effective_end) - 6,
+        (SELECT end_date FROM effective_end),
         '1 day'::INTERVAL
     )::DATE as day_date
 ),
@@ -139,8 +143,8 @@ this_week_checkins AS (
     FROM check_ins ci
     WHERE ci.goal_id = p_goal_id
       AND ci.user_id = p_user_id
-      AND ci.check_in_date >= CURRENT_DATE - 6
-      AND ci.check_in_date <= CURRENT_DATE
+      AND ci.check_in_date >= (SELECT end_date FROM effective_end) - 6
+      AND ci.check_in_date <= (SELECT end_date FROM effective_end)
 ),
 
 this_week_summary AS (
@@ -241,7 +245,7 @@ all_goal_weeks AS (
     FROM (
         SELECT generate_series(
             (SELECT start_week FROM goal_creation_week),
-            DATE_TRUNC('week', CURRENT_DATE)::DATE,
+            DATE_TRUNC('week', (SELECT end_date FROM effective_end))::DATE,
             '1 week'::INTERVAL
         )::DATE as week_start
     ) weeks
@@ -283,15 +287,20 @@ streak_history AS (
     ORDER BY w.week_num
 ),
 
+-- Mood trend: last 14 days only (avoids fetching 30/90/180 days when chart can't show that many).
 mood_trend AS (
     SELECT 
-        check_in_date::TEXT as date,
-        mood,
-        CASE mood WHEN 'amazing' THEN 3 WHEN 'good' THEN 2 WHEN 'tough' THEN 1 ELSE NULL END as mood_score,
-        TO_CHAR(check_in_date, 'Mon DD') as label
-    FROM goal_checkins
-    WHERE mood IS NOT NULL
-    ORDER BY check_in_date
+        ci.check_in_date::TEXT as date,
+        ci.mood,
+        CASE ci.mood WHEN 'amazing' THEN 3 WHEN 'good' THEN 2 WHEN 'tough' THEN 1 ELSE NULL END as mood_score,
+        TO_CHAR(ci.check_in_date, 'Mon DD') as label
+    FROM check_ins ci
+    WHERE ci.goal_id = p_goal_id
+      AND ci.user_id = p_user_id
+      AND ci.mood IS NOT NULL
+      AND ci.check_in_date >= GREATEST((SELECT created_at::DATE FROM goal_info), (SELECT end_date FROM effective_end) - 14)
+      AND ci.check_in_date <= (SELECT end_date FROM effective_end)
+    ORDER BY ci.check_in_date
 ),
 
 skip_totals AS (
@@ -327,9 +336,9 @@ months AS (
     SELECT generate_series(
         GREATEST(
             DATE_TRUNC('month', (SELECT start_date FROM date_range)),
-            DATE_TRUNC('month', CURRENT_DATE - INTERVAL '5 months')
+            DATE_TRUNC('month', (SELECT end_date FROM effective_end) - INTERVAL '5 months')
         ),
-        DATE_TRUNC('month', CURRENT_DATE),
+        DATE_TRUNC('month', (SELECT end_date FROM effective_end)),
         '1 month'::INTERVAL
     )::DATE as month_date
 ),

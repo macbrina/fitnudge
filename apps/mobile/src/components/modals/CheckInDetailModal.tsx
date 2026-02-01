@@ -100,6 +100,12 @@ export function CheckInDetailModal({
         player.pause();
         setIsPlaying(false);
       }
+      if (player) {
+        player.pause();
+        player.seekTo(0);
+      }
+      setPlaybackProgress(0);
+      setIsLoadingAudio(false);
       Animated.timing(translateY, {
         toValue: SCREEN_HEIGHT,
         duration: 300,
@@ -116,21 +122,23 @@ export function CheckInDetailModal({
     if (!player || !isPlaying) return;
 
     const interval = setInterval(() => {
-      if (player.duration && player.duration > 0) {
-        const progress = player.currentTime / player.duration;
+      const total = checkIn?.voice_note_duration ?? player.duration;
+      if (total && total > 0) {
+        const progress = player.currentTime / total;
         setPlaybackProgress(progress);
 
         // Check if playback completed
-        if (player.currentTime >= player.duration - 0.1) {
+        if (player.currentTime >= total - 0.1) {
           setIsPlaying(false);
           setPlaybackProgress(0);
+          player.pause();
           player.seekTo(0);
         }
       }
     }, 100);
 
     return () => clearInterval(interval);
-  }, [player, isPlaying]);
+  }, [player, isPlaying, checkIn?.voice_note_duration]);
 
   // Voice note playback toggle
   const handleVoiceNoteToggle = useCallback(async () => {
@@ -265,7 +273,9 @@ export function CheckInDetailModal({
             {/* Date */}
             <View style={styles.dateRow}>
               <Calendar size={16} color={colors.text.tertiary} />
-              <Text style={styles.dateText}>{formatDate(checkIn.check_in_date)}</Text>
+              <Text style={styles.dateText}>
+                {formatDate(checkIn.check_in_date, "short", true)}
+              </Text>
             </View>
 
             {/* Status Badge */}
@@ -346,8 +356,10 @@ export function CheckInDetailModal({
                       />
                     </View>
                     <Text style={styles.durationText}>
-                      {player?.duration
-                        ? `${formatDuration(player.currentTime)} / ${formatDuration(player.duration)}`
+                      {checkIn.voice_note_duration || player?.duration
+                        ? `${formatDuration(player.currentTime)} / ${formatDuration(
+                            checkIn.voice_note_duration ?? player.duration
+                          )}`
                         : "0:00"}
                     </Text>
                   </View>

@@ -20,8 +20,8 @@ Scalability (per SCALABILITY.md):
 - No N+1 queries - batch operations where possible
 """
 
-from datetime import datetime, timedelta
-from typing import Dict, Any, List, Optional
+from datetime import datetime, timedelta, date
+from typing import Dict, Any, List, Optional, Set
 import pytz
 
 from app.services.tasks.base import (
@@ -75,6 +75,38 @@ def has_feature_access(supabase, user_id: str) -> bool:
     return has_user_feature_sync(supabase, user_id, "adaptive_nudging")
 
 
+def get_goal_ids_with_pending_checkin_today(
+    supabase,
+    goal_ids: List[str],
+    today_utc: Optional[date] = None,
+) -> Set[str]:
+    """
+    Return goal_ids that have a pending check-in for today (UTC date).
+
+    Use before sending "check in today" nudges so we only nudge users who
+    have not yet checked in for the day. Call from check_streak_at_risk,
+    check_risky_day_warning, check_approaching_milestone, check_pattern_suggestion, etc.
+    """
+    if not goal_ids:
+        return set()
+    today = today_utc or datetime.utcnow().date()
+    try:
+        result = (
+            supabase.table("check_ins")
+            .select("goal_id")
+            .in_("goal_id", goal_ids)
+            .eq("check_in_date", today.isoformat())
+            .eq("status", "pending")
+            .execute()
+        )
+        return {r["goal_id"] for r in (result.data or []) if r.get("goal_id")}
+    except Exception as e:
+        logger.warning(
+            f"[AdaptiveNudging] get_goal_ids_with_pending_checkin_today: {e}"
+        )
+        return set()
+
+
 @celery_app.task(name="check_streak_at_risk", bind=True, max_retries=2)
 def check_streak_at_risk_task(self):
     """
@@ -120,6 +152,12 @@ def check_streak_at_risk_task(self):
             n.get("user_id") for n in (existing_nudges_result.data or [])
         )
 
+        # Only nudge goals that have a pending check-in today (user has not checked in yet)
+        goal_ids = [ug.get("goal_id") for ug in result.data if ug.get("goal_id")]
+        goals_with_pending_today = get_goal_ids_with_pending_checkin_today(
+            supabase, goal_ids, utc_today
+        )
+
         for user_goal in result.data:
             processed += 1
             user_id = user_goal.get("user_id")
@@ -132,6 +170,10 @@ def check_streak_at_risk_task(self):
 
             # O(1) lookup: Skip if already sent streak_at_risk nudge today
             if user_id in users_with_streak_nudge_today:
+                continue
+
+            # Skip if user has already checked in for this goal today (no pending check-in)
+            if goal_id not in goals_with_pending_today:
                 continue
 
             # Check if we can send
@@ -264,6 +306,12 @@ def check_risky_day_warning_task(self):
             n.get("user_id") for n in (existing_nudges_result.data or [])
         )
 
+        # Only nudge goals that have a pending check-in today (user has not checked in yet)
+        goal_ids_risky = [i.get("goal_id") for i in risky_insights if i.get("goal_id")]
+        goals_with_pending_today_risky = get_goal_ids_with_pending_checkin_today(
+            supabase, goal_ids_risky, utc_today
+        )
+
         for insight in risky_insights:
             processed += 1
             user_id = insight.get("user_id")
@@ -273,6 +321,10 @@ def check_risky_day_warning_task(self):
 
             # O(1) lookup: Skip if already sent risky day nudge today
             if user_id in users_with_risky_nudge_today:
+                continue
+
+            # Skip if user has already checked in for this goal today (no pending check-in)
+            if goal_id not in goals_with_pending_today_risky:
                 continue
 
             # Get user info from batch-fetched map
@@ -407,7 +459,7 @@ def check_missed_days_intervention_task(self):
                 body = f"Hey {user_name}, I noticed you've been quiet. Ready to get back on track? Your streak is waiting! 💪"
                 title = "Ready to Restart? 💪"
 
-            # Use send_push_to_user_sync (handles tokens + history)
+            # No goal deepLink (tap opens app home) — push only, don't save to notification_history
             result = send_push_to_user_sync(
                 user_id=user_id,
                 title=title,
@@ -419,6 +471,7 @@ def check_missed_days_intervention_task(self):
                     # No deepLink - tap opens app home
                 },
                 notification_type="adaptive_nudge",
+                save_to_notification_history=False,
             )
 
             if result.get("success") or result.get("delivered", 0) > 0:
@@ -487,6 +540,12 @@ def check_approaching_milestone_task(self):
             n.get("user_id") for n in (existing_nudges_result.data or [])
         )
 
+        # Only nudge goals that have a pending check-in today (user has not checked in yet)
+        goal_ids_milestone = [g.get("id") for g in result.data if g.get("id")]
+        goals_with_pending_today_milestone = get_goal_ids_with_pending_checkin_today(
+            supabase, goal_ids_milestone, utc_today
+        )
+
         for goal in result.data:
             current_streak = goal.get("current_streak", 0)
             goal_id = goal.get("id")
@@ -506,6 +565,10 @@ def check_approaching_milestone_task(self):
 
             # O(1) lookup: Skip if already sent milestone_approaching nudge today
             if user_id in users_with_milestone_nudge_today:
+                continue
+
+            # Skip if user has already checked in for this goal today (no pending check-in)
+            if goal_id not in goals_with_pending_today_milestone:
                 continue
 
             processed += 1
@@ -587,10 +650,7 @@ def check_pattern_suggestion_task(self):
         # Get completed pattern_insights where needs_extra_motivation is true
         insights_result = (
             supabase.table("pattern_insights")
-            .select(
-                "id, user_id, goal_id, nudge_config, current_metrics, "
-                "goals!inner(title, user_id, users!inner(timezone, name))"
-            )
+            .select("id, user_id, goal_id, nudge_config, current_metrics")
             .eq("status", "completed")
             .execute()
         )
@@ -617,6 +677,30 @@ def check_pattern_suggestion_task(self):
             user_insights[user_id].append(insight)
 
         user_ids = list(user_insights.keys())
+        goal_ids = list(
+            {
+                i.get("goal_id")
+                for i in motivation_needed
+                if i.get("goal_id") is not None
+            }
+        )
+
+        # Batch fetch goals + users (avoid PostgREST embed ambiguity)
+        goals_result = (
+            supabase.table("goals")
+            .select("id, title, user_id")
+            .in_("id", goal_ids)
+            .execute()
+        )
+        goals_by_id = {g["id"]: g for g in (goals_result.data or []) if g.get("id")}
+
+        users_result = (
+            supabase.table("users")
+            .select("id, name, timezone")
+            .in_("id", user_ids)
+            .execute()
+        )
+        users_by_id = {u["id"]: u for u in (users_result.data or []) if u.get("id")}
 
         # SCALABILITY: Batch prefetch existing pattern nudges this week for ALL users
         utc_now = datetime.now(pytz.UTC)
@@ -637,6 +721,14 @@ def check_pattern_suggestion_task(self):
             n.get("user_id") for n in (existing_nudges_result.data or [])
         )
 
+        # Only nudge goals that have a pending check-in today (user has not checked in yet)
+        goal_ids_pattern = [
+            i.get("goal_id") for i in motivation_needed if i.get("goal_id")
+        ]
+        goals_with_pending_today_pattern = get_goal_ids_with_pending_checkin_today(
+            supabase, goal_ids_pattern, utc_today
+        )
+
         for user_id, insights in user_insights.items():
             processed += 1
 
@@ -649,11 +741,16 @@ def check_pattern_suggestion_task(self):
 
             # Get first insight for this user
             insight = insights[0]
-            goal = insight.get("goals", {})
             goal_id = insight.get("goal_id")
-            goal_title = goal.get("title", "your goal")
-            user_name = goal.get("users", {}).get("name") or "Champion"
-            user_tz_str = goal.get("users", {}).get("timezone") or "UTC"
+            goal = goals_by_id.get(goal_id) or {}
+            user = users_by_id.get(user_id) or {}
+
+            # Skip if user has already checked in for this goal today (no pending check-in)
+            if goal_id not in goals_with_pending_today_pattern:
+                continue
+            goal_title = goal.get("title") or "your goal"
+            user_name = user.get("name") or "Champion"
+            user_tz_str = user.get("timezone") or "UTC"
 
             # Check if it's morning (8-10 AM) in user's timezone
             try:
@@ -724,6 +821,7 @@ def check_pattern_suggestion_task(self):
                 },
             )
 
+            # Save to history only when we have a goal deepLink
             result = send_push_to_user_sync(
                 user_id=user_id,
                 title=suggestion["title"],
@@ -740,6 +838,7 @@ def check_pattern_suggestion_task(self):
                 notification_type="adaptive_nudge",
                 entity_type="goal",
                 entity_id=goal_id,
+                save_to_notification_history=bool(goal_id),
             )
 
             if result.get("success") or result.get("delivered", 0) > 0:
@@ -775,12 +874,10 @@ def check_crushing_it_task(self):
         nudged = 0
         processed = 0
 
-        # Get all active goals with user info
+        # Get all active goals (batch join users in Python to avoid embed ambiguity)
         goals_result = (
             supabase.table("goals")
-            .select(
-                "id, user_id, title, frequency_type, target_days, users!inner(timezone, name)"
-            )
+            .select("id, user_id, title, frequency_type, target_days")
             .eq("status", "active")
             .execute()
         )
@@ -791,6 +888,14 @@ def check_crushing_it_task(self):
         goals = goals_result.data
         goal_ids = [g["id"] for g in goals]
         user_ids = list(set(g["user_id"] for g in goals))
+
+        users_result = (
+            supabase.table("users")
+            .select("id, name, timezone")
+            .in_("id", user_ids)
+            .execute()
+        )
+        users_by_id = {u["id"]: u for u in (users_result.data or []) if u.get("id")}
 
         # SCALABILITY: Batch prefetch this week's check-ins for ALL goals at once
         # Instead of 1 query per goal (N+1), we do 1 query total
@@ -836,8 +941,9 @@ def check_crushing_it_task(self):
             user_id = goal.get("user_id")
             goal_id = goal.get("id")
             goal_title = goal.get("title")
-            user_name = goal.get("users", {}).get("name") or "Champion"
-            user_tz_str = goal.get("users", {}).get("timezone") or "UTC"
+            user = users_by_id.get(user_id) or {}
+            user_name = user.get("name") or "Champion"
+            user_tz_str = user.get("timezone") or "UTC"
 
             # Check if it's evening in user's timezone (5 PM - 8 PM)
             try:
@@ -880,12 +986,14 @@ def check_crushing_it_task(self):
                 # Count scheduled days completed (using status)
                 # V2.1: status='completed' means done, status='rest_day' is a rest day
                 completed_count = sum(
-                    1
-                    for c in week_checkins
-                    if c.get("status") == "completed"
+                    1 for c in week_checkins if c.get("status") == "completed"
                 )
                 total_scheduled = len(
-                    [c for c in week_checkins if c.get("status") not in ("pending", "rest_day")]
+                    [
+                        c
+                        for c in week_checkins
+                        if c.get("status") not in ("pending", "rest_day")
+                    ]
                 )
 
                 # Need at least 3 scheduled days and all completed

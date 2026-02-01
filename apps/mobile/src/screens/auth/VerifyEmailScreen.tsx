@@ -8,7 +8,7 @@ import { toRN } from "@/lib/units";
 import { useAuthStore } from "@/stores/authStore";
 import { useStyles } from "@/themes/makeStyles";
 import { lineHeight } from "@/themes/tokens";
-import { getRedirection } from "@/utils/getRedirection";
+import { getRedirection, hasCompletedV2Onboarding } from "@/utils/getRedirection";
 import { router } from "expo-router";
 import { useRef, useState } from "react";
 import { useAlertModal } from "@/contexts/AlertModalContext";
@@ -200,13 +200,10 @@ export default function VerifyEmailScreen() {
         // Update user in store with email_verified = true
         useAuthStore.getState().updateUser({ email_verified: true });
 
-        capture("email_verified", {
-          user_id: user?.id
-        });
-
         // Get redirect URL based on onboarding status
-        const redirectUrl = await getRedirection();
-        router.replace(redirectUrl);
+        const hasCompletedOnboarding = hasCompletedV2Onboarding(user);
+        const destination = await getRedirection({ hasCompletedOnboarding });
+        router.replace(destination);
       } else {
         const errorMessage = response.error || t("auth.verify_email.error_invalid_code");
         setError(errorMessage);

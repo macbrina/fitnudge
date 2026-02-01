@@ -83,7 +83,7 @@ async def complete_onboarding(
 
         result = supabase.table("users").update(update_data).eq("id", user_id).execute()
 
-        if not result.data:
+        if not result or not getattr(result, "data", None):
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to update user profile",
@@ -129,16 +129,16 @@ async def get_onboarding_status(
                 "first_name, motivation_style, morning_motivation_enabled, onboarding_completed_at"
             )
             .eq("id", user_id)
-            .single()
+            .maybe_single()
             .execute()
         )
 
-        if not result.data:
+        user = getattr(result, "data", None) if result is not None else None
+        if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
             )
 
-        user = result.data
         onboarding_completed = user.get("onboarding_completed_at") is not None
 
         return {

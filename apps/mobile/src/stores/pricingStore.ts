@@ -10,7 +10,7 @@ interface PricingState {
   lastFetched: number | null;
 
   // Actions
-  fetchPlans: () => Promise<void>;
+  fetchPlans: (force?: boolean) => Promise<void>;
   getPlanById: (id: string) => PricingPlan | undefined;
   getGoalLimit: (planId: string) => number | null; // null means unlimited
   canCreateGoal: (planId: string, currentGoalCount: number) => boolean;
@@ -32,14 +32,15 @@ export const usePricingStore = create<PricingState>((set, get) => ({
   lastFetched: null,
 
   // Actions
-  fetchPlans: async () => {
+  fetchPlans: async (force = false) => {
     const { lastFetched, plans } = get();
 
-    // Check if we have recent data AND plans array is not empty
-    // If plans is empty, we should refetch even if cache timestamp exists
-    const hasValidData = plans && plans.length > 0;
-    if (hasValidData && lastFetched && Date.now() - lastFetched < CACHE_DURATION) {
-      return;
+    // Skip cache check when force=true (e.g. offline retry)
+    if (!force) {
+      const hasValidData = plans && plans.length > 0;
+      if (hasValidData && lastFetched && Date.now() - lastFetched < CACHE_DURATION) {
+        return;
+      }
     }
 
     // If a request is already in flight, wait for it instead of starting a new one

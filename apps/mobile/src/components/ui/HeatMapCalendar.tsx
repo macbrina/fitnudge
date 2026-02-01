@@ -83,16 +83,15 @@ export function HeatMapCalendar({
       : new Date(today.getTime() - daysToShow * 24 * 60 * 60 * 1000);
     start.setHours(0, 0, 0, 0);
 
-    // Adjust to start from Sunday
-    const dayOfWeek = start.getDay();
-    start.setDate(start.getDate() - dayOfWeek);
+    // Adjust to start from Monday (ISO week, matches WeeklyProgressView)
+    const startDayOfWeek = start.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+    const daysToMonday = startDayOfWeek === 0 ? 6 : startDayOfWeek - 1;
+    start.setDate(start.getDate() - daysToMonday);
 
-    // Generate days until today + remaining week
+    // Extend end to Sunday of the week containing today (Mon–Sun; Sunday = getDay() 0)
     const end = new Date(today);
-    const endDayOfWeek = end.getDay();
-    if (endDayOfWeek !== 6) {
-      end.setDate(end.getDate() + (6 - endDayOfWeek));
-    }
+    const daysToSunday = (7 - end.getDay()) % 7;
+    end.setDate(end.getDate() + daysToSunday);
 
     const current = new Date(start);
     // Helper to get YYYY-MM-DD in local time (not UTC)
@@ -167,11 +166,19 @@ export function HeatMapCalendar({
     return result;
   }, [checkInMap, daysToShow, startDate, goalCreationDate, targetDays]);
 
-  // Group into weeks (rows)
+  // Group into weeks (rows); pad last row to 7 so columns align with day labels
   const weeks = useMemo(() => {
     const result: (typeof days)[] = [];
     for (let i = 0; i < days.length; i += 7) {
-      result.push(days.slice(i, i + 7));
+      const chunk = days.slice(i, i + 7);
+      while (chunk.length < 7) {
+        chunk.push({
+          date: new Date(0),
+          dateStr: `pad-${i}-${chunk.length}`,
+          status: "future" as const
+        });
+      }
+      result.push(chunk);
     }
     return result;
   }, [days]);
@@ -205,16 +212,16 @@ export function HeatMapCalendar({
     }
   };
 
-  // Day labels using translation keys
+  // Day labels Mon–Sun (ISO week, matches WeeklyProgressView)
   const dayLabels = useMemo(
     () => [
-      t("common.days_of_week.short.sun"),
       t("common.days_of_week.short.mon"),
       t("common.days_of_week.short.tue"),
       t("common.days_of_week.short.wed"),
       t("common.days_of_week.short.thu"),
       t("common.days_of_week.short.fri"),
-      t("common.days_of_week.short.sat")
+      t("common.days_of_week.short.sat"),
+      t("common.days_of_week.short.sun")
     ],
     [t]
   );

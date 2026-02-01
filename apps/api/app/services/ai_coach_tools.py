@@ -36,6 +36,13 @@ from app.core.subscriptions import get_user_effective_plan
 
 VALID_FREQUENCIES = ["daily", "weekly"]
 
+# Tool limits (bounded fetch, scalability)
+GET_CHECKINS_MAX_DAYS = 30
+GET_CHECKINS_MAX_ROWS = 200
+GET_WEEKLY_RECAP_MAX_WEEKS = 8
+GET_GOALS_MAX_LIMIT = 10  # Max active goals per user; only active goals are returned
+GET_PATTERN_INSIGHTS_MAX = 20
+
 
 # =============================================================================
 # TOOL DEFINITIONS (OpenAI Function Calling Schema)
@@ -142,6 +149,153 @@ This helps you give accurate, plan-aware advice without guessing limits.
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_goals",
+            "description": """Fetch the user's **active** goals only (fresh from DB). Use when you need up-to-date goals, streaks, or status.
+
+- goal_id: optional. If provided, return only that goal if it is active (otherwise not found). Use for goal-specific chat.
+- limit: max goals to return when fetching all (default 10, max 10). Ignored when goal_id is provided. Users have at most 10 active goals.
+
+Returns: id, title, status, frequency_type, frequency_count, current_streak, longest_streak, total_completions, why_statement, week_completions, week_start_date. Only active goals are included.
+""",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "goal_id": {
+                        "type": "string",
+                        "description": "Optional. Specific goal UUID. When provided, return only this goal if active (goal-specific context). Omit for general context (all active goals).",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Max number of active goals to return when not filtering by goal_id. Default 10, max 10.",
+                        "minimum": 1,
+                        "maximum": 10,
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_pattern_insights",
+            "description": """Fetch AI-generated pattern insights (best/worst days, skip reasons, etc.). Use when you need fresh insights instead of pre-passed context.
+
+- goal_id: optional. If provided, return insights only for that goal. Omit for all goals (general context).
+
+Returns: per-goal insights (type, text, goal_id).
+""",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "goal_id": {
+                        "type": "string",
+                        "description": "Optional. Filter insights to this goal only. Omit for all goals.",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_goal_stats",
+            "description": """Fetch detailed stats for a single goal: completion rates (7d, 30d), streaks, best/worst days. Use when answering "how am I doing on X?" or need up-to-date metrics.
+
+- goal_id: required. The goal to get stats for.
+
+Returns: goal_title, completion_rate_30d, completion_rate_7d, current_streak, longest_streak, total_checkins_30d, completed_checkins_30d, best_day_index, worst_day_index, goal_age_days, etc.
+""",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "goal_id": {
+                        "type": "string",
+                        "description": "Required. Goal UUID to fetch stats for.",
+                    },
+                },
+                "required": ["goal_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_checkins",
+            "description": """Fetch check-ins for a date range. Use when user asks about specific periods, mood, notes, or voice.
+
+- goal_id: optional. Filter to this goal only. Omit for all goals (general).
+- from_date: start date (YYYY-MM-DD). Required.
+- to_date: end date (YYYY-MM-DD). Required. Must be >= from_date. Max range 30 days.
+- include_voice_transcripts: include full voice_note_transcript and voice_note_sentiment. Default false. Set true when user asks "what did I say" or similar.
+
+Limits: date range capped at 30 days; max 200 rows returned. Check-ins exclude pending (only completed/skipped/missed/rest_day).
+""",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "goal_id": {
+                        "type": "string",
+                        "description": "Optional. Filter check-ins to this goal. Omit for all goals.",
+                    },
+                    "from_date": {
+                        "type": "string",
+                        "description": "Start date YYYY-MM-DD.",
+                    },
+                    "to_date": {
+                        "type": "string",
+                        "description": "End date YYYY-MM-DD. Must be >= from_date. Max 30 days range.",
+                    },
+                    "include_voice_transcripts": {
+                        "type": "boolean",
+                        "description": "Include full voice note transcript and sentiment. Default false.",
+                    },
+                },
+                "required": ["from_date", "to_date"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_weekly_recap",
+            "description": """Fetch weekly recap(s). Use when user asks about their week, "last week", or similar.
+
+- week_start: single week start (YYYY-MM-DD, Monday). Use current week Monday or last week Monday.
+- from_week, to_week: range (both required). Max 8 weeks span.
+- goal_id: optional. When provided: stats overridden from that goal; goal_breakdown filtered; summary/focus suppressed.
+
+Note: Current week recap may be empty (not yet generated). If empty, use get_checkins for current week + get_weekly_recap for last week to give the user a useful answer (last week summary + so far this week).
+Provide either week_start OR (from_week + to_week). Returns goal_breakdown, stats. Empty recaps = no cached recap for that week.
+""",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "week_start": {
+                        "type": "string",
+                        "description": "Single week start date (Monday) YYYY-MM-DD.",
+                    },
+                    "from_week": {
+                        "type": "string",
+                        "description": "Range start (Monday) YYYY-MM-DD. Use with to_week.",
+                    },
+                    "to_week": {
+                        "type": "string",
+                        "description": "Range end (Monday) YYYY-MM-DD. Use with from_week. Max 8 weeks span.",
+                    },
+                    "goal_id": {
+                        "type": "string",
+                        "description": "Optional. Filter goal_breakdown to this goal only.",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
 ]
 
 
@@ -169,7 +323,9 @@ def validate_frequency_type(frequency_type: str) -> Optional[str]:
     return None
 
 
-def validate_frequency_count(frequency_count: Optional[int], frequency_type: str) -> Optional[str]:
+def validate_frequency_count(
+    frequency_count: Optional[int], frequency_type: str
+) -> Optional[str]:
     """Validate frequency_count for weekly goals."""
     if frequency_type == "weekly":
         if frequency_count is not None:
@@ -179,7 +335,9 @@ def validate_frequency_count(frequency_count: Optional[int], frequency_type: str
 
 
 def validate_target_days(
-    days: Optional[List[str]], frequency_type: str, frequency_count: Optional[int] = None
+    days: Optional[List[str]],
+    frequency_type: str,
+    frequency_count: Optional[int] = None,
 ) -> Optional[str]:
     """Validate target days for weekly frequency."""
     valid_days = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
@@ -248,7 +406,11 @@ def validate_goal_params(params: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
     # Target days validation (for weekly)
     # If frequency_count not provided, infer from target_days length
     target_days = params.get("target_days", [])
-    effective_frequency_count = frequency_count if frequency_count else (len(target_days) if target_days else None)
+    effective_frequency_count = (
+        frequency_count
+        if frequency_count
+        else (len(target_days) if target_days else None)
+    )
     err = validate_target_days(target_days, frequency_type, effective_frequency_count)
     if err:
         errors.append(err)
@@ -307,6 +469,16 @@ class ToolExecutor:
                 return await self._create_goal(arguments)
             elif tool_name == "get_feature_inventory":
                 return await self._get_feature_inventory()
+            elif tool_name == "get_goals":
+                return await self._get_goals(arguments)
+            elif tool_name == "get_pattern_insights":
+                return await self._get_pattern_insights(arguments)
+            elif tool_name == "get_goal_stats":
+                return await self._get_goal_stats(arguments)
+            elif tool_name == "get_checkins":
+                return await self._get_checkins(arguments)
+            elif tool_name == "get_weekly_recap":
+                return await self._get_weekly_recap(arguments)
             else:
                 return {
                     "success": False,
@@ -378,7 +550,11 @@ class ToolExecutor:
             frequency_count = len(target_days_names)
 
         # Convert day names to integers for database (0=Sun, 1=Mon, ..., 6=Sat)
-        target_days_ints = [day_name_to_int(d) for d in target_days_names] if target_days_names else None
+        target_days_ints = (
+            [day_name_to_int(d) for d in target_days_names]
+            if target_days_names
+            else None
+        )
 
         goal_data = {
             "user_id": self.user_id,
@@ -440,7 +616,9 @@ class ToolExecutor:
                     "schedule": schedule_desc,
                     "reminder_time": reminder_time,
                     "frequency_type": frequency_type,
-                    "target_days": target_days_names if frequency_type == "weekly" else None,
+                    "target_days": (
+                        target_days_names if frequency_type == "weekly" else None
+                    ),
                     # Limit info if paused
                     "limit_reached": will_be_paused,
                     "goal_limit": limit_check.get("limit") if will_be_paused else None,
@@ -522,6 +700,407 @@ class ToolExecutor:
                 "success": False,
                 "error": str(e),
                 "message": "I couldn't retrieve the feature information. Please try again.",
+            }
+
+    async def _get_goals(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Fetch user's active goals only. goal_id optional (single goal); else list with limit (max 10)."""
+        try:
+            goal_id = (params.get("goal_id") or "").strip() or None
+            limit = params.get("limit")
+            if limit is None:
+                limit = GET_GOALS_MAX_LIMIT
+            else:
+                limit = max(1, min(int(limit), GET_GOALS_MAX_LIMIT))
+
+            base = (
+                self.supabase.table("goals")
+                .select(
+                    "id, title, status, frequency_type, frequency_count, "
+                    "current_streak, longest_streak, total_completions, "
+                    "why_statement, week_completions, week_start_date, created_at"
+                )
+                .eq("user_id", self.user_id)
+                .eq("status", "active")
+            )
+            if goal_id:
+                r = base.eq("id", goal_id).execute()
+                if not r.data or len(r.data) == 0:
+                    return {
+                        "success": False,
+                        "error": "Goal not found or not active",
+                        "message": "I couldn't find that goal. It may have been deleted, paused, or you don't have access.",
+                    }
+                return {"success": True, "data": {"goals": r.data, "scope": "goal"}}
+            else:
+                r = base.order("current_streak", desc=True).limit(limit).execute()
+                return {
+                    "success": True,
+                    "data": {"goals": r.data or [], "scope": "general"},
+                }
+        except Exception as e:
+            logger.error(f"[AI Coach Tools] get_goals error: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "message": "I couldn't fetch your goals. Please try again.",
+            }
+
+    async def _get_pattern_insights(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Fetch pattern insights. goal_id optional."""
+        try:
+            goal_id = (params.get("goal_id") or "").strip() or None
+            q = (
+                self.supabase.table("pattern_insights")
+                .select("goal_id, insights, current_metrics")
+                .eq("user_id", self.user_id)
+                .eq("status", "completed")
+                .limit(GET_PATTERN_INSIGHTS_MAX)
+            )
+            if goal_id:
+                q = q.eq("goal_id", goal_id)
+            r = q.execute()
+            rows = r.data or []
+            # Verify goal belongs to user when goal_id provided
+            if goal_id and rows:
+                g = (
+                    self.supabase.table("goals")
+                    .select("id")
+                    .eq("user_id", self.user_id)
+                    .eq("id", goal_id)
+                    .execute()
+                )
+                if not g.data:
+                    return {
+                        "success": False,
+                        "error": "Goal not found or access denied",
+                        "message": "I couldn't find that goal.",
+                    }
+            out = []
+            for p in rows:
+                for i in p.get("insights") or []:
+                    out.append(
+                        {
+                            "type": i.get("type", "pattern"),
+                            "text": i.get("text", ""),
+                            "goal_id": p.get("goal_id"),
+                        }
+                    )
+            return {
+                "success": True,
+                "data": {"insights": out, "scope": "goal" if goal_id else "general"},
+            }
+        except Exception as e:
+            logger.error(f"[AI Coach Tools] get_pattern_insights error: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "message": "I couldn't fetch pattern insights. Please try again.",
+            }
+
+    async def _get_goal_stats(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Fetch stats for a single goal via calculate_goal_metrics RPC."""
+        try:
+            goal_id = (params.get("goal_id") or "").strip()
+            if not goal_id:
+                return {
+                    "success": False,
+                    "error": "goal_id is required",
+                    "message": "I need a goal to look up stats for. Which goal do you mean?",
+                }
+            # Verify ownership
+            g = (
+                self.supabase.table("goals")
+                .select("id")
+                .eq("user_id", self.user_id)
+                .eq("id", goal_id)
+                .execute()
+            )
+            if not g.data:
+                return {
+                    "success": False,
+                    "error": "Goal not found or access denied",
+                    "message": "I couldn't find that goal.",
+                }
+            r = self.supabase.rpc(
+                "calculate_goal_metrics", {"p_goal_id": goal_id}
+            ).execute()
+            raw = r.data
+            if isinstance(raw, list) and len(raw) == 1:
+                raw = raw[0]
+            if isinstance(raw, dict) and raw.get("error"):
+                return {
+                    "success": False,
+                    "error": raw["error"],
+                    "message": "I couldn't compute stats for that goal.",
+                }
+            return {"success": True, "data": raw if isinstance(raw, dict) else {}}
+        except Exception as e:
+            logger.error(f"[AI Coach Tools] get_goal_stats error: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "message": "I couldn't fetch goal stats. Please try again.",
+            }
+
+    async def _get_checkins(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Fetch check-ins for date range. goal_id optional; include_voice_transcripts optional."""
+        try:
+            goal_id = (params.get("goal_id") or "").strip() or None
+            from_date = (params.get("from_date") or "").strip()
+            to_date = (params.get("to_date") or "").strip()
+            include_voice = bool(params.get("include_voice_transcripts"))
+
+            if not from_date or not to_date:
+                return {
+                    "success": False,
+                    "error": "from_date and to_date are required",
+                    "message": "I need a date range (from_date and to_date in YYYY-MM-DD) to look up check-ins.",
+                }
+            try:
+                fd = datetime.strptime(from_date, "%Y-%m-%d").date()
+                td = datetime.strptime(to_date, "%Y-%m-%d").date()
+            except ValueError:
+                return {
+                    "success": False,
+                    "error": "Invalid date format. Use YYYY-MM-DD.",
+                    "message": "Please use dates in YYYY-MM-DD format.",
+                }
+            # NOTE: Do NOT block "future" dates here.
+            # check_in_date is timezone-based and pre-created, so a user's "today" can be
+            # ahead of server UTC. We only enforce bounded range size.
+            if fd > td:
+                return {
+                    "success": False,
+                    "error": "from_date must be <= to_date",
+                    "message": "The start date must be on or before the end date.",
+                }
+            delta = (td - fd).days
+            if delta > GET_CHECKINS_MAX_DAYS:
+                return {
+                    "success": False,
+                    "error": f"Date range must be at most {GET_CHECKINS_MAX_DAYS} days",
+                    "message": f"I can only look up up to {GET_CHECKINS_MAX_DAYS} days at a time. Please narrow the range.",
+                }
+
+            select_cols = "check_in_date, status, mood, note, skip_reason, goal_id"
+            if include_voice:
+                select_cols += ", voice_note_transcript, voice_note_sentiment"
+            q = (
+                self.supabase.table("check_ins")
+                .select(select_cols)
+                .eq("user_id", self.user_id)
+                .gte("check_in_date", from_date)
+                .lte("check_in_date", to_date)
+                .neq("status", "pending")
+                .order("check_in_date", desc=True)
+                .limit(GET_CHECKINS_MAX_ROWS)
+            )
+            if goal_id:
+                g = (
+                    self.supabase.table("goals")
+                    .select("id")
+                    .eq("user_id", self.user_id)
+                    .eq("id", goal_id)
+                    .execute()
+                )
+                if not g.data:
+                    return {
+                        "success": False,
+                        "error": "Goal not found or access denied",
+                        "message": "I couldn't find that goal.",
+                    }
+                q = q.eq("goal_id", goal_id)
+            rows = q.execute().data or []
+
+            # Optional: truncate long notes for context; keep full if include_voice
+            out = []
+            for r in rows:
+                rec = {
+                    "check_in_date": r.get("check_in_date"),
+                    "status": r.get("status"),
+                    "mood": r.get("mood"),
+                    "note": (
+                        (r.get("note") or "")[:500]
+                        if not include_voice
+                        else (r.get("note") or "")
+                    ),
+                    "skip_reason": r.get("skip_reason"),
+                    "goal_id": r.get("goal_id"),
+                }
+                if include_voice:
+                    rec["voice_note_transcript"] = r.get("voice_note_transcript")
+                    rec["voice_note_sentiment"] = r.get("voice_note_sentiment")
+                out.append(rec)
+            return {
+                "success": True,
+                "data": {
+                    "check_ins": out,
+                    "from_date": from_date,
+                    "to_date": to_date,
+                    "scope": "goal" if goal_id else "general",
+                },
+            }
+        except Exception as e:
+            logger.error(f"[AI Coach Tools] get_checkins error: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "message": "I couldn't fetch check-ins. Please try again.",
+            }
+
+    def _parse_week_start(self, s: str) -> Optional[date]:
+        """Parse YYYY-MM-DD and return the date. Caller normalizes to Monday if needed."""
+        try:
+            return datetime.strptime((s or "").strip(), "%Y-%m-%d").date()
+        except (ValueError, TypeError):
+            return None
+
+    def _monday_of_week(self, d: date) -> date:
+        """Return Monday of the week containing d (ISO week)."""
+        # Monday = 0, Sunday = 6
+        wd = d.weekday()
+        return d - timedelta(days=wd)
+
+    async def _get_weekly_recap(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Fetch weekly recap(s). week_start XOR (from_week, to_week). goal_id optional to filter goal_breakdown."""
+        try:
+            goal_id = (params.get("goal_id") or "").strip() or None
+            week_start = self._parse_week_start(params.get("week_start") or "")
+            from_week = self._parse_week_start(params.get("from_week") or "")
+            to_week = self._parse_week_start(params.get("to_week") or "")
+
+            single = week_start is not None and from_week is None and to_week is None
+            range_ = from_week is not None and to_week is not None
+
+            if not single and not range_:
+                return {
+                    "success": False,
+                    "error": "Provide either week_start or both from_week and to_week",
+                    "message": "I need a week (week_start) or a range (from_week and to_week) in YYYY-MM-DD.",
+                }
+            if single:
+                from_week = to_week = self._monday_of_week(week_start)
+            else:
+                from_week = self._monday_of_week(from_week)
+                to_week = self._monday_of_week(to_week)
+                if from_week > to_week:
+                    from_week, to_week = to_week, from_week
+                span = (to_week - from_week).days // 7 + 1
+                if span > GET_WEEKLY_RECAP_MAX_WEEKS:
+                    return {
+                        "success": False,
+                        "error": f"Max {GET_WEEKLY_RECAP_MAX_WEEKS} weeks allowed",
+                        "message": f"I can only fetch up to {GET_WEEKLY_RECAP_MAX_WEEKS} weeks at a time.",
+                    }
+
+            q = (
+                self.supabase.table("weekly_recaps")
+                .select(
+                    "week_start, week_end, summary, win, insight, focus_next_week, "
+                    "motivational_close, goal_breakdown, stats"
+                )
+                .eq("user_id", self.user_id)
+                .gte("week_start", from_week.isoformat())
+                .lte("week_start", to_week.isoformat())
+                .order("week_start", desc=True)
+            )
+            rows = q.execute().data or []
+
+            # Day names for best/worst (0=Sunday .. 6=Saturday, matches calculate_goal_metrics)
+            day_names = [
+                "Sunday",
+                "Monday",
+                "Tuesday",
+                "Wednesday",
+                "Thursday",
+                "Friday",
+                "Saturday",
+            ]
+
+            out = []
+            for r in rows:
+                gb = r.get("goal_breakdown") or []
+                if goal_id:
+                    gb = [x for x in gb if str(x.get("goal_id") or "") == str(goal_id)]
+
+                stats = dict(r.get("stats") or {})
+
+                if goal_id:
+                    # Goal-specific: override stats with authoritative data from the goal
+                    # (current_streak from goals table; best/worst days from calculate_goal_metrics,
+                    # same as PatternInsights/ai_insights_service for consistency)
+                    try:
+                        rpc_result = self.supabase.rpc(
+                            "calculate_goal_metrics", {"p_goal_id": goal_id}
+                        ).execute()
+                        raw = rpc_result.data
+                        if isinstance(raw, list) and len(raw) == 1:
+                            raw = raw[0]
+                        if isinstance(raw, dict) and not raw.get("error"):
+                            metrics = raw
+                            stats["current_streak"] = metrics.get("current_streak", 0)
+                            best_idx = metrics.get("best_day_index")
+                            worst_idx = metrics.get("worst_day_index")
+                            stats["strongest_day"] = (
+                                day_names[best_idx] if best_idx is not None else None
+                            )
+                            stats["weakest_day"] = (
+                                day_names[worst_idx] if worst_idx is not None else None
+                            )
+                    except Exception as e:
+                        logger.warning(
+                            f"[AI Coach Tools] Goal stats override failed: {e}"
+                        )
+
+                    # Override completion_rate with goal-specific rate from goal_breakdown
+                    # gb is already filtered to this goal above, so gb[0] is the focused goal's data
+                    if gb and len(gb) > 0:
+                        focused_goal_data = gb[0]  # This is the goal matching goal_id
+                        stats["completion_rate"] = focused_goal_data.get("completion_rate", 0)
+                        stats["completed_check_ins"] = focused_goal_data.get("completed", 0)
+                        stats["total_scheduled"] = focused_goal_data.get("total", 0)
+
+                rec = {
+                    "week_start": r.get("week_start"),
+                    "week_end": r.get("week_end"),
+                    "goal_breakdown": gb,
+                    "stats": stats,
+                }
+
+                if goal_id:
+                    # Cached recap was generated for ALL goals - summary/win/insight/focus_next_week
+                    # may reference other goals. Suppress them so AI uses only goal_breakdown + stats.
+                    rec["summary"] = None
+                    rec["win"] = None
+                    rec["insight"] = None
+                    rec["focus_next_week"] = None
+                    rec["motivational_close"] = None
+                    rec["goal_specific_note"] = (
+                        "This recap is filtered to one goal. Use goal_breakdown and stats only. "
+                        "Generate summary/win/insight/focus_next_week from that goal's data. "
+                        "Do NOT mention other goals."
+                    )
+                else:
+                    rec["summary"] = r.get("summary")
+                    rec["win"] = r.get("win")
+                    rec["insight"] = r.get("insight")
+                    rec["focus_next_week"] = r.get("focus_next_week")
+                    rec["motivational_close"] = r.get("motivational_close")
+
+                out.append(rec)
+            return {
+                "success": True,
+                "data": {
+                    "recaps": out,
+                    "scope": "goal" if goal_id else "general",
+                },
+            }
+        except Exception as e:
+            logger.error(f"[AI Coach Tools] get_weekly_recap error: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "message": "I couldn't fetch weekly recaps. Please try again.",
             }
 
 
