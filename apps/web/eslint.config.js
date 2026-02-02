@@ -12,6 +12,7 @@ export default tseslint.config(
     },
     rules: {
       "turbo/no-undeclared-env-vars": "off",
+      "@typescript-eslint/no-unused-vars": "off",
     },
   },
   {

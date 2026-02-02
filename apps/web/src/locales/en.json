@@ -503,6 +503,18 @@
       "achievements": "Achievements"
     }
   },
+  "join": {
+    "title": "Get the FitNudge app",
+    "subtitle": "Download on your device and start building lasting habits.",
+    "choose_platform": "Choose your platform",
+    "ios_label": "iPhone & iPad",
+    "android_label": "Android",
+    "app_store": "Download on App Store",
+    "google_play": "Get it on Google Play",
+    "referral_applied": "Your friend's referral will be applied when you sign up.",
+    "already_have_app": "Already have the app?",
+    "back_home": "Back to home"
+  },
   "download": {
     "title": "Download now and start building lasting habits.",
     "description": "Join thousands of users who are building better habits with FitNudge. Coming soon to iOS and Android.",
