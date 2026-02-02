@@ -32,6 +32,7 @@ import {
 } from "@/lib/auth/apple";
 import { ApiError } from "@/services/api/base";
 import { useExternalUrls } from "@/hooks/api/useAppConfig";
+import { getAndClearPendingReferralCode } from "@/utils/referralStorage";
 
 export default function SignupScreen() {
   // Get query params from deep links
@@ -98,12 +99,20 @@ export default function SignupScreen() {
     }
   };
 
-  // Sync referral code from URL params
+  // Sync referral code from URL params or from install referrer (Android)
   useEffect(() => {
     if (referral) {
       setReferralCode(referral);
       setShowReferralInput(true);
+      return;
     }
+    // No URL param: check pending referral from install referrer (e.g. Android Play Store)
+    getAndClearPendingReferralCode().then((pending) => {
+      if (pending) {
+        setReferralCode(pending);
+        setShowReferralInput(true);
+      }
+    });
   }, [referral]);
 
   useEffect(() => {

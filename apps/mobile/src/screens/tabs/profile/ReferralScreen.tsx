@@ -327,6 +327,14 @@ export const ReferralScreen: React.FC = () => {
               </View>
             </View>
           </Card>
+
+          <View style={[styles.pasteTipCard, { backgroundColor: `${brandColors.primary}10` }]}>
+            <Ionicons name="information-circle-outline" size={20} color={brandColors.primary} />
+            <Text style={[styles.pasteTipText, { color: colors.text.secondary }]}>
+              {t("referral.paste_tip") ||
+                "Tip: If your friend's link doesn't apply automatically, encourage them to paste your referral code in the \"Have a referral code?\" field on the signup screen."}
+            </Text>
+          </View>
         </View>
 
         {/* Referrals History */}
@@ -605,6 +613,20 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: colors.border.subtle,
     marginVertical: toRN(tokens.spacing[3]),
     marginLeft: 60
+  },
+  pasteTipCard: {
+    flexDirection: "row" as const,
+    alignItems: "flex-start" as const,
+    gap: toRN(tokens.spacing[2]),
+    padding: toRN(tokens.spacing[3]),
+    borderRadius: toRN(tokens.borderRadius.lg),
+    marginTop: toRN(tokens.spacing[3])
+  },
+  pasteTipText: {
+    flex: 1,
+    fontSize: toRN(tokens.typography.fontSize.sm),
+    fontFamily: fontFamily.regular,
+    lineHeight: toRN(tokens.typography.fontSize.sm) * 1.4
   },
 
   // Referrals Section

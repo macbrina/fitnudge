@@ -29,7 +29,11 @@ export const STORAGE_KEYS = {
   DISMISSED_UPDATE_VERSION: "dismissed_update_version",
 
   // Rating prompt (first check-in)
-  HAS_REQUESTED_RATING: "has_requested_rating"
+  HAS_REQUESTED_RATING: "has_requested_rating",
+
+  // Referral (from install referrer or deferred deep link)
+  PENDING_REFERRAL_CODE: "pending_referral_code",
+  PENDING_REFERRAL_EXPIRY: "pending_referral_expiry"
 } as const;
 
 class StorageUtil {

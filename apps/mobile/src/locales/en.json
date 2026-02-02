@@ -2096,6 +2096,7 @@
     "step2_desc": "They sign up and subscribe to premium",
     "step3_title": "You Get Rewarded",
     "step3_desc": "Earn 7 free days added to your subscription!",
+    "paste_tip": "Tip: If your friend's link doesn't apply automatically, encourage them to paste your referral code in the \"Have a referral code?\" field on the signup screen.",
     "your_referrals": "Your Referrals",
     "referrals_count": "{{count}} friend(s) joined",
     "joined_on": "Joined {{date}}",

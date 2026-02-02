@@ -16,6 +16,7 @@ import { logger } from "@/services/logger";
 import { ThemeProvider, useTheme } from "@/themes";
 import { setupDeepLinkListener } from "@/utils/deepLinkHandler";
 import { initDeviceInfo } from "@/utils/deviceInfo";
+import { captureInstallReferrerIfNeeded } from "@/utils/installReferrer";
 import "@i18n";
 import * as Sentry from "@sentry/react-native";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
@@ -167,6 +168,11 @@ function RootLayout(): ReactElement {
       console.warn("[RootLayout] Failed to initialize device info:", error);
     });
     return cleanup;
+  }, []);
+
+  // Capture Android install referrer (from Play Store ?referrer=ref%3DCODE) for referral attribution
+  useEffect(() => {
+    captureInstallReferrerIfNeeded().catch(() => {});
   }, []);
 
   // Prefetch app config early (no auth required, used by many screens)
