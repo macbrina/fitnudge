@@ -29,17 +29,32 @@ class WeeklyRecapService:
     """Service for generating weekly recaps with rich insights"""
 
     async def get_weekly_recap(
-        self, user_id: str, force_regenerate: bool = False
+        self,
+        user_id: str,
+        force_regenerate: bool = False,
+        for_previous_week: bool = False,
     ) -> Optional[Dict[str, Any]]:
         """
         Get cached weekly recap or generate on-demand.
         Cache-first pattern per SCALABILITY.md.
+
+        Args:
+            user_id: User ID
+            force_regenerate: Skip cache and generate fresh
+            for_previous_week: If True, generate for the week that just ended (Mon-Sun).
+                Used by the Monday batch job. If False, uses week-to-date (Mon-today).
         """
         supabase = get_supabase_client()
         today = date.today()
-        # Week starts on Monday; we generate a recap for this week-to-date.
-        week_start = today - timedelta(days=today.weekday())
-        week_end = today
+
+        if for_previous_week:
+            # Week that just ended: Sunday = yesterday, Monday = 6 days before that
+            week_end = today - timedelta(days=1)  # Sunday
+            week_start = week_end - timedelta(days=6)  # Monday
+        else:
+            # Week-to-date: Mon → today (for on-demand / current week view)
+            week_start = today - timedelta(days=today.weekday())
+            week_end = today
 
         if not force_regenerate:
             # Try to get cached recap first
@@ -749,6 +764,10 @@ class WeeklyRecapService:
         wow_change = stats.get("week_over_week_change", 0)
         wow_str = f"+{wow_change}" if wow_change > 0 else str(wow_change)
 
+        # Mood distribution for insight
+        mood_dist = stats.get("mood_distribution", {})
+        mood_str = ", ".join(f"{k}: {v}" for k, v in mood_dist.items()) if mood_dist else "None"
+
         prompt = f"""Generate a personalized weekly recap for {user_name} in a fitness accountability app.
 
 TONE: {tone}
@@ -758,9 +777,11 @@ GOALS:
 
 STATS (Week of {week_start.strftime('%b %d')} - {week_end.strftime('%b %d')}):
 - Completed: {stats['completed_check_ins']} check-ins ({wow_str} vs last week)
-- Streak: {stats['current_streak']} days
+- Streak: {stats['current_streak']} days (longest: {stats.get('longest_streak', 0)})
 - Completion: {stats['completion_rate']}%
-- Best Day: {stats.get('strongest_day', 'N/A')}
+- Strongest day: {stats.get('strongest_day', 'N/A')}
+- Weakest day: {stats.get('weakest_day', 'N/A')}
+- Mood when checked in: {mood_str}
 
 4-WEEK TREND: {trend_str if trend_str else 'N/A'}
 
@@ -770,12 +791,12 @@ ACHIEVEMENTS THIS WEEK:
 PARTNERS:
 {partner_str if partner_str else 'None'}
 
-Generate a recap with these EXACT 4 sections (keep each section to 1-2 sentences max):
+Generate a helpful, actionable recap with these 4 sections. Be specific—reference their actual goals, stats, and patterns. Write 2-4 sentences per section so users get real value:
 
-1. SUMMARY: Brief overview of the week
-2. WIN: Their biggest accomplishment 
-3. INSIGHT: One pattern or observation
-4. FOCUS_NEXT_WEEK: One specific action for next week
+1. SUMMARY: How the week went across their goals. Mention completion rate and week-over-week change. Call out their strongest day (if available) and any noticeable patterns.
+2. WIN: Their biggest accomplishment—be specific (e.g. streak, goal hit, consistency).
+3. INSIGHT: One concrete pattern or observation from the data (e.g. "You crushed it on Mondays but slipped midweek—consider a midweek checkpoint" or "Mood was mostly 'amazing' when you completed—momentum helps").
+4. FOCUS_NEXT_WEEK: One specific, actionable tip based on their weakest area or trend. Make it something they can actually do.
 
 Respond in JSON format:
 {{"summary": "...", "win": "...", "insight": "...", "focus_next_week": "..."}}"""
@@ -790,7 +811,7 @@ Respond in JSON format:
                     },
                     {"role": "user", "content": prompt},
                 ],
-                max_tokens=300,
+                max_tokens=600,
                 temperature=0.8,
             )
 

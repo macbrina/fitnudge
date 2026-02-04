@@ -31,6 +31,8 @@ interface OnboardingState {
   goal_frequency: number; // Times per week (1-7)
   goal_days: string[]; // Selected days ['mon', 'tue', etc.]
   goal_reminder_time: string; // ISO time string e.g., "18:00"
+  goal_reminder_before_minutes: number; // 0 = exact time, else minutes before
+  goal_checkin_delay_minutes: number; // 0 = at reminder time, else minutes after
   goal_is_daily: boolean; // For custom goals
 
   // Screen 6: Why Matters
@@ -53,6 +55,8 @@ interface OnboardingState {
   setGoalFrequency: (frequency: number) => void;
   setGoalDays: (days: string[]) => void;
   setGoalReminderTime: (time: string) => void;
+  setGoalReminderBeforeMinutes: (minutes: number) => void;
+  setGoalCheckinDelayMinutes: (minutes: number) => void;
   setGoalIsDaily: (isDaily: boolean) => void;
   setGoalWhy: (why: string) => void;
   setMorningMotivationEnabled: (enabled: boolean) => void;
@@ -69,6 +73,8 @@ const initialState = {
   goal_frequency: 3,
   goal_days: [] as string[],
   goal_reminder_time: "18:00",
+  goal_reminder_before_minutes: 30,
+  goal_checkin_delay_minutes: 30,
   goal_is_daily: false,
   goal_why: "",
   morning_motivation_enabled: true,
@@ -95,6 +101,11 @@ export const useOnboardingStore = create<OnboardingState>()(
       setGoalDays: (days) => set({ goal_days: days }),
 
       setGoalReminderTime: (time) => set({ goal_reminder_time: time }),
+
+      setGoalReminderBeforeMinutes: (minutes: number) =>
+        set({ goal_reminder_before_minutes: minutes }),
+
+      setGoalCheckinDelayMinutes: (minutes: number) => set({ goal_checkin_delay_minutes: minutes }),
 
       setGoalIsDaily: (isDaily) => set({ goal_is_daily: isDaily }),
 

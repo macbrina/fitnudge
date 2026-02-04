@@ -5,7 +5,7 @@ Handles accountability partners and social nudges.
 """
 
 from typing import Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 from app.core.database import get_supabase_client
 from app.services.logger import logger
 
@@ -39,7 +39,7 @@ class SocialAccountabilityService:
             # This triggers realtime events to their partners
             result = (
                 supabase.table("accountability_partners")
-                .update({"updated_at": datetime.utcnow().isoformat()})
+                .update({"updated_at": datetime.now(timezone.utc).isoformat()})
                 .or_(f"user_id.eq.{user_id},partner_user_id.eq.{user_id}")
                 .eq("status", "accepted")
                 .execute()
@@ -69,7 +69,7 @@ class SocialAccountabilityService:
         try:
             result = (
                 supabase.table("accountability_partners")
-                .update({"updated_at": datetime.utcnow().isoformat()})
+                .update({"updated_at": datetime.now(timezone.utc).isoformat()})
                 .or_(f"user_id.eq.{user_id},partner_user_id.eq.{user_id}")
                 .eq("status", "accepted")
                 .execute()
@@ -114,7 +114,7 @@ class SocialAccountabilityService:
 
             result = (
                 supabase.table("accountability_partners")
-                .update({"updated_at": datetime.utcnow().isoformat()})
+                .update({"updated_at": datetime.now(timezone.utc).isoformat()})
                 .or_(or_conditions)
                 .eq("status", "accepted")
                 .execute()

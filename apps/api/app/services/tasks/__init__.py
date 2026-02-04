@@ -2,6 +2,7 @@
 Celery Tasks Package - V2.1
 
 Re-exports all tasks for Celery autodiscovery.
+
 All tasks are organized into domain-specific modules:
 
 - goal_tasks: Check-in pre-creation, streak updates, pattern insights
@@ -21,6 +22,9 @@ V2.1 Architecture Notes:
 - Streaks updated via event-driven task after each check-in
 - Daily motivations generated on-demand in send_morning_motivations
 """
+
+# Import audit signals so they connect on worker startup (must be after tasks are loaded)
+from app.services.tasks.audit_signals import on_task_failure, on_task_success  # noqa: F401
 
 # Goal-related tasks (V2.1: Pre-creation + O(1) inline streak updates + batch tasks)
 from app.services.tasks.goal_tasks import (
@@ -66,6 +70,7 @@ from app.services.tasks.analytics_refresh_tasks import (
 from app.services.tasks.subscription_tasks import (
     check_expiring_subscriptions_task,
     process_failed_webhook_events_task,
+    downgrade_expired_promotional_subscriptions_task,
     cleanup_expired_partner_requests_task,
     cleanup_inactive_user_partnerships_task,
     enforce_free_tier_limits_task,
@@ -114,6 +119,11 @@ from app.services.tasks.adaptive_nudging_tasks import (
     run_all_adaptive_nudges_task,
 )
 
+# Maintenance tasks (task_audit_log cleanup)
+from app.services.tasks.maintenance_tasks import (
+    cleanup_task_audit_log_task,
+)
+
 # Task utilities (for scalable chunking)
 from app.services.tasks.task_utils import (
     chunk_list,
@@ -150,6 +160,7 @@ __all__ = [
     # Subscription tasks
     "check_expiring_subscriptions_task",
     "process_failed_webhook_events_task",
+    "downgrade_expired_promotional_subscriptions_task",
     "cleanup_expired_partner_requests_task",
     "cleanup_inactive_user_partnerships_task",
     "enforce_free_tier_limits_task",
@@ -172,6 +183,8 @@ __all__ = [
     "check_missed_days_intervention_task",
     "check_approaching_milestone_task",
     "run_all_adaptive_nudges_task",
+    # Maintenance
+    "cleanup_task_audit_log_task",
     # Task utilities
     "chunk_list",
     "dispatch_chunked_tasks",

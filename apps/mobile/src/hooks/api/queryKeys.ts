@@ -102,3 +102,27 @@ export const blogQueryKeys = {
   featured: (limit: number) => [...blogQueryKeys.all, "featured", limit] as const,
   categories: () => [...blogQueryKeys.all, "categories"] as const
 } as const;
+
+// Home Dashboard Query Keys (used by useHomeDashboard, deepLinkHandler)
+export const homeDashboardQueryKeys = {
+  all: ["home"] as const,
+  dashboard: () => [...homeDashboardQueryKeys.all, "dashboard"] as const
+} as const;
+
+// Achievements Query Keys (used by useAchievements, deepLinkHandler)
+export const achievementsQueryKeys = {
+  all: ["achievements"] as const,
+  types: () => [...achievementsQueryKeys.all, "types"] as const,
+  myAchievements: () => [...achievementsQueryKeys.all, "my"] as const,
+  stats: () => [...achievementsQueryKeys.all, "stats"] as const
+} as const;
+
+// Notification History Query Keys (used by useNotificationHistory, deepLinkHandler)
+export const notificationHistoryQueryKeys = {
+  all: ["notificationHistory"] as const,
+  list: (type?: string) =>
+    type
+      ? ([...notificationHistoryQueryKeys.all, "list", type] as const)
+      : ([...notificationHistoryQueryKeys.all, "list"] as const),
+  unreadCount: () => [...notificationHistoryQueryKeys.all, "unreadCount"] as const
+} as const;

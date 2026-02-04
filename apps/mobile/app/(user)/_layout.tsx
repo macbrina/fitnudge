@@ -24,7 +24,7 @@ import { useAndroidNextUpPushRegistration } from "@/features/nextUp/android/useA
 const FLOATING_BUTTONS_ALLOWED_SEGMENTS = ["(tabs)"];
 
 export default function UserLayout() {
-  const { isAuthenticated, isLoading } = useAuthStore();
+  const { isAuthenticated, isLoading, isVerifyingUser } = useAuthStore();
   const segments = useSegments();
 
   // Persistent "Next up" system surface (Android ongoing notification; iOS stub for now)
@@ -35,7 +35,7 @@ export default function UserLayout() {
   useAndroidNextUpPushRegistration(isAuthenticated);
 
   // AI Coach modal state from store
-  const { isModalVisible, openModal, closeModal, focusedGoalId } = useAICoachStore();
+  const { isModalVisible, closeModal, focusedGoalId } = useAICoachStore();
 
   // Subscription modal state from store
   const { isModalVisible: isSubscriptionModalVisible, closeModal: closeSubscriptionModal } =
@@ -84,10 +84,10 @@ export default function UserLayout() {
       }
     };
 
-    if (isAuthenticated) {
+    if (isAuthenticated && !isVerifyingUser) {
       initializeExitOffer();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, isVerifyingUser]);
 
   // FloatingOfferButton shows when: exit offer is active AND user is free tier
   const isOfferButtonVisible = useMemo(() => {
@@ -158,14 +158,14 @@ export default function UserLayout() {
     ]
   );
 
-  if (!isLoading && !isAuthenticated) {
+  if (!isLoading && !isAuthenticated && !isVerifyingUser) {
     return <Redirect href={MOBILE_ROUTES.AUTH.LOGIN} />;
   }
 
   return (
     <View style={styles.container}>
       <Stack>
-        <Stack.Protected guard={isAuthenticated}>
+        <Stack.Protected guard={isAuthenticated && !isVerifyingUser}>
           <Stack.Screen
             name="(tabs)"
             options={{

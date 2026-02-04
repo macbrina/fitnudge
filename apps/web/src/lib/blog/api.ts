@@ -10,14 +10,15 @@ export async function fetchBlogPosts(filters?: BlogFilters): Promise<BlogListRes
   if (filters?.search) params.set("search", filters.search);
   if (filters?.limit) params.set("limit", String(filters.limit));
   if (filters?.offset !== undefined) params.set("offset", String(filters.offset));
+  if (filters?.page !== undefined) params.set("page", String(filters.page));
 
   const url = `${API_BASE}/posts${params.toString() ? `?${params}` : ""}`;
   const response = await fetch(url);
-  
+
   if (!response.ok) {
     throw new Error("Failed to fetch blog posts");
   }
-  
+
   return response.json();
 }
 

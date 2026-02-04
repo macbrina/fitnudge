@@ -10,6 +10,8 @@ import ssl
 from typing import Dict, Optional
 
 from celery import Celery
+from celery.schedules import crontab
+
 from app.core.config import settings
 
 
@@ -38,7 +40,7 @@ celery_app = Celery(
     "fitnudge",
     broker=redis_url,
     backend=redis_url,
-    include=["app.services.tasks"],  # Include task modules
+    include=["app.services.tasks"],
 )
 
 # Celery configuration
@@ -54,6 +56,7 @@ celery_app.conf.update(
     worker_prefetch_multiplier=1,  # Prefetch only one task at a time for better distribution
     worker_max_tasks_per_child=1000,  # Restart worker after 1000 tasks to prevent memory leaks
     result_expires=3600,  # Results expire after 1 hour
+    result_extended=True,  # Store task name, args, kwargs in result backend (for admin portal logs)
     task_acks_late=True,  # Acknowledge task only after completion
     task_reject_on_worker_lost=True,  # Reject task if worker dies
     broker_use_ssl=redis_ssl_options,
@@ -62,23 +65,19 @@ celery_app.conf.update(
     beat_schedule={
         "generate-weekly-recaps": {
             "task": "generate_weekly_recaps",
-            "schedule": 60.0
-            * 60.0
-            * 24.0,  # Run daily (check if it's time for weekly recaps)
-            # Alternatively: use crontab for specific day/time
-            # "schedule": crontab(hour=8, minute=0, day_of_week=1),  # Monday 8am
+            "schedule": crontab(hour=8, minute=0, day_of_week=1),  # Monday 8am UTC
         },
         # V2.1: Check-in Pre-creation Tasks
         "precreate-daily-checkins": {
             "task": "precreate_daily_checkins",
-            "schedule": 60.0 * 60.0,  # Run HOURLY to catch all timezones
+            "schedule": crontab(minute=0),  # Top of every hour
             # Pre-creates check-ins with status='pending' for all active goals for today
             # Uses PostgreSQL precreate_checkins_for_date(p_target_date) - O(1) batch
             # Trigger on goal INSERT (trg_goal_insert_checkin) also creates today's check-in for new goals
         },
         "mark-missed-checkins": {
             "task": "mark_missed_checkins",
-            "schedule": 60.0 * 60.0,  # Run HOURLY to catch all timezones
+            "schedule": crontab(minute=0),  # Top of every hour
             # Marks pending check-ins as 'missed' when their day has passed
             # Uses PostgreSQL batch function - O(1) performance
         },
@@ -108,20 +107,20 @@ celery_app.conf.update(
         },
         "send-reengagement-notifications": {
             "task": "send_reengagement_notifications",
-            "schedule": 60.0 * 60.0 * 24.0,  # Run DAILY
+            "schedule": crontab(hour=3, minute=0),  # 3am UTC daily
             # Sends re-engagement when user has not opened app for 7+ days (users.last_active_at).
             # Distinct from check_missed_days_intervention (missed check-ins while still using app).
         },
         "notify-inactive-partners": {
             "task": "notify_inactive_partners",
-            "schedule": 60.0 * 60.0 * 24.0,  # Run DAILY
+            "schedule": crontab(hour=3, minute=0),  # 3am UTC daily
             # Notifies users when their accountability partner hasn't checked in for 3+ days
             # Prompts active partner to send encouragement
         },
         # V2 Streak Management Tasks
         "reset-missed-streaks": {
             "task": "reset_missed_streaks",
-            "schedule": 60.0 * 60.0,  # Run HOURLY to catch all timezones
+            "schedule": crontab(minute=0),  # Top of every hour
             # Resets current_streak to 0 for goals where:
             # - Yesterday was a target day AND
             # - No check-in was completed
@@ -129,33 +128,23 @@ celery_app.conf.update(
         },
         "reset-weekly-completions": {
             "task": "reset_weekly_completions",
-            "schedule": 60.0 * 60.0 * 24.0,  # Run DAILY (resets on Mondays)
-            # Resets week_completions counter for weekly goals
-            # Note: Streaks are managed per check-in (same as daily goals)
-            # This only resets the "X/Y this week" counter for UI display
-            # Alternative: crontab(hour=0, minute=0, day_of_week=1) for Monday only
+            "schedule": crontab(hour=0, minute=0, day_of_week=1),  # Monday midnight UTC
         },
         # REMOVED: "detect-patterns" weekly batch task
         # Pattern insights now generate on-demand after each check-in (more cost-effective)
         # See: generate_goal_insights_task triggered in checkins.py create_check_in endpoint
         "refresh-analytics-views": {
             "task": "refresh_analytics_views",
-            "schedule": 60.0 * 60.0,  # Run HOURLY
-            # Refreshes materialized views for analytics dashboards
-            # Performance: 280x faster queries with pre-computed data
-            # Alternative: crontab(minute=0) for every hour on the hour
+            "schedule": crontab(minute=0),  # Top of every hour
         },
         "prewarm-analytics-cache": {
             "task": "prewarm_analytics_cache_task",
-            "schedule": 60.0 * 60.0 * 8,  # Run every 8 hours (3x daily)
-            # Pre-computes analytics for active premium users
-            # Reduces latency when users open Analytics screen
-            # Alternative: crontab(hour=3, minute=0) for 3 AM only
+            "schedule": crontab(minute=0, hour="0,8,16"),  # Every 8 hours (midnight, 8am, 4pm UTC)
         },
         # Subscription lifecycle tasks
         "check-expiring-subscriptions": {
             "task": "check_expiring_subscriptions",
-            "schedule": 60.0 * 60.0 * 24.0,  # Run DAILY
+            "schedule": crontab(hour=3, minute=0),  # 3am UTC daily
             # Warns users 3 days before subscription expires (if auto_renew=false)
             # Sends push notification with upgrade CTA
         },
@@ -167,56 +156,62 @@ celery_app.conf.update(
         },
         "cleanup-expired-partner-requests": {
             "task": "cleanup_expired_partner_requests",
-            "schedule": 60.0 * 60.0 * 24.0,  # Run DAILY
+            "schedule": crontab(hour=3, minute=0),  # 3am UTC daily
             # Deletes pending partner requests from users who lost subscription
             # Catches missed webhooks and edge cases
         },
         "cleanup-inactive-user-partnerships": {
             "task": "cleanup_inactive_user_partnerships",
-            "schedule": 60.0 * 60.0 * 24.0,  # Run DAILY
+            "schedule": crontab(hour=3, minute=0),  # 3am UTC daily
             # Deletes partnerships for disabled/suspended users
             # Ensures inactive users don't appear in partner lists
         },
         "enforce-free-tier-limits": {
             "task": "enforce_free_tier_limits",
-            "schedule": 60.0 * 60.0 * 24.0,  # Run DAILY
+            "schedule": crontab(hour=3, minute=0),  # 3am UTC daily
             # Enforces subscription limits for all free users:
             # - Deactivates excess goals beyond active_goal_limit
             # - Deletes pending partner requests (no social_accountability feature)
             # BACKUP to webhooks - catches missed EXPIRATION events
         },
+        "downgrade-expired-promotional-subscriptions": {
+            "task": "downgrade_expired_promotional_subscriptions",
+            "schedule": crontab(hour=3, minute=0),  # 3am UTC daily
+            # RevenueCat does NOT send webhooks when promotional entitlements expire.
+            # This task finds active subscriptions with expires_date < now and
+            # downgrades users to free (same flow as EXPIRATION webhook).
+        },
         # Auth maintenance tasks
         "cleanup-expired-refresh-tokens": {
             "task": "cleanup_expired_refresh_tokens",
-            "schedule": 60.0 * 60.0 * 24.0,  # Run DAILY
+            "schedule": crontab(hour=3, minute=0),  # 3am UTC daily
             # Removes expired refresh tokens from abandoned sessions
             # With immediate deletion on rotation, this is just for cleanup
         },
         # Achievement tasks
         "check-account-age-achievements": {
             "task": "check_account_age_achievements",
-            "schedule": 60.0 * 60.0 * 24.0,  # Run DAILY
+            "schedule": crontab(hour=3, minute=0),  # 3am UTC daily
             # Checks and unlocks account age milestone achievements
             # (30, 90, 180, 365, 730, 1095, 1825 days)
         },
         # Notification cleanup tasks
         "cleanup-orphaned-notifications": {
             "task": "cleanup_orphaned_notifications",
-            "schedule": 60.0 * 60.0 * 24.0 * 7,  # Run WEEKLY
+            "schedule": crontab(hour=0, minute=0, day_of_week=1),  # Monday midnight UTC
             # Removes notifications referencing deleted entities (goals, etc.)
             # Keeps notification_history table clean
         },
         "cleanup-blocked-partnership-nudges": {
             "task": "cleanup_blocked_partnership_nudges",
-            "schedule": 60.0 * 60.0 * 24.0 * 7,  # Run WEEKLY
+            "schedule": crontab(hour=0, minute=0, day_of_week=1),  # Monday midnight UTC
             # Removes social_nudges and notifications for blocked partnerships
             # Safety net for fire-and-forget cleanup failures
         },
         # Adaptive Nudging tasks (V2 Premium)
         "check-streak-at-risk": {
             "task": "check_streak_at_risk",
-            "schedule": 60.0
-            * 60.0,  # Run HOURLY between 2-8 PM (task filters internally)
+            "schedule": crontab(minute=0, hour="14,15,16,17,18,19,20"),  # 2pm-8pm UTC only
             # Sends extra check-in reminder when user is about to break a long streak
             # Criteria: 7+ day streak, goal scheduled today, no check-in yet, past reminder time
         },
@@ -228,15 +223,21 @@ celery_app.conf.update(
         },
         "check-missed-days-intervention": {
             "task": "check_missed_days_intervention",
-            "schedule": 60.0 * 60.0 * 24.0,  # Run DAILY at 10 AM UTC
+            "schedule": crontab(hour=10, minute=0),  # 10am UTC daily
             # Sends intervention message for users who've missed 2+ consecutive days
             # Gentle re-engagement to help users get back on track
         },
         "check-approaching-milestone": {
             "task": "check_approaching_milestone",
-            "schedule": 60.0 * 60.0 * 24.0,  # Run DAILY at 9 AM UTC
+            "schedule": crontab(hour=9, minute=0),  # 9am UTC daily
             # Sends hype notification when within 3 days of a streak milestone
             # Milestones: 7, 14, 21, 30, 50, 100, 200, 365, etc.
+        },
+        # Task audit log cleanup (failure records retention)
+        "cleanup-task-audit-log": {
+            "task": "cleanup_task_audit_log",
+            "schedule": crontab(hour=4, minute=0, day_of_week=0),  # Sunday 4am UTC
+            # Deletes task_audit_log records older than 30 days
         },
     },
 )

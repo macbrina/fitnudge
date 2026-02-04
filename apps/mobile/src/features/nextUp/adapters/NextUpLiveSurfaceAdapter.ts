@@ -8,6 +8,8 @@ export type LiveSurfaceContent = {
   emoji?: string | null;
   completedCount?: number;
   totalCount?: number;
+  /** When true, skip banner/alert (no sound) - e.g. app open resume of same task */
+  skipBanner?: boolean;
 };
 
 export interface NextUpLiveSurfaceAdapter {

@@ -8,7 +8,7 @@ import {
   rollbackProgressData,
   snapshotProgressData
 } from "./progressOptimisticUpdates";
-import { homeDashboardQueryKeys } from "./useHomeDashboard";
+import { homeDashboardQueryKeys } from "./queryKeys";
 // trackingStatsQueryKeys removed in V2
 // Import from shared queryKeys to avoid circular dependency
 import { checkInsQueryKeys, goalsQueryKeys } from "./queryKeys";

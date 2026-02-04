@@ -15,7 +15,6 @@ import { AdBanner, NativeAdCard } from "@/components/ads";
 import BackButton from "@/components/ui/BackButton";
 import { useInAppBrowser } from "@/components/ui/InAppBrowser";
 import { SkeletonBox } from "@/components/ui/SkeletonBox";
-import { AD_CONFIG } from "@/constants/adUnits";
 import { trackBlogPostView, useBlogCategories, useBlogPosts } from "@/hooks/api/useBlogPosts";
 import { useShowAds } from "@/hooks/useShowAds";
 import { fontFamily } from "@/lib/fonts";
@@ -72,6 +71,13 @@ export default function BlogScreen() {
     category: selectedCategory || undefined
   });
   const { data: categories } = useBlogCategories();
+
+  const [refreshing, setRefreshing] = useState(false);
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  }, [refetch]);
 
   // Show loading when changing categories (not initial load, not pull-to-refresh)
   const isChangingCategory = isFetching && !isLoading && !isRefetching;
@@ -406,8 +412,8 @@ export default function BlogScreen() {
             showsVerticalScrollIndicator={false}
             refreshControl={
               <RefreshControl
-                refreshing={isRefetching}
-                onRefresh={refetch}
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
                 tintColor={brandColors.primary}
               />
             }

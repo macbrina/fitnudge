@@ -6,8 +6,8 @@ Tasks for managing subscription lifecycle:
 - process_failed_webhook_events_task: Retry failed RevenueCat webhooks
 - enforce_free_tier_limits_task: Backup cleanup for missed expiration events
 - cleanup_expired_partner_requests_task: Remove pending requests from expired users
-
-
+- downgrade_expired_promotional_subscriptions_task: Downgrade users whose promo expired
+  (RevenueCat does NOT send webhooks for promotional entitlement expiration)
 """
 
 from datetime import datetime, timedelta
@@ -353,6 +353,184 @@ def enforce_free_tier_limits_task(self) -> dict:
 
     except Exception as e:
         logger.error(f"[SUBSCRIPTION_CLEANUP] Error: {e}")
+        raise self.retry(exc=e)
+
+
+@celery_app.task(
+    name="downgrade_expired_promotional_subscriptions",
+    bind=True,
+    max_retries=3,
+    default_retry_delay=300,
+)
+def downgrade_expired_promotional_subscriptions_task(self) -> dict:
+    """
+    Downgrade users whose promotional subscriptions have expired.
+
+    RevenueCat does NOT send webhooks when promotional entitlements expire
+    (e.g. referral bonus days). This task finds subscriptions where:
+    - status = 'active'
+    - expires_date < now
+
+    For each, it performs the same actions as the EXPIRATION webhook:
+    - Update subscription status to 'expired'
+    - Downgrade user to free plan
+    - Reset AI Coach daily usage
+    - Deactivate excess goals, delete pending partner requests
+    - Send push notification
+    - Notify partners of subscription change
+
+    Runs daily. Catches both promotional and any missed paid-subscription expirations.
+    """
+    import asyncio
+
+    try:
+        supabase = get_supabase_client()
+        now = datetime.utcnow().isoformat()
+
+        # Find active subscriptions that have expired (expires_date in the past)
+        expired_result = (
+            supabase.table("subscriptions")
+            .select("user_id, plan, expires_date")
+            .eq("status", "active")
+            .lt("expires_date", now)
+            .execute()
+        )
+
+        expired_subscriptions = expired_result.data or []
+        downgraded_count = 0
+
+        if not expired_subscriptions:
+            logger.info(
+                "[PROMO_EXPIRY] No expired active subscriptions found"
+            )
+            return {
+                "status": "success",
+                "found": 0,
+                "downgraded": 0,
+            }
+
+        logger.info(
+            f"[PROMO_EXPIRY] Found {len(expired_subscriptions)} expired active subscriptions"
+        )
+
+        from app.services.subscription_service import (
+            handle_subscription_expiry_deactivation,
+            reset_ai_coach_daily_usage_on_downgrade,
+        )
+
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        for sub in expired_subscriptions:
+            user_id = sub["user_id"]
+            previous_plan = sub.get("plan", "unknown")
+
+            try:
+                # 1. Update subscription status to expired
+                supabase.table("subscriptions").update(
+                    {
+                        "status": "expired",
+                        "auto_renew": False,
+                        "updated_at": datetime.utcnow().isoformat(),
+                    }
+                ).eq("user_id", user_id).execute()
+
+                # 2. Downgrade user to free plan
+                supabase.table("users").update({"plan": "free"}).eq(
+                    "id", user_id
+                ).execute()
+
+                # 3. Reset AI Coach daily usage
+                loop.run_until_complete(
+                    reset_ai_coach_daily_usage_on_downgrade(supabase, user_id)
+                )
+
+                # 4. Deactivate excess goals, delete pending partner requests
+                summary = loop.run_until_complete(
+                    handle_subscription_expiry_deactivation(
+                        supabase,
+                        user_id,
+                        previous_plan,
+                        reason="promotional_expired",
+                    )
+                )
+
+                logger.info(
+                    f"[PROMO_EXPIRY] Downgraded user {user_id}: {summary}"
+                )
+
+                # 5. Send push notification
+                try:
+                    from app.services.expo_push_service import (
+                        send_push_to_user_sync,
+                    )
+
+                    goals_msg = ""
+                    if summary.get("goals_deactivated", 0) > 0:
+                        goals_msg = (
+                            f"{summary['goals_deactivated']} goal(s) paused. "
+                        )
+
+                    send_push_to_user_sync(
+                        user_id=user_id,
+                        title="Subscription Expired",
+                        body=f"{goals_msg}Your premium features are no longer active. Upgrade to reactivate them.",
+                        data={
+                            "type": "subscription_expired",
+                            "previous_plan": previous_plan,
+                            "goals_deactivated": summary.get(
+                                "goals_deactivated", 0
+                            ),
+                            "deepLink": "/(user)/(tabs)/profile",
+                        },
+                        notification_type="subscription",
+                        skip_preference_check=True,
+                        save_to_notification_history=False,
+                    )
+                except Exception as notify_err:
+                    logger.error(
+                        f"[PROMO_EXPIRY] Failed to send expiry notification to {user_id}: {notify_err}"
+                    )
+
+                # 6. Notify partners of subscription change
+                try:
+                    from app.api.v1.endpoints.webhooks import (
+                        notify_partners_of_subscription_change,
+                    )
+
+                    loop.run_until_complete(
+                        notify_partners_of_subscription_change(
+                            supabase, user_id
+                        )
+                    )
+                except Exception as partner_err:
+                    logger.warning(
+                        f"[PROMO_EXPIRY] Failed to notify partners for {user_id}: {partner_err}"
+                    )
+
+                downgraded_count += 1
+
+            except Exception as user_err:
+                logger.error(
+                    f"[PROMO_EXPIRY] Error downgrading user {user_id}: {user_err}"
+                )
+                # Continue with other users
+
+        logger.info(
+            f"[PROMO_EXPIRY] Completed: found={len(expired_subscriptions)}, downgraded={downgraded_count}"
+        )
+
+        return {
+            "status": "success",
+            "found": len(expired_subscriptions),
+            "downgraded": downgraded_count,
+        }
+
+    except Exception as e:
+        logger.error(f"[PROMO_EXPIRY] Error: {e}")
         raise self.retry(exc=e)
 
 

@@ -17,11 +17,14 @@ function getNativeModule(): typeof import("local:next-up-live-activity") | null 
 
 /**
  * Returns banner fields for AlertConfiguration only when task changes (throttled).
+ * Skips banner when skipBanner is true (e.g. app open resume of same task - no sound).
  */
 function getBannerFields(content: LiveSurfaceContent): {
   bannerTitle: string;
   bannerBody: string;
 } | null {
+  if (content.skipBanner) return null;
+
   const dayKey = content.dayKey ?? "";
   const nextTaskId = content.nextTaskId ?? "";
   const key = `${dayKey}:${nextTaskId}`;

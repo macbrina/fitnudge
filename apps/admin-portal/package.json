@@ -2,20 +2,39 @@
   "name": "admin-portal",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --turbopack --port 3001",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint --max-warnings 0",
+    "check-types": "tsc --noEmit"
   },
   "dependencies": {
     "@fitnudge/lib": "workspace:*",
     "@fitnudge/ui": "workspace:*",
+    "@heroicons/react": "^2.2.0",
+    "@tailwindcss/typography": "^0.5.19",
+    "@tanstack/react-query": "^5.90.5",
+    "@tanstack/react-table": "^8.21.3",
+    "@tiptap/extension-image": "^2.10.4",
+    "@tiptap/extension-link": "^2.27.2",
+    "@tiptap/react": "^2.10.4",
+    "@tiptap/starter-kit": "^2.10.4",
+    "autoprefixer": "^10.4.21",
+    "framer-motion": "^12.23.24",
+    "i18next": "^23.0.0",
+    "lottie-react": "^2.4.1",
+    "lucide-react": "^0.468.0",
+    "next": "16.0.10",
+    "nextjs-toploader": "^3.9.17",
+    "postcss": "^8.5.6",
     "react": "19.1.0",
     "react-dom": "19.1.0",
-    "next": "16.0.10",
     "react-i18next": "^15.0.0",
-    "i18next": "^23.0.0"
+    "recharts": "^3.7.0",
+    "sonner": "^2.0.7",
+    "tailwindcss": "^4.1.18"
   },
   "devDependencies": {
     "@fitnudge/eslint-config": "workspace:*",

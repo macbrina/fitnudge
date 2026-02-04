@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings
+from pydantic import ConfigDict
 from typing import List, Optional
 from dotenv import load_dotenv
 from pathlib import Path
@@ -85,6 +86,14 @@ class Settings(BaseSettings):
 
     # Legacy support: If REDIS_URL is provided, use it (for backward compatibility)
     REDIS_URL: Optional[str] = os.getenv("REDIS_URL", None)
+
+    # Task audit log: days to retain failure records before cleanup
+    TASK_AUDIT_LOG_RETENTION_DAYS: int = int(
+        os.getenv("TASK_AUDIT_LOG_RETENTION_DAYS", "30")
+    )
+
+    # Task failure alerting: POST to this URL when a task fails (Slack, Incident.io, etc.)
+    TASK_FAILURE_WEBHOOK_URL: Optional[str] = os.getenv("TASK_FAILURE_WEBHOOK_URL", None)
 
     @property
     def redis_connection_url(self) -> str:
@@ -226,10 +235,11 @@ class Settings(BaseSettings):
         os.getenv("POSTHOG_ENABLE_EXCEPTION_AUTOCAPTURE", "true").lower() == "true"
     )
 
-    class Config:
-        env_file = [".env.local", ".env"]
-        case_sensitive = True
-        extra = "ignore"
+    model_config = ConfigDict(
+        env_file=[".env.local", ".env"],
+        case_sensitive=True,
+        extra="ignore",
+    )
 
 
 # Create settings instance

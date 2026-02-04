@@ -16,6 +16,7 @@ import GoalDetailsScreen, { GoalDetails } from "./GoalDetailsScreen";
 import CustomGoalScreen, { CustomGoalDetails } from "./CustomGoalScreen";
 import WhyMattersScreen from "./WhyMattersScreen";
 import OnboardingCompleteScreen from "./OnboardingCompleteScreen";
+import { usePostHog } from "@/hooks/usePostHog";
 
 // Goal type keys for translation lookup
 const GOAL_TYPE_KEYS = ["workout", "read", "meditate", "hydration", "journal"] as const;
@@ -31,6 +32,7 @@ type OnboardingStep =
 
 export default function PersonalizationFlow() {
   const { t } = useTranslation();
+  const { capture } = usePostHog();
   const [currentStep, setCurrentStep] = useState<OnboardingStep>("name");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -51,6 +53,8 @@ export default function PersonalizationFlow() {
     goal_frequency,
     goal_days,
     goal_reminder_time,
+    goal_reminder_before_minutes,
+    goal_checkin_delay_minutes,
     goal_why,
     morning_motivation_enabled,
     morning_motivation_time,
@@ -61,6 +65,8 @@ export default function PersonalizationFlow() {
     setGoalFrequency,
     setGoalDays,
     setGoalReminderTime,
+    setGoalReminderBeforeMinutes,
+    setGoalCheckinDelayMinutes,
     setGoalIsDaily,
     setGoalWhy,
     setCompleted,
@@ -90,6 +96,7 @@ export default function PersonalizationFlow() {
 
   const handleNameContinue = (newName: string) => {
     setName(newName);
+    capture("onboarding_step_completed", { step: "name", skipped: false });
     setCurrentStep("motivation_style");
   };
 
@@ -119,8 +126,9 @@ export default function PersonalizationFlow() {
     setGoalFrequency(details.frequency);
     setGoalIsDaily(details.isDaily);
     setGoalDays(details.days);
-    // reminderTimes is now an array - store first one for onboarding (free users get 1)
     setGoalReminderTime(details.reminderTimes[0] || "18:00");
+    setGoalReminderBeforeMinutes(details.reminderWindowBeforeMinutes);
+    setGoalCheckinDelayMinutes(details.checkinPromptDelayMinutes);
     setCurrentStep("why_matters");
   };
 
@@ -129,8 +137,9 @@ export default function PersonalizationFlow() {
     setGoalFrequency(details.frequency);
     setGoalIsDaily(details.isDaily);
     setGoalDays(details.days);
-    // reminderTimes is now an array - store first one for onboarding (free users get 1)
     setGoalReminderTime(details.reminderTimes[0] || "18:00");
+    setGoalReminderBeforeMinutes(details.reminderWindowBeforeMinutes);
+    setGoalCheckinDelayMinutes(details.checkinPromptDelayMinutes);
     setCurrentStep("why_matters");
   };
 
@@ -175,6 +184,8 @@ export default function PersonalizationFlow() {
         frequency_count: isDaily ? 7 : goal_frequency,
         target_days: isDaily ? ALL_DAYS : targetDays,
         reminder_times: [goal_reminder_time],
+        reminder_window_before_minutes: goal_reminder_before_minutes ?? 30,
+        checkin_prompt_delay_minutes: goal_checkin_delay_minutes ?? 30,
         why_statement: why || undefined
       });
 
@@ -185,6 +196,8 @@ export default function PersonalizationFlow() {
       // Mark onboarding as complete locally
       await storageUtil.setItem(STORAGE_KEYS.HAS_SEEN_PERSONALIZATION, true);
       setCompleted(true);
+
+      capture("onboarding_completed", {});
 
       setCurrentStep("complete");
     } catch (error) {

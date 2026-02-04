@@ -182,6 +182,12 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
           setCustomerInfo(info);
           updateSubscriptionStatus(info);
 
+          // Skip refresh if user logged out - subscription API requires auth
+          // (RevenueCat fires this listener when logOut() switches to anonymous user)
+          if (!useAuthStore.getState().isAuthenticated) {
+            return;
+          }
+
           // IMPORTANT: Await refresh to ensure new features are loaded
           // hasFeature() will return correct values when components re-render
           await refreshSubscription();
@@ -441,7 +447,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
     }
   };
 
-  const getPlatformFromStore = (store: string): "ios" | "android" | "stripe" | null => {
+  const getPlatformFromStore = (store: string): "ios" | "android" | "stripe" | "promo" | null => {
     switch (store) {
       case "APP_STORE":
       case "MAC_APP_STORE":
@@ -451,6 +457,8 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
         return "android";
       case "STRIPE":
         return "stripe";
+      case "PROMOTIONAL":
+        return "promo";
       default:
         return null;
     }
@@ -565,6 +573,16 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
         return false;
       }
 
+      // If user already has active subscription, don't attempt purchase - guide them to Restore
+      if (hasActiveEntitlement(customerInfo)) {
+        showAlert({
+          title: t("onboarding.subscription.already_subscribed_title"),
+          message: t("onboarding.subscription.already_subscribed_message"),
+          variant: "info"
+        });
+        return false;
+      }
+
       try {
         setPurchaseState("purchasing");
         setError(null);
@@ -653,7 +671,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
         return false;
       }
     },
-    [isReady, refreshSubscription, markAsSubscribed, showAlert, t]
+    [isReady, customerInfo, refreshSubscription, markAsSubscribed, showAlert, t]
   );
 
   const purchaseProExitOffer = useCallback(async (): Promise<boolean> => {
@@ -688,11 +706,6 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
       // RevenueCat automatically detects eligibility via product.introPrice
       const storeProduct = premiumAnnualPackage.rcPackage?.product;
       const hasIntroOffer = storeProduct?.introPrice != null;
-
-      // After line 661, add:
-      console.log("[RevenueCat] Store Product:", JSON.stringify(storeProduct, null, 2));
-      console.log("[RevenueCat] introPrice:", storeProduct?.introPrice);
-      console.log("[RevenueCat] All product data:", premiumAnnualPackage);
 
       if (hasIntroOffer) {
         // User is eligible for intro offer - just purchase normally

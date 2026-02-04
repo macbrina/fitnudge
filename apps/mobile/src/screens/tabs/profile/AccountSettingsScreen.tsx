@@ -1,5 +1,14 @@
 import React, { useState, useMemo, useCallback } from "react";
-import { View, Text, ScrollView, TouchableOpacity, Modal, FlatList, TextInput } from "react-native";
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  Modal,
+  FlatList,
+  TextInput,
+  Linking
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useAuthStore } from "@/stores/authStore";
@@ -11,9 +20,10 @@ import { MOBILE_ROUTES } from "@/lib/routes";
 import { Card } from "@/components/ui/Card";
 import BackButton from "@/components/ui/BackButton";
 import Button from "@/components/ui/Button";
-import { useUpdateProfile } from "@/hooks/api/useUser";
+import { useUpdateProfile, useDeleteAccount } from "@/hooks/api/useUser";
 import { useAlertModal } from "@/contexts/AlertModalContext";
 import { ApiError } from "@/services/api/base";
+import { isIOS } from "@/utils/platform";
 import {
   LANGUAGES,
   COUNTRIES,
@@ -41,6 +51,7 @@ export default function AccountSettingsScreen() {
   const router = useRouter();
   const { showAlert, showConfirm } = useAlertModal();
   const updateProfileMutation = useUpdateProfile();
+  const deleteAccountMutation = useDeleteAccount();
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   // Modal states
@@ -161,12 +172,24 @@ export default function AccountSettingsScreen() {
     }
   ];
 
+  const handleManageSubscription = useCallback(() => {
+    const url = isIOS
+      ? "https://apps.apple.com/account/subscriptions"
+      : "https://play.google.com/store/account/subscriptions";
+    Linking.openURL(url).catch(() => {});
+  }, []);
+
   const handleDeleteAccount = async () => {
+    const isPremium = user?.plan === "premium";
+    const message = isPremium
+      ? t("profile.delete_account_subscription_warning") ||
+        "You have an active subscription. Cancel it in your device's subscription settings first to avoid future charges. Your account will be deleted, but you may still be charged until you cancel."
+      : t("profile.delete_account_warning") ||
+        "This action is permanent and cannot be undone. All your data will be deleted. Are you sure?";
+
     const confirmed = await showConfirm({
       title: t("profile.delete_account") || "Delete Account",
-      message:
-        t("profile.delete_account_warning") ||
-        "This action is permanent and cannot be undone. All your data will be deleted. Are you sure?",
+      message,
       confirmLabel: t("profile.delete_confirm") || "Delete Account",
       cancelLabel: t("common.cancel"),
       variant: "error"
@@ -175,8 +198,7 @@ export default function AccountSettingsScreen() {
     if (confirmed) {
       setIsDeletingAccount(true);
       try {
-        // TODO: Implement account deletion API call
-        // await userApi.deleteAccount();
+        await deleteAccountMutation.mutateAsync();
         await logout();
         router.replace(MOBILE_ROUTES.AUTH.LOGIN);
       } catch (error: unknown) {
@@ -460,23 +482,38 @@ export default function AccountSettingsScreen() {
           </Text>
           <Card style={styles.dangerCard}>
             <View style={styles.dangerContent}>
-              <View style={styles.dangerTextContainer}>
-                <Text style={styles.dangerTitle}>
-                  {t("profile.delete_account") || "Delete Account"}
-                </Text>
-                <Text style={styles.dangerDescription}>
-                  {t("profile.delete_account_desc") ||
-                    "Permanently delete your account and all associated data"}
-                </Text>
+              {user?.plan === "premium" && (
+                <TouchableOpacity
+                  style={[styles.manageSubscriptionLink, { borderColor: colors.border.default }]}
+                  onPress={handleManageSubscription}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="card-outline" size={18} color={brandColors.primary} />
+                  <Text style={[styles.manageSubscriptionText, { color: brandColors.primary }]}>
+                    {t("profile.manage_subscription") || "Manage Subscription"}
+                  </Text>
+                  <Ionicons name="open-outline" size={16} color={brandColors.primary} />
+                </TouchableOpacity>
+              )}
+              <View style={styles.dangerRow}>
+                <View style={styles.dangerTextContainer}>
+                  <Text style={styles.dangerTitle}>
+                    {t("profile.delete_account") || "Delete Account"}
+                  </Text>
+                  <Text style={styles.dangerDescription}>
+                    {t("profile.delete_account_desc") ||
+                      "Permanently delete your account and all associated data"}
+                  </Text>
+                </View>
+                <Button
+                  title={t("common.delete") || "Delete"}
+                  variant="danger"
+                  size="sm"
+                  onPress={handleDeleteAccount}
+                  loading={isDeletingAccount}
+                  disabled={isDeletingAccount}
+                />
               </View>
-              <Button
-                title={t("common.delete") || "Delete"}
-                variant="danger"
-                size="sm"
-                onPress={handleDeleteAccount}
-                loading={isDeletingAccount}
-                disabled={isDeletingAccount}
-              />
             </View>
           </Card>
         </View>
@@ -716,6 +753,24 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     backgroundColor: `${colors.feedback.error}05`
   },
   dangerContent: {
+    flexDirection: "column" as const,
+    gap: toRN(tokens.spacing[3])
+  },
+  manageSubscriptionLink: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: toRN(tokens.spacing[2]),
+    paddingVertical: toRN(tokens.spacing[2]),
+    paddingHorizontal: toRN(tokens.spacing[3]),
+    borderRadius: 8,
+    borderWidth: 1
+  },
+  manageSubscriptionText: {
+    fontSize: toRN(tokens.typography.fontSize.sm),
+    fontFamily: fontFamily.medium,
+    flex: 1
+  },
+  dangerRow: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
     justifyContent: "space-between" as const,

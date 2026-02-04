@@ -1,29 +1,12 @@
 /**
  * Capture referral attribution on app launch:
  * - Android: Play Store Install Referrer API (referrer=ref%3DCODE)
- * - iOS: Clipboard (FITNUDGE_REF:CODE copied by /join page before App Store redirect)
+ * - iOS: No automatic capture (clipboard approach removed - caused "Allow paste?" prompts and issues)
  */
 import { Platform } from "react-native";
-import * as Clipboard from "expo-clipboard";
 import { setPendingReferralCode } from "./referralStorage";
 
 const REFERRAL_PREFIX = "ref=";
-const CLIPBOARD_REF_PREFIX = "FITNUDGE_REF:";
-
-/** iOS: Read clipboard for FITNUDGE_REF:CODE (copied by /join page before App Store). */
-async function captureClipboardReferrerIfNeeded(): Promise<void> {
-  if (Platform.OS !== "ios") return;
-  try {
-    const text = await Clipboard.getStringAsync();
-    if (!text || typeof text !== "string") return;
-    const trimmed = text.trim();
-    if (!trimmed.startsWith(CLIPBOARD_REF_PREFIX)) return;
-    const code = trimmed.slice(CLIPBOARD_REF_PREFIX.length).trim();
-    if (code) await setPendingReferralCode(code);
-  } catch (_e) {
-    // Clipboard read may prompt "Allow paste?" - user can deny
-  }
-}
 
 export async function captureInstallReferrerIfNeeded(): Promise<void> {
   // Android: Play Store Install Referrer
@@ -39,11 +22,8 @@ export async function captureInstallReferrerIfNeeded(): Promise<void> {
     } catch (_e) {
       // Module not linked or not available
     }
-    return;
   }
-
-  // iOS: Clipboard (copied by /join page before App Store redirect)
-  await captureClipboardReferrerIfNeeded();
+  // iOS: No clipboard capture - users can enter referral code manually on signup
 }
 
 /**

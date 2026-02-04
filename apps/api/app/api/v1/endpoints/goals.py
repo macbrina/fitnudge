@@ -19,6 +19,15 @@ import re
 router = APIRouter(redirect_slashes=False)
 
 
+# Columns required for GoalResponse and get_goals logic (last_checkin_date for today check)
+GOAL_SELECT_COLUMNS = (
+    "id, user_id, title, frequency_type, frequency_count, target_days, "
+    "reminder_times, reminder_window_before_minutes, checkin_prompt_delay_minutes, "
+    "why_statement, status, current_streak, longest_streak, total_completions, "
+    "created_at, updated_at, last_checkin_date"
+)
+
+
 # =============================================================================
 # HELPER FUNCTIONS
 # =============================================================================
@@ -39,7 +48,7 @@ def check_goal_access(
     try:
         goal_result = (
             supabase.table("goals")
-            .select("*")
+            .select(GOAL_SELECT_COLUMNS)
             .eq("id", goal_id)
             .maybe_single()
             .execute()
@@ -148,6 +157,12 @@ class GoalCreate(BaseModel):
     frequency_count: Optional[int] = 1  # For weekly: how many times per week (1-7)
     target_days: Optional[List[int]] = None  # 0=Sunday, 1=Monday, ..., 6=Saturday
     reminder_times: Optional[List[str]] = None  # HH:MM format
+    reminder_window_before_minutes: Optional[int] = (
+        30  # 0 = exact time, 30 = 30 min before
+    )
+    checkin_prompt_delay_minutes: Optional[int] = (
+        30  # 0 = at reminder time, 30 = 30 min after last
+    )
     why_statement: Optional[str] = None  # User's personal "why"
 
 
@@ -159,6 +174,8 @@ class GoalUpdate(BaseModel):
     frequency_count: Optional[int] = None
     target_days: Optional[List[int]] = None
     reminder_times: Optional[List[str]] = None
+    reminder_window_before_minutes: Optional[int] = None
+    checkin_prompt_delay_minutes: Optional[int] = None
     why_statement: Optional[str] = None
     status: Optional[str] = None  # active, paused, archived
 
@@ -173,6 +190,8 @@ class GoalResponse(BaseModel):
     frequency_count: int
     target_days: Optional[List[int]] = None
     reminder_times: Optional[List[str]] = None
+    reminder_window_before_minutes: Optional[int] = 30
+    checkin_prompt_delay_minutes: Optional[int] = 30
     why_statement: Optional[str] = None
     status: str  # active, paused, archived
     current_streak: int = 0
@@ -213,7 +232,7 @@ async def get_goals(
     supabase = get_supabase_client()
     user_id = current_user["id"]
 
-    query = supabase.table("goals").select("*").eq("user_id", user_id)
+    query = supabase.table("goals").select(GOAL_SELECT_COLUMNS).eq("user_id", user_id)
 
     if active_only:
         query = query.eq("status", "active")
@@ -417,6 +436,20 @@ async def create_goal(
                 detail=f"{plan_name} plan allows only {reminder_limit} reminder(s) per goal. Upgrade to add more.",
             )
 
+    # Validate reminder window values (0 = exact time, 15-120 allowed)
+    before_min = goal_data.reminder_window_before_minutes
+    if before_min is not None and (before_min < 0 or before_min > 120):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="reminder_window_before_minutes must be 0-120",
+        )
+    delay_min = goal_data.checkin_prompt_delay_minutes
+    if delay_min is not None and (delay_min < 0 or delay_min > 120):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="checkin_prompt_delay_minutes must be 0-120",
+        )
+
     # V2: Simple goal data
     goal = {
         "user_id": user_id,
@@ -427,6 +460,8 @@ async def create_goal(
         "reminder_times": normalized_reminder_times
         or goal_data.reminder_times
         or ["18:00"],
+        "reminder_window_before_minutes": before_min if before_min is not None else 30,
+        "checkin_prompt_delay_minutes": delay_min if delay_min is not None else 30,
         "why_statement": (
             goal_data.why_statement.strip() if goal_data.why_statement else None
         ),
@@ -493,6 +528,14 @@ async def create_goal(
         refresh_nextup_fcm_for_user_task.delay(str(user_id))
     except Exception as e:
         logger.warning(f"Failed to queue live activity/nextup refresh: {e}")
+
+    from app.core.analytics import track_goal_created
+
+    track_goal_created(
+        user_id,
+        goal_data.frequency_type,
+        {"goal_id": goal_id, "has_why": bool(goal_data.why_statement)},
+    )
 
     return result.data[0]
 
@@ -564,7 +607,7 @@ async def update_goal(
     # Check if goal exists and belongs to user
     existing_goal = (
         supabase.table("goals")
-        .select("*")
+        .select(GOAL_SELECT_COLUMNS)
         .eq("id", goal_id)
         .eq("user_id", user_id)
         .maybe_single()
@@ -576,7 +619,7 @@ async def update_goal(
             status_code=status.HTTP_404_NOT_FOUND, detail="Goal not found"
         )
 
-    update_data = {k: v for k, v in goal_data.dict().items() if v is not None}
+    update_data = {k: v for k, v in goal_data.model_dump().items() if v is not None}
 
     # Lock frequency settings after first check-in
     # This prevents users from gaming streak calculations
@@ -685,6 +728,22 @@ async def update_goal(
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"{plan_name} plan allows only {reminder_limit} reminder(s) per goal. Upgrade to add more.",
+            )
+
+    # Validate reminder window values (0-120)
+    if "reminder_window_before_minutes" in update_data:
+        v = update_data["reminder_window_before_minutes"]
+        if v < 0 or v > 120:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="reminder_window_before_minutes must be 0-120",
+            )
+    if "checkin_prompt_delay_minutes" in update_data:
+        v = update_data["checkin_prompt_delay_minutes"]
+        if v < 0 or v > 120:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="checkin_prompt_delay_minutes must be 0-120",
             )
 
     # If activating this goal, check active goal limit
@@ -798,7 +857,7 @@ async def activate_goal(goal_id: str, current_user: dict = Depends(get_current_u
     # Check if goal exists and belongs to user
     existing_goal = (
         supabase.table("goals")
-        .select("*")
+        .select(GOAL_SELECT_COLUMNS)
         .eq("id", goal_id)
         .eq("user_id", user_id)
         .maybe_single()
@@ -867,7 +926,7 @@ async def deactivate_goal(goal_id: str, current_user: dict = Depends(get_current
     # Check if goal exists and belongs to user
     existing_goal = (
         supabase.table("goals")
-        .select("*")
+        .select(GOAL_SELECT_COLUMNS)
         .eq("id", goal_id)
         .eq("user_id", user_id)
         .maybe_single()
@@ -925,7 +984,7 @@ async def archive_goal(goal_id: str, current_user: dict = Depends(get_current_us
     # Check if goal exists and belongs to user
     existing_goal = (
         supabase.table("goals")
-        .select("*")
+        .select(GOAL_SELECT_COLUMNS)
         .eq("id", goal_id)
         .eq("user_id", user_id)
         .maybe_single()
@@ -987,7 +1046,7 @@ async def complete_goal(goal_id: str, current_user: dict = Depends(get_current_u
     # Check if goal exists and belongs to user
     existing_goal = (
         supabase.table("goals")
-        .select("*")
+        .select(GOAL_SELECT_COLUMNS)
         .eq("id", goal_id)
         .eq("user_id", user_id)
         .maybe_single()
@@ -1049,7 +1108,7 @@ async def get_goal_stats(goal_id: str, current_user: dict = Depends(get_current_
     # Verify goal belongs to user
     goal = (
         supabase.table("goals")
-        .select("*")
+        .select(GOAL_SELECT_COLUMNS)
         .eq("id", goal_id)
         .eq("user_id", current_user["id"])
         .maybe_single()
@@ -1122,7 +1181,12 @@ async def get_goals_summary(current_user: dict = Depends(get_current_user)):
     user_id = current_user["id"]
 
     # Get all goals
-    goals_result = supabase.table("goals").select("*").eq("user_id", user_id).execute()
+    goals_result = (
+        supabase.table("goals")
+        .select(GOAL_SELECT_COLUMNS)
+        .eq("user_id", user_id)
+        .execute()
+    )
 
     goals = goals_result.data or []
     total_goals = len(goals)

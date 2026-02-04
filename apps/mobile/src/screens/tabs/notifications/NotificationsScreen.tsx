@@ -124,8 +124,7 @@ export default function NotificationsScreen() {
   const [activeTab, setActiveTab] = useState<NotificationTab>("all");
   const [refreshing, setRefreshing] = useState(false);
   const [, setTimeTick] = useState(0);
-  const [adminBroadcastModalItem, setAdminBroadcastModalItem] =
-    useState<NotificationHistoryItem | null>(null);
+  const [modalItem, setModalItem] = useState<NotificationHistoryItem | null>(null);
 
   const markBroadcastSeen = useMarkBroadcastSeen();
 
@@ -178,25 +177,6 @@ export default function NotificationsScreen() {
     });
   }, [allNotifications, activeTab]);
 
-  // Count notifications by category
-  const activityCount = useMemo(() => {
-    return allNotifications.filter(
-      (n) => categorizeNotificationType(n.notification_type) === "activity"
-    ).length;
-  }, [allNotifications]);
-
-  const requestsCount = useMemo(() => {
-    return allNotifications.filter(
-      (n) => categorizeNotificationType(n.notification_type) === "requests"
-    ).length;
-  }, [allNotifications]);
-
-  const systemCount = useMemo(() => {
-    return allNotifications.filter(
-      (n) => categorizeNotificationType(n.notification_type) === "system"
-    ).length;
-  }, [allNotifications]);
-
   // Refresh
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -223,25 +203,34 @@ export default function NotificationsScreen() {
     }
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
+  // Entity types that open in BroadcastModal (admin_broadcast, user_report, etc.)
+  const MODAL_ENTITY_TYPES = ["admin_broadcast", "user_report"] as const;
+  const isModalEntity = (et: string | null | undefined) =>
+    !!et && MODAL_ENTITY_TYPES.includes(et as (typeof MODAL_ENTITY_TYPES)[number]);
+
   // Handle notification press
   const handleNotificationPress = useCallback(
     (notification: NotificationHistoryItem) => {
-      const isAdminBroadcast =
-        notification.notification_type === "general" &&
-        notification.entity_type === "admin_broadcast";
-
-      if (isAdminBroadcast) {
-        if (!notification.opened_at && notification.entity_id) {
+      // Modal types: open in BroadcastModal
+      if (isModalEntity(notification.entity_type)) {
+        if (
+          notification.entity_type === "admin_broadcast" &&
+          !notification.opened_at &&
+          notification.entity_id
+        ) {
           markBroadcastSeen.mutate(
             { broadcastId: notification.entity_id, dismissed: false },
             { onSettled: () => {} }
           );
         }
-        setAdminBroadcastModalItem(notification);
+        if (notification.entity_type !== "admin_broadcast" && !notification.opened_at) {
+          markOpenedMutation.mutate(notification.id);
+        }
+        setModalItem(notification);
         return;
       }
 
-      // Mark as opened (non–admin-broadcast)
+      // Mark as opened (non-modal notifications)
       if (!notification.opened_at) {
         markOpenedMutation.mutate(notification.id);
       }
@@ -332,39 +321,48 @@ export default function NotificationsScreen() {
     [router, markOpenedMutation, markBroadcastSeen]
   );
 
-  const handleAdminBroadcastModalClose = useCallback(() => {
-    const item = adminBroadcastModalItem;
-    setAdminBroadcastModalItem(null);
-    if (item?.entity_id) {
+  const handleModalClose = useCallback(() => {
+    const item = modalItem;
+    setModalItem(null);
+    if (item?.entity_type === "admin_broadcast" && item?.entity_id) {
       markBroadcastSeen.mutate(
         { broadcastId: item.entity_id, dismissed: true },
         { onSettled: () => {} }
       );
     }
-  }, [adminBroadcastModalItem, markBroadcastSeen]);
+  }, [modalItem, markBroadcastSeen]);
 
-  const adminBroadcastForModal: Broadcast | null = useMemo(() => {
-    if (!adminBroadcastModalItem) return null;
-    const d = adminBroadcastModalItem.data as Record<string, unknown> | undefined;
+  const broadcastForModal: Broadcast | null = useMemo(() => {
+    if (!modalItem) return null;
+    const d = modalItem.data as Record<string, unknown> | undefined;
+    const entityType = modalItem.entity_type;
+    const imageUrl = (d?.image_url as string) ?? null;
+    const ctaLabel = (d?.cta_label as string) ?? null;
+    const ctaUrl = (d?.cta_url as string) ?? null;
+    const deeplink = (d?.deeplink as string) ?? (d?.deepLink as string) ?? null;
+
+    // user_report: no CTA, just informational (who they reported + resolution)
+    const isUserReport = entityType === "user_report";
+
     return {
-      id: adminBroadcastModalItem.entity_id ?? "",
-      title: adminBroadcastModalItem.title,
-      body: adminBroadcastModalItem.body,
-      image_url: (d?.image_url as string) ?? null,
-      cta_label: (d?.cta_label as string) ?? null,
-      cta_url: (d?.cta_url as string) ?? null,
-      deeplink: (d?.deeplink as string) ?? null
+      id: modalItem.entity_id ?? modalItem.id,
+      title: modalItem.title,
+      body: modalItem.body,
+      image_url: imageUrl,
+      cta_label: isUserReport ? null : ctaLabel,
+      cta_url: isUserReport ? null : ctaUrl,
+      deeplink: isUserReport ? null : deeplink,
+      showImage: entityType === "admin_broadcast" || !!imageUrl
     };
-  }, [adminBroadcastModalItem]);
+  }, [modalItem]);
 
   // Render notification card
   const renderNotificationCard = ({ item }: { item: NotificationHistoryItem }) => {
     const icon = getNotificationIcon(item.notification_type);
     const isUnread = !item.opened_at;
-    const isAdminBroadcast =
-      item.notification_type === "general" && item.entity_type === "admin_broadcast";
+    const showHtmlBody = isModalEntity(item.entity_type);
 
-    const bodyContent = isAdminBroadcast ? (
+    const bodyContent = showHtmlBody ? (
       <View style={[styles.cardBodyWrap, { maxHeight: cardBodyMaxHeight }]}>
         <RenderHtml
           contentWidth={cardHtmlContentWidth}
@@ -554,11 +552,11 @@ export default function NotificationsScreen() {
       {/* Loading State - Skeleton */}
       {isLoading && filteredNotifications.length === 0 && renderSkeletonLoading()}
 
-      {/* Admin broadcast modal (System tab tap) */}
+      {/* Single modal for admin_broadcast, user_report, etc. */}
       <BroadcastModal
-        visible={!!adminBroadcastModalItem}
-        broadcast={adminBroadcastForModal}
-        onClose={handleAdminBroadcastModalClose}
+        visible={!!modalItem}
+        broadcast={broadcastForModal}
+        onClose={handleModalClose}
       />
     </View>
   );

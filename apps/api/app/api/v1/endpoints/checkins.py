@@ -30,6 +30,14 @@ import pytz
 router = APIRouter(redirect_slashes=False)
 
 
+# Columns required for CheckInResponse (current_streak, week_completions from goal)
+CHECKIN_SELECT_COLUMNS = (
+    "id, goal_id, user_id, check_in_date, status, mood, skip_reason, note, "
+    "ai_response, created_at, updated_at, voice_note_url, voice_note_transcript, "
+    "voice_note_sentiment, voice_note_duration"
+)
+
+
 # =============================================================================
 # V2 PYDANTIC MODELS
 # =============================================================================
@@ -197,7 +205,7 @@ async def create_check_in(
     # Verify goal belongs to user and is active
     goal = (
         supabase.table("goals")
-        .select("*")
+        .select("id, user_id, status, frequency_type, target_days")
         .eq("id", checkin_data.goal_id)
         .eq("user_id", user_id)
         .maybe_single()
@@ -504,6 +512,19 @@ async def create_check_in(
         logger.warning(f"Failed to queue pattern insights generation: {e}")
         # Non-critical - insights will still generate on-demand when user views goal
 
+    from app.core.analytics import track_check_in
+
+    track_check_in(
+        user_id,
+        str(checkin_data.goal_id),
+        properties={
+            "completed": checkin_data.completed,
+            "is_rest_day": checkin_data.is_rest_day or False,
+            "status": checkin_status,
+            "mood": checkin_data.mood,
+        },
+    )
+
     return created_checkin
 
 
@@ -524,7 +545,7 @@ async def get_check_ins(
 
     supabase = get_supabase_client()
 
-    query = supabase.table("check_ins").select("*").eq("user_id", current_user["id"])
+    query = supabase.table("check_ins").select(CHECKIN_SELECT_COLUMNS).eq("user_id", current_user["id"])
 
     if goal_id:
         query = query.eq("goal_id", goal_id)
@@ -555,7 +576,7 @@ async def get_today_check_ins(current_user: dict = Depends(get_current_user)):
 
     result = (
         supabase.table("check_ins")
-        .select("*")
+        .select(CHECKIN_SELECT_COLUMNS)
         .eq("user_id", current_user["id"])
         .eq("check_in_date", user_today.isoformat())
         .execute()
@@ -586,7 +607,7 @@ async def get_goal_today_status(
     # Verify goal belongs to user
     goal = (
         supabase.table("goals")
-        .select("*")
+        .select("id, user_id, frequency_type, target_days")
         .eq("id", goal_id)
         .eq("user_id", user_id)
         .maybe_single()
@@ -615,7 +636,7 @@ async def get_goal_today_status(
     # Check if user has checked in today
     checkin = (
         supabase.table("check_ins")
-        .select("*")
+        .select(CHECKIN_SELECT_COLUMNS)
         .eq("goal_id", goal_id)
         .eq("user_id", user_id)
         .eq("check_in_date", user_today.isoformat())
@@ -646,7 +667,7 @@ async def get_check_in_stats(
 
     supabase = get_supabase_client()
 
-    query = supabase.table("check_ins").select("*").eq("user_id", current_user["id"])
+    query = supabase.table("check_ins").select(CHECKIN_SELECT_COLUMNS).eq("user_id", current_user["id"])
 
     if goal_id:
         query = query.eq("goal_id", goal_id)
@@ -876,7 +897,7 @@ async def get_check_in(
 
     result = (
         supabase.table("check_ins")
-        .select("*")
+        .select(CHECKIN_SELECT_COLUMNS)
         .eq("id", checkin_id)
         .eq("user_id", current_user["id"])
         .maybe_single()
@@ -905,7 +926,7 @@ async def update_check_in(
     # Check if check-in exists and belongs to user
     existing = (
         supabase.table("check_ins")
-        .select("*")
+        .select(CHECKIN_SELECT_COLUMNS)
         .eq("id", checkin_id)
         .eq("user_id", current_user["id"])
         .maybe_single()
@@ -917,7 +938,7 @@ async def update_check_in(
             status_code=status.HTTP_404_NOT_FOUND, detail="Check-in not found"
         )
 
-    update_data = {k: v for k, v in checkin_data.dict().items() if v is not None}
+    update_data = {k: v for k, v in checkin_data.model_dump().items() if v is not None}
 
     # Validate mood if provided
     if "mood" in update_data and update_data["mood"] not in VALID_MOODS:
@@ -940,7 +961,7 @@ async def update_check_in(
         supabase.table("check_ins").update(update_data).eq("id", checkin_id).execute()
 
     # Get updated check-in
-    result = supabase.table("check_ins").select("*").eq("id", checkin_id).execute()
+    result = supabase.table("check_ins").select(CHECKIN_SELECT_COLUMNS).eq("id", checkin_id).execute()
 
     updated_checkin = result.data[0]
 

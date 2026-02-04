@@ -1213,8 +1213,7 @@ These tables are essential for the app:
 | `blog_posts`               | Blog content                | Website                        |
 | `blog_categories`          | Blog categories             | Website                        |
 | `user_reports`             | User safety reports         | Moderation                     |
-| `referral_codes`           | User referral codes         | Keep - growth                  |
-| `referral_redemptions`     | Referral tracking           | Keep - growth                  |
+| `referrals`                | Referral conversions        | Per-referral tracking, +7/+7 day bonus |
 | `achievements`             | Milestones & badges         | Keep - gamification            |
 
 **Notes:**
@@ -1859,22 +1858,23 @@ CREATE INDEX idx_ai_coach_usage_user_date ON ai_coach_daily_usage(user_id, date)
 -- =====================================================
 -- REFERRAL SYSTEM
 -- =====================================================
-CREATE TABLE referral_codes (
+-- Referral codes live on users.referral_code (unique per user).
+-- referrals table tracks each conversion with idempotency and bonus days.
+CREATE TABLE referrals (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE UNIQUE,
-  code TEXT NOT NULL UNIQUE,
-  uses_count INTEGER DEFAULT 0,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  referrer_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  referred_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE UNIQUE,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'subscribed', 'processing', 'rewarded', 'failed')),
+  bonus_days_referrer INTEGER DEFAULT 7,
+  bonus_days_referred INTEGER DEFAULT 7,
+  rewarded_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE referral_redemptions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  referrer_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  referred_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  referral_code_id UUID REFERENCES referral_codes(id),
-  reward_granted BOOLEAN DEFAULT false,
-  redeemed_at TIMESTAMPTZ DEFAULT NOW()
-);
+CREATE UNIQUE INDEX idx_referrals_referred_user ON referrals(referred_user_id);
+CREATE INDEX idx_referrals_referrer ON referrals(referrer_user_id);
+CREATE INDEX idx_referrals_status ON referrals(status);
 
 -- =====================================================
 -- DAILY CHECK-IN SUMMARIES (for scalability)

@@ -29,12 +29,13 @@ export default function AchievementsScreen() {
 
   const [activeTab, setActiveTab] = useState<TabType>("badges");
 
-  const {
-    data: achievements,
-    isLoading: loadingAchievements,
-    refetch,
-    isRefetching
-  } = useMyAchievements();
+  const { data: achievements, isLoading: loadingAchievements, refetch } = useMyAchievements();
+  const [refreshing, setRefreshing] = useState(false);
+  const handleRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  }, [refetch]);
   const { data: achievementTypes, isLoading: loadingTypes } = useAchievementTypes();
   const { data: stats } = useAchievementStats();
 
@@ -103,8 +104,8 @@ export default function AchievementsScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={isRefetching}
-            onRefresh={refetch}
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
             tintColor={brandColors.primary}
           />
         }

@@ -11,6 +11,8 @@
           "/verify-email/*",
           "/invite",
           "/invite/*",
+          "/join",
+          "/join/*",
           "/goal",
           "/goal/*",
           "/goals",

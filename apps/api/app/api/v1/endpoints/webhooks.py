@@ -78,6 +78,7 @@ class RevenueCatEvent(BaseModel):
     grace_period_expiration_at_ms: Optional[int] = None
     id: Optional[str] = None
     is_family_share: Optional[bool] = None
+    is_trial_conversion: Optional[bool] = None  # RENEWAL: True when trial converted to paid
     offer_code: Optional[str] = None
     original_app_user_id: Optional[str] = None
     original_transaction_id: Optional[str] = None
@@ -137,61 +138,49 @@ def get_plan_from_entitlement_ids(
 
 
 def get_platform_from_store(store: str) -> str:
-    """Map RevenueCat store to platform"""
+    """Map RevenueCat store to platform (ios, android, web, admin_granted, promo)"""
     store_map = {
         "APP_STORE": "ios",
         "MAC_APP_STORE": "ios",
         "PLAY_STORE": "android",
         "AMAZON": "android",
         "STRIPE": "stripe",
-        "PROMOTIONAL": "promotional",
+        "PROMOTIONAL": "promo",  # RevenueCat promo grants (referral, etc.)
     }
     return store_map.get(store, "unknown")
 
 
-async def is_event_already_processed(supabase, event_id: str) -> bool:
-    """Check if event has already been processed (idempotency check)."""
+def _is_unique_violation(e: Exception) -> bool:
+    """Check if exception is PostgreSQL unique constraint violation (23505)."""
+    err = str(e).lower()
+    return "23505" in err or "unique" in err or "duplicate" in err or "conflict" in err
+
+
+async def try_claim_webhook_event(
+    supabase, event_id: str, event_type: str, user_id: str, payload: dict
+) -> bool:
+    """
+    Atomically claim event for processing via INSERT.
+    Returns True if we claimed it (first to insert), False if already claimed/processed.
+    """
     if not event_id:
         return False
-
     try:
-        result = (
-            supabase.table("webhook_events")
-            .select("id, status")
-            .eq("event_id", event_id)
-            .execute()
-        )
-
-        if result.data:
-            status = result.data[0].get("status")
-            # If already completed or processing, skip
-            return status in ["completed", "processing"]
-
-        return False
-    except Exception as e:
-        logger.error(f"Error checking event idempotency: {e}")
-        return False
-
-
-async def mark_event_processing(
-    supabase, event_id: str, event_type: str, user_id: str, payload: dict
-):
-    """Mark event as being processed."""
-    try:
-        supabase.table("webhook_events").upsert(
+        supabase.table("webhook_events").insert(
             {
                 "event_id": event_id,
                 "event_type": event_type,
                 "user_id": user_id,
                 "status": "processing",
                 "payload": payload,
-                "created_at": datetime.utcnow().isoformat(),
-                "updated_at": datetime.utcnow().isoformat(),
-            },
-            on_conflict="event_id",
+            }
         ).execute()
+        return True
     except Exception as e:
-        logger.error(f"Error marking event as processing: {e}")
+        if _is_unique_violation(e):
+            return False
+        logger.error(f"Error claiming webhook event: {e}")
+        raise
 
 
 async def mark_event_completed(supabase, event_id: str):
@@ -277,15 +266,11 @@ async def revenuecat_webhook(
 
     supabase = get_supabase_client()
 
-    # Get event ID for idempotency
+    # Get event ID for idempotency (include transaction_id for safer fallback)
     event_id = (
-        event.id or f"{event.type}_{event.app_user_id}_{event.event_timestamp_ms}"
+        event.id
+        or f"{event.type}_{event.app_user_id}_{event.event_timestamp_ms or 0}_{getattr(event, 'transaction_id', '') or getattr(event, 'original_transaction_id', '')}"
     )
-
-    # Idempotency check
-    if await is_event_already_processed(supabase, event_id):
-        logger.info(f"Event {event_id} already processed, skipping")
-        return {"status": "already_processed", "event_id": event_id}
 
     # Get user ID
     user_id = event.app_user_id or event.original_app_user_id
@@ -294,8 +279,24 @@ async def revenuecat_webhook(
         print("No user ID in webhook event")
         return {"status": "skipped", "reason": "no_user_id"}
 
-    # Mark as processing
-    await mark_event_processing(supabase, event_id, event.type, user_id, payload)
+    # Skip if user no longer exists (e.g. deleted account but subscription still active in store)
+    user_exists = (
+        supabase.table("users").select("id").eq("id", user_id).execute()
+    )
+    if not user_exists.data or len(user_exists.data) == 0:
+        logger.warning(
+            f"Skipping {event.type} webhook: user {user_id} not found in users table "
+            "(likely deleted account with active subscription)"
+        )
+        return {"status": "skipped", "reason": "user_not_found"}
+
+    # Atomic claim: only first request to insert succeeds
+    claimed = await try_claim_webhook_event(
+        supabase, event_id, event.type, user_id, payload
+    )
+    if not claimed:
+        logger.info(f"Event {event_id} already claimed/processed, skipping")
+        return {"status": "already_processed", "event_id": event_id}
 
     # Process event
     try:
@@ -372,38 +373,47 @@ async def notify_partners_of_subscription_change(supabase, user_id: str):
 
 async def process_referral_bonus_on_subscription(supabase, user_id: str):
     """
-    Grant referral bonus when a referred user subscribes for the first time.
+    Grant referral bonus when a referred user makes their first actual paid purchase.
 
-    This is called on INITIAL_PURCHASE and NON_RENEWING_PURCHASE events.
-    The referrer gets bonus days when the user they referred becomes a paying customer.
+    Called only when:
+    - INITIAL_PURCHASE with period_type NORMAL (direct paid, not trial)
+    - RENEWAL with is_trial_conversion=True (trial converted to paid)
+    - NON_RENEWING_PURCHASE (one-time/lifetime, always paid)
+
+    Free trial starts (INITIAL_PURCHASE with period_type TRIAL/INTRO) do NOT trigger this.
     """
     try:
-        # Check if user was referred and hasn't received bonus yet
+        print(f"[REFERRAL] process_referral_bonus_on_subscription called for user_id={user_id}")
+        # Check if user was referred (idempotency handled in process_referral_bonus)
         user_result = (
             supabase.table("users")
-            .select("id, referred_by_user_id, referral_bonus_granted_at")
+            .select("id, referred_by_user_id")
             .eq("id", user_id)
             .execute()
         )
 
         if not user_result.data:
+            print(f"[REFERRAL] No user found for user_id={user_id}, skipping")
             return
 
         user = user_result.data[0]
         referrer_id = user.get("referred_by_user_id")
-        bonus_granted = user.get("referral_bonus_granted_at")
 
-        # Only grant bonus if user was referred and hasn't received it yet
-        if referrer_id and not bonus_granted:
+        if referrer_id:
             from app.services.referral_service import process_referral_bonus
 
+            print(f"[REFERRAL] User {user_id} was referred by {referrer_id}, calling process_referral_bonus")
             logger.info(
                 f"Granting referral bonus: user {user_id} subscribed, referrer {referrer_id}"
             )
-            await process_referral_bonus(user_id, referrer_id)
+            result = await process_referral_bonus(user_id, referrer_id)
+            print(f"[REFERRAL] process_referral_bonus returned {result} for user_id={user_id}")
+        else:
+            print(f"[REFERRAL] User {user_id} has no referred_by_user_id, skipping bonus")
 
     except Exception as e:
         # Don't fail the subscription if referral bonus fails
+        print(f"[REFERRAL] ERROR in process_referral_bonus_on_subscription for user_id={user_id}: {e}")
         logger.error(f"Error processing referral bonus for user {user_id}: {e}")
 
 
@@ -467,6 +477,9 @@ async def handle_subscription_active(supabase, event: RevenueCatEvent, user_id: 
     # INITIAL_PURCHASE, RENEWAL, UNCANCELLATION all indicate user intends to keep subscription
     auto_renew = event.type in ["INITIAL_PURCHASE", "RENEWAL", "UNCANCELLATION"]
 
+    now_iso = datetime.utcnow().isoformat()
+    period_start = purchased_at or now_iso
+    is_promo = platform == "promo"
     subscription_data = {
         "user_id": user_id,
         "plan": plan,
@@ -475,12 +488,16 @@ async def handle_subscription_active(supabase, event: RevenueCatEvent, user_id: 
         "product_id": event.product_id,
         "purchase_date": purchased_at,
         "expires_date": expires_at,
-        "auto_renew": auto_renew,
+        "current_period_start": period_start,
+        "current_period_end": expires_at,
+        "auto_renew": False if is_promo else auto_renew,
         "revenuecat_event_id": event.id,
         "environment": event.environment,
         "grace_period_ends_at": None,
-        "updated_at": datetime.utcnow().isoformat(),
+        "updated_at": now_iso,
     }
+    if is_promo:
+        subscription_data["cancel_at_period_end"] = True
 
     if existing.data:
         supabase.table("subscriptions").update(subscription_data).eq(
@@ -488,7 +505,7 @@ async def handle_subscription_active(supabase, event: RevenueCatEvent, user_id: 
         ).execute()
         logger.info(f"Updated subscription for user {user_id}: {plan}")
     else:
-        subscription_data["created_at"] = datetime.utcnow().isoformat()
+        subscription_data["created_at"] = now_iso
         supabase.table("subscriptions").insert(subscription_data).execute()
         logger.info(f"Created subscription for user {user_id}: {plan}")
 
@@ -499,12 +516,35 @@ async def handle_subscription_active(supabase, event: RevenueCatEvent, user_id: 
     if event.type in ["INITIAL_PURCHASE", "RENEWAL"]:
         await reset_ai_coach_daily_usage_on_downgrade(supabase, user_id)
 
-    # Grant referral bonus on first purchase (not on renewals/uncancellations)
+    # Grant referral bonus only on actual paid purchase (not free trial start)
+    # - INITIAL_PURCHASE with period_type NORMAL = direct paid purchase
+    # - INITIAL_PURCHASE with period_type TRIAL/INTRO = free trial start, skip (grant on RENEWAL)
+    # - RENEWAL with is_trial_conversion=True = trial converted to paid
+    # - RENEWAL with period_type=NORMAL = paid period (covers trial conversion when flag missing, or regular renewal; idempotency prevents double-grant)
+    is_paid_purchase = False
     if event.type == "INITIAL_PURCHASE":
+        pt = (event.period_type or "").upper()
+        if pt not in ("TRIAL", "INTRO"):
+            is_paid_purchase = True
+    elif event.type == "RENEWAL":
+        pt = (event.period_type or "").upper()
+        if event.is_trial_conversion or pt not in ("TRIAL", "INTRO"):
+            is_paid_purchase = True
+    print(f"[REFERRAL] handle_subscription_active: event_type={event.type}, period_type={event.period_type}, is_trial_conversion={event.is_trial_conversion}, is_paid_purchase={is_paid_purchase}")
+    if is_paid_purchase:
         await process_referral_bonus_on_subscription(supabase, user_id)
 
     # Notify partners so their PartnerDetailScreen shows updated premium status
     await notify_partners_of_subscription_change(supabase, user_id)
+
+    # Analytics: track new subscription (INITIAL_PURCHASE only)
+    if event.type == "INITIAL_PURCHASE":
+        try:
+            from app.core.analytics import track_subscription_created
+
+            track_subscription_created(user_id, plan, platform)
+        except Exception as e:
+            logger.warning(f"Failed to track subscription_created: {e}")
 
 
 async def handle_subscription_cancelled(supabase, event: RevenueCatEvent, user_id: str):
@@ -695,13 +735,21 @@ async def handle_product_change(supabase, event: RevenueCatEvent, user_id: str):
     if event.expiration_at_ms:
         expires_at = datetime.fromtimestamp(event.expiration_at_ms / 1000).isoformat()
 
+    purchased_at = None
+    if event.purchased_at_ms:
+        purchased_at = datetime.fromtimestamp(event.purchased_at_ms / 1000).isoformat()
+    now_iso = datetime.utcnow().isoformat()
+    period_start = purchased_at or now_iso
+
     supabase.table("subscriptions").update(
         {
             "plan": new_plan,
             "product_id": event.product_id,
             "expires_date": expires_at,
+            "current_period_start": period_start,
+            "current_period_end": expires_at,
             "status": "active",
-            "updated_at": datetime.utcnow().isoformat(),
+            "updated_at": now_iso,
         }
     ).eq("user_id", user_id).execute()
 
@@ -800,6 +848,8 @@ async def handle_non_renewing_purchase(supabase, event: RevenueCatEvent, user_id
         supabase.table("subscriptions").select("id").eq("user_id", user_id).execute()
     )
 
+    now_iso = datetime.utcnow().isoformat()
+    period_start = purchased_at or now_iso
     subscription_data = {
         "user_id": user_id,
         "plan": plan,
@@ -808,11 +858,13 @@ async def handle_non_renewing_purchase(supabase, event: RevenueCatEvent, user_id
         "product_id": event.product_id,
         "purchase_date": purchased_at,
         "expires_date": expires_at,  # May be None for lifetime
+        "current_period_start": period_start,
+        "current_period_end": expires_at,
         "auto_renew": False,  # Non-renewing purchases never auto-renew
         "revenuecat_event_id": event.id,
         "environment": event.environment,
         "grace_period_ends_at": None,
-        "updated_at": datetime.utcnow().isoformat(),
+        "updated_at": now_iso,
     }
 
     if existing.data:
@@ -821,7 +873,7 @@ async def handle_non_renewing_purchase(supabase, event: RevenueCatEvent, user_id
         ).execute()
         logger.info(f"Updated non-renewing subscription for user {user_id}: {plan}")
     else:
-        subscription_data["created_at"] = datetime.utcnow().isoformat()
+        subscription_data["created_at"] = now_iso
         supabase.table("subscriptions").insert(subscription_data).execute()
         logger.info(f"Created non-renewing subscription for user {user_id}: {plan}")
 
@@ -853,16 +905,16 @@ async def handle_subscription_extended(supabase, event: RevenueCatEvent, user_id
         )
         return
 
-    # Update the subscription expiration date
+    # Update the subscription expiration date and period
+    update_data = {
+        "expires_date": expires_at,
+        "current_period_end": expires_at,
+        "status": "active",  # Ensure status is active
+        "updated_at": datetime.utcnow().isoformat(),
+    }
     result = (
         supabase.table("subscriptions")
-        .update(
-            {
-                "expires_date": expires_at,
-                "status": "active",  # Ensure status is active
-                "updated_at": datetime.utcnow().isoformat(),
-            }
-        )
+        .update(update_data)
         .eq("user_id", user_id)
         .execute()
     )

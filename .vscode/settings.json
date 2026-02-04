@@ -3,5 +3,6 @@
     {
       "mode": "auto"
     }
-  ]
+  ],
+  "jest.rootPath": "apps/mobile"
 }

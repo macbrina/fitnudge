@@ -254,15 +254,19 @@ export class UserService extends BaseApiService {
    * Get list of users referred by current user
    */
   async getMyReferrals(): Promise<
-    ApiResponse<
-      Array<{
+    ApiResponse<{
+      referrals: Array<{
         id: string;
         username: string;
         name: string;
+        profile_picture_url?: string | null;
         created_at: string;
         referral_bonus_granted_at?: string;
-      }>
-    >
+        bonus_days_referrer?: number;
+        status?: "pending" | "subscribed" | "processing" | "rewarded" | "failed";
+      }>;
+      total_bonus_days_earned: number;
+    }>
   > {
     return this.get(ROUTES.USERS.REFERRALS);
   }

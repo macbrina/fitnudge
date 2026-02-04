@@ -1,0 +1,88 @@
+# FitNudge E2E: Login flow
+# Requires: existing test user (TEST_EMAIL, TEST_PASSWORD env vars)
+# Run: export TEST_EMAIL=... TEST_PASSWORD=... && maestro test .maestro/flows/login.yaml
+#
+# App flow: launch -> onboarding carousel (or login if seen) -> after login: notification -> personalization -> home
+
+appId: com.fitnudge.app
+
+---
+- launchApp
+# If on onboarding carousel, tap "Log in" to go to login screen
+- extendedWaitUntil:
+    visible:
+      id: "log-in"
+    timeout: 8000
+    optional: true
+- tapOn:
+    id: "log-in"
+    optional: true
+# Fill credentials (LoginScreen uses "Sign in" for submit button, not "Log in")
+- inputText:
+    id: "email"
+    text: "${TEST_EMAIL}"
+- inputText:
+    id: "password"
+    text: "${TEST_PASSWORD}"
+- tapOn:
+    text: "Sign in"
+# Post-login onboarding (required): notification permission, then personalization
+- extendedWaitUntil:
+    visible:
+      text: "Maybe Later"
+    timeout: 10000
+    optional: true
+- tapOn:
+    text: "Maybe Later"
+    optional: true
+# Personalization (if storage cleared - full flow like signup)
+- extendedWaitUntil:
+    visible:
+      text: "Continue"
+    timeout: 8000
+    optional: true
+- inputText:
+    text: "Test User"
+    optional: true
+- tapOn:
+    text: "Supportive Coach"
+    optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+- tapOn:
+    text: "Work out regularly"
+    optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+- tapOn:
+    text: "Daily"
+    optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+- tapOn:
+    text: "Skip for now"
+    optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+- tapOn:
+    text: "Start Using FitNudge"
+    optional: true
+# Dismiss subscription modal if shown (free users see it on first Home load)
+- extendedWaitUntil:
+    visible:
+      id: "subscription-close"
+    timeout: 8000
+    optional: true
+- tapOn:
+    id: "subscription-close"
+    optional: true
+# After onboarding - land on Home tab
+- scrollUntilVisible:
+    element:
+      id: "todays-goals"
+    direction: DOWN
+    timeout: 15000

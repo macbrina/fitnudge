@@ -18,8 +18,8 @@ from app.services.tasks.base import (
 )
 
 
-# Constants
-CHECKIN_PROMPT_DELAY_MINUTES = 30  # Send check-in prompt 30 min after last reminder
+# Constants (defaults when goal has no value - e.g. legacy rows)
+DEFAULT_CHECKIN_PROMPT_DELAY_MINUTES = 30
 
 
 def is_today_a_work_day(
@@ -93,6 +93,11 @@ def send_scheduled_ai_motivations_task(self) -> Dict[str, Any]:
     Send AI-generated motivations to users at their reminder times.
     Runs every minute to check if any user has a reminder scheduled for current time.
 
+    MULTIPLE REMINDER TIMES: When a goal has multiple reminder_times (e.g. 08:00, 12:00, 18:00),
+    a motivation is sent at EACH of those times. times_to_match includes all reminder times
+    plus optional "before" times (reminder_window_before_minutes), so the user gets a nudge
+    at every configured slot.
+
     TIMEZONE-AWARE: Checks user's local time against their reminder_times.
 
     Features:
@@ -158,8 +163,8 @@ def send_scheduled_ai_motivations_task(self) -> Dict[str, Any]:
         active_goals_result = (
             supabase.table("goals")
             .select(
-                "id, user_id, title, reminder_times, frequency_type, target_days, "
-                "created_at, status, current_streak, why_statement"
+                "id, user_id, title, reminder_times, reminder_window_before_minutes, "
+                "frequency_type, target_days, created_at, status, current_streak, why_statement"
             )
             .eq("status", "active")
             .in_("user_id", active_user_ids)
@@ -237,12 +242,32 @@ def send_scheduled_ai_motivations_task(self) -> Dict[str, Any]:
                 user_today = user_now.date()
                 current_time = user_now.strftime("%H:%M")
 
-                # ✅ Check if current time matches any reminder time
+                # ✅ Check if current time matches any reminder time OR (reminder - before_minutes)
                 # Normalize reminder times (HH:MM:SS -> HH:MM) for comparison
                 normalized_reminders = [
                     t[:5] if len(t) >= 5 else t for t in reminder_times
                 ]
-                if current_time not in normalized_reminders:
+                before_min = goal.get("reminder_window_before_minutes") or 30
+                if before_min < 0:
+                    before_min = 0
+
+                # Build set of times we should send at: exact + optional "before" times
+                times_to_match = set(normalized_reminders)
+                if before_min > 0:
+                    from datetime import time as dt_time, timedelta
+                    for rt in normalized_reminders:
+                        try:
+                            h, m = map(int, rt.split(":"))
+                            t = dt_time(h, m)
+                            td = timedelta(minutes=before_min)
+                            # Combine date + time, subtract, extract time
+                            before_dt = datetime.combine(user_today, t) - td
+                            before_str = before_dt.strftime("%H:%M")
+                            times_to_match.add(before_str)
+                        except (ValueError, IndexError):
+                            pass
+
+                if current_time not in times_to_match:
                     continue
 
                 # ✅ Check if today is a work day (V2: frequency_type, target_days)
@@ -381,22 +406,6 @@ def send_scheduled_ai_motivations_task(self) -> Dict[str, Any]:
         if self.request.retries < self.max_retries:
             raise self.retry(exc=e)
         return {"success": False, "error": str(e)}
-
-    while current <= end_date:
-        if frequency_type == "daily":
-            scheduled_dates.append(current)
-        elif frequency_type == "weekly" and target_days:
-            our_weekday = python_to_our_weekday.get(
-                current.weekday(), current.weekday()
-            )
-            if our_weekday in target_days:
-                scheduled_dates.append(current)
-        else:
-            # No target_days for weekly = treat as daily
-            scheduled_dates.append(current)
-        current += timedelta(days=1)
-
-    return scheduled_dates
 
 
 REENGAGEMENT_INACTIVE_DAYS = (
@@ -567,19 +576,21 @@ def send_reengagement_notifications_task(self) -> Dict[str, Any]:
 )
 def send_checkin_prompts_task(self) -> Dict[str, Any]:
     """
-    Send check-in prompts to users 30 minutes after their LAST reminder time of the day.
+    Send check-in prompts to users after their LAST reminder time of the day.
+
+    CHECK-IN IS ONCE PER DAY: Regardless of how many reminder times a goal has (1 or 5),
+    the user gets ONE check-in prompt per day. It is sent at last_reminder + checkin_prompt_delay_minutes.
+    This gives them time to complete their activity after their final "start" reminder.
 
     TIMEZONE-AWARE: Runs every minute to check if any user needs a check-in prompt.
 
     V2 Flow (goals only):
     1. Get all active goals with reminder times
     2. For each goal, find the LAST reminder time of the day
-    3. If current time = last_reminder + 30 min:
+    3. If current time = last_reminder + checkin_prompt_delay_minutes:
        - Check if check-in is already completed -> skip
        - Check if prompt already sent today -> skip
        - Otherwise, send "How did it go?" notification
-
-    This ensures users get prompted AFTER they've had time to complete their activity.
 
     SCALABILITY: Uses batch prefetching to avoid N+1 queries.
     """
@@ -594,10 +605,10 @@ def send_checkin_prompts_task(self) -> Dict[str, Any]:
         skipped_already_prompted = 0
         skipped_no_reminders = 0
 
-        # Get all active goals with reminder times
+        # Get all active goals with reminder times and checkin_prompt_delay_minutes
         active_goals_result = (
             supabase.table("goals")
-            .select("id, user_id, title, reminder_times")
+            .select("id, user_id, title, reminder_times, checkin_prompt_delay_minutes")
             .eq("status", "active")
             .execute()
         )
@@ -694,7 +705,14 @@ def send_checkin_prompts_task(self) -> Dict[str, Any]:
                 sorted_reminders = sorted(reminder_times)
                 last_reminder_str = sorted_reminders[-1]  # e.g., "18:00"
 
-                # Calculate prompt time (last reminder + 30 min)
+                # Use goal's checkin_prompt_delay_minutes (0 = at reminder time)
+                delay_min = goal.get("checkin_prompt_delay_minutes")
+                if delay_min is None:
+                    delay_min = DEFAULT_CHECKIN_PROMPT_DELAY_MINUTES
+                if delay_min < 0:
+                    delay_min = 0
+
+                # Calculate prompt time (last reminder + delay_min)
                 last_reminder_parts = last_reminder_str.split(":")
                 last_reminder_hour = int(last_reminder_parts[0])
                 last_reminder_minute = int(last_reminder_parts[1])
@@ -706,21 +724,20 @@ def send_checkin_prompts_task(self) -> Dict[str, Any]:
                     second=0,
                     microsecond=0,
                 )
+                prompt_dt = last_reminder_dt + timedelta(minutes=delay_min)
 
-                # Add 30 minutes to get prompt time
-                prompt_dt = last_reminder_dt + timedelta(
-                    minutes=CHECKIN_PROMPT_DELAY_MINUTES
-                )
+                # Don't send if prompt would cross midnight - the day has passed, no point
+                # asking "did you do it?" when the check-in moment is gone.
+                if prompt_dt.date() != last_reminder_dt.date():
+                    continue
+
                 prompt_time_str = prompt_dt.strftime("%H:%M")
-
-                # Check if current time matches prompt time
                 if current_time_str != prompt_time_str:
                     continue
 
                 # ✅ It's time to potentially send a prompt!
 
                 # O(1) lookup: Has user already responded to check-in today?
-                # V2.1: Check-ins are pre-created with status='pending'
                 checkin_key = (goal_id, str(user_today))
                 if checkins_lookup.get(checkin_key, False):
                     skipped_already_completed += 1
@@ -862,10 +879,10 @@ def send_checkin_followups_task(self) -> Dict[str, Any]:
         skipped_already_followed_up = 0
         skipped_not_time_yet = 0
 
-        # Get all active goals with reminder times
+        # Get all active goals with reminder times and checkin_prompt_delay_minutes
         active_goals_result = (
             supabase.table("goals")
-            .select("id, user_id, title, reminder_times")
+            .select("id, user_id, title, reminder_times, checkin_prompt_delay_minutes")
             .eq("status", "active")
             .execute()
         )
@@ -957,14 +974,22 @@ def send_checkin_followups_task(self) -> Dict[str, Any]:
                 sorted_reminders = sorted(reminder_times)
                 last_reminder_str = sorted_reminders[-1]
 
-                # Calculate follow-up time (last reminder + 2.5 hours)
-                # 30 min prompt + 2 hour wait = 2.5 hours after last reminder
+                # Use goal's checkin_prompt_delay_minutes for prompt time
+                delay_min = goal.get("checkin_prompt_delay_minutes")
+                if delay_min is None:
+                    delay_min = DEFAULT_CHECKIN_PROMPT_DELAY_MINUTES
+                if delay_min < 0:
+                    delay_min = 0
+
+                # Follow-up = last_reminder + checkin_prompt_delay + 2 hours
+                # (prompt sent at last_reminder + delay, then 2hr wait for follow-up)
+                total_minutes = delay_min + 120  # 2 hours after prompt
                 last_reminder_parts = last_reminder_str.split(":")
                 last_reminder_hour = int(last_reminder_parts[0])
                 last_reminder_minute = int(last_reminder_parts[1])
 
-                followup_hour = last_reminder_hour + 2
-                followup_minute = last_reminder_minute + 30
+                followup_minute = last_reminder_minute + (total_minutes % 60)
+                followup_hour = last_reminder_hour + (total_minutes // 60)
 
                 if followup_minute >= 60:
                     followup_minute -= 60
@@ -1250,7 +1275,7 @@ def notify_inactive_partners_task(self) -> Dict[str, Any]:
         # ============================================================
         prefs_result = (
             supabase.table("notification_preferences")
-            .select("user_id, enabled, partner_nudges")
+            .select("user_id, enabled, partners")
             .in_("user_id", all_user_ids)
             .execute()
         )
@@ -1324,7 +1349,7 @@ def notify_inactive_partners_task(self) -> Dict[str, Any]:
                     recipient_prefs = prefs_by_user.get(recipient_id, {})
                     if not recipient_prefs.get(
                         "enabled", True
-                    ) or not recipient_prefs.get("partner_nudges", True):
+                    ) or not recipient_prefs.get("partners", True):
                         skipped_reasons["notifications_disabled"] += 1
                         skipped_count += 1
                         continue

@@ -1,9 +1,10 @@
 import Button from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { BackButton } from "@/components/ui/BackButton";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { SkeletonBox } from "@/components/ui/SkeletonBox";
 import { useAlertModal } from "@/contexts/AlertModalContext";
-import { useReferralCode, useMyReferrals } from "@/hooks/api/useReferral";
+import { useReferralCode, useMyReferrals, useRefreshReferrals } from "@/hooks/api/useReferral";
 import { fontFamily } from "@/lib/fonts";
 import { useTranslation } from "@/lib/i18n";
 import { toRN } from "@/lib/units";
@@ -11,7 +12,8 @@ import { useStyles, useTheme } from "@/themes";
 import { Ionicons } from "@expo/vector-icons";
 import CheckmarkCircle from "@/components/ui/CheckmarkCircle";
 import { useRouter } from "expo-router";
-import React from "react";
+import React, { useState } from "react";
+import { UserAvatar } from "@/components/avatars";
 import {
   Image,
   Platform,
@@ -30,8 +32,11 @@ interface ReferralUser {
   id: string;
   username?: string;
   name?: string;
+  profile_picture_url?: string | null;
   created_at: string;
   referral_bonus_granted_at?: string | null;
+  bonus_days_referrer?: number;
+  status?: "pending" | "subscribed" | "processing" | "rewarded" | "failed";
 }
 
 // 3D illustration for the hero section
@@ -49,16 +54,18 @@ export const ReferralScreen: React.FC = () => {
   const {
     data: referralData,
     isLoading: isLoadingCode,
-    isFetching: isFetchingCode,
-    refetch: refetchCode
+    isFetching: isFetchingCode
   } = useReferralCode();
 
   const {
     data: referralsData,
     isLoading: isLoadingReferrals,
-    isFetching: isFetchingReferrals,
-    refetch: refetchReferrals
+    isFetching: isFetchingReferrals
   } = useMyReferrals();
+
+  // Force refresh hook (invalidates cache to ensure network call)
+  const refreshReferrals = useRefreshReferrals();
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
 
   const referralCode = referralData?.data?.referral_code || "";
   const referralLink = referralData?.data?.referral_link || "";
@@ -72,15 +79,25 @@ export const ReferralScreen: React.FC = () => {
       : [];
 
   const isLoading = isLoadingCode || isLoadingReferrals;
-  const isRefreshing = isFetchingCode || isFetchingReferrals;
+  const isRefreshing = isFetchingCode || isFetchingReferrals || isManualRefreshing;
 
-  // Calculate stats
+  // Calculate stats (use API total when available, else fallback to earnedReferrals * 7)
   const totalReferrals = referrals.length;
-  const earnedReferrals = referrals.filter((r) => r.referral_bonus_granted_at).length;
-  const totalDaysEarned = earnedReferrals * 7;
+  // Use status as primary check, fall back to referral_bonus_granted_at for backward compat
+  const earnedReferrals = referrals.filter(
+    (r) => r.status === "rewarded" || r.referral_bonus_granted_at
+  ).length;
+  const totalDaysEarned =
+    (referralsData?.data as { total_bonus_days_earned?: number })?.total_bonus_days_earned ??
+    earnedReferrals * 7;
 
   const onRefresh = async () => {
-    await Promise.all([refetchCode(), refetchReferrals()]);
+    setIsManualRefreshing(true);
+    try {
+      await refreshReferrals();
+    } finally {
+      setIsManualRefreshing(false);
+    }
   };
 
   const handleCopyCode = async () => {
@@ -142,6 +159,13 @@ export const ReferralScreen: React.FC = () => {
     });
   };
 
+  const [tabIndex, setTabIndex] = useState(0);
+  const tabOptions = [
+    t("referral.tab_invite") || "Invite",
+    t("referral.tab_how_it_works") || "How It Works",
+    t("referral.tab_referrals") || "Referrals"
+  ];
+
   // Skeleton Loading State
   if (isLoading) {
     return (
@@ -175,104 +199,120 @@ export const ReferralScreen: React.FC = () => {
     );
   }
 
-  return (
-    <View style={styles.container}>
-      <BackButton title={t("referral.title") || "Invite Friends"} onPress={() => router.back()} />
-
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.contentContainer}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={onRefresh}
-            tintColor={brandColors.primary}
-          />
-        }
-      >
-        {/* Hero Section with 3D Image */}
-        <View style={styles.heroSection}>
-          <View style={styles.heroImageContainer}>
-            <Image source={REFERRAL_HERO_IMAGE} style={styles.heroImage} resizeMode="contain" />
-          </View>
-          <Text style={styles.heroTitle}>
-            {t("referral.hero_title") || "Invite Friends, Earn Rewards"}
-          </Text>
-          <Text style={styles.heroSubtitle}>
-            {t("referral.hero_subtitle") ||
-              "Share your referral link and get 7 days free when a friend subscribes!"}
-          </Text>
-        </View>
-
-        {/* Stats Cards */}
-        <View style={styles.statsContainer}>
-          <View style={[styles.statCard, { backgroundColor: `${brandColors.primary}15` }]}>
-            <View style={[styles.statIconCircle, { backgroundColor: brandColors.primary }]}>
-              <Ionicons name="people" size={20} color="#FFFFFF" />
+  const renderTabContent = () => {
+    if (tabIndex === 0) {
+      return (
+        <>
+          {/* Tab 1: Hero Section with 3D Image up to Referral Code Card - Premium Design */}
+          <View style={styles.heroSection}>
+            <View style={styles.heroImageWrapper}>
+              <Image source={REFERRAL_HERO_IMAGE} style={styles.heroImage} resizeMode="contain" />
             </View>
-            <Text style={styles.statValue}>{totalReferrals}</Text>
-            <Text style={styles.statLabel}>{t("referral.stat_friends") || "Friends Invited"}</Text>
-          </View>
-          <View style={[styles.statCard, { backgroundColor: `${colors.feedback.success}15` }]}>
-            <View style={[styles.statIconCircle, { backgroundColor: colors.feedback.success }]}>
-              <Ionicons name="gift" size={20} color="#FFFFFF" />
-            </View>
-            <Text style={[styles.statValue, { color: colors.feedback.success }]}>
-              {totalDaysEarned}
+            <Text style={styles.heroTitle}>
+              {t("referral.hero_title") || "Invite Friends, Earn Rewards"}
             </Text>
-            <Text style={styles.statLabel}>{t("referral.stat_days") || "Days Earned"}</Text>
+            <Text style={styles.heroSubtitle}>
+              {t("referral.hero_subtitle") ||
+                "Share your referral link and get 7 days free when a friend subscribes!"}
+            </Text>
           </View>
-        </View>
 
-        {/* Referral Code Card - Premium Design */}
-        <View style={styles.codeCardWrapper}>
-          <Svg style={styles.codeCardGradient} height="100%" width="100%">
-            <Defs>
-              <SvgLinearGradient id="codeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <Stop
-                  offset="0%"
-                  stopColor={brandColors.primary}
-                  stopOpacity={isDark ? 0.2 : 0.1}
-                />
-                <Stop
-                  offset="100%"
-                  stopColor={brandColors.primary}
-                  stopOpacity={isDark ? 0.05 : 0.02}
-                />
-              </SvgLinearGradient>
-            </Defs>
-            <Rect x="0" y="0" width="100%" height="100%" fill="url(#codeGradient)" rx={20} />
-          </Svg>
-          <View style={styles.codeCardContent}>
-            <Text style={styles.codeLabel}>{t("referral.your_code") || "Your Referral Code"}</Text>
-            <View style={styles.codeContainer}>
-              <Text style={styles.codeText}>{referralCode}</Text>
-              <TouchableOpacity onPress={handleCopyCode} style={styles.copyIconButton}>
-                <Ionicons name="copy" size={18} color={brandColors.primary} />
-              </TouchableOpacity>
+          <View style={styles.statsContainer}>
+            <View style={[styles.statCard, { backgroundColor: `${brandColors.primary}15` }]}>
+              <View style={[styles.statIconCircle, { backgroundColor: brandColors.primary }]}>
+                <Ionicons name="people" size={20} color="#FFFFFF" />
+              </View>
+              <Text style={styles.statValue}>{totalReferrals}</Text>
+              <Text style={styles.statLabel}>
+                {t("referral.stat_friends") || "Friends Invited"}
+              </Text>
             </View>
-            <View style={styles.codeActions}>
-              <TouchableOpacity onPress={handleCopyLink} style={styles.copyLinkButton}>
-                <Ionicons name="link" size={16} color={brandColors.primary} />
-                <Text style={styles.copyLinkText}>{t("referral.copy_link") || "Copy Link"}</Text>
-              </TouchableOpacity>
+            <View style={[styles.statCard, { backgroundColor: `${colors.feedback.success}15` }]}>
+              <View style={[styles.statIconCircle, { backgroundColor: colors.feedback.success }]}>
+                <Ionicons name="gift" size={20} color="#FFFFFF" />
+              </View>
+              <Text style={[styles.statValue, { color: colors.feedback.success }]}>
+                {totalDaysEarned}
+              </Text>
+              <Text style={styles.statLabel}>{t("referral.stat_days") || "Days Earned"}</Text>
             </View>
           </View>
-        </View>
 
-        {/* Share Button */}
-        <Button
-          title={t("referral.share_link") || "Share Referral Link"}
-          onPress={handleShare}
-          style={styles.shareButton}
-          leftIcon="share-social"
-          size="md"
-        />
+          <View style={styles.codeCardWrapper}>
+            <Svg style={styles.codeCardGradient} height="100%" width="100%">
+              <Defs>
+                <SvgLinearGradient id="codeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <Stop
+                    offset="0%"
+                    stopColor={brandColors.primary}
+                    stopOpacity={isDark ? 0.2 : 0.1}
+                  />
+                  <Stop
+                    offset="100%"
+                    stopColor={brandColors.primary}
+                    stopOpacity={isDark ? 0.05 : 0.02}
+                  />
+                </SvgLinearGradient>
+              </Defs>
+              <Rect x="0" y="0" width="100%" height="100%" fill="url(#codeGradient)" rx={20} />
+            </Svg>
+            <View style={styles.codeCardContent}>
+              <Text style={styles.codeLabel}>
+                {t("referral.your_code") || "Your Referral Code"}
+              </Text>
+              <View style={styles.codeContainer}>
+                <Text style={styles.codeText}>{referralCode}</Text>
+                <TouchableOpacity onPress={handleCopyCode} style={styles.copyIconButton}>
+                  <Ionicons name="copy" size={18} color={brandColors.primary} />
+                </TouchableOpacity>
+              </View>
+              <View style={styles.codeActions}>
+                <TouchableOpacity onPress={handleCopyLink} style={styles.copyLinkButton}>
+                  <Ionicons name="link" size={16} color={brandColors.primary} />
+                  <Text style={styles.copyLinkText}>{t("referral.copy_link") || "Copy Link"}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
 
-        {/* How it Works - Card Style */}
+          <Button
+            title={t("referral.share_link") || "Share Referral Link"}
+            onPress={handleShare}
+            style={styles.shareButton}
+            leftIcon="share-social"
+            size="md"
+          />
+        </>
+      );
+    }
+
+    if (tabIndex === 1) {
+      return (
         <View style={styles.howItWorksSection}>
-          <Text style={styles.sectionTitle}>{t("referral.how_it_works") || "How It Works"}</Text>
+          <Card style={styles.programInfoCard}>
+            <Text style={styles.programInfoTitle}>
+              {t("referral.program_info_title") || "Program Details"}
+            </Text>
+            <Text style={[styles.programInfoText, { color: colors.text.secondary }]}>
+              {t("referral.program_info_1") ||
+                "Users can earn up to 30 free premium days by referring friends."}
+            </Text>
+            <Text style={[styles.programInfoText, { color: colors.text.secondary }]}>
+              {t("referral.program_info_2") ||
+                "Each successful referral grants 7 days once the referred user completes a paid subscription."}
+            </Text>
+            <Text style={[styles.programInfoText, { color: colors.text.secondary }]}>
+              {t("referral.program_info_3") || "Free days do not stack beyond the maximum limit."}
+            </Text>
+          </Card>
+
+          <View style={[styles.pasteTipCard, { backgroundColor: `${brandColors.primary}10` }]}>
+            <Ionicons name="information-circle-outline" size={20} color={brandColors.primary} />
+            <Text style={[styles.pasteTipText, { color: colors.text.secondary }]}>
+              {t("referral.paste_tip") ||
+                "Tip: If your friend's link doesn't apply automatically, encourage them to paste your referral code in the \"Have a referral code?\" field on the signup screen."}
+            </Text>
+          </View>
 
           <Card style={styles.stepsCard}>
             <View style={styles.stepItem}>
@@ -327,60 +367,55 @@ export const ReferralScreen: React.FC = () => {
               </View>
             </View>
           </Card>
+        </View>
+      );
+    }
 
-          <View style={[styles.pasteTipCard, { backgroundColor: `${brandColors.primary}10` }]}>
-            <Ionicons name="information-circle-outline" size={20} color={brandColors.primary} />
-            <Text style={[styles.pasteTipText, { color: colors.text.secondary }]}>
-              {t("referral.paste_tip") ||
-                "Tip: If your friend's link doesn't apply automatically, encourage them to paste your referral code in the \"Have a referral code?\" field on the signup screen."}
-            </Text>
-          </View>
+    return (
+      <View style={styles.referralsSection}>
+        <View style={styles.referralsSectionHeader}>
+          <Text style={styles.sectionTitle}>
+            {t("referral.your_referrals") || "Your Referrals"}
+          </Text>
+          {totalReferrals > 0 && (
+            <View style={styles.referralsCountBadge}>
+              <Text style={styles.referralsCountBadgeText}>{totalReferrals}</Text>
+            </View>
+          )}
         </View>
 
-        {/* Referrals History */}
-        <View style={styles.referralsSection}>
-          <View style={styles.referralsSectionHeader}>
-            <Text style={styles.sectionTitle}>
-              {t("referral.your_referrals") || "Your Referrals"}
+        {referrals.length === 0 ? (
+          <Card style={styles.emptyReferralsCard}>
+            <View style={styles.emptyIconCircle}>
+              <Ionicons name="people-outline" size={32} color={colors.text.tertiary} />
+            </View>
+            <Text style={styles.emptyTitle}>
+              {t("referral.no_referrals_title") || "No referrals yet"}
             </Text>
-            {totalReferrals > 0 && (
-              <View style={styles.referralsCountBadge}>
-                <Text style={styles.referralsCountBadgeText}>{totalReferrals}</Text>
-              </View>
-            )}
-          </View>
+            <Text style={styles.emptyDescription}>
+              {t("referral.no_referrals_desc") ||
+                "Share your link with friends to start earning rewards!"}
+            </Text>
+          </Card>
+        ) : (
+          <Card style={styles.referralsListCard}>
+            {referrals.map((referral: ReferralUser, index: number) => {
+              // Use status as primary check, fall back to referral_bonus_granted_at
+              const isRewarded =
+                referral.status === "rewarded" || !!referral.referral_bonus_granted_at;
 
-          {referrals.length === 0 ? (
-            <Card style={styles.emptyReferralsCard}>
-              <View style={styles.emptyIconCircle}>
-                <Ionicons name="people-outline" size={32} color={colors.text.tertiary} />
-              </View>
-              <Text style={styles.emptyTitle}>
-                {t("referral.no_referrals_title") || "No referrals yet"}
-              </Text>
-              <Text style={styles.emptyDescription}>
-                {t("referral.no_referrals_desc") ||
-                  "Share your link with friends to start earning rewards!"}
-              </Text>
-            </Card>
-          ) : (
-            <Card style={styles.referralsListCard}>
-              {referrals.map((referral: ReferralUser, index: number) => (
+              return (
                 <React.Fragment key={referral.id}>
                   <View style={styles.referralItem}>
-                    <View
-                      style={[
-                        styles.referralAvatar,
-                        {
-                          backgroundColor: referral.referral_bonus_granted_at
-                            ? colors.feedback.success
-                            : brandColors.primary
+                    <View style={styles.referralAvatarContainer}>
+                      <UserAvatar
+                        profilePictureUrl={referral.profile_picture_url}
+                        name={referral.name || referral.username}
+                        size={44}
+                        placeholderColor={
+                          isRewarded ? colors.feedback.success : brandColors.primary
                         }
-                      ]}
-                    >
-                      <Text style={styles.referralAvatarText}>
-                        {(referral.name || referral.username || "U").charAt(0).toUpperCase()}
-                      </Text>
+                      />
                     </View>
                     <View style={styles.referralInfo}>
                       <Text style={styles.referralName}>
@@ -392,7 +427,7 @@ export const ReferralScreen: React.FC = () => {
                         }) || `Joined ${formatDate(referral.created_at)}`}
                       </Text>
                     </View>
-                    {referral.referral_bonus_granted_at ? (
+                    {isRewarded ? (
                       <View style={styles.earnedBadge}>
                         <CheckmarkCircle size={14} color={colors.feedback.success} mr={1} />
                         <Text style={styles.earnedBadgeText}>
@@ -410,12 +445,40 @@ export const ReferralScreen: React.FC = () => {
                   </View>
                   {index < referrals.length - 1 && <View style={styles.referralDivider} />}
                 </React.Fragment>
-              ))}
-            </Card>
-          )}
-        </View>
+              );
+            })}
+          </Card>
+        )}
+      </View>
+    );
+  };
 
-        {/* Bottom Spacing */}
+  return (
+    <View style={styles.container}>
+      <BackButton title={t("referral.title") || "Invite Friends"} onPress={() => router.back()} />
+
+      <View style={styles.tabsWrapper}>
+        <SegmentedControl
+          options={tabOptions}
+          selectedIndex={tabIndex}
+          onChange={setTabIndex}
+          style={styles.segmentedControl}
+        />
+      </View>
+
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={onRefresh}
+            tintColor={brandColors.primary}
+          />
+        }
+      >
+        {renderTabContent()}
         <View style={{ height: 24 }} />
       </ScrollView>
     </View>
@@ -434,6 +497,13 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     padding: toRN(tokens.spacing[4]),
     paddingTop: toRN(tokens.spacing[2])
   },
+  tabsWrapper: {
+    paddingHorizontal: toRN(tokens.spacing[4]),
+    paddingBottom: toRN(tokens.spacing[3])
+  },
+  segmentedControl: {
+    width: "100%"
+  },
 
   // Hero Section
   heroSection: {
@@ -444,6 +514,21 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     width: 180,
     height: 180,
     marginBottom: toRN(tokens.spacing[3])
+  },
+  heroImageWrapper: {
+    width: 200,
+    height: 200,
+    marginBottom: toRN(tokens.spacing[3]),
+    borderRadius: toRN(tokens.borderRadius["2xl"]),
+    overflow: "hidden" as const,
+    backgroundColor: `${brand.primary}08`,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8
   },
   heroImage: {
     width: "100%" as any,
@@ -575,8 +660,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
   sectionTitle: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.semiBold,
-    color: colors.text.primary,
-    marginBottom: toRN(tokens.spacing[3])
+    color: colors.text.primary
   },
   stepsCard: {
     padding: toRN(tokens.spacing[4])
@@ -620,13 +704,30 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     gap: toRN(tokens.spacing[2]),
     padding: toRN(tokens.spacing[3]),
     borderRadius: toRN(tokens.borderRadius.lg),
-    marginTop: toRN(tokens.spacing[3])
+    marginTop: toRN(tokens.spacing[3]),
+    marginBottom: toRN(tokens.spacing[3])
   },
   pasteTipText: {
     flex: 1,
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
     lineHeight: toRN(tokens.typography.fontSize.sm) * 1.4
+  },
+  programInfoCard: {
+    padding: toRN(tokens.spacing[4]),
+    marginTop: toRN(tokens.spacing[3])
+  },
+  programInfoTitle: {
+    fontSize: toRN(tokens.typography.fontSize.sm),
+    fontFamily: fontFamily.semiBold,
+    color: colors.text.primary,
+    marginBottom: toRN(tokens.spacing[2])
+  },
+  programInfoText: {
+    fontSize: toRN(tokens.typography.fontSize.sm),
+    fontFamily: fontFamily.regular,
+    lineHeight: toRN(tokens.typography.fontSize.sm) * 1.5,
+    marginBottom: toRN(tokens.spacing[2])
   },
 
   // Referrals Section
@@ -636,19 +737,19 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
   referralsSectionHeader: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    marginBottom: toRN(tokens.spacing[3])
+    marginBottom: toRN(tokens.spacing[2])
   },
   referralsCountBadge: {
     marginLeft: toRN(tokens.spacing[2]),
     backgroundColor: brand.primary,
     paddingHorizontal: toRN(tokens.spacing[2]),
-    paddingVertical: 2,
+    // paddingVertical: toRN(tokens.spacing[1]),
     borderRadius: toRN(tokens.borderRadius.full)
   },
   referralsCountBadgeText: {
     fontSize: toRN(tokens.typography.fontSize.xs),
     fontFamily: fontFamily.semiBold,
-    color: "#FFFFFF"
+    color: brand.onPrimary
   },
 
   // Empty State
@@ -689,18 +790,8 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     alignItems: "center" as const,
     paddingVertical: toRN(tokens.spacing[2])
   },
-  referralAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center" as const,
-    justifyContent: "center" as const,
+  referralAvatarContainer: {
     marginRight: toRN(tokens.spacing[3])
-  },
-  referralAvatarText: {
-    fontSize: toRN(tokens.typography.fontSize.base),
-    fontFamily: fontFamily.bold,
-    color: "#FFFFFF"
   },
   referralInfo: {
     flex: 1

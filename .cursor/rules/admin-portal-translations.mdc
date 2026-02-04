@@ -1,0 +1,38 @@
+---
+description: Always add translations when adding admin portal UI strings
+globs:
+  - "apps/admin-portal/**/*.tsx"
+  - "apps/admin-portal/**/*.ts"
+alwaysApply: false
+---
+
+# Admin Portal Translations
+
+When adding or changing user-facing strings in the admin portal:
+
+1. **Never hardcode UI text** – use `t("admin.section.key")` via `useTranslation()`.
+2. **Always add the key to `apps/admin-portal/src/locales/en.json`** – add the English string for every new `t()` key you introduce.
+3. **Add keys in the correct section** – follow the existing structure (e.g. `admin.menu.*`, `admin.tasks.*`, `admin.users.*`, `admin.blog.*`, `admin.pages.*`).
+4. **Checklist before finishing** – when adding a new view, menu item, button label, or any visible text, verify the key exists in `en.json`.
+
+### Example
+
+```tsx
+// In a component
+{t("admin.tasks.new_feature_title")}
+```
+
+```json
+// In en.json – add this
+"admin": {
+  "tasks": {
+    "new_feature_title": "New Feature"
+  }
+}
+```
+
+### New menu items
+
+When adding a sidebar or nav item, add both:
+- `admin.menu.<key>` – label shown in the menu
+- `admin.pages.<key>_description` – page description (if applicable)

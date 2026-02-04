@@ -1,6 +1,17 @@
 import { router } from "expo-router";
 import { MOBILE_ROUTES } from "@/lib/routes";
 import * as Linking from "expo-linking";
+import { queryClient } from "@/lib/queryClient";
+import {
+  weeklyRecapsQueryKeys,
+  goalsQueryKeys,
+  partnersQueryKeys,
+  nudgesQueryKeys,
+  userQueryKeys,
+  homeDashboardQueryKeys,
+  achievementsQueryKeys,
+  notificationHistoryQueryKeys
+} from "@/hooks/api/queryKeys";
 
 /**
  * Check if user is authenticated and not in verification state
@@ -21,13 +32,14 @@ type AuthRedirectType = "signup" | "login";
  * @param redirectParams - Params to pass to auth screen for post-auth redirect
  * @param authType - Which auth screen to redirect to: "signup" or "login" (default: "signup")
  */
-async function routeWithAuthCheck(
+export async function routeWithAuthCheck(
   authenticatedRoute: string,
   redirectParams?: Record<string, string>,
   authType: AuthRedirectType = "signup"
 ): Promise<void> {
   const authenticated = await isUserAuthenticated();
   if (authenticated) {
+    invalidateQueriesForRoute(authenticatedRoute);
     router.push(authenticatedRoute);
   } else {
     // Build auth URL with redirect params
@@ -35,6 +47,113 @@ async function routeWithAuthCheck(
     const authRoute = authType === "login" ? MOBILE_ROUTES.AUTH.LOGIN : MOBILE_ROUTES.AUTH.SIGNUP;
     const authUrl = params.toString() ? `${authRoute}?${params.toString()}` : authRoute;
     router.push(authUrl);
+  }
+}
+
+/**
+ * Invalidate React Query cache for the destination route.
+ * When navigating via deep link (notification, external link), the screen
+ * won't have been prefetched - invalidating ensures fresh data on mount.
+ */
+function invalidateQueriesForRoute(route: string): void {
+  try {
+    const [path, query] = route.split("?");
+    const params = query
+      ? Object.fromEntries(new URLSearchParams(query))
+      : ({} as Record<string, string>);
+
+    // Weekly recaps list
+    if (path === MOBILE_ROUTES.PROFILE.WEEKLY_RECAPS) {
+      queryClient.invalidateQueries({ queryKey: weeklyRecapsQueryKeys.all });
+      return;
+    }
+
+    // Weekly recap detail: /(user)/profile/weekly-recaps/{id}
+    if (path.startsWith("/(user)/profile/weekly-recaps/")) {
+      const recapId =
+        path.replace("/(user)/profile/weekly-recaps/", "").split("/")[0] || params.recapId;
+      if (recapId) {
+        queryClient.invalidateQueries({ queryKey: weeklyRecapsQueryKeys.all });
+        queryClient.invalidateQueries({ queryKey: weeklyRecapsQueryKeys.detail(recapId) });
+      }
+      return;
+    }
+
+    // Goals list
+    if (path === MOBILE_ROUTES.GOALS.LIST || path.startsWith("/(user)/(tabs)/goals")) {
+      queryClient.invalidateQueries({ queryKey: goalsQueryKeys.all });
+      return;
+    }
+    // Goal detail: /(user)/(goals)/details?id=xxx
+    if (path.startsWith("/(user)/(goals)/details")) {
+      const goalId = params.id || params.goalId;
+      queryClient.invalidateQueries({ queryKey: goalsQueryKeys.all });
+      if (goalId) {
+        queryClient.invalidateQueries({ queryKey: goalsQueryKeys.detail(goalId) });
+      }
+      return;
+    }
+
+    // Notifications tab
+    if (path === MOBILE_ROUTES.NOTIFICATIONS.TAB || path.includes("notifications")) {
+      queryClient.invalidateQueries({ queryKey: notificationHistoryQueryKeys.all });
+      return;
+    }
+
+    // Partners list and partners/{id} (legacy - actual detail is at partner/{id})
+    if (path === MOBILE_ROUTES.PROFILE.PARTNERS || path.startsWith("/(user)/profile/partners")) {
+      queryClient.invalidateQueries({ queryKey: partnersQueryKeys.all });
+      return;
+    }
+
+    // Partner detail: /(user)/profile/partner/{partnerUserId}
+    if (path.startsWith("/(user)/profile/partner/")) {
+      const partnerUserId =
+        path.replace("/(user)/profile/partner/", "").split("/")[0] || params.partnerId;
+      if (partnerUserId) {
+        queryClient.invalidateQueries({ queryKey: partnersQueryKeys.all });
+        queryClient.invalidateQueries({ queryKey: partnersQueryKeys.dashboard(partnerUserId) });
+      }
+      return;
+    }
+
+    // Activity (nudges from partners)
+    if (path === MOBILE_ROUTES.PROFILE.ACTIVITY) {
+      queryClient.invalidateQueries({ queryKey: nudgesQueryKeys.all });
+      return;
+    }
+
+    // Achievements
+    if (path === MOBILE_ROUTES.PROFILE.ACHIEVEMENTS || path === MOBILE_ROUTES.ACHIEVEMENTS.LIST) {
+      queryClient.invalidateQueries({ queryKey: achievementsQueryKeys.all });
+      return;
+    }
+
+    // Profile main
+    if (path === MOBILE_ROUTES.PROFILE.MAIN || path.startsWith("/(user)/(tabs)/profile")) {
+      queryClient.invalidateQueries({ queryKey: userQueryKeys.currentUser });
+      return;
+    }
+
+    // Profile settings (may include id param for viewing another user)
+    if (path === MOBILE_ROUTES.PROFILE.PROFILE_SETTINGS || path.includes("profile-settings")) {
+      const profileId = params.id;
+      queryClient.invalidateQueries({ queryKey: userQueryKeys.currentUser });
+      if (profileId) {
+        queryClient.invalidateQueries({ queryKey: userQueryKeys.userById(profileId) });
+      }
+      return;
+    }
+
+    // Home - invalidate dashboard and goals
+    if (path === MOBILE_ROUTES.MAIN.HOME || path === "/(user)/(tabs)") {
+      queryClient.invalidateQueries({ queryKey: homeDashboardQueryKeys.all });
+      queryClient.invalidateQueries({ queryKey: goalsQueryKeys.all });
+      return;
+    }
+  } catch (e) {
+    // Don't block navigation on invalidation errors
+    console.warn("[DeepLink] Failed to invalidate queries for route:", route, e);
   }
 }
 
@@ -55,7 +174,9 @@ export async function handleDeepLink(url: string): Promise<void> {
 
     const normalizedPath = path ? (path.startsWith("/") ? path : `/${path}`) : "/";
 
-    // Handle fitnudge.app (production) or localhost/ngrok (development)
+    // Custom scheme (fitnudge:///join?ref=CODE) - always process
+    const isCustomScheme = url.startsWith("fitnudge://");
+    // Universal Links: fitnudge.app (production) or localhost/ngrok (development)
     const isProductionDomain = hostname === "fitnudge.app";
     const isDevelopmentDomain =
       hostname === "localhost" ||
@@ -63,9 +184,9 @@ export async function handleDeepLink(url: string): Promise<void> {
       hostname?.endsWith(".ngrok.io") ||
       hostname?.endsWith(".ngrok-free.app") ||
       hostname?.endsWith(".loca.lt") ||
-      __DEV__; // Allow any domain in development mode
+      __DEV__;
 
-    if (!isProductionDomain && !isDevelopmentDomain) {
+    if (!isCustomScheme && !isProductionDomain && !isDevelopmentDomain) {
       return;
     }
 
@@ -89,6 +210,7 @@ export async function handleDeepLink(url: string): Promise<void> {
       const authenticated = await isUserAuthenticated();
       console.log("authenticated", authenticated);
       if (authenticated || normalizedPath.startsWith("/(auth)")) {
+        invalidateQueriesForRoute(fullPath);
         router.push(fullPath as any);
       } else {
         // User not authenticated - redirect to auth with original destination
@@ -129,6 +251,14 @@ export async function handleDeepLink(url: string): Promise<void> {
 
       case "/forgot-password":
         router.push(MOBILE_ROUTES.AUTH.FORGOT_PASSWORD);
+        break;
+
+      // Help center - /help is used by external links (e.g. Tawk help widget)
+      // Map to the actual help-center screen (authenticated route)
+      case "/help":
+        await routeWithAuthCheck(MOBILE_ROUTES.PROFILE.HELP_CENTER, {
+          redirectTo: MOBILE_ROUTES.PROFILE.HELP_CENTER
+        });
         break;
 
       // Referral signup link: /join?ref={code}

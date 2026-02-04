@@ -192,6 +192,23 @@ def should_send_notification(
         return (True, "preference_check_failed")
 
 
+def _get_unread_notification_count(supabase, user_id: str) -> int:
+    """Get count of unread notifications (opened_at is null) for app icon badge."""
+    try:
+        result = (
+            supabase.table("notification_history")
+            .select("id", count="exact")
+            .eq("user_id", user_id)
+            .is_("opened_at", "null")
+            .limit(1)
+            .execute()
+        )
+        return getattr(result, "count", 0) or 0
+    except Exception as e:
+        logger.warning(f"Failed to get unread count for {user_id}: {e}")
+        return 0
+
+
 def _get_user_timezone(supabase, user_id: str) -> str:
     """Get user's timezone from users table."""
     try:
@@ -444,6 +461,9 @@ async def send_push_to_user(
         print(f"📊 Sending {len(tokens)} notifications in {total_batches} batches")
         print(f"   Estimated rate: ~{int(estimated_rate)}/sec (limit: 600/sec)")
 
+    # Get unread count for app icon badge (iOS/Android home screen)
+    badge_count = _get_unread_notification_count(supabase, user_id)
+
     # Process tokens in batches with rate limiting
     for batch_idx, batch_start in enumerate(range(0, len(tokens), EXPO_BATCH_SIZE), 1):
         batch_tokens = tokens[batch_start : batch_start + EXPO_BATCH_SIZE]
@@ -464,6 +484,9 @@ async def send_push_to_user(
                 "sound": sound,
                 "priority": priority,
             }
+            # App icon badge count (home screen) - from notification_history unread count
+            if badge_count > 0:
+                message_kwargs["badge"] = badge_count
             # Add category identifier for action buttons (iOS)
             if category_id:
                 message_kwargs["category"] = category_id
@@ -786,6 +809,9 @@ def send_push_to_user_sync(
                 "notification_id": notification_id,
             }
 
+        # Get unread count for app icon badge (iOS/Android home screen)
+        badge_count = _get_unread_notification_count(supabase, user_id)
+
         # SCALABILITY: Use batch sending with publish_multiple()
         # instead of sending one-by-one
         delivered_count = 0
@@ -805,6 +831,9 @@ def send_push_to_user_sync(
                 "sound": "default",
                 "priority": "high",
             }
+            # App icon badge count (home screen) - from notification_history unread count
+            if badge_count > 0:
+                message_kwargs["badge"] = badge_count
             # Add category identifier for action buttons (iOS)
             if category_id:
                 message_kwargs["category"] = category_id

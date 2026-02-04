@@ -78,7 +78,7 @@ export interface NotificationHistoryItem {
   created_at: string;
 }
 
-/** Admin broadcast (in-app modal) */
+/** Admin broadcast and general modal notifications (in-app modal) */
 export interface Broadcast {
   id: string;
   title: string;
@@ -87,6 +87,8 @@ export interface Broadcast {
   cta_label?: string | null;
   cta_url?: string | null;
   deeplink?: string | null;
+  /** When false, hide image section (e.g. user_report). Default true. */
+  showImage?: boolean;
 }
 
 class NotificationsService extends BaseApiService {

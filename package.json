@@ -14,6 +14,7 @@
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
     "shadcn": "cd packages/ui && pnpm dlx shadcn@latest",
+    "fix-imports": "pnpm --filter @fitnudge/ui fix-imports",
     "precommit:dry": "lint-staged --no-stash",
     "prepare": "husky"
   },

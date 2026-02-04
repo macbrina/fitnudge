@@ -18,6 +18,7 @@ import {
   Folder,
   User,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -49,16 +50,26 @@ function BlogCard({
       viewport={{ once: true }}
       className="group bg-background rounded-2xl border border-border overflow-hidden hover:shadow-xl transition-all duration-300"
     >
-      {/* Image placeholder */}
+      {/* Featured image or placeholder */}
       <div className="relative h-48 bg-linear-to-br from-primary/20 to-primary/5 overflow-hidden">
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="text-center p-4">
-            <Folder className="h-10 w-10 text-primary/40 mx-auto mb-2" />
-            <span className="text-sm text-primary/60 font-medium">
-              {post.categories[0]?.name || t("web.blog.article")}
-            </span>
+        {post.featured_image ? (
+          <Image
+            src={post.featured_image}
+            alt=""
+            fill
+            className="object-cover"
+            sizes="(max-width: 768px) 100vw, 50vw"
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="text-center p-4">
+              <Folder className="h-10 w-10 text-primary/40 mx-auto mb-2" />
+              <span className="text-sm text-primary/60 font-medium">
+                {post.categories[0]?.name || t("web.blog.article")}
+              </span>
+            </div>
           </div>
-        </div>
+        )}
         <div className="absolute inset-0 bg-linear-to-t from-background/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
       </div>
 
@@ -187,16 +198,26 @@ function FeaturedPost({
           </Link>
         </div>
 
-        {/* Image placeholder */}
-        <div className="hidden lg:flex items-center justify-center p-12 bg-white/5">
-          <div className="text-center">
-            <div className="w-32 h-32 rounded-full bg-white/10 flex items-center justify-center mx-auto mb-4">
-              <Folder className="h-16 w-16 text-white/40" />
+        {/* Featured image or placeholder */}
+        <div className="hidden lg:flex items-center justify-center p-12 bg-white/5 overflow-hidden relative min-h-[280px]">
+          {post.featured_image ? (
+            <Image
+              src={post.featured_image}
+              alt=""
+              fill
+              className="object-cover"
+              sizes="50vw"
+            />
+          ) : (
+            <div className="text-center">
+              <div className="w-32 h-32 rounded-full bg-white/10 flex items-center justify-center mx-auto mb-4">
+                <Folder className="h-16 w-16 text-white/40" />
+              </div>
+              <p className="text-white/50 text-sm">
+                {t("web.blog.featured_article")}
+              </p>
             </div>
-            <p className="text-white/50 text-sm">
-              {t("web.blog.featured_article")}
-            </p>
-          </div>
+          )}
         </div>
       </div>
     </motion.article>
@@ -339,64 +360,25 @@ export default function BlogPage() {
       try {
         setLoading(true);
 
-        // Calculate offset and limit based on page and category
-        // Without category filter:
-        //   - Page 1: offset=0, limit=7 (1 featured + 6 in grid)
-        //   - Page 2: offset=7, limit=6
-        //   - Page 3: offset=13, limit=6
-        // With category filter:
-        //   - Page N: offset=(N-1)*6, limit=6
-
-        let offset: number;
-        let limit: number;
-
-        if (!activeCategory) {
-          // No category filter - include featured post on page 1
-          if (currentPage === 1) {
-            offset = 0;
-            limit = POSTS_PER_PAGE + 1; // 7 posts (1 featured + 6 grid)
-          } else {
-            offset = POSTS_PER_PAGE + 1 + (currentPage - 2) * POSTS_PER_PAGE; // 7 + (page-2)*6
-            limit = POSTS_PER_PAGE;
-          }
-        } else {
-          // With category filter - standard pagination
-          offset = (currentPage - 1) * POSTS_PER_PAGE;
-          limit = POSTS_PER_PAGE;
-        }
+        // Without category: use page param for featured-aware pagination (API returns 6 or 7 on page 1)
+        // With category: use offset/limit (standard 6 per page)
+        const fetchParams = activeCategory
+          ? {
+              category: activeCategory,
+              offset: (currentPage - 1) * POSTS_PER_PAGE,
+              limit: POSTS_PER_PAGE,
+            }
+          : { page: currentPage };
 
         const [postsData, categoriesData] = await Promise.all([
-          fetchBlogPosts({
-            category: activeCategory || undefined,
-            limit,
-            offset,
-          }),
+          fetchBlogPosts(fetchParams),
           fetchCategories(),
         ]);
         setPosts(postsData.posts);
 
-        // Calculate total pages
-        // Without category: page 1 shows 7 (1+6), subsequent pages show 6
-        // With category: all pages show 6
-        let calculatedTotalPages: number;
-        if (!activeCategory) {
-          // First page has 7, rest have 6
-          // If total <= 7, only 1 page needed
-          // Otherwise: 1 + ceil((total - 7) / 6)
-          if (postsData.total <= POSTS_PER_PAGE + 1) {
-            calculatedTotalPages = 1;
-          } else {
-            calculatedTotalPages =
-              1 +
-              Math.ceil(
-                (postsData.total - (POSTS_PER_PAGE + 1)) / POSTS_PER_PAGE
-              );
-          }
-        } else {
-          calculatedTotalPages = Math.ceil(postsData.total / POSTS_PER_PAGE);
-        }
-
-        setTotalPages(calculatedTotalPages > 0 ? calculatedTotalPages : 1);
+        setTotalPages(
+          postsData.total_pages > 0 ? postsData.total_pages : 1
+        );
         setCategories(categoriesData);
       } catch {
         // Failed to load blog data
@@ -426,9 +408,15 @@ export default function BlogPage() {
     window.scrollTo({ top: 400, behavior: "smooth" });
   };
 
-  const featuredPost = posts[0];
+  // Featured section: only on page 1 when no category and first post is featured
+  const featuredPost =
+    currentPage === 1 && !activeCategory && posts[0]?.is_featured
+      ? posts[0]
+      : null;
   const otherPosts =
-    currentPage === 1 && !activeCategory ? posts.slice(1) : posts;
+    currentPage === 1 && !activeCategory && posts[0]?.is_featured
+      ? posts.slice(1)
+      : posts;
 
   return (
     <LandingLayout>

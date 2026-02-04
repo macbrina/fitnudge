@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime, timedelta
 from app.core.admin_auth import get_current_admin, log_admin_action
-from app.core.database import get_supabase_client
+from app.core.database import get_supabase_client, first_row
 
 router = APIRouter(prefix="/subscriptions", tags=["Subscription Management"])
 
@@ -27,7 +27,7 @@ class SubscriptionStats(BaseModel):
     total_subscriptions: int
     active_subscriptions: int
     by_plan: dict
-    by_platform: dict
+    by_platform: dict  # ios, android, admin_granted, promo
     by_status: dict
     mrr_estimate: float  # Monthly Recurring Revenue estimate
 
@@ -56,7 +56,7 @@ async def get_subscription_stats(current_admin: dict = Depends(get_current_admin
     premium_result = (
         supabase.table("subscriptions")
         .select("id", count="exact")
-        .eq("plan_id", "premium")
+        .eq("plan", "premium")
         .eq("status", "active")
         .execute()
     )
@@ -74,6 +74,22 @@ async def get_subscription_stats(current_admin: dict = Depends(get_current_admin
         supabase.table("subscriptions")
         .select("id", count="exact")
         .eq("platform", "android")
+        .eq("status", "active")
+        .execute()
+    )
+
+    admin_granted_result = (
+        supabase.table("subscriptions")
+        .select("id", count="exact")
+        .eq("platform", "admin_granted")
+        .eq("status", "active")
+        .execute()
+    )
+
+    promo_result = (
+        supabase.table("subscriptions")
+        .select("id", count="exact")
+        .eq("platform", "promo")
         .eq("status", "active")
         .execute()
     )
@@ -103,7 +119,8 @@ async def get_subscription_stats(current_admin: dict = Depends(get_current_admin
 
     monthly_price = 9.99  # Default
     if plan_result.data:
-        monthly_price = float(plan_result.data[0].get("monthly_price", 9.99))
+        plan_row = first_row(plan_result.data)
+        monthly_price = float(plan_row.get("monthly_price", 9.99)) if plan_row else 9.99
 
     active_count = active_result.count or 0
     mrr = active_count * monthly_price
@@ -118,6 +135,8 @@ async def get_subscription_stats(current_admin: dict = Depends(get_current_admin
         by_platform={
             "ios": ios_result.count or 0,
             "android": android_result.count or 0,
+            "admin_granted": admin_granted_result.count or 0,
+            "promo": promo_result.count or 0,
         },
         by_status={
             "active": active_count,
@@ -141,9 +160,9 @@ async def list_subscriptions(
     """
     supabase = get_supabase_client()
 
-    # Build query - join with users to get email
+    # Build query - join with users to get email (DB column: plan)
     query = supabase.table("subscriptions").select(
-        "id, user_id, plan_id, status, platform, current_period_end, created_at, "
+        "id, user_id, plan, status, platform, current_period_end, expires_date, created_at, "
         "users(email)",
         count="exact",
     )
@@ -166,10 +185,12 @@ async def list_subscriptions(
             "id": s["id"],
             "user_id": s["user_id"],
             "user_email": s.get("users", {}).get("email") if s.get("users") else None,
-            "plan_id": s["plan_id"],
+            "plan_id": s.get("plan"),  # Expose as plan_id for API consistency
+            "plan": s.get("plan"),
             "status": s["status"],
             "platform": s.get("platform"),
             "current_period_end": s.get("current_period_end"),
+            "expires_date": s.get("expires_date"),
             "created_at": s["created_at"],
         }
         for s in result.data
@@ -194,7 +215,7 @@ async def get_subscription(
 
     result = (
         supabase.table("subscriptions")
-        .select("*, users(id, email, display_name)")
+        .select("*, users(id, email, name)")
         .eq("id", subscription_id)
         .execute()
     )
@@ -205,7 +226,7 @@ async def get_subscription(
             detail="Subscription not found",
         )
 
-    return result.data[0]
+    return first_row(result.data)
 
 
 @router.post("/{subscription_id}/cancel")
@@ -277,14 +298,18 @@ async def grant_subscription(
             detail="User not found",
         )
 
-    # Create or update subscription
+    # Create or update subscription (DB: plan, expires_date, purchase_date)
     subscription_data = {
         "user_id": user_id,
-        "plan_id": plan_id,
+        "plan": plan_id,
         "status": "active",
         "platform": "admin_granted",
+        "purchase_date": now.isoformat(),
+        "expires_date": period_end.isoformat(),
         "current_period_start": now.isoformat(),
         "current_period_end": period_end.isoformat(),
+        "auto_renew": False,
+        "cancel_at_period_end": True,  # Admin grant ends at period end, no renewal
     }
 
     # Upsert subscription
@@ -294,10 +319,8 @@ async def grant_subscription(
         .execute()
     )
 
-    # Update user's subscription_plan
-    supabase.table("users").update({"subscription_plan": plan_id}).eq(
-        "id", user_id
-    ).execute()
+    # Update user's plan (DB column: plan)
+    supabase.table("users").update({"plan": plan_id}).eq("id", user_id).execute()
 
     # Log admin action
     await log_admin_action(

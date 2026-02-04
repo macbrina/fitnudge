@@ -41,7 +41,13 @@ export function useNextUpLiveSurface() {
     // Initial run (data may already be cached from prefetch)
     runUpdate();
 
-    return () => unsub();
+    return () => {
+      unsub();
+      // End Live Activity / ongoing notification when user logs out
+      if (!useAuthStore.getState().isAuthenticated) {
+        liveSurfaceManager.end().catch((e) => console.warn("[NextUp] end on logout failed:", e));
+      }
+    };
   }, [isAuthenticated, isVerifyingUser, queryClient]);
 
   // Foreground resume update (catches when returning from background with stale cache)

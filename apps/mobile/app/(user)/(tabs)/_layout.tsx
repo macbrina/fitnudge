@@ -211,11 +211,11 @@ export default function TabLayout() {
           headerShown: false
         }}
       >
-        <Tabs.Screen name="index" />
-        <Tabs.Screen name="goals" />
-        <Tabs.Screen name="progress" />
-        <Tabs.Screen name="notifications" />
-        <Tabs.Screen name="profile" />
+        <Tabs.Screen name="index" options={{ tabBarAccessibilityLabel: "Home" }} />
+        <Tabs.Screen name="goals" options={{ tabBarAccessibilityLabel: "Goals" }} />
+        <Tabs.Screen name="progress" options={{ tabBarAccessibilityLabel: "Progress" }} />
+        <Tabs.Screen name="notifications" options={{ tabBarAccessibilityLabel: "Notifications" }} />
+        <Tabs.Screen name="profile" options={{ tabBarAccessibilityLabel: "Profile" }} />
       </Tabs>
     </TabBarInsetsContext.Provider>
   );

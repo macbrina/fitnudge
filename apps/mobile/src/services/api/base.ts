@@ -3,6 +3,11 @@ import Constants from "expo-constants";
 import * as Device from "expo-device";
 import { STORAGE_KEYS, storageUtil } from "../../utils/storageUtil";
 import { useSystemStatusStore } from "@/stores/systemStatusStore";
+import {
+  decodeJwtPayload,
+  isTokenExpiringSoon as isTokenExpiringSoonUtil,
+  isTokenExpired as isTokenExpiredUtil
+} from "@/utils/tokenUtils";
 
 // Build User-Agent string once at startup
 const buildUserAgent = (): string => {
@@ -31,53 +36,9 @@ let refreshPromise: Promise<any> | null = null;
 // Buffer time before token expiration to trigger proactive refresh (5 minutes)
 const TOKEN_REFRESH_BUFFER_SECONDS = 5 * 60;
 
-/**
- * Decode JWT payload without verification (just to read expiration)
- * JWTs are base64url encoded: header.payload.signature
- */
-const decodeJwtPayload = (token: string): { exp?: number } | null => {
-  try {
-    const parts = token.split(".");
-    if (parts.length !== 3) return null;
-
-    // Base64url decode the payload (second part)
-    const payload = parts[1];
-    // Replace base64url chars and add padding
-    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
-    const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
-
-    // Decode using atob (available in React Native)
-    const decoded = atob(padded);
-    return JSON.parse(decoded);
-  } catch {
-    return null;
-  }
-};
-
-/**
- * Check if token expires within the buffer time
- */
-const isTokenExpiringSoon = (token: string): boolean => {
-  const payload = decodeJwtPayload(token);
-  if (!payload?.exp) return false;
-
-  const now = Math.floor(Date.now() / 1000);
-  const expiresIn = payload.exp - now;
-
-  // Token expires within buffer time
-  return expiresIn <= TOKEN_REFRESH_BUFFER_SECONDS;
-};
-
-/**
- * Check if token is already expired
- */
-const isTokenExpired = (token: string): boolean => {
-  const payload = decodeJwtPayload(token);
-  if (!payload?.exp) return false;
-
-  const now = Math.floor(Date.now() / 1000);
-  return payload.exp <= now;
-};
+const isTokenExpiringSoon = (token: string) =>
+  isTokenExpiringSoonUtil(token, TOKEN_REFRESH_BUFFER_SECONDS);
+const isTokenExpired = isTokenExpiredUtil;
 
 // Types
 export interface ApiResponse<T = any> {

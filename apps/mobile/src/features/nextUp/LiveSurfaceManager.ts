@@ -114,6 +114,10 @@ class LiveSurfaceManager {
       return;
     }
 
+    // Skip banner/sound when resuming same task (e.g. app open) - only alert when task actually changes
+    const isSameTaskAsPersisted =
+      persisted.shownDayKey === dayKey && persisted.shownTaskId === nextTask.id;
+
     await this.adapter.startOrUpdate({
       title: "Today's focus",
       body: buildBody(nextTask, { completed: state.completedToday, total: state.totalDueToday }),
@@ -122,7 +126,8 @@ class LiveSurfaceManager {
       taskTitle: nextTask.title,
       emoji: undefined,
       completedCount: state.completedToday,
-      totalCount: state.totalDueToday
+      totalCount: state.totalDueToday,
+      skipBanner: isSameTaskAsPersisted
     });
 
     await persistShownTask({ dayKey, taskId: nextTask.id });

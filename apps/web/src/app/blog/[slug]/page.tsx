@@ -21,6 +21,7 @@ import {
   Twitter,
   User,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -118,10 +119,20 @@ function RelatedPostCard({
       href={`/blog/${post.slug}`}
       className="group block bg-background rounded-xl border border-border overflow-hidden hover:shadow-lg transition-all"
     >
-      <div className="h-32 bg-linear-to-br from-primary/20 to-primary/5 flex items-center justify-center">
-        <span className="text-sm text-primary/60 font-medium">
-          {post.categories[0]?.name || t("web.blog.article")}
-        </span>
+      <div className="relative h-32 bg-linear-to-br from-primary/20 to-primary/5 overflow-hidden">
+        {post.featured_image ? (
+          <Image
+            src={post.featured_image}
+            alt=""
+            fill
+            className="object-cover"
+            sizes="(max-width: 768px) 100vw, 33vw"
+          />
+        ) : (
+          <span className="absolute inset-0 flex items-center justify-center text-sm text-primary/60 font-medium">
+            {post.categories[0]?.name || t("web.blog.article")}
+          </span>
+        )}
       </div>
       <div className="p-4">
         <h4 className="font-semibold text-foreground group-hover:text-primary transition-colors line-clamp-2 mb-2">
@@ -236,6 +247,30 @@ export default function BlogPostPage() {
           </div>
         </div>
       </section>
+
+      {/* Featured Image */}
+      {post.featured_image && (
+        <section className="relative w-full py-4 sm:py-6">
+          <div className="w-full px-4 sm:px-6 lg:px-8">
+            <div className="max-w-4xl mx-auto">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+                className="rounded-2xl overflow-hidden border border-border relative aspect-video"
+              >
+                <Image
+                  src={post.featured_image}
+                  alt=""
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 1024px) 100vw, 896px"
+                />
+              </motion.div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Article Header */}
       <section className="relative w-full py-6 sm:py-8 lg:py-12">

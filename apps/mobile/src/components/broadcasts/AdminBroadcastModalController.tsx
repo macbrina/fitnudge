@@ -1,8 +1,10 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { AppState, type AppStateStatus } from "react-native";
+import { usePathname } from "expo-router";
 import { useActiveBroadcasts, useMarkBroadcastSeen } from "@/hooks/api/useBroadcasts";
 import type { Broadcast } from "@/services/api/notifications";
 import { useDeletedBroadcastIdsStore } from "@/stores/deletedBroadcastIdsStore";
+import { useSubscriptionStore } from "@/stores/subscriptionStore";
 import { BroadcastModal } from "./BroadcastModal";
 
 /**
@@ -15,12 +17,19 @@ import { BroadcastModal } from "./BroadcastModal";
  * - On dismiss: fire-and-forget mark dismissed (dismissed: true), then show next until queue empty.
  */
 export function AdminBroadcastModalController() {
+  const pathname = usePathname();
+  const isSubscriptionModalVisible = useSubscriptionStore((s) => s.isModalVisible);
   const { refetch } = useActiveBroadcasts();
   const markSeen = useMarkBroadcastSeen();
   const deletedIds = useDeletedBroadcastIdsStore((s) => s.ids);
   const consumeDeleted = useDeletedBroadcastIdsStore((s) => s.consume);
   const [queue, setQueue] = useState<Broadcast[]>([]);
   const openedIdRef = useRef<string | null>(null);
+
+  // Don't show broadcast when subscription modal or subscription screen is open
+  const isSubscriptionScreenOpen =
+    isSubscriptionModalVisible ||
+    (typeof pathname === "string" && pathname.includes("subscription"));
 
   useEffect(() => {
     refetch().then(({ data }) => {
@@ -52,14 +61,14 @@ export function AdminBroadcastModalController() {
   }, [deletedIds, consumeDeleted]);
 
   const current = queue[0] ?? null;
-  const isVisible = !!current;
+  const isVisible = !!current && !isSubscriptionScreenOpen;
 
   useEffect(() => {
-    if (!current) return;
+    if (!current || !isVisible) return;
     if (openedIdRef.current === current.id) return;
     openedIdRef.current = current.id;
     markSeen.mutate({ broadcastId: current.id, dismissed: false }, { onSettled: () => {} });
-  }, [current?.id, markSeen]);
+  }, [current?.id, isVisible, markSeen]);
 
   const handleClose = useCallback(() => {
     if (!current) return;

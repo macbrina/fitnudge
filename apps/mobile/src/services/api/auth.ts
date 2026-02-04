@@ -272,6 +272,11 @@ export class AuthService extends BaseApiService {
     // Get device info for session tracking
     const deviceInfo = getCachedDeviceInfo() || (await getDeviceInfo());
 
+    // Send device timezone/country so new users get accurate locale (same as email signup)
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const locales = getLocales();
+    const country = locales[0]?.regionCode || undefined;
+
     const response = await this.post<{
       user: AuthUserResponse;
       access_token: string;
@@ -279,7 +284,9 @@ export class AuthService extends BaseApiService {
     }>(ROUTES.AUTH.OAUTH.GOOGLE, {
       id_token: idToken,
       device_info: deviceInfo,
-      referral_code: referralCode || undefined
+      referral_code: referralCode || undefined,
+      timezone,
+      country
     });
 
     // Transform the response to match LoginResponse with transformed user
@@ -307,6 +314,11 @@ export class AuthService extends BaseApiService {
     // Get device info for session tracking
     const deviceInfo = getCachedDeviceInfo() || (await getDeviceInfo());
 
+    // Send device timezone/country so new users get accurate locale (same as email signup)
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const locales = getLocales();
+    const country = locales[0]?.regionCode || undefined;
+
     const response = await this.post<{
       user: AuthUserResponse;
       access_token: string;
@@ -317,7 +329,9 @@ export class AuthService extends BaseApiService {
       email: payload.email,
       full_name: payload.fullName,
       device_info: deviceInfo,
-      referral_code: referralCode || undefined
+      referral_code: referralCode || undefined,
+      timezone,
+      country
     });
 
     // Transform the response to match LoginResponse with transformed user

@@ -76,6 +76,8 @@ CREATE TABLE goals (
   
   -- Reminder
   reminder_times TIME[] NOT NULL DEFAULT ARRAY['18:00'::TIME],
+  reminder_window_before_minutes INTEGER DEFAULT 30, -- 0 = exact time, 30 = 30 min before
+  checkin_prompt_delay_minutes INTEGER DEFAULT 30,  -- 0 = at reminder time, 30 = 30 min after last reminder
   
   -- Motivation
   why_statement TEXT, -- User's personal "why"

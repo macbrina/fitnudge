@@ -67,7 +67,10 @@ app.include_router(api_router, prefix="/api")
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint"""
+    """Health check endpoint for uptime monitoring.
+    Returns status and component health: database, redis, celery.
+    """
+    import redis
     from app.core.database import get_supabase_client
     from app.core.celery_client import get_celery_inspect
 
@@ -77,7 +80,7 @@ async def health_check():
         "components": {},
     }
 
-    # Check Supabase
+    # Check Supabase (database)
     try:
         supabase = get_supabase_client()
         supabase.table("users").select("id").limit(1).execute()
@@ -86,7 +89,24 @@ async def health_check():
         health["components"]["database"] = f"error: {str(e)}"
         health["status"] = "degraded"
 
-    # Check Celery/Redis
+    # Check Redis (direct connectivity)
+    try:
+        redis_url = settings.redis_connection_url
+        if redis_url and "rediss://" in redis_url:
+            client = redis.from_url(
+                redis_url,
+                decode_responses=True,
+                ssl_cert_reqs=None,
+            )
+        else:
+            client = redis.from_url(redis_url, decode_responses=True)
+        client.ping()
+        health["components"]["redis"] = "ok"
+    except Exception as e:
+        health["components"]["redis"] = f"error: {str(e)}"
+        health["status"] = "degraded"
+
+    # Check Celery (workers via inspect)
     try:
         inspect = get_celery_inspect()
         ping = inspect.ping()
@@ -105,6 +125,16 @@ async def health_check():
 async def startup_event():
     print("🔐 FitNudge Admin API started!")
     print(f"   Environment: {settings.ENVIRONMENT}")
+
+    # Bootstrap admin user if ADMIN_EMAIL and ADMIN_PASSWORD are set
+    try:
+        from app.core.create_admin import ensure_admin_user
+
+        admin_id = ensure_admin_user()
+        if admin_id:
+            print("   Admin user ensured (ADMIN_EMAIL/ADMIN_PASSWORD set)")
+    except Exception as e:
+        print(f"   Warning: Could not ensure admin user: {e}")
 
 
 @app.on_event("shutdown")

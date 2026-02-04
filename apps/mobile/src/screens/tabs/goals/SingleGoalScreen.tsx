@@ -422,18 +422,25 @@ export default function SingleGoalScreen() {
   }, [goalId, router]);
 
   // Loading state - don't wait for insights, they load in their own card
+  // Wait for initial data load (not just cached data) to prevent "not found" flash
   if (goalLoading || checkInsLoading) {
     return <SingleGoalSkeleton />;
   }
 
-  // Not found state
-  if (!goal) {
+  // Not found state - only show if we've finished loading AND goal is null
+  // Check goalLoading again to prevent flash when data is being fetched
+  if (!goal && !goalLoading) {
     return (
       <NotFoundState
         title={t("goals.not_found.title")}
         description={t("goals.not_found.message")}
       />
     );
+  }
+
+  // Extra safety: if goal is still loading but we passed the loading check, show skeleton
+  if (!goal) {
+    return <SingleGoalSkeleton />;
   }
 
   // Use current_streak from goal (computed by database trigger) instead of calculating from check-ins

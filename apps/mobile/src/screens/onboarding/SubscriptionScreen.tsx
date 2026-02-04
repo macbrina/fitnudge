@@ -520,6 +520,7 @@ export default function SubscriptionScreen({
       <TouchableOpacity
         style={[styles.closeButton, { top: insets.top + toRN(tokens.spacing[4]) }]}
         onPress={handleClose}
+        testID="subscription-close"
         accessibilityLabel={t("common.close")}
         accessibilityRole="button"
       >

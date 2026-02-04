@@ -9,6 +9,15 @@ import hashlib
 import random
 import secrets
 
+# Columns for user fetches (needed for get_current_user, serialize_user, endpoints)
+USER_SELECT_COLUMNS = (
+    "id, email, password_hash, auth_provider, email_verified, username, name, "
+    "profile_picture_url, bio, timezone, language, country, status, role, "
+    "motivation_style, morning_motivation_enabled, morning_motivation_time, "
+    "plan, referral_code, referred_by_user_id, "
+    "onboarding_completed_at, created_at, updated_at, last_login_at, last_active_at"
+)
+
 # Password hashing: prefer pbkdf2_sha256 for portability, still verify bcrypt
 pwd_context = CryptContext(
     schemes=["pbkdf2_sha256", "bcrypt"],
@@ -183,7 +192,9 @@ async def authenticate_user(email: str, password: str) -> Optional[Dict[str, Any
     supabase = get_supabase_client()
 
     # Get user from database
-    result = supabase.table("users").select("*").eq("email", email).execute()
+    result = (
+        supabase.table("users").select(USER_SELECT_COLUMNS).eq("email", email).execute()
+    )
 
     if not result.data:
         return None
@@ -237,7 +248,7 @@ async def generate_verification_code(user_id: str) -> Optional[str]:
         code = f"{secrets.randbelow(1000000):06d}"
 
         # Calculate expiration (24 hours from now)
-        expires_at = datetime.utcnow() + timedelta(hours=24)
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
 
         # Invalidate any existing unverified codes for the user
         supabase.table("email_verification_codes").delete().eq("user_id", user_id).eq(
@@ -491,7 +502,9 @@ async def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
     """Get user by ID"""
     supabase = get_supabase_client()
 
-    result = supabase.table("users").select("*").eq("id", user_id).execute()
+    result = (
+        supabase.table("users").select(USER_SELECT_COLUMNS).eq("id", user_id).execute()
+    )
 
     if not result.data:
         return None

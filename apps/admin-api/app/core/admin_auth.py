@@ -9,7 +9,7 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import HTTPException, status, Depends, Request
 from app.core.config import settings
-from app.core.database import get_supabase_client
+from app.core.database import get_supabase_client, first_row
 
 # Password hashing
 pwd_context = CryptContext(
@@ -26,6 +26,20 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 def get_password_hash(password: str) -> str:
     """Hash a password"""
     return pwd_context.hash(password)
+
+
+def check_password_strength(password: str) -> dict:
+    """Check password meets minimum requirements (a-z, 0-9, 8+ chars)"""
+    issues = []
+    if len(password) < 8:
+        issues.append("Password must be at least 8 characters")
+    if not any(c.isupper() for c in password):
+        issues.append("Password must contain at least one uppercase letter")
+    if not any(c.islower() for c in password):
+        issues.append("Password must contain at least one lowercase letter")
+    if not any(c.isdigit() for c in password):
+        issues.append("Password must contain at least one number")
+    return {"is_valid": len(issues) == 0, "message": "; ".join(issues) if issues else ""}
 
 
 def create_admin_token(user_id: str, email: str) -> str:
@@ -71,7 +85,7 @@ async def authenticate_admin(email: str, password: str) -> Dict[str, Any]:
     # Fetch user by email
     result = (
         supabase.table("users")
-        .select("id, email, password_hash, role, status, display_name")
+        .select("id, email, password_hash, role, status, name")
         .eq("email", email.lower())
         .execute()
     )
@@ -82,7 +96,7 @@ async def authenticate_admin(email: str, password: str) -> Dict[str, Any]:
             detail="Invalid credentials",
         )
 
-    user = result.data[0]
+    user = first_row(result.data)
 
     # Check if user is admin
     if user.get("role") != "admin":
@@ -114,7 +128,7 @@ async def authenticate_admin(email: str, password: str) -> Dict[str, Any]:
     return {
         "id": user["id"],
         "email": user["email"],
-        "display_name": user.get("display_name"),
+        "display_name": user.get("name"),
         "role": user["role"],
     }
 
@@ -161,7 +175,7 @@ async def get_current_admin(request: Request) -> Dict[str, Any]:
     supabase = get_supabase_client()
     result = (
         supabase.table("users")
-        .select("id, email, role, status, display_name")
+        .select("id, email, role, status, name")
         .eq("id", user_id)
         .execute()
     )
@@ -172,7 +186,7 @@ async def get_current_admin(request: Request) -> Dict[str, Any]:
             detail="User not found",
         )
 
-    user = result.data[0]
+    user = first_row(result.data)
 
     if user.get("role") != "admin":
         raise HTTPException(
@@ -189,7 +203,7 @@ async def get_current_admin(request: Request) -> Dict[str, Any]:
     return {
         "id": user["id"],
         "email": user["email"],
-        "display_name": user.get("display_name"),
+        "display_name": user.get("name"),
         "role": user["role"],
     }
 
@@ -211,7 +225,7 @@ async def log_admin_action(
                 "action": action,
                 "resource_type": resource_type,
                 "resource_id": resource_id,
-                "details": details,
+                "new_values": details,
             }
         ).execute()
     except Exception as e:

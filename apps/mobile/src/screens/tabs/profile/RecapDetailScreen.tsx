@@ -21,6 +21,7 @@ import { tokens } from "@/themes/tokens";
 import { formatWeekRange } from "@/utils/helper";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useCallback, useState } from "react";
 import { RefreshControl, ScrollView, Text, View } from "react-native";
 import Markdown from "react-native-markdown-display";
 import Svg, { Circle } from "react-native-svg";
@@ -41,10 +42,16 @@ export default function RecapDetailScreen() {
   // Only fetch if user has premium access (enabled=hasWeeklyRecapFeature)
   const {
     data: recap,
-    isLoading,
-    refetch,
-    isRefetching
+    isLoading: recapLoading,
+    refetch
   } = useWeeklyRecapDetail(recapId, hasWeeklyRecapFeature);
+
+  const [refreshing, setRefreshing] = useState(false);
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  }, [refetch]);
 
   const formatRecapWeekRange = (startDate: string, endDate: string) => {
     return formatWeekRange(startDate, endDate, "long");
@@ -93,11 +100,14 @@ export default function RecapDetailScreen() {
     );
   }
 
-  if (isLoading) {
+  // Loading state - wait for initial data load to prevent "not found" flash (same as SingleGoalScreen)
+  // Also show skeleton when recapId is empty (waiting for route params)
+  if (recapLoading || !recapId) {
     return <RecapDetailSkeleton />;
   }
 
-  if (!recap) {
+  // Not found state - only show if we've finished loading AND recap is null
+  if (!recap && !recapLoading) {
     return (
       <NotFoundState
         title={t("recaps.not_found_title") || "Recap not found"}
@@ -105,6 +115,11 @@ export default function RecapDetailScreen() {
         icon="document-text-outline"
       />
     );
+  }
+
+  // Extra safety: if recap is still null but we passed the loading check, show skeleton
+  if (!recap) {
+    return <RecapDetailSkeleton />;
   }
 
   const stats = recap.stats || {};
@@ -177,8 +192,8 @@ export default function RecapDetailScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={isRefetching}
-            onRefresh={refetch}
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
             tintColor={brandColors.primary}
           />
         }

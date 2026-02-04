@@ -16,6 +16,7 @@ import { BackButton } from "@/components/ui/BackButton";
 import Button from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { ReminderTimesPicker } from "@/components/ui/ReminderTimesPicker";
+import { ReminderOptionsPicker } from "@/components/ui/ReminderOptionsPicker";
 import { TextInput } from "@/components/ui/TextInput";
 import { useActiveGoals, useCreateGoal, useGoal, useUpdateGoal } from "@/hooks/api/useGoals";
 import { FrequencyType } from "@/services/api/goals";
@@ -28,6 +29,7 @@ import { useTheme } from "@/themes";
 import { useStyles } from "@/themes/makeStyles";
 import { ApiError } from "@/services/api/base";
 import { usePricingStore } from "@/stores/pricingStore";
+import { usePostHog } from "@/hooks/usePostHog";
 
 const FREQUENCY_OPTIONS = [1, 2, 3, 4, 5, 6, 7];
 const DAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
@@ -53,6 +55,7 @@ export default function CreateGoalScreen() {
   const styles = useStyles(makeStyles);
   const { colors, brandColors } = useTheme();
   const { showToast } = useAlertModal();
+  const { capture } = usePostHog();
 
   // Form state
   const [title, setTitle] = useState("");
@@ -60,6 +63,8 @@ export default function CreateGoalScreen() {
   const [frequency, setFrequency] = useState(3);
   const [selectedDays, setSelectedDays] = useState<number[]>([]);
   const [reminderTimes, setReminderTimes] = useState<string[]>(["18:00"]);
+  const [reminderWindowBeforeMinutes, setReminderWindowBeforeMinutes] = useState(30);
+  const [checkinPromptDelayMinutes, setCheckinPromptDelayMinutes] = useState(30);
   const [whyStatement, setWhyStatement] = useState("");
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
   const [showDaysError, setShowDaysError] = useState(false);
@@ -103,6 +108,8 @@ export default function CreateGoalScreen() {
       if (goal.reminder_times?.length) {
         setReminderTimes(goal.reminder_times);
       }
+      setReminderWindowBeforeMinutes(goal.reminder_window_before_minutes ?? 30);
+      setCheckinPromptDelayMinutes(goal.checkin_prompt_delay_minutes ?? 30);
       // Lock frequency editing if goal has check-ins (prevents streak manipulation)
       setIsFrequencyLocked(goal.total_completions > 0);
     }
@@ -176,6 +183,8 @@ export default function CreateGoalScreen() {
       frequency_count: isDaily ? 7 : frequency,
       target_days: isDaily ? ALL_DAYS : selectedDays,
       reminder_times: reminderTimes.length > 0 ? reminderTimes : ["18:00"],
+      reminder_window_before_minutes: reminderWindowBeforeMinutes,
+      checkin_prompt_delay_minutes: checkinPromptDelayMinutes,
       why_statement: whyStatement.trim() || undefined
     };
 
@@ -187,6 +196,10 @@ export default function CreateGoalScreen() {
         });
       } else {
         await createMutation.mutateAsync(goalData);
+        capture("goal_created", {
+          frequency_type: goalData.frequency_type,
+          has_why: !!goalData.why_statement
+        });
       }
       router.back();
     } catch (error) {
@@ -206,6 +219,8 @@ export default function CreateGoalScreen() {
     frequency,
     selectedDays,
     reminderTimes,
+    reminderWindowBeforeMinutes,
+    checkinPromptDelayMinutes,
     whyStatement,
     createMutation,
     updateMutation,
@@ -450,8 +465,14 @@ export default function CreateGoalScreen() {
             description={
               maxReminderTimes === 1
                 ? t("goals.reminder_times_free_limit")
-                : t("goals.reminder_times_premium", { max: maxReminderTimes })
+                : `${t("goals.reminder_times_premium", { max: maxReminderTimes })}\n\n${t("goals.reminder_times_multiple_hint")}`
             }
+          />
+          <ReminderOptionsPicker
+            reminderBeforeMinutes={reminderWindowBeforeMinutes}
+            checkinDelayMinutes={checkinPromptDelayMinutes}
+            onReminderBeforeChange={setReminderWindowBeforeMinutes}
+            onCheckinDelayChange={setCheckinPromptDelayMinutes}
           />
         </Card>
 

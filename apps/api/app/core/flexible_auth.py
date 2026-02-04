@@ -6,7 +6,7 @@ Supports both JWT tokens and API keys for authentication
 from fastapi import HTTPException, status, Header, Depends, Request
 from starlette.requests import Request
 from typing import Optional, Dict, Any
-from app.core.auth import verify_token
+from app.core.auth import USER_SELECT_COLUMNS, verify_token
 from app.core.api_keys import get_api_key_user
 
 
@@ -97,7 +97,7 @@ async def authenticate_with_jwt(token: str) -> Dict[str, Any]:
 
         supabase = get_supabase_client()
 
-        result = supabase.table("users").select("*").eq("id", user_id).execute()
+        result = supabase.table("users").select(USER_SELECT_COLUMNS).eq("id", user_id).execute()
 
         if not result.data:
             raise HTTPException(
@@ -154,7 +154,7 @@ async def authenticate_with_api_key(api_key: str) -> Dict[str, Any]:
         supabase = get_supabase_client()
 
         result = (
-            supabase.table("users").select("*").eq("id", user_info["user_id"]).execute()
+            supabase.table("users").select(USER_SELECT_COLUMNS).eq("id", user_info["user_id"]).execute()
         )
 
         if not result.data:

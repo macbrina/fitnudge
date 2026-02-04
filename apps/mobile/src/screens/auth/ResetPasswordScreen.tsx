@@ -23,7 +23,6 @@ import { authService } from "@/services/api";
 import { useAlertModal } from "@/contexts/AlertModalContext";
 import { ApiError } from "@/services/api/base";
 import { useAuthStore } from "@/stores/authStore";
-import { getRedirection, hasCompletedV2Onboarding } from "@/utils/getRedirection";
 import LoadingContainer from "@/components/common/LoadingContainer";
 
 export default function ResetPasswordScreen() {
@@ -48,7 +47,7 @@ export default function ResetPasswordScreen() {
   const insets = useSafeAreaInsets();
   const resetPasswordMutation = useResetPassword();
   const { showAlert } = useAlertModal();
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated } = useAuthStore();
 
   const redirectToLoginWithMessage = useCallback(
     (message: string) => {
@@ -59,34 +58,6 @@ export default function ResetPasswordScreen() {
     },
     [router]
   );
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const handleAuthenticatedRedirect = async () => {
-      try {
-        const destination = await getRedirection({
-          hasCompletedOnboarding: hasCompletedV2Onboarding(user)
-        });
-        if (isMounted) {
-          router.replace(destination);
-        }
-      } catch (error) {
-        console.warn("[ResetPassword] Failed to compute authenticated redirect", error);
-        if (isMounted) {
-          router.replace(MOBILE_ROUTES.MAIN.HOME);
-        }
-      }
-    };
-
-    if (isAuthenticated) {
-      handleAuthenticatedRedirect();
-    }
-
-    return () => {
-      isMounted = false;
-    };
-  }, [isAuthenticated, user]);
 
   useEffect(() => {
     setToken(initialToken);

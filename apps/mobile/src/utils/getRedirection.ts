@@ -1,5 +1,6 @@
 import { MOBILE_ROUTES } from "@/lib/routes";
 import { storageUtil, STORAGE_KEYS } from "@/utils/storageUtil";
+import { hasCompletedV2Onboarding } from "@/utils/onboardingUtils";
 
 interface RedirectionOptions {
   /** V2: If user has completed onboarding (onboarding_completed_at is set) */
@@ -52,13 +53,4 @@ export async function getRedirection(options: RedirectionOptions = {}): Promise<
     // On error, default to home
     return MOBILE_ROUTES.MAIN.HOME;
   }
-}
-
-/**
- * Helper to check if user has completed V2 onboarding from user object
- */
-export function hasCompletedV2Onboarding(
-  user: { onboarding_completed_at?: string | null } | null
-): boolean {
-  return !!user?.onboarding_completed_at;
 }

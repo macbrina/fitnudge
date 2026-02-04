@@ -73,7 +73,7 @@ export const OnboardingCarousel: React.FC<OnboardingCarouselProps> = ({ onComple
     <View style={styles.screenContainer}>
       <View style={styles.content}>
         {/* App Name */}
-        <Text style={styles.appName}>{t("common.app_name")}</Text>
+        {/* <Text style={styles.appName}>{t("common.app_name")}</Text> */}
 
         <View style={styles.illustrationContainer}>{item.illustration}</View>
 
@@ -135,11 +135,21 @@ export const OnboardingCarousel: React.FC<OnboardingCarouselProps> = ({ onComple
 
         {/* Fixed Bottom Section */}
         <View style={[styles.fixedBottom, { paddingBottom: insets.bottom + 20 }]}>
-          <TouchableOpacity style={styles.signUpButton} onPress={onComplete}>
+          <TouchableOpacity
+            style={styles.signUpButton}
+            onPress={onComplete}
+            testID="sign-up"
+            accessibilityLabel={t("onboarding.sign_up")}
+          >
             <Text style={styles.signUpButtonText}>{t("onboarding.sign_up")}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.loginButton} onPress={onSkip}>
+          <TouchableOpacity
+            style={styles.loginButton}
+            onPress={onSkip}
+            testID="log-in"
+            accessibilityLabel={t("onboarding.log_in")}
+          >
             <Text style={styles.loginText}>{t("onboarding.log_in")}</Text>
           </TouchableOpacity>
         </View>

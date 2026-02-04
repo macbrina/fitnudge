@@ -275,7 +275,7 @@ async def update_profile(
                 status_code=status.HTTP_400_BAD_REQUEST, detail="Username already taken"
             )
 
-    update_data = {k: v for k, v in profile_data.dict().items() if v is not None}
+    update_data = {k: v for k, v in profile_data.model_dump().items() if v is not None}
 
     if update_data:
         result = (
@@ -291,23 +291,33 @@ async def update_profile(
 
 @router.delete("/delete")
 async def delete_account(current_user: dict = Depends(get_current_user)):
-    """Delete user account from both public.users and auth.users"""
+    """Delete user account from public.users, auth.users, and RevenueCat.
+
+    Order: RevenueCat (GDPR) -> public.users (cascade) -> auth.users.
+    Does NOT cancel Apple/Google subscriptions - user must cancel in store.
+    """
     from app.core.database import get_supabase_client
     from app.services.logger import logger
+    from app.services.referral_service import delete_subscriber
 
     supabase = get_supabase_client()
     user_id = current_user["id"]
 
-    # Step 1: Delete from public.users FIRST (cascade deletes all related data)
-    supabase.table("users").delete().eq("id", user_id).execute()
-    print(f"Deleted user {user_id} from public.users (cascade handled related data)")
+    # Step 1: Delete from RevenueCat (GDPR - remove purchase data)
+    try:
+        await delete_subscriber(user_id)
+    except Exception as e:
+        logger.warning(f"Failed to delete user {user_id} from RevenueCat: {e}")
 
-    # Step 2: Delete from auth.users (for Supabase Auth/Realtime cleanup)
+    # Step 2: Delete from public.users FIRST (cascade deletes all related data)
+    supabase.table("users").delete().eq("id", user_id).execute()
+    logger.info(f"Deleted user {user_id} from public.users (cascade handled related data)")
+
+    # Step 3: Delete from auth.users (for Supabase Auth/Realtime cleanup)
     try:
         supabase.auth.admin.delete_user(user_id)
-        print(f"Deleted user {user_id} from auth.users")
+        logger.info(f"Deleted user {user_id} from auth.users")
     except Exception as e:
-        # Log but don't fail - public.users is the source of truth
         logger.warning(f"Failed to delete user {user_id} from auth.users: {e}")
 
     return {"message": "Account deleted successfully"}
@@ -496,6 +506,8 @@ async def get_my_referrals(current_user: dict = Depends(get_current_user)):
     """Get list of users referred by the current user
 
     Shows all users who signed up using your referral code.
+    total_bonus_days_earned is the sum of bonus_days_referrer across rewarded referrals
+    (respects 30-day cap).
     """
     from app.services.referral_service import get_user_referrals
 
@@ -503,15 +515,27 @@ async def get_my_referrals(current_user: dict = Depends(get_current_user)):
 
     # Format the response to match frontend expectations
     formatted_referrals = []
+    total_bonus_days = 0
     for referral in referrals:
+        bonus_days = referral.get("bonus_days_referrer") or 0
+        status = referral.get("status", "pending")
+        # Count bonus days for rewarded referrals (use status as primary check)
+        if status == "rewarded" or referral.get("referral_bonus_granted_at"):
+            total_bonus_days += bonus_days
         formatted_referrals.append(
             {
                 "id": referral.get("id"),
                 "username": referral.get("username"),
                 "name": referral.get("name"),
+                "profile_picture_url": referral.get("profile_picture_url"),
                 "created_at": referral.get("created_at"),
                 "referral_bonus_granted_at": referral.get("referral_bonus_granted_at"),
+                "bonus_days_referrer": bonus_days,
+                "status": status,  # Include status for UI
             }
         )
 
-    return formatted_referrals
+    return {
+        "referrals": formatted_referrals,
+        "total_bonus_days_earned": total_bonus_days,
+    }

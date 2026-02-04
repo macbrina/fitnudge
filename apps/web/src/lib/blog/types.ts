@@ -31,6 +31,7 @@ export interface BlogPost {
   content: string; // HTML content from CKEditor or similar
   excerpt?: string;
   featured_image?: string;
+  is_featured?: boolean;
   author: BlogAuthor;
   status: BlogPostStatus;
   published_at?: string;
@@ -47,6 +48,8 @@ export interface BlogListResponse {
   page: number;
   per_page: number;
   total_pages: number;
+  /** True when a featured post exists (for page 1 no-category pagination) */
+  has_featured?: boolean;
 }
 
 export interface BlogFilters {
@@ -55,6 +58,8 @@ export interface BlogFilters {
   search?: string;
   limit?: number;
   offset?: number;
+  /** Page number (1-based). Used with category empty for featured-aware pagination */
+  page?: number;
 }
 
 // Database row types (raw from Supabase)
@@ -65,6 +70,7 @@ export interface DbBlogPost {
   content: string;
   excerpt: string | null;
   featured_image_url: string | null;
+  is_featured: boolean;
   status: BlogPostStatus;
   author_id: string;
   published_at: string | null;

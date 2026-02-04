@@ -1,28 +1,50 @@
+import { MOBILE_ROUTES } from "@/lib/routes";
+import { queryClient } from "@/lib/queryClient";
+import { initializeAuthenticatedData } from "@/services/prefetch";
 import { useAuthStore } from "@/stores/authStore";
-import { Stack, Redirect, useSegments } from "expo-router";
+import { Stack, Redirect } from "expo-router";
 import { useEffect, useState } from "react";
-import { getRedirection, hasCompletedV2Onboarding } from "@/utils/getRedirection";
+import { getRedirection } from "@/utils/getRedirection";
+import { hasCompletedV2Onboarding } from "@/utils/onboardingUtils";
 
 export default function AuthLayout() {
-  const { isAuthenticated, isLoading, user } = useAuthStore();
+  const { isAuthenticated, isLoading, isVerifyingUser, user, setVerifyingUser } = useAuthStore();
   const [destination, setDestination] = useState<string | null>(null);
-  const segments = useSegments();
 
   useEffect(() => {
     if (isLoading || !isAuthenticated) return;
-    // Let login/signup screens handle their own redirect after prefetch — avoid double navigation
-    const onLoginOrSignup =
-      segments.includes("login") ||
-      segments.includes("signup") ||
-      segments.includes("verify-email") ||
-      segments.includes("reset-password");
-    if (onLoginOrSignup) return;
 
-    const hasCompletedOnboarding = hasCompletedV2Onboarding(user);
-    getRedirection({ hasCompletedOnboarding }).then(setDestination);
-  }, [isLoading, isAuthenticated, user, segments]);
+    // Don't redirect if user needs to verify email first (email signup flow)
+    const needsEmailVerification = user?.auth_provider === "email" && !user?.email_verified;
+    if (needsEmailVerification) return;
 
-  if (!isLoading && isAuthenticated && destination) {
+    // User just logged in (we have user from login/signup API) - no verification needed.
+    // index.tsx only runs on cold start; social/login from auth screen bypasses it.
+    if (isVerifyingUser && user) {
+      setVerifyingUser(false);
+      return; // Re-run effect with isVerifyingUser false
+    }
+    if (isVerifyingUser) return;
+
+    const runRedirect = async () => {
+      try {
+        // Prefetch critical data before navigating (ensures home has data)
+        await Promise.race([
+          initializeAuthenticatedData(queryClient),
+          new Promise((resolve) => setTimeout(resolve, 5000))
+        ]);
+        const hasCompletedOnboarding = hasCompletedV2Onboarding(user);
+        const dest = await getRedirection({ hasCompletedOnboarding });
+        setDestination(dest);
+      } catch (error) {
+        console.warn("[AuthLayout] Redirect failed:", error);
+        setDestination(MOBILE_ROUTES.MAIN.HOME);
+      }
+    };
+    runRedirect();
+  }, [isLoading, isAuthenticated, isVerifyingUser, user]);
+
+  if (!isLoading && isAuthenticated && !isVerifyingUser && destination) {
     return <Redirect href={destination} />;
   }
 

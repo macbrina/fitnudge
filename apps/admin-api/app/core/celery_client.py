@@ -1,17 +1,21 @@
 """
 Celery Client for Admin API
-Connects to the same Celery broker to monitor tasks
+Connects to the same Celery broker. Used for:
+- Monitoring (inspect, control) via tasks endpoints
+- Dispatching admin tasks (data export) - runs in admin-api workers
 """
 
 from celery import Celery
 from app.core.config import settings
 
-# Create Celery app instance for monitoring
-# This connects to the same broker as the main worker
+redis_url = settings.redis_connection_url
+
+# Create Celery app instance - same broker as main API
 celery_app = Celery(
-    "fitnudge",
-    broker=settings.REDIS_URL,
-    backend=settings.REDIS_URL,
+    "fitnudge_admin",
+    broker=redis_url,
+    backend=redis_url,
+    include=["app.services.tasks"],
 )
 
 # Configure Celery
@@ -21,13 +25,18 @@ celery_app.conf.update(
     enable_utc=True,
     # Result backend settings
     result_expires=3600,  # 1 hour
+    result_extended=True,  # Store task name in result backend (for admin portal logs)
     # Broker settings for SSL (Upstash)
     broker_use_ssl=(
-        {"ssl_cert_reqs": "none"} if "rediss://" in settings.REDIS_URL else None
+        {"ssl_cert_reqs": "none"} if redis_url and "rediss://" in redis_url else None
     ),
     redis_backend_use_ssl=(
-        {"ssl_cert_reqs": "none"} if "rediss://" in settings.REDIS_URL else None
+        {"ssl_cert_reqs": "none"} if redis_url and "rediss://" in redis_url else None
     ),
+    # Admin tasks use separate queue - main API tasks stay on default "celery" queue
+    task_routes={"admin.*": {"queue": "admin"}},
+    # Workers consume from "admin" queue by default (run without -Q admin)
+    task_default_queue="admin",
 )
 
 

@@ -1,0 +1,36 @@
+# FitNudge E2E: Goals CRUD
+# Requires: logged-in user (run signup-to-checkin or login first)
+# Run: maestro test .maestro/flows/goals-crud.yaml
+
+appId: com.fitnudge.app
+
+---
+- launchApp
+# Dismiss subscription if shown
+- extendedWaitUntil:
+    visible:
+      id: "subscription-close"
+    timeout: 5000
+    optional: true
+- tapOn:
+    id: "subscription-close"
+    optional: true
+# Home - scroll to Today's Goals (text selector)
+- scrollUntilVisible:
+    element:
+      text: "Today's Goals"
+    direction: DOWN
+    timeout: 15000
+# Go to Goals tab
+- tapOn:
+    text: "Goals"
+# Create goal
+- tapOn:
+    text: "Add"
+- inputText:
+    text: "Maestro Test Goal"
+- tapOn:
+    text: "Create Goal"
+# Verify
+- assertVisible:
+    text: "Maestro Test Goal"

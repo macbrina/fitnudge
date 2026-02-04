@@ -3,6 +3,7 @@ import { toRN } from "@/lib/units";
 import type { Broadcast } from "@/services/api/notifications";
 import { useStyles, useTheme } from "@/themes";
 import { X } from "lucide-react-native";
+import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import {
   Image,
@@ -47,6 +48,7 @@ export function BroadcastModal({ visible, broadcast, onClose, onCtaPress }: Broa
   const insets = useSafeAreaInsets();
   const styles = useStyles(makeStyles);
   const { colors, brandColors } = useTheme();
+  const router = useRouter();
   const [imageError, setImageError] = useState(false);
 
   const htmlSource = useMemo(() => {
@@ -147,17 +149,22 @@ export function BroadcastModal({ visible, broadcast, onClose, onCtaPress }: Broa
 
   const baseStyle = useMemo(() => ({ color: colors.text.secondary }), [colors.text.secondary]);
 
-  const useDefaultImage = broadcast ? !broadcast.image_url || imageError : false;
+  const showImage = broadcast?.showImage !== false;
+  const useDefaultImage = showImage && broadcast ? !broadcast.image_url || imageError : false;
   const hasCtaUrl = !!(broadcast?.cta_url || broadcast?.deeplink);
-  const ctaLabel = hasCtaUrl ? broadcast?.cta_label || "Learn more" : "Okay";
+  const defaultCtaLabel = "Learn more";
+  const ctaLabel = hasCtaUrl ? broadcast?.cta_label || defaultCtaLabel : "Okay";
 
   const handleCta = () => {
     if (!broadcast) return;
     if (hasCtaUrl) {
       const url = broadcast.deeplink || broadcast.cta_url!;
+      const isDeeplink = !!broadcast.deeplink;
       onClose();
       if (onCtaPress) {
-        onCtaPress(url, !!broadcast.deeplink);
+        onCtaPress(url, isDeeplink);
+      } else if (isDeeplink && (url.startsWith("/") || url.startsWith("("))) {
+        router.push(url as any);
       } else {
         Linking.openURL(url);
       }
@@ -200,22 +207,23 @@ export function BroadcastModal({ visible, broadcast, onClose, onCtaPress }: Broa
           ]}
           showsVerticalScrollIndicator={false}
         >
-          {useDefaultImage ? (
-            <Image
-              source={DEFAULT_IMAGE}
-              style={styles.image}
-              resizeMode="contain"
-              accessibilityLabel="Broadcast"
-            />
-          ) : (
-            <Image
-              source={{ uri: broadcast.image_url! }}
-              style={styles.image}
-              resizeMode="contain"
-              onError={() => setImageError(true)}
-              accessibilityLabel="Broadcast"
-            />
-          )}
+          {showImage &&
+            (useDefaultImage ? (
+              <Image
+                source={DEFAULT_IMAGE}
+                style={styles.image}
+                resizeMode="contain"
+                accessibilityLabel="Notification"
+              />
+            ) : (
+              <Image
+                source={{ uri: broadcast.image_url! }}
+                style={styles.image}
+                resizeMode="contain"
+                onError={() => setImageError(true)}
+                accessibilityLabel="Notification"
+              />
+            ))}
           <Text style={[styles.title, { color: colors.text.primary }]}>{broadcast.title}</Text>
           <RenderHtml
             contentWidth={contentWidth}

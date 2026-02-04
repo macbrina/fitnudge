@@ -38,6 +38,8 @@ export interface Goal {
 
   // Reminder
   reminder_times: string[] | null; // Array of times like ["18:00"]
+  reminder_window_before_minutes?: number; // 0 = exact time, else minutes before
+  checkin_prompt_delay_minutes?: number; // 0 = at reminder time, else minutes after last reminder
 
   // Motivation
   why_statement?: string | null; // User's personal "why"
@@ -68,6 +70,8 @@ export interface CreateGoalRequest {
   frequency_count?: number; // 7 for daily, 1-7 for weekly (days per week)
   target_days?: number[];
   reminder_times?: string[];
+  reminder_window_before_minutes?: number; // 0 = exact time, else minutes before
+  checkin_prompt_delay_minutes?: number; // 0 = at reminder time, else minutes after last reminder
   why_statement?: string;
 }
 
@@ -140,6 +144,8 @@ export interface UpdateGoalRequest {
   frequency_count?: number;
   target_days?: number[];
   reminder_times?: string[];
+  reminder_window_before_minutes?: number;
+  checkin_prompt_delay_minutes?: number;
   why_statement?: string;
   status?: GoalStatus;
 }

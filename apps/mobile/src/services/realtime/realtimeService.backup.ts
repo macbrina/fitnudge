@@ -36,7 +36,7 @@ import { useSubscriptionStore } from "@/stores/subscriptionStore";
 import { useAICoachStore } from "@/stores/aiCoachStore";
 import { aiCoachQueryKeys } from "@/hooks/api/queryKeys";
 import { TokenManager } from "@/services/api/base";
-import { achievementsQueryKeys } from "@/hooks/api/useAchievements";
+import { achievementsQueryKeys } from "@/hooks/api/queryKeys";
 import {
   goalsQueryKeys,
   checkInsQueryKeys,
@@ -46,11 +46,11 @@ import {
   userQueryKeys,
   blogQueryKeys
 } from "@/hooks/api/queryKeys";
-import { notificationHistoryQueryKeys } from "@/hooks/api/useNotificationHistory";
+import { notificationHistoryQueryKeys } from "@/hooks/api/queryKeys";
 import { broadcastsQueryKeys } from "@/hooks/api/useBroadcasts";
 import { useDeletedBroadcastIdsStore } from "@/stores/deletedBroadcastIdsStore";
 import { dailyMotivationsQueryKeys } from "@/hooks/api/useDailyMotivations";
-import { homeDashboardQueryKeys } from "@/hooks/api/useHomeDashboard";
+import { homeDashboardQueryKeys } from "@/hooks/api/queryKeys";
 import { analyticsQueryKeys } from "@/hooks/api/useAnalytics";
 import { analyticsService } from "@/services/api/analytics";
 import { getLastAnalyticsParams } from "@/hooks/api/useAnalytics";
