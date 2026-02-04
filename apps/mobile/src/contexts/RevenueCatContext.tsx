@@ -955,11 +955,13 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
 
   /**
    * Check trial/introductory offer eligibility for given product IDs.
-   * iOS: Uses RevenueCat's checkTrialOrIntroductoryEligibility method
-   * Android: Falls back to checking if user has any previous purchases
+   * Aligns with "Never had any subscription" eligibility in Play Console / App Store.
+   *
+   * iOS: Uses RevenueCat's checkTrialOrIntroductoryPriceEligibility (Apple evaluates)
+   * Android: Checks allPurchasedProductIdentifiers + entitlements.all (no prior purchases = eligible)
    *
    * @param productIds Array of product identifiers to check
-   * @returns Map of productId -> boolean (true if eligible for trial)
+   * @returns Map of productId -> boolean (true if eligible for trial / never subscribed)
    */
   const checkTrialEligibility = useCallback(
     async (productIds: string[]): Promise<TrialEligibilityMap> => {

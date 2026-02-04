@@ -182,8 +182,8 @@ For **each** subscription product, add:
 **Premium Plan:**
 
 ```
-Unlock your full fitness potential with FitNudge Premium:
-• Unlimited fitness goals
+Unlock your full potential with FitNudge Premium:
+• Unlimited goals (workout, read, meditate, learn—any habit)
 • AI Chat Motivation (our signature feature!)
 • Advanced analytics and insights
 • Full social features and accountability partners
@@ -191,7 +191,7 @@ Unlock your full fitness potential with FitNudge Premium:
 • Priority customer support
 • Ad-free experience
 
-The complete AI fitness coaching experience.
+The complete AI coaching experience for any goal.
 ```
 
 #### Step 4: Screenshots for Review (iOS Requires This)
@@ -229,7 +229,7 @@ SUBSCRIPTION TIERS (2-Tier System):
 2. Premium ($9.99/mo, $79.99/yr) - Unlimited goals, AI Chat Motivation, all features
 
 KEY DIFFERENTIATOR:
-Our Premium plan includes AI Chat Motivation - personalized AI coaching conversations that provide encouragement, guidance, and strategies based on user's fitness goals and progress. This is a unique, high-value feature that justifies the premium pricing.
+Our Premium plan includes AI Chat Motivation - personalized AI coaching conversations that provide encouragement, guidance, and strategies based on user's goals and progress. FitNudge works for any goal (workout, read, meditate, learn a skill, etc.). This is a unique, high-value feature that justifies the premium pricing.
 
 HOW TO TEST:
 1. Create account or use test account above
@@ -284,10 +284,10 @@ Introductory Offer: 3-day FREE TRIAL
 For each subscription, create a **Base Plan**:
 
 ```
-Base Plan ID: standard
+Base Plan ID: default
 Price: [as above]
 Renewal type: Auto-renewing
-Grace period: 7 days
+Grace period: 3 days
 Account hold: 30 days
 ```
 
@@ -297,7 +297,7 @@ For **Premium Annual**, add a **Free Trial Offer**:
 Offer ID: free-trial
 Offer type: Free trial
 Duration: 3 days
-Eligibility: New customers only
+Eligibility: New customer acquisition
 ```
 
 For **Premium Annual Exit Offer**, add a **Discounted Base Plan** (for Exit Intent):
@@ -307,7 +307,7 @@ Offer ID: exit-50-off
 Offer type: Pay Up Front
 Duration: 1 Year
 Price: $39.99 (50% off)
-Eligibility: Custom targeting for exit intent
+Eligibility: Developer determined
 ```
 
 #### Step 3: Link to RevenueCat
@@ -659,6 +659,14 @@ const getDisplayPrice = (pkg: PurchasesPackage) => {
 
 ##### 🤖 Android: Introductory Offers in Google Play Console
 
+**Eligibility criteria (when adding an offer):**
+
+| Option                       | Use case                                                                                   |
+| ---------------------------- | ------------------------------------------------------------------------------------------ |
+| **New customer acquisition** | First-time subscribers; Play evaluates eligibility. Use for free trial.                    |
+| **Upgrade**                  | Existing subscribers; Play evaluates eligibility. Use for plan upgrades.                   |
+| **Developer determined**     | You control eligibility in-app; offer cannot be sold outside the app. Use for exit intent. |
+
 **Step 1: Create FREE TRIAL for Premium Annual**
 
 1. Go to **Google Play Console** → **FitNudge** → **Monetize** → **Subscriptions**
@@ -666,11 +674,11 @@ const getDisplayPrice = (pkg: PurchasesPackage) => {
 3. Click on your base plan → **Add offer** → **Free trial**
 
 ```
-Offer ID: free-trial-3d
+Offer ID: free-trial
 Phases:
   - Phase 1: Free Trial
   - Duration: 3 days
-Eligibility: New customers only (default)
+Eligibility: New customer acquisition (Play evaluates first-time subscriber eligibility)
 ```
 
 **Step 2: Create 50% OFF Exit Offer for Premium Annual**
@@ -684,7 +692,7 @@ Phases:
   - Phase 1: Pay Up Front
   - Duration: 1 Year
   - Price: $39.99 USD (50% off $79.99)
-Eligibility: Custom targeting for exit intent
+Eligibility: Developer determined (you control when to show exit intent in-app; offer cannot be sold outside the app)
 ```
 
 **Step 3: Same Code Works for Android**
@@ -786,7 +794,7 @@ Base Plan ID: premium-annual-exit-offer
 Tag: exit_offer
 Price: $39.99 USD (50% off $79.99)
 Renewal type: Auto-renewing
-Eligibility: Use offer tags to control visibility
+Eligibility: Developer determined (you control visibility in-app via offer tags)
 ```
 
 **Step 2: Configure Offer Tags**
@@ -888,13 +896,13 @@ Get these keys from:
 
 #### For iOS App Review:
 
-| Screenshot          | Purpose           | What to Show                               |
-| ------------------- | ----------------- | ------------------------------------------ |
-| Subscription Screen | Price display     | Free vs Premium with Monthly/Annual toggle |
-| Feature Comparison  | Value proposition | What Premium unlocks                       |
-| AI Chat UI          | Premium feature   | AI Chat Motivation in action               |
-| Analytics Screen    | Premium feature   | Charts and insights                        |
-| Goal Creation       | Core feature      | Creating a fitness goal                    |
+| Screenshot          | Purpose           | What to Show                                    |
+| ------------------- | ----------------- | ----------------------------------------------- |
+| Subscription Screen | Price display     | Free vs Premium with Monthly/Annual toggle      |
+| Feature Comparison  | Value proposition | What Premium unlocks                            |
+| AI Chat UI          | Premium feature   | AI Chat Motivation in action                    |
+| Analytics Screen    | Premium feature   | Charts and insights                             |
+| Goal Creation       | Core feature      | Creating a goal (workout, read, meditate, etc.) |
 
 **File naming convention:**
 
@@ -964,10 +972,10 @@ Google typically doesn't require additional screenshots for subscription review,
 2. **Signup/Login** → Account creation
 3. **Notification Permission** → "Stay on Track" with benefits explanation
 4. **Personalization Flow** → 7 mandatory questions to understand user:
-   - Fitness level (Beginner/Intermediate/Advanced/Athlete)
-   - Primary goal (Lose weight/Build muscle/Stay active/General fitness/Sport-specific)
+   - Experience level (Beginner/Intermediate/Advanced/Expert)
+   - Primary goal type (Fitness/Reading/Meditation/Learning/Productivity/Other)
    - Current habits (Never/1-2x week/3-4x week/5+ week/Daily)
-   - Workout setting (Gym/Home/Outdoor/Mix/Don't know)
+   - Preferred setting (Home/Outdoor/Any/Mix/Don't know)
    - Available time (<30min/30-60min/1-2hrs/Flexible)
    - Motivation style (Tough love/Gentle encouragement/Data-driven/Accountability buddy)
    - Biggest challenge (Staying consistent/Getting started/Time/Lack of knowledge)
@@ -1053,7 +1061,7 @@ Google typically doesn't require additional screenshots for subscription review,
 
 - **New Year**: Create Apple Offer Code "NEWYEAR2025" (50% off 3 months)
 - **Summer**: Introductory offer - First month $2.99 (configured in App Store Connect)
-- **Fitness Friday**: Offer code "FITFRIDAY" for 1 week free trial
+- **Goal Friday**: Offer code "GOALFRIDAY" for 1 week free trial
 - **Back to School**: Student subscription tier at discounted price (no .edu verification needed)
 
 ---
@@ -1112,9 +1120,9 @@ Google typically doesn't require additional screenshots for subscription review,
 
 **YouTube/TikTok Content Ideas:**
 
-- "POV: Your AI coach calls you out for skipping gym"
+- "POV: Your AI coach calls you out for skipping your goal"
 - "Reading my AI motivation messages after a bad day"
-- "My 100-day fitness streak with FitNudge"
+- "My 100-day streak with FitNudge"
 - Before/After transformations with app screenshots
 - "AI vs Human Coach: Which is better?"
 - "Testing AI motivation for 30 days"
@@ -1125,8 +1133,8 @@ Google typically doesn't require additional screenshots for subscription review,
 
 - Mobile-first responsive design
 - Core Web Vitals optimization
-- Schema markup for fitness content
-- Local SEO for gym partnerships
+- Schema markup for goal/habit content
+- Local SEO for relevant partnerships
 
 **Content SEO:**
 
@@ -1139,26 +1147,26 @@ Google typically doesn't require additional screenshots for subscription review,
 
 ## 🤝 Partnership & Integration Marketing
 
-### 🏋️ Gym Partnerships
+### 🏋️ Gym, Studio & Goal-Focused Partnerships
 
 **Partnership Model:**
 
-- Offer gyms: "Give your members FitNudge Premium for free (you pay $2/member)"
-- Co-branded landing pages: "PlanetFitness + FitNudge = Success"
-- QR codes in gyms: "Scan to start your fitness journey"
-- Gym staff training on app benefits
+- Offer gyms/studios/organizations: "Give your members FitNudge Premium for free (you pay $2/member)"
+- Co-branded landing pages: "Your Organization + FitNudge = Success"
+- QR codes: "Scan to start your goal journey"
+- Staff training on app benefits
 
 **Revenue Sharing:**
 
-- 50/50 split on gym member subscriptions
-- Bulk pricing for gym chains
-- White-label options for premium gyms
+- 50/50 split on member subscriptions
+- Bulk pricing for chains
+- White-label options for premium partners
 
-### 👥 Fitness Influencer Collaborations
+### 👥 Influencer Collaborations (Goals, Wellness, Productivity)
 
 **Influencer Strategy:**
 
-- Custom voice models of popular fitness influencers (licensing)
+- Custom voice models of popular influencers (licensing)
 - Affiliate program: Influencers get 30% commission on conversions
 - Limited edition: "Get motivated by [Influencer Name]'s voice"
 - Sponsored content: "30-day challenge with [Influencer]"
@@ -1219,7 +1227,7 @@ Google typically doesn't require additional screenshots for subscription review,
 **Reactivation Strategy:**
 
 - Email: "We miss you! Come back to your 30-day streak for 50% off"
-- Push notification: "Your gym buddy needs you back"
+- Push notification: "Your accountability partner needs you back"
 - Offer: "Reactivate within 7 days, get 1 month free"
 - Social proof: "Your friends are still crushing their goals"
 
@@ -1238,25 +1246,25 @@ Google typically doesn't require additional screenshots for subscription review,
 
 **Pre-Launch:**
 
-- Build email list of 1,000+ fitness enthusiasts
+- Build email list of 1,000+ goal/habit enthusiasts
 - Create buzz with teaser content
-- Partner with fitness influencers for launch day
+- Partner with influencers (goals, wellness, productivity) for launch day
 - Prepare press kit and media outreach
 
 ### 📱 App Store Optimization (ASO)
 
 **Visual Assets:**
 
-- **Icon**: Friendly AI robot + fitness imagery
+- **Icon**: Friendly AI robot + goal/habit imagery
 - **Screenshots**: Show before/after, voice message UI, social features
 - **Video Preview**: 15-sec demo of AI motivation + check-in flow
-- **Keywords**: "AI fitness coach", "gym motivation", "accountability partner"
+- **Keywords**: "AI accountability coach", "habit motivation", "accountability partner"
 
 **ASO Strategy:**
 
-- **Title**: "FitNudge - AI Fitness Coach"
+- **Title**: "FitNudge - AI Goal & Habit Coach"
 - **Subtitle**: "Stay motivated with AI voice messages"
-- **Keywords**: AI fitness, gym motivation, habit tracker, accountability
+- **Keywords**: AI coach, habit tracker, goal accountability, motivation
 - **Description**: Focus on benefits, not features
 - **Reviews**: Encourage satisfied users to leave reviews
 
@@ -1264,21 +1272,21 @@ Google typically doesn't require additional screenshots for subscription review,
 
 **Meta Ads Strategy:**
 
-- **Target**: 18-45, interest in fitness, gym memberships
+- **Target**: 18-45, interest in self-improvement, habits, goals
 - **Creative**: UGC-style videos showing app in use
 - **Budget**: Start with $500/month, test different audiences
 - **Placements**: Instagram Stories, Facebook Feed, Reels
 
 **Google Ads:**
 
-- **Keywords**: "fitness accountability app", "gym motivation app"
+- **Keywords**: "habit accountability app", "goal motivation app"
 - **Budget**: $300/month initially
 - **Landing pages**: Optimized for each keyword group
 
 **TikTok Ads:**
 
 - **Format**: Short, engaging videos showing AI voice messages
-- **Target**: Gen Z fitness enthusiasts
+- **Target**: Gen Z self-improvement enthusiasts
 - **Budget**: $200/month for testing
 
 ---
@@ -1327,7 +1335,7 @@ Google typically doesn't require additional screenshots for subscription review,
 
 **Monthly Recap:**
 
-- "Your fitness journey recap + special offer"
+- "Your goal journey recap + special offer"
 - Achievement celebrations
 - Goal setting for next month
 
@@ -1346,35 +1354,35 @@ Google typically doesn't require additional screenshots for subscription review,
 **Campaign**: "2025 Resolution Edition"
 
 - "3 months Premium for price of 2"
-- Content: "How to actually keep your fitness resolution"
+- Content: "How to actually keep your New Year resolution"
 - Challenge: "January Jumpstart - 31-day community challenge"
 - Influencer partnerships for resolution content
 
 ### ☀️ Summer (May-June)
 
-**Campaign**: "Summer Body Ready"
+**Campaign**: "Summer Goals"
 
 - "Start your transformation today"
-- Beach body content marketing
+- Summer habit content marketing
 - Instagram challenge: "#FitNudgeSummer"
-- Pool party workout content
+- Outdoor activity and wellness content
 
 ### 🎓 Back to School (September)
 
-**Campaign**: "Student Fitness"
+**Campaign**: "Student Goals"
 
 - "Student discount: 50% off all plans with .edu email"
 - "Build healthy habits for the new semester"
-- Campus fitness challenges
-- Study break workout content
+- Campus goal challenges
+- Study break habit content
 
 ### 🎃 Halloween (October)
 
 **Campaign**: "Scare Away Bad Habits"
 
-- "30-day challenge to break bad fitness habits"
-- Spooky workout content
-- "Trick or Treat" fitness challenges
+- "30-day challenge to break bad habits"
+- Spooky habit content
+- "Trick or Treat" goal challenges
 
 ---
 
@@ -1510,8 +1518,8 @@ Net ARR:                          $135,036
 
 **Events & Partnerships (20% - $10,000):**
 
-- Fitness expos and events: $6,000
-- Gym partnership setup: $2,000
+- Wellness expos and events: $6,000
+- Partnership setup: $2,000
 - Corporate wellness outreach: $2,000
 
 **Tools & Technology (10% - $5,000):**
@@ -1663,10 +1671,10 @@ Net ARR:                          $135,036
 
 ### Partnership Offers
 
-**Gym Partnerships:**
+**Gym & Wellness Partnerships:**
 
-- Create bulk offer codes for gym members
-- Gym distributes codes to members
+- Create bulk offer codes for gym/studio members
+- Partners distribute codes to members
 - Track redemptions via backend analytics
 
 **Corporate Wellness:**

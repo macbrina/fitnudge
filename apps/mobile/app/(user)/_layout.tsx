@@ -1,5 +1,5 @@
 import { useMemo, useCallback, useState, useEffect } from "react";
-import { View, StyleSheet } from "react-native";
+import { View, StyleSheet, Platform } from "react-native";
 import { Stack, Redirect, useSegments } from "expo-router";
 import { useAuthStore } from "@/stores/authStore";
 import { MOBILE_ROUTES } from "@/lib/routes";
@@ -53,7 +53,12 @@ export default function UserLayout() {
     clearExitOffer
   } = useExitOfferStore();
 
-  const { subscriptionStatus, isReady: isRevenueCatReady, purchaseProExitOffer } = useRevenueCat();
+  const {
+    subscriptionStatus,
+    isReady: isRevenueCatReady,
+    purchaseProExitOffer,
+    checkTrialEligibility
+  } = useRevenueCat();
   const { plans } = usePricing();
   const [isExitOfferPurchasing, setIsExitOfferPurchasing] = useState(false);
 
@@ -120,8 +125,27 @@ export default function UserLayout() {
       return;
     }
 
+    // Check "never had any subscription" via RevenueCat (aligns with Play/App Store eligibility)
+    // iOS: RevenueCat uses Apple's eligibility; Android: checks allPurchasedProductIdentifiers
+    const proPlan = plans.find((p) => p.id === "premium");
+    if (proPlan) {
+      const productId =
+        Platform.OS === "ios"
+          ? proPlan.product_id_ios_annual || proPlan.product_id_ios_monthly
+          : proPlan.product_id_android_annual || proPlan.product_id_android_monthly;
+      if (productId) {
+        const eligibility = await checkTrialEligibility([productId]);
+        const isEligible = eligibility[productId] === true;
+        if (!isEligible) {
+          // User has subscribed before (this device or another) - don't show exit offer
+          await markAsSubscribed();
+          return;
+        }
+      }
+    }
+
     await openExitIntentModal();
-  }, [openExitIntentModal, subscriptionStatus, markAsSubscribed]);
+  }, [openExitIntentModal, subscriptionStatus, markAsSubscribed, plans, checkTrialEligibility]);
 
   // Handle exit offer modal close (user declined)
   const handleExitOfferClose = useCallback(async () => {
