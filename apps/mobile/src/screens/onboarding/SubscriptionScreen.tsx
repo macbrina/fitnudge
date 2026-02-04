@@ -126,7 +126,10 @@ export default function SubscriptionScreen({
 
         // 4. Check trial eligibility from API - if not eligible for any trial,
         // it means they've used a trial before (on this or another device)
+        // Android: Must verify "Never had any subscription" before showing exit offer (Play Console eligibility)
         const availablePlans = (plans ?? []).filter((plan) => plan.is_active && plan.id !== "free");
+        let trialEligibilityVerified = false;
+
         if (availablePlans.length > 0) {
           const productIds = availablePlans
             .map((plan) => {
@@ -156,11 +159,22 @@ export default function SubscriptionScreen({
                 setCanShowExitOffer(false);
                 return;
               }
+              trialEligibilityVerified = true;
             } catch (trialError) {
-              // If API check fails, continue with other checks
+              // If API check fails, on Android we must not show (can't verify "Never had any subscription")
               console.warn("[SubscriptionScreen] Failed to check trial eligibility:", trialError);
+              if (Platform.OS === "android") {
+                setCanShowExitOffer(false);
+                return;
+              }
             }
           }
+        }
+
+        // Android: Only show exit offer if we verified trial eligibility ("Never had any subscription")
+        if (Platform.OS === "android" && !trialEligibilityVerified) {
+          setCanShowExitOffer(false);
+          return;
         }
 
         // First time and eligible - SubscriptionScreen can show exit offer
