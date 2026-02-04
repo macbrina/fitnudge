@@ -9,6 +9,7 @@ import { useTheme } from "@/themes";
 import PersonalizationLayout from "./PersonalizationLayout";
 import { useOnboardingStore } from "@/stores/onboardingStore";
 import { ReminderTimesPicker } from "@/components/ui/ReminderTimesPicker";
+import { ReminderOptionsPicker } from "@/components/ui/ReminderOptionsPicker";
 import { TextInput } from "@/components/ui/TextInput";
 import { useSubscriptionStore } from "@/stores/subscriptionStore";
 
@@ -25,6 +26,8 @@ export interface CustomGoalDetails {
   isDaily: boolean;
   days: string[]; // Selected days of the week
   reminderTimes: string[]; // Array of HH:MM format strings
+  reminderWindowBeforeMinutes: number;
+  checkinPromptDelayMinutes: number;
 }
 
 const FREQUENCY_OPTIONS = [1, 2, 3, 4, 5, 6, 7];
@@ -42,6 +45,8 @@ export default function CustomGoalScreen({
   const storedIsDaily = useOnboardingStore((state) => state.goal_is_daily);
   const storedDays = useOnboardingStore((state) => state.goal_days);
   const storedReminderTime = useOnboardingStore((state) => state.goal_reminder_time);
+  const storedReminderBefore = useOnboardingStore((state) => state.goal_reminder_before_minutes);
+  const storedCheckinDelay = useOnboardingStore((state) => state.goal_checkin_delay_minutes);
 
   const [title, setTitle] = useState<string>(storedTitle);
   const [isDaily, setIsDaily] = useState<boolean>(storedIsDaily);
@@ -49,6 +54,12 @@ export default function CustomGoalScreen({
   const [selectedDays, setSelectedDays] = useState<string[]>(storedDays);
   const [reminderTimes, setReminderTimes] = useState<string[]>(
     storedReminderTime ? [storedReminderTime] : ["18:00"]
+  );
+  const [reminderWindowBeforeMinutes, setReminderWindowBeforeMinutes] = useState<number>(
+    storedReminderBefore ?? 30
+  );
+  const [checkinPromptDelayMinutes, setCheckinPromptDelayMinutes] = useState<number>(
+    storedCheckinDelay ?? 30
   );
   const [showDaysError, setShowDaysError] = useState<boolean>(false);
 
@@ -106,7 +117,9 @@ export default function CustomGoalScreen({
         frequency: isDaily ? 7 : frequency,
         isDaily,
         days: selectedDays,
-        reminderTimes: reminderTimes.length > 0 ? reminderTimes : ["18:00"]
+        reminderTimes: reminderTimes.length > 0 ? reminderTimes : ["18:00"],
+        reminderWindowBeforeMinutes,
+        checkinPromptDelayMinutes
       });
     }
   };
@@ -256,7 +269,17 @@ export default function CustomGoalScreen({
             onChange={setReminderTimes}
             maxTimes={maxReminderTimes}
             label={t("onboarding.custom_goal.checkin_time")}
-            description={maxReminderTimes === 1 ? t("goals.reminder_times_free_limit") : undefined}
+            description={
+              maxReminderTimes === 1
+                ? t("goals.reminder_times_free_limit")
+                : t("goals.reminder_times_multiple_hint")
+            }
+          />
+          <ReminderOptionsPicker
+            reminderBeforeMinutes={reminderWindowBeforeMinutes}
+            checkinDelayMinutes={checkinPromptDelayMinutes}
+            onReminderBeforeChange={setReminderWindowBeforeMinutes}
+            onCheckinDelayChange={setCheckinPromptDelayMinutes}
           />
         </View>
       </View>

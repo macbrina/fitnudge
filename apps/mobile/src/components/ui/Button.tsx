@@ -57,6 +57,7 @@ export interface ButtonProps {
   // Accessibility
   accessibilityLabel?: string;
   accessibilityHint?: string;
+  testID?: string;
 }
 
 // Create makeStyles function for theme-aware styling
@@ -324,7 +325,8 @@ export default function Button({
 
   // Accessibility
   accessibilityLabel,
-  accessibilityHint
+  accessibilityHint,
+  testID
 }: ButtonProps) {
   // Get theme and styles
   const { colors, brandColors } = useTheme();
@@ -392,6 +394,7 @@ export default function Button({
 
   return (
     <TouchableOpacity
+      testID={testID}
       style={buttonStyle}
       onPress={handlePress}
       disabled={isDisabled}

@@ -4,8 +4,8 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { Plus } from "lucide-react-native";
 
 import Button from "@/components/ui/Button";
-import { SkeletonCard } from "@/components/ui/SkeletonBox";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { GoalsScreenSkeleton } from "@/screens/tabs/goals/GoalsScreenSkeleton";
 import { useAllGoals, useArchivedGoals, useCompletedGoals } from "@/hooks/api/useGoals";
 import { useTabBarInsets } from "@/hooks/useTabBarInsets";
 import { fontFamily } from "@/lib/fonts";
@@ -110,18 +110,7 @@ export default function GoalsScreen() {
 
   // Loading state
   if (goalsLoading && !goals.length) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>{t("goals.screen_title")}</Text>
-        </View>
-        <View style={styles.content}>
-          <SkeletonCard height={120} style={{ marginBottom: 12 }} />
-          <SkeletonCard height={120} style={{ marginBottom: 12 }} />
-          <SkeletonCard height={120} />
-        </View>
-      </View>
-    );
+    return <GoalsScreenSkeleton />;
   }
 
   return (
@@ -129,7 +118,12 @@ export default function GoalsScreen() {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>{t("goals.screen_title")}</Text>
-        <TouchableOpacity onPress={handleCreateGoal} style={styles.addButton}>
+        <TouchableOpacity
+          onPress={handleCreateGoal}
+          style={styles.addButton}
+          accessibilityLabel={t("common.add")}
+          accessibilityRole="button"
+        >
           <Plus size={24} color={brandColors.onPrimary} />
         </TouchableOpacity>
       </View>

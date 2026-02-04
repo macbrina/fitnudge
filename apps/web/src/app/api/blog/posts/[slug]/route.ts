@@ -12,6 +12,7 @@ function transformPost(
     content: string;
     excerpt: string | null;
     featured_image_url: string | null;
+    is_featured?: boolean;
     status: string;
     published_at: string | null;
     created_at: string;
@@ -31,6 +32,7 @@ function transformPost(
     content: post.content,
     excerpt: post.excerpt || undefined,
     featured_image: post.featured_image_url || undefined,
+    is_featured: post.is_featured ?? false,
     status: post.status as "draft" | "published" | "archived",
     published_at: post.published_at || undefined,
     created_at: post.created_at,

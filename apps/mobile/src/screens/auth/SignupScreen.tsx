@@ -15,7 +15,6 @@ import { tokens, lineHeight } from "@/themes/tokens";
 import { useTheme } from "@/themes";
 import { MOBILE_ROUTES } from "@/lib/routes";
 import { useSignup } from "@/hooks/api/useAuth";
-import { getRedirection, hasCompletedV2Onboarding } from "@/utils/getRedirection";
 import { useAlertModal } from "@/contexts/AlertModalContext";
 import { authService, type LoginResponse } from "@/services/api/auth";
 import { getApiErrorDetails } from "@/services/api/errors";
@@ -33,6 +32,7 @@ import {
 import { ApiError } from "@/services/api/base";
 import { useExternalUrls } from "@/hooks/api/useAppConfig";
 import { getAndClearPendingReferralCode } from "@/utils/referralStorage";
+import { usePostHog } from "@/hooks/usePostHog";
 
 export default function SignupScreen() {
   // Get query params from deep links
@@ -56,13 +56,14 @@ export default function SignupScreen() {
     referralCode?: string;
   }>({});
 
-  const { login } = useAuthStore();
+  const { login, updateUser } = useAuthStore();
   const { t } = useTranslation();
   const styles = useStyles(makeSignupScreenStyles);
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { showAlert } = useAlertModal();
   const externalUrls = useExternalUrls();
+  const { capture } = usePostHog();
 
   // Use the signup mutation hook
   const signupMutation = useSignup();
@@ -139,26 +140,10 @@ export default function SignupScreen() {
 
   const handleSocialSuccess = async (payload: LoginResponse) => {
     await login(payload.user, payload.access_token, payload.refresh_token);
+    updateUser(payload.user); // Ensure layout has response user for redirect logic
 
-    // Prefetch critical data before navigating (ensures home screen has data)
-    await prefetchAfterAuth();
-
-    try {
-      // V2: Check if user has completed onboarding
-      const hasCompletedOnboarding = hasCompletedV2Onboarding(payload.user);
-      const destination = await getRedirection({ hasCompletedOnboarding });
-
-      // Defer navigation slightly to let auth state propagate through Stack.Protected guard
-      // This prevents double navigation when isAuthenticated changes
-      requestAnimationFrame(() => {
-        router.replace(destination);
-      });
-    } catch (redirectError) {
-      console.warn("[Signup] Failed to compute redirection", redirectError);
-      requestAnimationFrame(() => {
-        router.replace(MOBILE_ROUTES.MAIN.HOME);
-      });
-    }
+    // Prefetch in background; layout handles redirect when isAuthenticated updates
+    prefetchAfterAuth().catch((e) => console.warn("[Signup] Prefetch failed:", e));
   };
 
   const handleSocialError = async (message: string) => {
@@ -211,6 +196,8 @@ export default function SignupScreen() {
       return;
     }
 
+    capture("signup_started", { auth_provider: "email" });
+
     // Call the API
     signupMutation.mutate(
       {
@@ -222,41 +209,25 @@ export default function SignupScreen() {
       {
         onSuccess: async (response) => {
           if (response.data) {
-            // Login the user with the returned data
+            capture("signup_completed", { auth_provider: "email" });
+
+            // Login the user with the returned data (layout handles redirect)
             await login(
               response.data.user,
               response.data.access_token,
               response.data.refresh_token
             );
+            updateUser(response.data.user); // Ensure layout has response user for redirect logic
 
-            // Prefetch critical data before navigating (ensures home screen has data)
-            await prefetchAfterAuth();
+            // Prefetch in background; layout handles redirect when isAuthenticated updates
+            prefetchAfterAuth().catch((e) => console.warn("[Signup] Prefetch failed:", e));
 
-            // Check if email verification is required
+            // If email verification required, navigate within auth flow (layout won't redirect)
             const user = response.data.user;
             if (user && !user.email_verified && user.auth_provider === "email") {
-              // Redirect to email verification screen
-              // Defer navigation slightly to let auth state propagate through Stack.Protected guard
               requestAnimationFrame(() => {
                 router.replace(MOBILE_ROUTES.AUTH.VERIFY_EMAIL);
               });
-            } else {
-              try {
-                // V2: Check if user has completed onboarding
-                const hasCompletedOnboarding = hasCompletedV2Onboarding(response.data.user);
-                const destination = await getRedirection({ hasCompletedOnboarding });
-
-                // Defer navigation slightly to let auth state propagate through Stack.Protected guard
-                // This prevents double navigation when isAuthenticated changes
-                requestAnimationFrame(() => {
-                  router.replace(destination);
-                });
-              } catch (redirectError) {
-                console.warn("[Signup] Failed to compute redirection", redirectError);
-                requestAnimationFrame(() => {
-                  router.replace(MOBILE_ROUTES.MAIN.HOME);
-                });
-              }
             }
           }
         },
@@ -321,10 +292,13 @@ export default function SignupScreen() {
 
       if (response.data) {
         await handleSocialSuccess(response.data);
+        // Keep loading until redirect (auth layout handles it)
       } else {
+        setIsGoogleLoading(false);
         await handleSocialError(response.error || t("errors.authentication_error"));
       }
     } catch (error) {
+      setIsGoogleLoading(false);
       if (isGoogleCancelledError(error)) {
         return;
       }
@@ -339,10 +313,7 @@ export default function SignupScreen() {
         errorMessage = getFriendlyGoogleError(error);
       }
 
-      // Trigger alert asynchronously so loading state can reset immediately
       void handleSocialError(errorMessage);
-    } finally {
-      setIsGoogleLoading(false);
     }
   };
 
@@ -357,11 +328,13 @@ export default function SignupScreen() {
       const credential = await performNativeAppleSignIn();
 
       if (!credential.identityToken) {
+        setIsAppleLoading(false);
         await handleSocialError(t("errors.authentication_error"));
         return;
       }
 
       if (!credential.authorizationCode) {
+        setIsAppleLoading(false);
         await handleSocialError(t("errors.authentication_error"));
         return;
       }
@@ -384,10 +357,13 @@ export default function SignupScreen() {
 
       if (response.data) {
         await handleSocialSuccess(response.data);
+        // Keep loading until redirect (auth layout handles it)
       } else {
+        setIsAppleLoading(false);
         await handleSocialError(response.error || t("errors.authentication_error"));
       }
     } catch (error: any) {
+      setIsAppleLoading(false);
       if (isAppleCancelledError(error)) {
         return;
       }
@@ -403,8 +379,6 @@ export default function SignupScreen() {
       }
 
       await handleSocialError(errorMessage);
-    } finally {
-      setIsAppleLoading(false);
     }
   };
 
@@ -452,6 +426,7 @@ export default function SignupScreen() {
           {/* Form */}
           <View style={styles.form}>
             <TextInput
+              testID="username"
               label={t("auth.signup.username_label")}
               placeholder={t("auth.signup.username_placeholder")}
               value={username}
@@ -468,6 +443,7 @@ export default function SignupScreen() {
             />
 
             <TextInput
+              testID="email"
               label={t("auth.signup.email_label")}
               placeholder={t("auth.signup.email_placeholder")}
               value={email}
@@ -485,6 +461,7 @@ export default function SignupScreen() {
             />
 
             <TextInput
+              testID="password"
               label={t("auth.signup.password_label")}
               placeholder={t("auth.signup.password_placeholder")}
               value={password}

@@ -11,6 +11,8 @@ export interface SubscriptionResponse {
   product_id: string | null; // None for free users
   purchase_date: string | null; // None or user.created_at for free users
   expires_date: string | null;
+  current_period_start: string | null;
+  current_period_end: string | null;
   auto_renew: boolean;
   created_at: string | null; // None for free users
   updated_at: string | null; // None for free users
@@ -57,7 +59,7 @@ export interface SyncSubscriptionRequest {
   is_active: boolean;
   expires_at?: string | null;
   will_renew: boolean;
-  platform?: "ios" | "android" | "stripe" | null;
+  platform?: "ios" | "android" | "stripe" | "promo" | null;
   product_id?: string | null;
 }
 

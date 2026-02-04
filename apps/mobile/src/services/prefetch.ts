@@ -14,12 +14,15 @@ import { dailyMotivationService } from "@/services/api";
 import { notificationsService } from "@/services/api/notifications";
 
 import { useAuthStore } from "@/stores/authStore";
-import { homeDashboardQueryKeys } from "@/hooks/api/useHomeDashboard";
+import {
+  homeDashboardQueryKeys,
+  achievementsQueryKeys,
+  goalsQueryKeys,
+  partnersQueryKeys,
+  notificationHistoryQueryKeys
+} from "@/hooks/api/queryKeys";
 import { userQueryKeys } from "@/hooks/api/useUser";
-import { achievementsQueryKeys } from "@/hooks/api/useAchievements";
 import { dailyMotivationsQueryKeys } from "@/hooks/api/useDailyMotivations";
-import { goalsQueryKeys, partnersQueryKeys } from "@/hooks/api/queryKeys";
-import { notificationHistoryQueryKeys } from "@/hooks/api/useNotificationHistory";
 import { partnersService } from "@/services/api/partners";
 import { logger } from "@/services/logger";
 

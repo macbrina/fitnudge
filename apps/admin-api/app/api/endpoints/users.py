@@ -7,9 +7,24 @@ from pydantic import BaseModel, EmailStr
 from typing import Optional, List
 from datetime import datetime
 from app.core.admin_auth import get_current_admin, log_admin_action
-from app.core.database import get_supabase_client
+from app.core.database import get_supabase_client, first_row
 
 router = APIRouter(prefix="/users", tags=["User Management"])
+
+
+def _subscription_source_from_platform(platform: str | None) -> str | None:
+    """Derive subscription source from subscriptions.platform for display."""
+    if not platform:
+        return None
+    if platform in ("ios", "android"):
+        return "paid"
+    if platform == "admin_granted":
+        return "admin"
+    if platform == "promo":
+        return "promo"
+    if platform == "web":
+        return "paid"  # Web purchases
+    return None
 
 
 class UserSummary(BaseModel):
@@ -19,6 +34,7 @@ class UserSummary(BaseModel):
     role: str
     status: str
     subscription_plan: str | None
+    subscription_source: str | None = None  # paid, admin, promo
     created_at: str
     last_active_at: str | None
 
@@ -30,6 +46,7 @@ class UserDetail(BaseModel):
     role: str
     status: str
     subscription_plan: str | None
+    subscription_source: str | None = None  # paid, admin, promo
     timezone: str | None
     created_at: str
     updated_at: str | None
@@ -59,6 +76,11 @@ async def list_users(
     search: Optional[str] = Query(None, description="Search by email or name"),
     status: Optional[str] = Query(None, description="Filter by status"),
     role: Optional[str] = Query(None, description="Filter by role"),
+    sort_by: Optional[str] = Query(
+        "created_at",
+        description="Sort by: created_at, last_active_at, email",
+    ),
+    sort_order: Optional[str] = Query("desc", description="Sort order: asc or desc"),
     current_admin: dict = Depends(get_current_admin),
 ):
     """
@@ -66,15 +88,15 @@ async def list_users(
     """
     supabase = get_supabase_client()
 
-    # Build query
+    # Build query (DB columns: name, plan; API exposes as display_name, subscription_plan)
     query = supabase.table("users").select(
-        "id, email, display_name, role, status, subscription_plan, created_at, last_active_at",
+        "id, email, name, role, status, plan, created_at, last_active_at",
         count="exact",
     )
 
-    # Apply filters
+    # Apply filters (search by email, name, username)
     if search:
-        query = query.or_(f"email.ilike.%{search}%,display_name.ilike.%{search}%")
+        query = query.or_(f"email.ilike.%{search}%,name.ilike.%{search}%,username.ilike.%{search}%")
 
     if status:
         query = query.eq("status", status)
@@ -82,20 +104,49 @@ async def list_users(
     if role:
         query = query.eq("role", role)
 
+    # Sort (map API fields to DB columns: subscription_plan -> plan, display_name -> name)
+    sort_column = sort_by
+    if sort_column == "subscription_plan":
+        sort_column = "plan"
+    if sort_column == "display_name":
+        sort_column = "name"
+    if sort_column not in ("created_at", "last_active_at", "email", "plan", "name", "status", "role"):
+        sort_column = "created_at"
+    desc = (sort_order or "desc").lower() == "desc"
+    query = query.order(sort_column, desc=desc)
+
     # Pagination
     offset = (page - 1) * per_page
-    query = query.order("created_at", desc=True).range(offset, offset + per_page - 1)
+    query = query.range(offset, offset + per_page - 1)
 
     result = query.execute()
+
+    # Fetch subscription platform for premium users to derive source
+    user_ids = [u["id"] for u in result.data]
+    subs_result = (
+        supabase.table("subscriptions")
+        .select("user_id, platform")
+        .in_("user_id", user_ids)
+        .eq("status", "active")
+        .execute()
+    )
+    platform_by_user = {
+        s["user_id"]: s.get("platform") for s in (subs_result.data or [])
+    }
 
     users = [
         UserSummary(
             id=u["id"],
             email=u["email"],
-            display_name=u.get("display_name"),
+            display_name=u.get("name"),
             role=u["role"],
             status=u["status"],
-            subscription_plan=u.get("subscription_plan"),
+            subscription_plan=u.get("plan"),
+            subscription_source=_subscription_source_from_platform(
+                platform_by_user.get(u["id"])
+            )
+            if u.get("plan") == "premium"
+            else None,
             created_at=u["created_at"],
             last_active_at=u.get("last_active_at"),
         )
@@ -133,6 +184,12 @@ async def get_user_stats(current_admin: dict = Depends(get_current_admin)):
         .eq("status", "disabled")
         .execute()
     )
+    suspended_result = (
+        supabase.table("users")
+        .select("id", count="exact")
+        .eq("status", "suspended")
+        .execute()
+    )
 
     # By role
     admin_result = (
@@ -142,11 +199,11 @@ async def get_user_stats(current_admin: dict = Depends(get_current_admin)):
         .execute()
     )
 
-    # By subscription
+    # By subscription (DB column: plan)
     premium_result = (
         supabase.table("users")
         .select("id", count="exact")
-        .eq("subscription_plan", "premium")
+        .eq("plan", "premium")
         .execute()
     )
 
@@ -155,6 +212,7 @@ async def get_user_stats(current_admin: dict = Depends(get_current_admin)):
         "by_status": {
             "active": active_result.count or 0,
             "disabled": disabled_result.count or 0,
+            "suspended": suspended_result.count or 0,
         },
         "by_role": {
             "admin": admin_result.count or 0,
@@ -174,12 +232,12 @@ async def get_user(user_id: str, current_admin: dict = Depends(get_current_admin
     """
     supabase = get_supabase_client()
 
-    # Get user
+    # Get user (DB: name, plan, onboarding_completed_at)
     result = (
         supabase.table("users")
         .select(
-            "id, email, display_name, role, status, subscription_plan, "
-            "timezone, created_at, updated_at, last_active_at, onboarding_completed"
+            "id, email, name, role, status, plan, "
+            "timezone, created_at, updated_at, last_active_at, onboarding_completed_at"
         )
         .eq("id", user_id)
         .execute()
@@ -191,7 +249,26 @@ async def get_user(user_id: str, current_admin: dict = Depends(get_current_admin
             detail="User not found",
         )
 
-    user = result.data[0]
+    user = first_row(result.data)
+
+    # Get active subscription platform for source (paid/admin/promo)
+    sub_result = (
+        supabase.table("subscriptions")
+        .select("platform")
+        .eq("user_id", user_id)
+        .eq("status", "active")
+        .maybe_single()
+        .execute()
+    )
+    sub_row = sub_result.data
+    if isinstance(sub_row, list):
+        sub_row = sub_row[0] if sub_row else None
+    sub_platform = sub_row.get("platform") if sub_row else None
+    subscription_source = (
+        _subscription_source_from_platform(sub_platform)
+        if user.get("plan") == "premium"
+        else None
+    )
 
     # Get goal count
     goals_result = (
@@ -201,9 +278,9 @@ async def get_user(user_id: str, current_admin: dict = Depends(get_current_admin
         .execute()
     )
 
-    # Get checkin count
+    # Get check-in count (DB table: check_ins)
     checkins_result = (
-        supabase.table("checkins")
+        supabase.table("check_ins")
         .select("id", count="exact")
         .eq("user_id", user_id)
         .execute()
@@ -212,15 +289,16 @@ async def get_user(user_id: str, current_admin: dict = Depends(get_current_admin
     return UserDetail(
         id=user["id"],
         email=user["email"],
-        display_name=user.get("display_name"),
+        display_name=user.get("name"),
         role=user["role"],
         status=user["status"],
-        subscription_plan=user.get("subscription_plan"),
+        subscription_plan=user.get("plan"),
+        subscription_source=subscription_source,
         timezone=user.get("timezone"),
         created_at=user["created_at"],
         updated_at=user.get("updated_at"),
         last_active_at=user.get("last_active_at"),
-        onboarding_completed=user.get("onboarding_completed", False),
+        onboarding_completed=user.get("onboarding_completed_at") is not None,
         total_goals=goals_result.count,
         total_checkins=checkins_result.count,
     )
@@ -256,7 +334,7 @@ async def update_user(
         update_data["role"] = update.role
 
     if update.display_name is not None:
-        update_data["display_name"] = update.display_name
+        update_data["name"] = update.display_name
 
     if not update_data:
         raise HTTPException(
@@ -298,7 +376,7 @@ async def get_user_goals(
     result = (
         supabase.table("goals")
         .select(
-            "id, title, emoji, category, status, frequency_type, "
+            "id, title, status, frequency_type, "
             "current_streak, longest_streak, total_completions, created_at"
         )
         .eq("user_id", user_id)
@@ -321,7 +399,7 @@ async def get_user_activity(
     supabase = get_supabase_client()
 
     result = (
-        supabase.table("checkins")
+        supabase.table("check_ins")
         .select("id, goal_id, completed, check_in_date, created_at")
         .eq("user_id", user_id)
         .order("created_at", desc=True)

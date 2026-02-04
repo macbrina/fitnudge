@@ -1,6 +1,7 @@
 // Polyfill for Supabase (must be first import)
 import "react-native-url-polyfill/auto";
 
+import { AppBadgeSync } from "@/components/notifications/AppBadgeSync";
 import { SystemStatusListener } from "@/components/system/SystemStatusListener";
 import { AlertModalProvider } from "@/contexts/AlertModalContext";
 import { AppUpdateProvider } from "@/providers/AppUpdateProvider";
@@ -92,6 +93,8 @@ function SafeAreaWrapper() {
       }}
     >
       <Stack.Screen name="index" />
+      <Stack.Screen name="join" />
+      <Stack.Screen name="help" />
       <Stack.Screen name="(onboarding)" />
       <Stack.Screen name="(auth)" />
       <Stack.Protected guard={isAuthenticated}>
@@ -183,7 +186,8 @@ function RootLayout(): ReactElement {
   }, []);
 
   // Initialize app on cold start: cache tokens + fetch authenticated data
-  // This ensures data is available even when deep linking bypasses index.tsx
+  // Handles deep link to authenticated route (bypassing index.tsx)
+  // prefetch.ts deduplicates; auth layout handles post-login.
   useEffect(() => {
     const initializeApp = async () => {
       try {
@@ -196,7 +200,6 @@ function RootLayout(): ReactElement {
         // Uses coordinated initialization to prevent duplicates with index.tsx
         const isAuthenticated = useAuthStore.getState().isAuthenticated;
         const isVerifyingUser = useAuthStore.getState().isVerifyingUser;
-
         if (isAuthenticated && !isVerifyingUser) {
           await initializeAuthenticatedData(queryClient);
         }
@@ -204,7 +207,6 @@ function RootLayout(): ReactElement {
         console.warn("[RootLayout] App initialization failed:", error);
       }
     };
-
     initializeApp();
   }, []);
 
@@ -288,6 +290,7 @@ function RootLayout(): ReactElement {
                               <StatusBarWrapper />
                               <SafeAreaWrapper />
                               <SystemStatusListener />
+                              <AppBadgeSync />
                             </MaintenanceGate>
                           </AppUpdateProvider>
                         </RevenueCatProvider>

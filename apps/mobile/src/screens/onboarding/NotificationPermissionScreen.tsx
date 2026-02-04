@@ -9,7 +9,8 @@ import { logger } from "@/services/logger";
 import { useAuthStore } from "@/stores/authStore";
 import { useStyles, useTheme } from "@/themes";
 import { MOBILE_ROUTES } from "@/lib/routes";
-import { getRedirection, hasCompletedV2Onboarding } from "@/utils/getRedirection";
+import { getRedirection } from "@/utils/getRedirection";
+import { hasCompletedV2Onboarding } from "@/utils/onboardingUtils";
 import { STORAGE_KEYS, storageUtil } from "@/utils/storageUtil";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -38,11 +39,13 @@ export default function NotificationPermissionScreen() {
           source: "onboarding",
           screen: "notification_permission"
         });
+        capture("onboarding_step_completed", { step: "notification_permission", skipped: false });
       } else {
         capture("notification_permission_denied", {
           source: "onboarding",
           screen: "notification_permission"
         });
+        capture("onboarding_step_completed", { step: "notification_permission", skipped: true });
       }
 
       const completedOnboarding = hasCompletedV2Onboarding(user);
@@ -77,6 +80,7 @@ export default function NotificationPermissionScreen() {
       source: "onboarding",
       screen: "notification_permission"
     });
+    capture("onboarding_step_completed", { step: "notification_permission", skipped: true });
 
     const completedOnboarding = hasCompletedV2Onboarding(user);
 

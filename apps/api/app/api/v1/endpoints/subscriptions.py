@@ -31,6 +31,8 @@ class SubscriptionResponse(BaseModel):
     product_id: Optional[str] = None  # None for free users
     purchase_date: Optional[str] = None  # None or user.created_at for free users
     expires_date: Optional[str] = None
+    current_period_start: Optional[str] = None
+    current_period_end: Optional[str] = None
     auto_renew: bool = False  # Always False for free users
     created_at: Optional[str] = None  # None for free users
     updated_at: Optional[str] = None  # None for free users
@@ -72,6 +74,8 @@ async def get_my_subscription(current_user: dict = Depends(get_current_user)):
         "product_id": None,
         "purchase_date": current_user.get("created_at"),
         "expires_date": None,
+        "current_period_start": None,
+        "current_period_end": None,
         "auto_renew": False,
         "created_at": None,
         "updated_at": None,
@@ -165,11 +169,13 @@ async def sync_subscription(
         # Already in sync as free user
         return {"synced": False, "message": "Already in sync", "plan": current_db_plan}
 
-    # Check existing subscription in DB
+    # Check existing subscription in DB (include platform for admin_granted guard)
     existing_sub = (
         supabase.table("subscriptions")
-        .select("id, plan, status, updated_at")
+        .select("id, plan, status, platform, updated_at, purchase_date")
         .eq("user_id", user_id)
+        .order("created_at", desc=True)
+        .limit(1)
         .maybe_single()
         .execute()
     )
@@ -178,7 +184,7 @@ async def sync_subscription(
 
     # Prevent race condition: if subscription was updated very recently (< 30 seconds),
     # skip sync to avoid overwriting fresher webhook data
-    if existing_sub.data and existing_sub.data.get("updated_at"):
+    if existing_sub and existing_sub.data and existing_sub.data.get("updated_at"):
         try:
             last_updated = datetime.fromisoformat(
                 existing_sub.data["updated_at"].replace("Z", "+00:00")
@@ -199,19 +205,47 @@ async def sync_subscription(
             logger.warning(f"[Sync] Could not parse updated_at: {e}")
 
     if sync_data.is_active and revenuecat_plan != "free":
+        # Do NOT overwrite admin_granted subscriptions with RevenueCat data.
+        # Admin-granted subs are DB-only; RevenueCat sync would overwrite them incorrectly.
+        sub_row = existing_sub.data if (existing_sub and existing_sub.data) else None
+        existing_platform = sub_row.get("platform") if sub_row else None
+        if existing_platform == "admin_granted":
+            logger.info(
+                f"[Sync] Skipping update - user {user_id} has admin_granted subscription"
+            )
+            return {
+                "synced": False,
+                "message": "Admin-granted subscription - not syncing from RevenueCat",
+                "plan": current_db_plan,
+            }
+
         # User has active paid subscription in RevenueCat
+        expires_at = sync_data.expires_at
+        period_start = (sub_row.get("purchase_date") if sub_row else None) or now
+        # Infer promo when product_id indicates promo (rc_promo_*, promo*) and platform not set
+        platform = sync_data.platform
+        if not platform and sync_data.product_id:
+            pid = (sync_data.product_id or "").lower()
+            if "rc_promo" in pid or pid.startswith("promo"):
+                platform = "promo"
+        # Promo: no auto-renew, ends at period end
+        is_promo = platform == "promo"
         subscription_data = {
             "user_id": user_id,
             "plan": revenuecat_plan,
             "status": "active",
-            "platform": sync_data.platform,
+            "platform": platform,
             "product_id": sync_data.product_id,
-            "expires_date": sync_data.expires_at,
-            "auto_renew": sync_data.will_renew,
+            "expires_date": expires_at,
+            "current_period_start": period_start,
+            "current_period_end": expires_at,
+            "auto_renew": False if is_promo else sync_data.will_renew,
             "updated_at": now,
         }
+        if is_promo:
+            subscription_data["cancel_at_period_end"] = True
 
-        if existing_sub.data:
+        if existing_sub and existing_sub.data:
             # Update existing subscription
             supabase.table("subscriptions").update(subscription_data).eq(
                 "user_id", user_id
@@ -246,9 +280,23 @@ async def sync_subscription(
 
     else:
         # User is free in RevenueCat (no active subscription)
+        # Do NOT downgrade admin_granted subscriptions: they are managed in DB only,
+        # not in RevenueCat. Syncing from RevenueCat would incorrectly overwrite them.
+        sub_row = existing_sub.data if (existing_sub and existing_sub.data) else None
+        existing_platform = sub_row.get("platform") if sub_row else None
+        if existing_platform == "admin_granted":
+            logger.info(
+                f"[Sync] Skipping downgrade - user {user_id} has admin_granted subscription"
+            )
+            return {
+                "synced": False,
+                "message": "Admin-granted subscription - not syncing from RevenueCat",
+                "plan": current_db_plan,
+            }
+
         if current_db_plan != "free":
             # User was paid but now free - subscription expired
-            if existing_sub.data:
+            if existing_sub and existing_sub.data:
                 supabase.table("subscriptions").update(
                     {
                         "status": "expired",

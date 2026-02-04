@@ -10,19 +10,11 @@ import {
   type NotificationHistoryItem,
   type NotificationType
 } from "@/services/api/notifications";
+import { notificationHistoryQueryKeys } from "./queryKeys";
 
-// Re-export types for convenience
+// Re-export types and query keys for convenience
 export type { NotificationHistoryItem, NotificationType };
-
-// Query keys
-export const notificationHistoryQueryKeys = {
-  all: ["notificationHistory"] as const,
-  list: (type?: string) =>
-    type
-      ? ([...notificationHistoryQueryKeys.all, "list", type] as const)
-      : ([...notificationHistoryQueryKeys.all, "list"] as const),
-  unreadCount: () => [...notificationHistoryQueryKeys.all, "unreadCount"] as const
-};
+export { notificationHistoryQueryKeys };
 
 // API functions
 const PAGE_SIZE = 20;

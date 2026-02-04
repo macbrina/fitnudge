@@ -2,8 +2,14 @@
 const nextConfig = {
   images: {
     localPatterns: [
+      { pathname: '/mockups/**' },
+      { pathname: '/images/**' },
+    ],
+    remotePatterns: [
       {
-        pathname: '/mockups/**',
+        protocol: 'https',
+        hostname: '*.supabase.co',
+        pathname: '/storage/v1/object/public/**',
       },
     ],
   },

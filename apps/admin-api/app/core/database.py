@@ -5,9 +5,21 @@ Uses Supabase service role for full access
 
 from supabase import create_client, Client
 from app.core.config import settings
-from typing import Optional
+from typing import Optional, Any
 
 _supabase_client: Optional[Client] = None
+
+
+def first_row(data: Any) -> Any:
+    """
+    Get first row from Supabase result.
+    maybe_single() returns dict; select/insert/update return list.
+    """
+    if data is None:
+        return None
+    if isinstance(data, list):
+        return data[0] if data else None
+    return data
 
 
 def get_supabase_client() -> Client:

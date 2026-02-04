@@ -6,14 +6,9 @@ import {
   AchievementStats
 } from "@/services/api";
 import { useAuthStore } from "@/stores/authStore";
+import { achievementsQueryKeys } from "./queryKeys";
 
-// Query Keys
-export const achievementsQueryKeys = {
-  all: ["achievements"] as const,
-  types: () => [...achievementsQueryKeys.all, "types"] as const,
-  myAchievements: () => [...achievementsQueryKeys.all, "my"] as const,
-  stats: () => [...achievementsQueryKeys.all, "stats"] as const
-} as const;
+export { achievementsQueryKeys };
 
 // Empty placeholders - commented out to show proper loading skeletons
 // const EMPTY_ACHIEVEMENTS: UserAchievement[] = [];

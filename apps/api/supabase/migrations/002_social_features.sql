@@ -112,30 +112,6 @@ CREATE INDEX idx_user_achievements_goal ON user_achievements(goal_id);
 CREATE INDEX idx_user_achievements_unlocked ON user_achievements(unlocked_at DESC);
 
 -- =====================================================
--- REFERRAL SYSTEM
--- =====================================================
-CREATE TABLE referral_codes (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE UNIQUE,
-  code TEXT NOT NULL UNIQUE,
-  uses_count INTEGER DEFAULT 0,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE referral_redemptions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  referrer_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  referred_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  referral_code_id UUID REFERENCES referral_codes(id),
-  reward_granted BOOLEAN DEFAULT false,
-  redeemed_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE INDEX idx_referral_codes_user ON referral_codes(user_id);
-CREATE INDEX idx_referral_codes_code ON referral_codes(code);
-CREATE INDEX idx_referral_redemptions_referrer ON referral_redemptions(referrer_id);
-
--- =====================================================
 -- TRIGGERS
 -- =====================================================
 CREATE TRIGGER update_accountability_partners_updated_at

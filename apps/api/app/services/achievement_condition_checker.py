@@ -260,32 +260,41 @@ class AchievementConditionChecker:
     async def _check_account_age(
         self, supabase: Any, user_id: str, target_value: int
     ) -> ConditionResult:
-        """Check if account is at least X days old"""
-        result = (
-            supabase.table("users")
-            .select("created_at")
-            .eq("id", user_id)
-            .single()
-            .execute()
-        )
+        """Check if account is at least X days old. Returns (False, 0) if user not found."""
+        try:
+            result = (
+                supabase.table("users")
+                .select("created_at")
+                .eq("id", user_id)
+                .maybe_single()
+                .execute()
+            )
 
-        if not result.data:
+            data = result.data if hasattr(result, "data") else None
+            if not data or not isinstance(data, dict):
+                return False, {"account_age_days": 0}
+
+            created_at_str = data.get("created_at")
+            if not created_at_str:
+                return False, {"account_age_days": 0}
+
+            # Parse the datetime
+            if isinstance(created_at_str, str):
+                created_at = datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
+            else:
+                created_at = created_at_str
+
+            tz = getattr(created_at, "tzinfo", None) or datetime.now().astimezone().tzinfo
+            days_since_creation = (datetime.now(tz) - created_at).days
+            return days_since_creation >= target_value, {
+                "account_age_days": days_since_creation
+            }
+        except Exception as e:
+            logger.warning(
+                f"Account age check failed for user {user_id}: {e}",
+                extra={"user_id": user_id, "target_value": target_value},
+            )
             return False, {"account_age_days": 0}
-
-        created_at_str = result.data.get("created_at")
-        if not created_at_str:
-            return False, {"account_age_days": 0}
-
-        # Parse the datetime
-        if isinstance(created_at_str, str):
-            created_at = datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
-        else:
-            created_at = created_at_str
-
-        days_since_creation = (datetime.now(created_at.tzinfo) - created_at).days
-        return days_since_creation >= target_value, {
-            "account_age_days": days_since_creation
-        }
 
     # ==========================================
     # STREAK CALCULATION HELPERS

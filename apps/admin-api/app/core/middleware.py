@@ -293,7 +293,7 @@ class AuditLoggingMiddleware(BaseHTTPMiddleware):
                     "admin_user_id": log_entry.get("admin_user_id"),
                     "action": f"{log_entry['method']} {log_entry['path']}",
                     "resource_type": "admin_api",
-                    "details": log_entry,
+                    "new_values": log_entry,
                 }
             ).execute()
         except Exception as e:

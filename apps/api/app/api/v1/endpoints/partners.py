@@ -721,6 +721,7 @@ async def search_users_for_partners(
 
     try:
         # Search users by name or username with pagination
+        # Only role='user' - exclude admins from partner search
         result = (
             supabase.table("users")
             .select(
@@ -729,6 +730,7 @@ async def search_users_for_partners(
             .or_(f"name.ilike.%{query}%,username.ilike.%{query}%")
             .neq("id", user_id)  # Exclude current user
             .eq("status", "active")
+            .eq("role", "user")  # Only regular users, not admins
             .not_.is_(
                 "onboarding_completed_at", "null"
             )  # Only users who completed onboarding
@@ -907,10 +909,12 @@ async def get_suggested_partners(
         # We fetch more than needed to allow for scoring and filtering
         fetch_limit = min(limit * 5, 100)  # Fetch up to 5x or 100 candidates
 
+        # Only role='user' - exclude admins from partner suggestions
         users_query = (
             supabase.table("users")
             .select("id, name, username, profile_picture_url, timezone, last_active_at")
             .eq("status", "active")
+            .eq("role", "user")
             .not_.is_(
                 "onboarding_completed_at", "null"
             )  # Only users who completed onboarding

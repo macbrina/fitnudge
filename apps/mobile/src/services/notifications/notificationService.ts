@@ -675,8 +675,9 @@ class NotificationService {
 
   /**
    * Complete notification data wipe for account deletion/disabled/suspended.
-   * Cancels ALL scheduled notifications, clears preferences, and unregisters device.
-   * This is a complete reset - use only when user account is gone.
+   * Cancels ALL scheduled notifications and clears preferences.
+   * Unregister is handled by clearOnLogout (authStore) when user still exists.
+   * Notification permission is device-level - we do not reset permissionStatus.
    */
   public async clearAllNotificationData(): Promise<void> {
     try {
@@ -687,18 +688,8 @@ class NotificationService {
       await storageUtil.removeItem(STORAGE_KEYS.NOTIFICATION_PREFERENCES);
       await storageUtil.removeItem(STORAGE_KEYS.NOTIFICATION_SOFT_PROMPT_SHOWN);
 
-      // Unregister device from backend
-      if (this.fcmToken) {
-        try {
-          await notificationsService.unregisterDevice(this.fcmToken);
-        } catch (error) {
-          console.error("Failed to unregister device from backend:", error);
-        }
-      }
-
-      // Reset all in-memory state
+      // Clear FCM token (device will re-register when new user logs in)
       this.fcmToken = null;
-      this.permissionStatus = "undetermined";
     } catch (error) {
       console.error("Failed to clear all notification data:", error);
     }

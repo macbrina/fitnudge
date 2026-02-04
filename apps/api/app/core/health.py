@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from supabase import create_client, Client
 
@@ -54,8 +54,7 @@ class HealthReport(BaseModel):
     timestamp: datetime
     checks: List[HealthCheckResult]
 
-    class Config:
-        json_encoders = {datetime: lambda dt: dt.isoformat()}
+    model_config = ConfigDict()
 
 
 logger = logging.getLogger(__name__)

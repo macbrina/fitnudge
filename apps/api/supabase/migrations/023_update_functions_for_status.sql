@@ -133,6 +133,7 @@ RETURNS TABLE (
   push_token TEXT,
   days_missed INT
 ) AS $$
+#variable_conflict use_column
 BEGIN
   RETURN QUERY
   WITH missed_dates AS (
@@ -143,25 +144,25 @@ BEGIN
       AND ci.check_in_date < CURRENT_DATE
   ),
   with_gap AS (
-    SELECT user_id, d,
-           d - LAG(d) OVER (PARTITION BY user_id ORDER BY d) AS gap
-    FROM missed_dates
+    SELECT md.user_id, md.d,
+           md.d - LAG(md.d) OVER (PARTITION BY md.user_id ORDER BY md.d) AS gap
+    FROM missed_dates md
   ),
   run_groups AS (
-    SELECT user_id, d,
-           SUM(CASE WHEN gap IS NULL OR gap > 1 THEN 1 ELSE 0 END) OVER (PARTITION BY user_id ORDER BY d) AS run_id
-    FROM with_gap
+    SELECT wg.user_id, wg.d,
+           SUM(CASE WHEN wg.gap IS NULL OR wg.gap > 1 THEN 1 ELSE 0 END) OVER (PARTITION BY wg.user_id ORDER BY wg.d) AS run_id
+    FROM with_gap wg
   ),
   run_lengths AS (
-    SELECT user_id, COUNT(*)::INT AS run_len
-    FROM run_groups
-    GROUP BY user_id, run_id
+    SELECT rg.user_id, COUNT(*)::INT AS run_len
+    FROM run_groups rg
+    GROUP BY rg.user_id, rg.run_id
   ),
   eligible AS (
-    SELECT user_id, MAX(run_len)::INT AS max_consecutive
-    FROM run_lengths
-    GROUP BY user_id
-    HAVING MAX(run_len) >= min_days
+    SELECT rl.user_id, MAX(rl.run_len)::INT AS max_consecutive
+    FROM run_lengths rl
+    GROUP BY rl.user_id
+    HAVING MAX(rl.run_len) >= min_days
   )
   SELECT DISTINCT ON (u.id)
     u.id AS user_id,
@@ -182,6 +183,7 @@ BEGIN
   ORDER BY u.id;
 END;
 $$ LANGUAGE plpgsql;
+
 
 -- =====================================================
 -- 4. UPDATE: calculate_goal_metrics (from 021)

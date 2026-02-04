@@ -1,6 +1,7 @@
 /* Nunito font loaded via next/font/google in layout.tsx */
 
 @import "tailwindcss";
+@source "../components/**/*.{ts,tsx}";
 @import "tw-animate-css";
 
 @custom-variant dark (&:where(.dark, .dark *));

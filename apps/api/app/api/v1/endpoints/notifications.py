@@ -595,12 +595,16 @@ async def list_active_broadcasts(
     """
     List active admin broadcasts for the current user.
 
+    - Only for users who have completed onboarding (onboarding_completed_at is set).
     - Filter by is_active, starts_at/ends_at (server time).
     - Exclude broadcasts already in notification_history for this user
       (entity_type=admin_broadcast, entity_id=broadcast id).
     - Audience: all, free, premium; filter by user's effective plan.
     """
     try:
+        if not current_user.get("onboarding_completed_at"):
+            return []
+
         supabase = get_supabase_client()
         user_id = current_user["id"]
         now_utc = datetime.now(timezone.utc)

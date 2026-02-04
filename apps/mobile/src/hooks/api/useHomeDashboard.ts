@@ -2,12 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { homeService, HomeDashboardResponse } from "@/services/api";
 import { useAuthStore } from "@/stores/authStore";
 import { useUserTimezone } from "@/hooks/useUserTimezone";
-
-// Query keys for home dashboard
-export const homeDashboardQueryKeys = {
-  all: ["home"] as const,
-  dashboard: () => [...homeDashboardQueryKeys.all, "dashboard"] as const
-};
+import { homeDashboardQueryKeys } from "./queryKeys";
 
 /**
  * Empty dashboard data for placeholder (prevents loading spinners)

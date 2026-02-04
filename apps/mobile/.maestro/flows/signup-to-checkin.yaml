@@ -1,0 +1,103 @@
+# FitNudge E2E: Signup to Check-in
+# Requires: app installed, backend running
+# Run: maestro test .maestro/flows/signup-to-checkin.yaml
+#
+# Uses clearState for fresh app. Uses text selectors (no testID) so works without rebuild.
+
+appId: com.fitnudge.app
+
+---
+- launchApp:
+    clearState: true
+# Wait for carousel, tap Sign Up
+- extendedWaitUntil:
+    visible:
+      text: "Sign Up"
+    timeout: 15000
+- tapOn:
+    text: "Sign Up"
+# Signup form - REQUIRES app rebuild (testID on inputs)
+- extendedWaitUntil:
+    visible:
+      id: "username"
+    timeout: 10000
+- inputText:
+    id: "username"
+    text: "e2etest"
+- inputText:
+    id: "email"
+    text: "e2e-test@fitnudge-test.example.com"
+- inputText:
+    id: "password"
+    text: "TestPassword123!"
+- tapOn:
+    text: "Create account"
+# Notification
+- extendedWaitUntil:
+    visible:
+      text: "Maybe Later"
+    timeout: 10000
+- tapOn:
+    text: "Maybe Later"
+# Personalization
+- extendedWaitUntil:
+    visible:
+      text: "Continue"
+    timeout: 8000
+- inputText:
+    text: "Test User"
+- tapOn:
+    text: "Continue"
+- tapOn:
+    text: "Supportive Coach"
+    optional: true
+- tapOn:
+    text: "Continue"
+- tapOn:
+    text: "Work out regularly"
+    optional: true
+- tapOn:
+    text: "Continue"
+- tapOn:
+    text: "Daily"
+    optional: true
+- tapOn:
+    text: "Continue"
+- tapOn:
+    text: "Skip for now"
+    optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+- tapOn:
+    text: "Start Using FitNudge"
+# Subscription modal - tap X (accessibility "Close") or scroll past
+- extendedWaitUntil:
+    visible:
+      id: "subscription-close"
+    timeout: 5000
+    optional: true
+- tapOn:
+    id: "subscription-close"
+    optional: true
+# Home - use text (works without testID)
+- scrollUntilVisible:
+    element:
+      text: "Today's Goals"
+    direction: DOWN
+    timeout: 15000
+# Create goal
+- tapOn:
+    text: "Create First Goal"
+    optional: true
+- tapOn:
+    text: "Add"
+    optional: true
+- inputText:
+    text: "E2E Test Goal"
+- tapOn:
+    text: "Create Goal"
+# Check in
+- tapOn:
+    text: "Yes"
+    optional: true

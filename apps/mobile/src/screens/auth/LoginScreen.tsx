@@ -17,7 +17,6 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { Image, KeyboardAvoidingView, Platform, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { getRedirection, hasCompletedV2Onboarding } from "@/utils/getRedirection";
 import { useAlertModal } from "@/contexts/AlertModalContext";
 import {
   performNativeGoogleSignIn,
@@ -33,9 +32,10 @@ import {
 import type { LoginResponse } from "@/services/api/auth";
 import { ApiError } from "@/services/api/base";
 import { logger } from "@/services/logger";
+import { getAndClearPendingReferralCode } from "@/utils/referralStorage";
 
 export default function LoginScreen() {
-  const params = useLocalSearchParams<{ alertMessage?: string }>();
+  const params = useLocalSearchParams<{ alertMessage?: string; referral?: string }>();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
@@ -44,7 +44,7 @@ export default function LoginScreen() {
     password?: string;
   }>({});
 
-  const { login } = useAuthStore();
+  const { login, updateUser } = useAuthStore();
   const { t } = useTranslation();
   const styles = useStyles(makeLoginScreenStyles);
   const insets = useSafeAreaInsets();
@@ -55,8 +55,22 @@ export default function LoginScreen() {
   const [appleAvailable, setAppleAvailable] = useState(false);
   const [initialAlertShown, setInitialAlertShown] = useState(false);
   const [manualLoginAttempt, setManualLoginAttempt] = useState(false);
+  const [referralCode, setReferralCode] = useState("");
 
   const showGoogle = hasGoogleSignInConfiguration();
+
+  // Sync referral code from URL params or install referrer (for social signup creating new accounts)
+  useEffect(() => {
+    const referral = Array.isArray(params.referral) ? params.referral[0] : params.referral;
+
+    if (referral) {
+      setReferralCode(referral);
+      return;
+    }
+    getAndClearPendingReferralCode().then((pending) => {
+      if (pending) setReferralCode(pending);
+    });
+  }, [params.referral]);
   const showApple = Platform.OS === "ios" && appleAvailable;
 
   // Prefetch all critical data after login
@@ -105,31 +119,15 @@ export default function LoginScreen() {
 
   const handleSocialSuccess = async (payload: LoginResponse, provider: "google" | "apple") => {
     await login(payload.user, payload.access_token, payload.refresh_token);
+    updateUser(payload.user); // Ensure layout has response user for redirect logic
 
     capture("user_logged_in", {
       method: provider,
       user_id: payload.user.id
     });
 
-    // Prefetch critical data before navigating (ensures home screen has data)
-    await prefetchAfterAuth();
-
-    try {
-      // V2: Check if user has completed onboarding
-      const hasCompletedOnboarding = hasCompletedV2Onboarding(payload.user);
-      const destination = await getRedirection({ hasCompletedOnboarding });
-
-      // Defer navigation slightly to let auth state propagate through Stack.Protected guard
-      // This prevents double navigation when isAuthenticated changes
-      requestAnimationFrame(() => {
-        router.replace(destination);
-      });
-    } catch (redirectError) {
-      console.warn("[Login] Failed to compute redirection", redirectError);
-      requestAnimationFrame(() => {
-        router.replace(MOBILE_ROUTES.MAIN.HOME);
-      });
-    }
+    // Prefetch in background; layout handles redirect when isAuthenticated updates
+    prefetchAfterAuth().catch((e) => console.warn("[Login] Prefetch failed:", e));
   };
 
   const handleSocialError = async (message: string) => {
@@ -231,40 +229,23 @@ export default function LoginScreen() {
       {
         onSuccess: async (response) => {
           if (response.data) {
-            // Login the user with the returned data
+            // Login the user with the returned data (layout handles redirect)
             await login(
               response.data.user,
               response.data.access_token,
               response.data.refresh_token
             );
+            updateUser(response.data.user); // Ensure layout has response user for redirect logic
 
             // Handle remember me functionality
             if (rememberMe) {
-              // Store remember me preference for future logins
               await authService.setRememberMePreference(response.data.user.email, true);
             } else {
-              // Clear remember me preference if unchecked
               await authService.setRememberMePreference(response.data.user.email, false);
             }
 
-            // Prefetch critical data before navigating (ensures home screen has data)
-            await prefetchAfterAuth();
-
-            try {
-              // V2: Check if user has completed onboarding
-              const hasCompletedOnboarding = hasCompletedV2Onboarding(response.data.user);
-              const destination = await getRedirection({ hasCompletedOnboarding });
-
-              // Defer navigation slightly to let auth state propagate through Stack.Protected guard
-              // This prevents double navigation when isAuthenticated changes
-              requestAnimationFrame(() => {
-                router.replace(destination);
-              });
-            } catch (redirectError) {
-              requestAnimationFrame(() => {
-                router.replace(MOBILE_ROUTES.MAIN.HOME);
-              });
-            }
+            // Prefetch in background; layout handles redirect when isAuthenticated updates
+            prefetchAfterAuth().catch((e) => console.warn("[Login] Prefetch failed:", e));
           }
         },
         onError: async (error: unknown) => {
@@ -361,14 +342,17 @@ export default function LoginScreen() {
       setIsGoogleLoading(true);
       const { idToken } = await performNativeGoogleSignIn();
 
-      const response = await authService.loginWithGoogle(idToken);
+      const response = await authService.loginWithGoogle(idToken, referralCode.trim() || undefined);
 
       if (response.data) {
         await handleSocialSuccess(response.data, "google");
+        // Keep loading until redirect (auth layout handles it)
       } else {
+        setIsGoogleLoading(false);
         await handleSocialError(response.error || t("errors.authentication_error"));
       }
     } catch (error) {
+      setIsGoogleLoading(false);
       if (isGoogleCancelledError(error)) {
         return;
       }
@@ -384,8 +368,6 @@ export default function LoginScreen() {
       }
 
       void handleSocialError(errorMessage);
-    } finally {
-      setIsGoogleLoading(false);
     }
   };
 
@@ -404,33 +386,41 @@ export default function LoginScreen() {
       const credential = await performNativeAppleSignIn();
 
       if (!credential.identityToken) {
+        setIsAppleLoading(false);
         await handleSocialError(t("errors.authentication_error"));
         return;
       }
 
       if (!credential.authorizationCode) {
+        setIsAppleLoading(false);
         await handleSocialError(t("errors.authentication_error"));
         return;
       }
 
-      const response = await authService.loginWithApple({
-        identityToken: credential.identityToken,
-        authorizationCode: credential.authorizationCode,
-        email: credential.email ?? undefined,
-        fullName: credential.fullName
-          ? {
-              givenName: credential.fullName.givenName ?? undefined,
-              familyName: credential.fullName.familyName ?? undefined
-            }
-          : undefined
-      });
+      const response = await authService.loginWithApple(
+        {
+          identityToken: credential.identityToken,
+          authorizationCode: credential.authorizationCode,
+          email: credential.email ?? undefined,
+          fullName: credential.fullName
+            ? {
+                givenName: credential.fullName.givenName ?? undefined,
+                familyName: credential.fullName.familyName ?? undefined
+              }
+            : undefined
+        },
+        referralCode.trim() || undefined
+      );
 
       if (response.data) {
         await handleSocialSuccess(response.data, "apple");
+        // Keep loading until redirect (auth layout handles it)
       } else {
+        setIsAppleLoading(false);
         await handleSocialError(response.error || t("errors.authentication_error"));
       }
     } catch (error: any) {
+      setIsAppleLoading(false);
       if (isAppleCancelledError(error)) {
         return;
       }
@@ -446,8 +436,6 @@ export default function LoginScreen() {
       }
 
       await handleSocialError(errorMessage);
-    } finally {
-      setIsAppleLoading(false);
     }
   };
 
@@ -499,6 +487,7 @@ export default function LoginScreen() {
           {/* Form */}
           <View style={styles.form}>
             <TextInput
+              testID="email"
               label={t("auth.login.email_label")}
               placeholder={t("auth.login.email_placeholder")}
               value={email}
@@ -516,6 +505,7 @@ export default function LoginScreen() {
             />
 
             <TextInput
+              testID="password"
               label={t("auth.login.password_label")}
               placeholder={t("auth.login.password_placeholder")}
               value={password}
@@ -564,6 +554,7 @@ export default function LoginScreen() {
             {/* Sign Up Link */}
             <View style={styles.signupContainer}>
               <Button
+                testID="sign-up"
                 title={t("auth.login.no_account")}
                 onPress={() => router.push(MOBILE_ROUTES.AUTH.SIGNUP)}
                 variant="text"

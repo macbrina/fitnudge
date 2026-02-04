@@ -1,5 +1,5 @@
-import BackButton from "@/components/ui/BackButton";
 import Button from "@/components/ui/Button";
+import { useAlertModal } from "@/contexts/AlertModalContext";
 import { useResendVerification, useVerifyEmail } from "@/hooks/api/useAuth";
 import { usePostHog } from "@/hooks/usePostHog";
 import { fontFamily } from "@/lib/fonts";
@@ -8,10 +8,7 @@ import { toRN } from "@/lib/units";
 import { useAuthStore } from "@/stores/authStore";
 import { useStyles } from "@/themes/makeStyles";
 import { lineHeight } from "@/themes/tokens";
-import { getRedirection, hasCompletedV2Onboarding } from "@/utils/getRedirection";
-import { router } from "expo-router";
 import { useRef, useState } from "react";
-import { useAlertModal } from "@/contexts/AlertModalContext";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -197,13 +194,11 @@ export default function VerifyEmailScreen() {
       });
 
       if (response.data) {
-        // Update user in store with email_verified = true
-        useAuthStore.getState().updateUser({ email_verified: true });
-
-        // Get redirect URL based on onboarding status
-        const hasCompletedOnboarding = hasCompletedV2Onboarding(user);
-        const destination = await getRedirection({ hasCompletedOnboarding });
-        router.replace(destination);
+        // Update user in store from API response (layout consumes for redirect logic)
+        const userFromResponse = (response.data as { user?: Record<string, unknown> })?.user;
+        useAuthStore
+          .getState()
+          .updateUser(userFromResponse ? userFromResponse : { email_verified: true });
       } else {
         const errorMessage = response.error || t("auth.verify_email.error_invalid_code");
         setError(errorMessage);

@@ -86,4 +86,6 @@ export const getCurrentLanguage = (): SupportedLanguage => {
   return i18next.language as SupportedLanguage;
 };
 
+export { useTranslation } from "react-i18next";
+
 export default i18next;

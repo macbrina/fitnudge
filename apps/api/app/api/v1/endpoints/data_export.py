@@ -233,43 +233,45 @@ async def request_data_export(
 
     supabase = get_supabase_client()
 
-    # Check for recent export requests (rate limiting - 1 per 24 hours)
+    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
     recent_exports = (
         supabase.table("data_export_requests")
-        .select("*")
+        .select("id, status")
         .eq("user_id", user_id)
-        .gte(
-            "created_at",
-            (
-                datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-            ).isoformat(),
-        )
+        .gte("created_at", today_start)
+        .order("created_at", desc=True)
         .execute()
     )
 
-    if recent_exports.data and len(recent_exports.data) > 0:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="You can only request one data export per day. Please try again tomorrow.",
-        )
-
     try:
-        # Create export request record
-        export_result = (
-            supabase.table("data_export_requests")
-            .insert({"user_id": user_id, "status": "pending", "email": email})
-            .execute()
-        )
+        export_id = None
+        if recent_exports.data:
+            existing = recent_exports.data[0]
+            if existing["status"] == "failed":
+                export_id = existing["id"]
+                supabase.table("data_export_requests").update(
+                    {"status": "pending", "error_message": None, "completed_at": None}
+                ).eq("id", export_id).execute()
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="You can only request one data export per day. Please try again tomorrow.",
+                )
 
-        if not export_result.data:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to create export request",
+        if not export_id:
+            export_result = (
+                supabase.table("data_export_requests")
+                .insert({"user_id": user_id, "status": "pending", "email": email})
+                .execute()
             )
+            if not export_result.data:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to create export request",
+                )
+            export_id = export_result.data[0]["id"]
 
-        export_id = export_result.data[0]["id"]
-
-        # Add background task to generate export
+        # Add background task to generate export (runs after response is sent)
         background_tasks.add_task(generate_user_data_export, user_id, email, export_id)
 
         return DataExportResponse(

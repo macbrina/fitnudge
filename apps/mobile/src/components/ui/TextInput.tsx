@@ -30,6 +30,7 @@ export interface TextInputProps {
   maxLength?: number;
   onBlur?: () => void;
   onFocus?: () => void;
+  testID?: string;
 }
 
 const makeTextInputStyles = (tokens: any, colors: any, brandColors: any) => {
@@ -123,7 +124,8 @@ export const TextInput: React.FC<TextInputProps> = ({
   numberOfLines,
   maxLength,
   onBlur,
-  onFocus
+  onFocus,
+  testID
 }) => {
   const [isFocused, setIsFocused] = useState(false);
   const [isPasswordVisible, setIsPasswordVisible] = useState(!secureTextEntry);
@@ -165,6 +167,7 @@ export const TextInput: React.FC<TextInputProps> = ({
         {leftIcon && <View style={styles.leftIconContainer}>{leftIcon}</View>}
 
         <RNTextInput
+          testID={testID}
           style={getInputStyle()}
           placeholder={placeholder}
           placeholderTextColor={disabled ? colors.text.muted : colors.text.tertiary}

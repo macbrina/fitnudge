@@ -152,12 +152,13 @@ async def list_weekly_recaps(
                 detail="Weekly recaps require a premium subscription",
             )
 
-        # Get recaps from cache table
+        # Get recaps from cache table, most recent first (week_end desc = latest week first)
         result = (
             supabase.table("weekly_recaps")
             .select("*")
             .eq("user_id", current_user["id"])
-            .order("week_start", desc=True)
+            .order("week_end", desc=True)
+            .order("generated_at", desc=True)
             .range(offset, offset + limit - 1)
             .execute()
         )
@@ -277,10 +278,10 @@ async def get_recap_by_id(
 
         # Mark as viewed if not already viewed
         if not recap.get("viewed_at"):
-            from datetime import datetime
+            from datetime import datetime, timezone
 
             supabase.table("weekly_recaps").update(
-                {"viewed_at": datetime.utcnow().isoformat()}
+                {"viewed_at": datetime.now(timezone.utc).isoformat()}
             ).eq("id", recap_id).execute()
 
             # Check recap achievements (non-blocking)

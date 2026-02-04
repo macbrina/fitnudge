@@ -102,6 +102,9 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           return false;
         }
 
+        // Clear React Query cache to prevent data leakage between users
+        clearQueryCache();
+
         // IMMEDIATELY mark as not authenticated and logging out
         // This prevents race conditions where other code checks isAuthenticated
         set({
@@ -111,12 +114,6 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           accessToken: null,
           refreshToken: null
         });
-
-        // Clear tokens from cache immediately
-        await TokenManager.clearTokens();
-
-        // Clear React Query cache to prevent data leakage between users
-        clearQueryCache();
 
         // Clear all user-specific stores to prevent data leakage
         try {
@@ -160,6 +157,8 @@ export const useAuthStore = create<AuthState & AuthActions>()(
             }
 
             const response = await authService.logout();
+            // Clear tokens from cache immediately
+            await TokenManager.clearTokens();
             if (response.status >= 200 && response.status < 400) {
               success = true;
             } else if (response.status === 401) {

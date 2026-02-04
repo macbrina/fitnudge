@@ -66,5 +66,11 @@ Uses the same environment variables as the main API:
 - `GET /api/tasks/{id}` - Task details
 - `POST /api/tasks/{id}/revoke` - Revoke a task
 
+**Data export** runs in Celery workers. Start admin-api workers (use `-Q admin` so they only consume admin tasks, not main API tasks):
+```bash
+cd apps/admin-api
+poetry run celery -A celery_worker worker -Q admin --loglevel=info
+```
+
 ### Analytics
 - `GET /api/analytics/dashboard` - Admin dashboard stats

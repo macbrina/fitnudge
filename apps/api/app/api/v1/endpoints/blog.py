@@ -503,7 +503,7 @@ async def update_blog_post(
 
     update_data = {
         k: v
-        for k, v in post_data.dict().items()
+        for k, v in post_data.model_dump().items()
         if v is not None and k not in ["category_ids", "tag_ids"]
     }
 

@@ -37,7 +37,7 @@ import { useSubscriptionStore } from "@/stores/subscriptionStore";
 import { useAICoachStore } from "@/stores/aiCoachStore";
 import { aiCoachQueryKeys } from "@/hooks/api/queryKeys";
 import { TokenManager } from "@/services/api/base";
-import { achievementsQueryKeys } from "@/hooks/api/useAchievements";
+import { achievementsQueryKeys } from "@/hooks/api/queryKeys";
 import {
   goalsQueryKeys,
   checkInsQueryKeys,
@@ -47,11 +47,12 @@ import {
   userQueryKeys,
   blogQueryKeys
 } from "@/hooks/api/queryKeys";
-import { notificationHistoryQueryKeys } from "@/hooks/api/useNotificationHistory";
+import { referralQueryKeys } from "@/hooks/api/useReferral";
+import { notificationHistoryQueryKeys } from "@/hooks/api/queryKeys";
 import { broadcastsQueryKeys } from "@/hooks/api/useBroadcasts";
 import { useDeletedBroadcastIdsStore } from "@/stores/deletedBroadcastIdsStore";
 import { dailyMotivationsQueryKeys } from "@/hooks/api/useDailyMotivations";
-import { homeDashboardQueryKeys } from "@/hooks/api/useHomeDashboard";
+import { homeDashboardQueryKeys } from "@/hooks/api/queryKeys";
 import { analyticsQueryKeys } from "@/hooks/api/useAnalytics";
 import { analyticsService } from "@/services/api/analytics";
 import { getLastAnalyticsParams } from "@/hooks/api/useAnalytics";
@@ -89,7 +90,9 @@ const REALTIME_TABLES = [
   // Blog
   "blog_posts",
   // Admin broadcasts
-  "notifications"
+  "notifications",
+  // Referrals (ReferralScreen)
+  "referrals"
 ] as const;
 
 type RealtimeTable = (typeof REALTIME_TABLES)[number];
@@ -449,6 +452,9 @@ class RealtimeService {
           { event: "*", schema: "public", table: "notifications" },
           (payload) => this.handleChange("notifications", payload)
         )
+        .on("postgres_changes", { event: "*", schema: "public", table: "referrals" }, (payload) =>
+          this.handleChange("referrals", payload)
+        )
         .on(
           "postgres_changes",
           { event: "*", schema: "public", table: "users", filter: `id=eq.${this.userId}` },
@@ -547,6 +553,9 @@ class RealtimeService {
         break;
       case "notifications":
         this.handleNotificationsChange(payload);
+        break;
+      case "referrals":
+        this.handleReferralsChange(payload);
         break;
     }
   }
@@ -2385,6 +2394,24 @@ class RealtimeService {
       scheduleInvalidate(broadcastsQueryKeys.active());
       scheduleRefetch(broadcastsQueryKeys.active(), "active");
     }
+  }
+
+  // ========================================
+  // REFERRALS (ReferralScreen)
+  // ========================================
+
+  private async handleReferralsChange(payload: RealtimePostgresChangesPayload<any>) {
+    if (!this.queryClient) return;
+
+    logger.debug("[Realtime] 🎁 Referrals change, invalidating referral queries", {
+      event: payload.eventType
+    });
+
+    await this.queryClient.cancelQueries({ queryKey: referralQueryKeys.all });
+    scheduleInvalidate(referralQueryKeys.code());
+    scheduleInvalidate(referralQueryKeys.referrals());
+    scheduleRefetch(referralQueryKeys.code(), "active");
+    scheduleRefetch(referralQueryKeys.referrals(), "active");
   }
 
   // ========================================

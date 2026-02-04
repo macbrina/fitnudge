@@ -9,7 +9,7 @@
  */
 
 import { checkInsQueryKeys, goalsQueryKeys, userQueryKeys } from "@/hooks/api/queryKeys";
-import { homeDashboardQueryKeys } from "@/hooks/api/useHomeDashboard";
+import { homeDashboardQueryKeys } from "./queryKeys";
 import { useGoalNotifications } from "@/hooks/notifications/useGoalNotifications";
 import { CreateGoalRequest, Goal, goalsService, UpdateGoalRequest } from "@/services/api/goals";
 import { ApiError } from "@/services/api/base";
@@ -1049,14 +1049,13 @@ export const useCompleteGoal = () => {
  * Premium feature - returns empty array for free users
  */
 export const useGoalInsights = (goalId: string, enabled: boolean = true) => {
-  console.log("[useGoalInsights] goalId", goalId);
-  console.log("[useGoalInsights] enabled", enabled);
   return useQuery({
     queryKey: goalsQueryKeys.insights(goalId),
     queryFn: () => goalsService.getGoalInsights(goalId),
     enabled: enabled && !!goalId,
     staleTime: 1000 * 60 * 60, // 1 hour - insights don't change often
-    gcTime: 1000 * 60 * 60 * 24 // Keep for 24 hours
+    gcTime: 1000 * 60 * 60 * 24, // Keep for 24 hours
+    refetchOnMount: true // Always fetch fresh data on mount to prevent stale check-in counts
     // staleTime: 0, // Always refetch for testing
     // refetchOnMount: "always",
   });

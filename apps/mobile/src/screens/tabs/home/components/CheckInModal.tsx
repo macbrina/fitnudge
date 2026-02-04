@@ -32,6 +32,7 @@ import { fontFamily } from "@/lib/fonts";
 import { useTranslation } from "@/lib/i18n";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useCreateCheckIn, useCheckInStats } from "@/hooks/api/useCheckIns";
+import { usePostHog } from "@/hooks/usePostHog";
 import { useAlertModal } from "@/contexts/AlertModalContext";
 import { CheckInMood, MOODS, SKIP_REASONS, SkipReason } from "@/services/api/checkins";
 import Button from "@/components/ui/Button";
@@ -97,6 +98,7 @@ export function CheckInModal({ isVisible, goal, onClose, onSuccess }: CheckInMod
   // Mutations and stats (for first-check-in rating prompt)
   const createCheckIn = useCreateCheckIn();
   const { data: stats } = useCheckInStats();
+  const { capture } = usePostHog();
 
   // Scroll ref for auto-scrolling to note input
   const scrollViewRef = useRef<ScrollView>(null);
@@ -241,6 +243,12 @@ export function CheckInModal({ isVisible, goal, onClose, onSuccess }: CheckInMod
     const attemptSubmit = (retryCount: number) => {
       createCheckIn.mutate(checkInPayload, {
         onSuccess: (res) => {
+          capture("check_in_completed", {
+            completed: checkInPayload.completed,
+            is_rest_day: checkInPayload.is_rest_day ?? false,
+            goal_id: checkInPayload.goal_id,
+            mood: checkInPayload.mood
+          });
           if (uri != null && dur != null && res?.data?.id) {
             voiceNotesService.uploadVoiceNote(res.data.id, uri, dur).catch((e) => {
               const msg = e?.response?.data?.detail ?? e?.message ?? String(e);

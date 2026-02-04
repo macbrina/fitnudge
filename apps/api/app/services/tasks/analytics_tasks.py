@@ -147,7 +147,7 @@ def _process_user_recaps(user_ids: List[str]) -> int:
         Number of successfully processed recaps
     """
     from app.services.weekly_recap_service import weekly_recap_service
-    from app.services.subscription_service import has_user_feature
+    from app.services.subscription_service import has_user_feature_sync
     from app.services.expo_push_service import send_push_to_user_sync
     from datetime import date, timedelta
     import asyncio
@@ -168,16 +168,16 @@ def _process_user_recaps(user_ids: List[str]) -> int:
     skipped_count = 0
     notified_count = 0
 
-    # Calculate week_start for deduplication (Monday = start of current week)
+    # Calculate week_start for the PREVIOUS week (Mon-Sun that just ended)
+    # Matches the recap we generate (for_previous_week=True)
     today = date.today()
-    week_start = today - timedelta(days=today.weekday())
+    week_end = today - timedelta(days=1)  # Sunday of previous week
+    week_start = week_end - timedelta(days=6)  # Monday of previous week
 
     for user_id in user_ids:
         try:
-            # Check if user has premium weekly_recap feature
-            has_feature = loop.run_until_complete(
-                has_user_feature(supabase, user_id, "weekly_recap")
-            )
+            # Check if user has premium weekly_recap feature (sync for Celery)
+            has_feature = has_user_feature_sync(supabase, user_id, "weekly_recap")
 
             if not has_feature:
                 skipped_count += 1
@@ -187,10 +187,13 @@ def _process_user_recaps(user_ids: List[str]) -> int:
             # 1. Checks cache first
             # 2. Generates if not cached
             # 3. Stores in weekly_recaps table
+            # for_previous_week=True: Generate for the week that just ended (Mon-Sun),
+            # not week-to-date. On Monday, that's the full previous week.
             recap = loop.run_until_complete(
                 weekly_recap_service.get_weekly_recap(
                     user_id=user_id,
                     force_regenerate=True,  # Force regenerate for batch job
+                    for_previous_week=True,  # Full week that just ended
                 )
             )
 
@@ -218,6 +221,17 @@ def _process_user_recaps(user_ids: List[str]) -> int:
                     )
 
                     if not existing_notif.data:
+                        # Get recap id from weekly_recaps for entity_id (UUID)
+                        recap_row = (
+                            supabase.table("weekly_recaps")
+                            .select("id")
+                            .eq("user_id", user_id)
+                            .eq("week_start", week_start.isoformat())
+                            .maybe_single()
+                            .execute()
+                        )
+                        recap_id = recap_row.data.get("id") if recap_row.data else None
+
                         # Build notification body with stats
                         stats = recap.get("stats", {})
                         total_checkins = stats.get(
@@ -230,7 +244,7 @@ def _process_user_recaps(user_ids: List[str]) -> int:
                         # send_push_to_user_sync handles preference & quiet hours check
                         result = send_push_to_user_sync(
                             user_id=user_id,
-                            title="Your Weekly Recap is Ready! 📊",
+                            title="Your Weekly Report! 📊",
                             body=body,
                             data={
                                 "type": "weekly_recap",
@@ -239,7 +253,7 @@ def _process_user_recaps(user_ids: List[str]) -> int:
                             },
                             notification_type="weekly_recap",
                             entity_type="weekly_recap",
-                            entity_id=week_start.isoformat(),
+                            entity_id=recap_id,  # UUID from weekly_recaps table
                             category_id="weekly_recap",  # Adds "View Recap" action button
                         )
                         if not result.get("skipped"):

@@ -68,6 +68,8 @@ class AppleOAuth(BaseModel):
     full_name: Optional[dict] = None
     device_info: Optional[DeviceInfo] = None
     referral_code: Optional[str] = None  # Referral code for new users
+    timezone: Optional[str] = None  # IANA timezone from device (e.g. 'America/New_York')
+    country: Optional[str] = None  # ISO 3166-1 alpha-2 from device (e.g. 'US')
 
 
 class GoogleOAuth(BaseModel):
@@ -75,6 +77,8 @@ class GoogleOAuth(BaseModel):
     access_token: Optional[str] = None
     device_info: Optional[DeviceInfo] = None
     referral_code: Optional[str] = None  # Referral code for new users
+    timezone: Optional[str] = None  # IANA timezone from device (e.g. 'America/New_York')
+    country: Optional[str] = None  # ISO 3166-1 alpha-2 from device (e.g. 'US')
 
 
 class TokenRefresh(BaseModel):
@@ -478,11 +482,12 @@ async def signup(user_data: UserSignup, request: Request):
         # Create user (this should NOT fail even if email sending fails)
         # Exclude device_info and referral_code from user data (handled separately)
         # country is included in user_dict for storage
-        user_dict = user_data.dict(exclude={"device_info", "referral_code"})
+        user_dict = user_data.model_dump(exclude={"device_info", "referral_code"})
         user = await create_user(user_dict)
 
         # Handle referral system
         from app.services.referral_service import (
+            create_referral_record,
             generate_referral_code,
             get_referrer_by_code,
         )
@@ -500,6 +505,7 @@ async def signup(user_data: UserSignup, request: Request):
                     f"User {user['id']} was referred by {referrer_id}",
                     {"referral_code": user_data.referral_code},
                 )
+                await create_referral_record(referrer_id, user["id"])
 
         # Update user with referral info (bonus granted later when they subscribe)
         supabase.table("users").update(
@@ -551,6 +557,11 @@ async def signup(user_data: UserSignup, request: Request):
                 "auth_provider": user.get("auth_provider", "email"),
                 "referral_code": new_referral_code,
             }
+
+        # Analytics: track signup
+        from app.core.analytics import track_user_signup
+
+        track_user_signup(user["id"], user.get("auth_provider", "email"))
 
         return {
             "access_token": access_token,
@@ -637,6 +648,11 @@ async def login(credentials: UserLogin, request: Request):
     ).execute()
     user["last_login_at"] = current_timestamp
 
+    # Analytics: track login
+    from app.core.analytics import track_user_login
+
+    track_user_login(user["id"], user.get("auth_provider", "email"))
+
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,
@@ -713,6 +729,10 @@ async def google_oauth(oauth_data: GoogleOAuth, request: Request):
 
         display_name = full_name or username
 
+        # Prefer device timezone/country from client; Google token rarely has timezone
+        tz = oauth_data.timezone or token_data.get("timezone") or "UTC"
+        country = oauth_data.country
+
         user = await create_user(
             {
                 "email": email,
@@ -721,7 +741,8 @@ async def google_oauth(oauth_data: GoogleOAuth, request: Request):
                 "auth_provider": "google",
                 "email_verified": email_verified,
                 "plan": "free",
-                "timezone": token_data.get("timezone") or "UTC",
+                "timezone": tz,
+                "country": country,
                 "language": token_data.get("locale", "en"),
                 "profile_picture_url": picture,
             }
@@ -730,6 +751,7 @@ async def google_oauth(oauth_data: GoogleOAuth, request: Request):
 
         # Handle referral for new OAuth users - always generate referral code
         from app.services.referral_service import (
+            create_referral_record,
             generate_referral_code,
             get_referrer_by_code,
         )
@@ -746,6 +768,7 @@ async def google_oauth(oauth_data: GoogleOAuth, request: Request):
                     f"Google OAuth user {user['id']} was referred by {referrer_id}",
                     {"referral_code": oauth_data.referral_code},
                 )
+                await create_referral_record(referrer_id, user["id"])
 
         # Store referral code (and referrer if any)
         supabase.table("users").update(
@@ -801,6 +824,13 @@ async def google_oauth(oauth_data: GoogleOAuth, request: Request):
     refresh_token = create_refresh_token(
         {"user_id": user["id"]}, device_info=device_info
     )
+
+    from app.core.analytics import track_user_login, track_user_signup
+
+    if is_new_user:
+        track_user_signup(user["id"], "google")
+    else:
+        track_user_login(user["id"], "google")
 
     return {
         "access_token": access_token,
@@ -865,6 +895,7 @@ async def apple_oauth(oauth_data: AppleOAuth, request: Request):
         if existing_user:
             user = existing_user
 
+    is_new_user = False
     if not user:
         if not email:
             raise HTTPException(
@@ -879,6 +910,10 @@ async def apple_oauth(oauth_data: AppleOAuth, request: Request):
 
         display_name = full_name or username
 
+        # Use device timezone/country from client; Apple token does not include these
+        tz = oauth_data.timezone or "UTC"
+        country = oauth_data.country
+
         user = await create_user(
             {
                 "email": email,
@@ -887,13 +922,16 @@ async def apple_oauth(oauth_data: AppleOAuth, request: Request):
                 "auth_provider": "apple",
                 "email_verified": email_verified,
                 "plan": "free",
-                "timezone": "UTC",
+                "timezone": tz,
+                "country": country,
                 "language": payload.get("locale", "en"),
             }
         )
+        is_new_user = True
 
         # Handle referral for new OAuth users - always generate referral code
         from app.services.referral_service import (
+            create_referral_record,
             generate_referral_code,
             get_referrer_by_code,
         )
@@ -910,6 +948,7 @@ async def apple_oauth(oauth_data: AppleOAuth, request: Request):
                     f"Apple OAuth user {user['id']} was referred by {referrer_id}",
                     {"referral_code": oauth_data.referral_code},
                 )
+                await create_referral_record(referrer_id, user["id"])
 
         # Store referral code (and referrer if any)
         supabase.table("users").update(
@@ -958,6 +997,13 @@ async def apple_oauth(oauth_data: AppleOAuth, request: Request):
     refresh_token = create_refresh_token(
         {"user_id": user["id"]}, device_info=device_info
     )
+
+    from app.core.analytics import track_user_login, track_user_signup
+
+    if is_new_user:
+        track_user_signup(user["id"], "apple")
+    else:
+        track_user_login(user["id"], "apple")
 
     return {
         "access_token": access_token,

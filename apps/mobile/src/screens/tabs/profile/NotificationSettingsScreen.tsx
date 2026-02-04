@@ -73,6 +73,13 @@ export default function NotificationSettingsScreen() {
   } = useNotificationPreferences();
   const updatePreferencesMutation = useUpdateNotificationPreferences();
 
+  const [refreshing, setRefreshing] = useState(false);
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  }, [refetch]);
+
   const { enabled: liveActivitiesEnabled, refresh: refreshLiveActivitiesStatus } =
     useLiveActivitiesStatus();
 
@@ -197,8 +204,8 @@ export default function NotificationSettingsScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={isLoading}
-            onRefresh={() => refetch()}
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
             tintColor={brandColors.primary}
           />
         }

@@ -145,7 +145,7 @@ export default function HomeScreen() {
           <AICoachCard onPress={() => openAICoach()} />
 
           {/* Today's Goals Section */}
-          <View style={styles.goalsSection}>
+          <View style={styles.goalsSection} testID="todays-goals">
             <Text style={styles.sectionTitle}>{t("home.todays_goals")}</Text>
 
             {isLoading ? (

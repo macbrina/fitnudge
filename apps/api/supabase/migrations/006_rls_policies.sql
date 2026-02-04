@@ -11,8 +11,6 @@ ALTER TABLE accountability_partners ENABLE ROW LEVEL SECURITY;
 ALTER TABLE social_nudges ENABLE ROW LEVEL SECURITY;
 ALTER TABLE achievement_types ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_achievements ENABLE ROW LEVEL SECURITY;
-ALTER TABLE referral_codes ENABLE ROW LEVEL SECURITY;
-ALTER TABLE referral_redemptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ai_coach_conversations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ai_coach_daily_usage ENABLE ROW LEVEL SECURITY;
 ALTER TABLE weekly_recaps ENABLE ROW LEVEL SECURITY;
@@ -342,20 +340,6 @@ CREATE POLICY data_export_select_own ON data_export_requests
 CREATE POLICY data_export_insert_own ON data_export_requests
   FOR INSERT TO authenticated
   WITH CHECK (user_id = get_user_id_from_auth());
-
--- =====================================================
--- REFERRAL POLICIES
--- =====================================================
-CREATE POLICY referral_codes_select_own ON referral_codes
-  FOR SELECT TO authenticated
-  USING (user_id = get_user_id_from_auth());
-
-CREATE POLICY referral_redemptions_select_own ON referral_redemptions
-  FOR SELECT TO authenticated
-  USING (
-    referrer_id = get_user_id_from_auth() 
-    OR referred_id = get_user_id_from_auth()
-  );
 
 -- =====================================================
 -- AUTH TOKENS (User-specific or denied)

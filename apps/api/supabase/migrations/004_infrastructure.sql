@@ -164,7 +164,7 @@ CREATE TABLE subscriptions (
   user_id UUID REFERENCES users(id) ON DELETE CASCADE UNIQUE,
   plan TEXT NOT NULL DEFAULT 'free' REFERENCES subscription_plans(id),
   status TEXT DEFAULT 'active' CHECK (status IN ('active', 'cancelled', 'expired', 'trial', 'grace_period', 'billing_issue')),
-  platform TEXT CHECK (platform IN ('ios', 'android', 'web')), -- Platform where subscription was made
+  platform TEXT CHECK (platform IN ('ios', 'android', 'web', 'admin_granted', 'promo')), -- Platform: ios/android/web (IAP), admin_granted, promo (referral)
   product_id TEXT, -- RevenueCat product identifier
   original_transaction_id TEXT, -- Apple/Google transaction ID
   purchase_date TIMESTAMPTZ, -- When the subscription was originally purchased
@@ -176,6 +176,7 @@ CREATE TABLE subscriptions (
   current_period_end TIMESTAMPTZ,
   trial_end TIMESTAMPTZ,
   cancelled_at TIMESTAMPTZ,
+  cancel_at_period_end BOOLEAN DEFAULT false,
   cancel_reason TEXT,
   grace_period_ends_at TIMESTAMPTZ, -- End date of grace period during billing issues
   revenuecat_event_id TEXT, -- The ID of the last RevenueCat webhook event processed
@@ -380,7 +381,7 @@ CREATE TABLE audit_logs (
   admin_user_id UUID REFERENCES users(id), -- References admin user (if admin action)
   action TEXT NOT NULL,
   resource_type TEXT NOT NULL,
-  resource_id UUID,
+  resource_id TEXT,
   old_values JSONB,
   new_values JSONB,
   ip_address INET,
@@ -474,6 +475,7 @@ CREATE TABLE blog_posts (
   content TEXT NOT NULL, -- rich text content
   excerpt TEXT,
   featured_image_url TEXT,
+  is_featured BOOLEAN NOT NULL DEFAULT false,
   status TEXT DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'archived')),
   author_id UUID NOT NULL REFERENCES users(id),
   published_at TIMESTAMP WITH TIME ZONE,
@@ -515,6 +517,7 @@ CREATE TABLE blog_post_tags (
 CREATE INDEX idx_blog_posts_slug ON blog_posts(slug);
 CREATE INDEX idx_blog_posts_status ON blog_posts(status);
 CREATE INDEX idx_blog_posts_published ON blog_posts(published_at DESC) WHERE status = 'published';
+CREATE INDEX idx_blog_posts_is_featured ON blog_posts(is_featured) WHERE is_featured = true;
 
 -- =====================================================
 -- TRIGGERS
@@ -542,6 +545,24 @@ CREATE TRIGGER update_plan_features_updated_at
 CREATE TRIGGER update_blog_posts_updated_at
   BEFORE UPDATE ON blog_posts
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- When a post is set to is_featured=true, unset all other featured posts (only one featured at a time)
+CREATE OR REPLACE FUNCTION unset_other_featured_posts()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.is_featured = true AND (TG_OP = 'INSERT' OR OLD.is_featured IS DISTINCT FROM NEW.is_featured) THEN
+    UPDATE blog_posts
+    SET is_featured = false
+    WHERE id != NEW.id AND is_featured = true;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+CREATE TRIGGER trigger_unset_other_featured
+  BEFORE INSERT OR UPDATE ON blog_posts
+  FOR EACH ROW
+  WHEN (NEW.is_featured = true)
+  EXECUTE FUNCTION unset_other_featured_posts();
 
 CREATE TRIGGER update_oauth_accounts_updated_at
   BEFORE UPDATE ON oauth_accounts

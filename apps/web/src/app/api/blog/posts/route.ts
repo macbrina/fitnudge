@@ -8,6 +8,8 @@ import type {
 } from "@/lib/blog/types";
 import { NextRequest, NextResponse } from "next/server";
 
+const POSTS_PER_PAGE = 6;
+
 // Type for Supabase joined post result
 interface PostWithRelations extends DbBlogPost {
   author: { id: string; name: string; profile_picture_url: string | null };
@@ -22,7 +24,6 @@ function transformPost(
   categories: DbBlogCategory[],
   tags: DbBlogTag[],
 ): BlogPost {
-  // Estimate read time based on content length (average 200 words per minute)
   const wordCount = post.content.split(/\s+/).length;
   const readTime = Math.max(1, Math.ceil(wordCount / 200));
 
@@ -33,6 +34,7 @@ function transformPost(
     content: post.content,
     excerpt: post.excerpt || undefined,
     featured_image: post.featured_image_url || undefined,
+    is_featured: post.is_featured ?? false,
     status: post.status,
     published_at: post.published_at || undefined,
     created_at: post.created_at,
@@ -66,6 +68,7 @@ export async function GET(request: NextRequest) {
   const search = searchParams.get("search");
   const limit = parseInt(searchParams.get("limit") || "10");
   const offset = parseInt(searchParams.get("offset") || "0");
+  const page = parseInt(searchParams.get("page") || "1");
 
   const supabase = getServerClient();
 
@@ -76,8 +79,156 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const defaultAuthor = {
+    id: "",
+    name: "Anonymous",
+    profile_picture_url: null as string | null,
+  };
+
+  function mapToBlogPost(post: PostWithRelations): BlogPost {
+    const categories =
+      post.blog_post_categories
+        ?.map((pc) => pc.category)
+        .filter((c): c is DbBlogCategory => c !== null) || [];
+    const tags =
+      post.blog_post_tags
+        ?.map((pt) => pt.tag)
+        .filter((t): t is DbBlogTag => t !== null) || [];
+    const author = post.author ?? defaultAuthor;
+    return transformPost(post, author, categories, tags);
+  }
+
   try {
-    // Build the query for posts
+    const hasCategoryOrTagOrSearch = !!(category || tag || search);
+
+    // Featured-aware pagination: only when no category/tag/search filter
+    if (!hasCategoryOrTagOrSearch) {
+      const { data: featuredRow } = await supabase
+        .from("blog_posts")
+        .select(
+          `
+          *,
+          author:users!author_id(id, name, profile_picture_url),
+          blog_post_categories(
+            category:blog_categories(*)
+          ),
+          blog_post_tags(
+            tag:blog_tags(*)
+          )
+        `
+        )
+        .eq("status", "published")
+        .eq("is_featured", true)
+        .limit(1)
+        .maybeSingle();
+
+      const hasFeatured = !!featuredRow;
+      const featuredPost = featuredRow ? mapToBlogPost(featuredRow as PostWithRelations) : null;
+
+      const { count: totalCount } = await supabase
+        .from("blog_posts")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "published");
+
+      const total = totalCount ?? 0;
+
+      if (page === 1) {
+        const gridLimit = POSTS_PER_PAGE;
+        const excludeId = featuredPost?.id;
+
+        const gridQuery = supabase
+          .from("blog_posts")
+          .select(
+            `
+            *,
+            author:users!author_id(id, name, profile_picture_url),
+            blog_post_categories(
+              category:blog_categories(*)
+            ),
+            blog_post_tags(
+              tag:blog_tags(*)
+            )
+          `
+          )
+          .eq("status", "published")
+          .order("published_at", { ascending: false });
+
+        if (excludeId) {
+          gridQuery.neq("id", excludeId);
+        }
+
+        const { data: gridRows } = await gridQuery.range(0, gridLimit - 1);
+
+        const gridPosts = (gridRows || []).map((p) => mapToBlogPost(p as PostWithRelations));
+
+        const posts = hasFeatured && featuredPost
+          ? [featuredPost, ...gridPosts]
+          : gridPosts;
+
+        const totalPages = hasFeatured
+          ? total <= 7
+            ? 1
+            : 1 + Math.ceil((total - 7) / POSTS_PER_PAGE)
+          : Math.ceil(total / POSTS_PER_PAGE);
+
+        const response: BlogListResponse = {
+          posts,
+          total,
+          page: 1,
+          per_page: hasFeatured ? 7 : 6,
+          total_pages: Math.max(1, totalPages),
+          has_featured: hasFeatured,
+        };
+        return NextResponse.json(response);
+      }
+
+      const pageOffset = (page - 1) * POSTS_PER_PAGE;
+      const excludeId = featuredPost?.id;
+
+      let listQuery = supabase
+        .from("blog_posts")
+        .select(
+          `
+          *,
+          author:users!author_id(id, name, profile_picture_url),
+          blog_post_categories(
+            category:blog_categories(*)
+          ),
+          blog_post_tags(
+            tag:blog_tags(*)
+          )
+        `,
+          { count: "exact" }
+        )
+        .eq("status", "published")
+        .order("published_at", { ascending: false });
+
+      if (excludeId) {
+        listQuery = listQuery.neq("id", excludeId);
+      }
+
+      const { data: listRows, count: listCount } = await listQuery.range(
+        pageOffset,
+        pageOffset + POSTS_PER_PAGE - 1
+      );
+
+      const posts = (listRows || []).map((p) => mapToBlogPost(p as PostWithRelations));
+      const totalPages = hasFeatured
+        ? Math.ceil((total - 1) / POSTS_PER_PAGE)
+        : Math.ceil(total / POSTS_PER_PAGE);
+
+      const response: BlogListResponse = {
+        posts,
+        total,
+        page,
+        per_page: POSTS_PER_PAGE,
+        total_pages: Math.max(1, totalPages),
+        has_featured: hasFeatured,
+      };
+      return NextResponse.json(response);
+    }
+
+    // With category/tag/search: standard pagination, no featured
     let query = supabase
       .from("blog_posts")
       .select(
@@ -91,20 +242,15 @@ export async function GET(request: NextRequest) {
           tag:blog_tags(*)
         )
       `,
-        { count: "exact" },
+        { count: "exact" }
       )
       .eq("status", "published")
       .order("published_at", { ascending: false });
 
-    // Filter by category - need to filter after fetch for nested relations
-    // Filter by tag - need to filter after fetch for nested relations
-
-    // Search in title and excerpt
     if (search) {
       query = query.or(`title.ilike.%${search}%,excerpt.ilike.%${search}%`);
     }
 
-    // Apply pagination
     query = query.range(offset, offset + limit - 1);
 
     const { data: posts, error, count } = await query;
@@ -116,33 +262,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Transform posts
-    let transformedPosts: BlogPost[] = (posts as PostWithRelations[]).map(
-      (post) => {
-        const categories =
-          post.blog_post_categories
-            ?.map((pc) => pc.category)
-            .filter((c): c is DbBlogCategory => c !== null) || [];
-        const tags =
-          post.blog_post_tags
-            ?.map((pt) => pt.tag)
-            .filter((t): t is DbBlogTag => t !== null) || [];
+    let transformedPosts: BlogPost[] = (posts as PostWithRelations[]).map(mapToBlogPost);
 
-        return transformPost(post, post.author, categories, tags);
-      },
-    );
-
-    // Filter by category (client-side filtering for nested relation)
     if (category) {
       transformedPosts = transformedPosts.filter((post) =>
-        post.categories.some((cat) => cat.slug === category),
+        post.categories.some((cat) => cat.slug === category)
       );
     }
-
-    // Filter by tag (client-side filtering for nested relation)
     if (tag) {
       transformedPosts = transformedPosts.filter((post) =>
-        post.tags.some((t) => t.slug === tag),
+        post.tags.some((t) => t.slug === tag)
       );
     }
 
