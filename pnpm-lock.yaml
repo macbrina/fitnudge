@@ -204,9 +204,6 @@ importers:
       '@fitnudge/ui':
         specifier: workspace:*
         version: link:../../packages/ui
-      '@launchdarkly/react-native-client-sdk':
-        specifier: ^10.11.0
-        version: 10.12.5(react-native@0.81.5(@babel/core@7.28.6)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
       '@notifee/react-native':
         specifier: ^9.1.8
         version: 9.1.8(react-native@0.81.5(@babel/core@7.28.6)(@types/react@19.1.17)(react@19.1.0))
@@ -351,9 +348,6 @@ importers:
       i18next:
         specifier: ^23.0.0
         version: 23.16.8
-      launchdarkly-react-native-client-sdk:
-        specifier: ^9.4.2
-        version: 9.4.2(react-native@0.81.5(@babel/core@7.28.6)(@types/react@19.1.17)(react@19.1.0))
       lucide-react-native:
         specifier: ^0.548.0
         version: 0.548.0(react-native-svg@15.12.1(react-native@0.81.5(@babel/core@7.28.6)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0))(react-native@0.81.5(@babel/core@7.28.6)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
@@ -2151,18 +2145,6 @@ packages:
     resolution: {integrity: sha512-Qbo4NEj48SQ4k8FZJHFE2fgZDKTWaUGmVxcIQh3msg5JezLdTMMHuRRDYctfdHI6L0FZGObmEv3haWbIvmol8w==}
     peerDependencies:
       '@jsamr/counter-style': ^1.0.0 || ^2.0.0
-      react: 19.1.0
-      react-native: '*'
-
-  '@launchdarkly/js-client-sdk-common@1.17.1':
-    resolution: {integrity: sha512-ZwzMKwP3qfhpDzkjQG76PITYsrvQUT+YfqFv4MHjoD96PNRcYRhzULhDewC51OBKajWjFMYmi5MvAXZtIMDWAQ==}
-
-  '@launchdarkly/js-sdk-common@2.20.0':
-    resolution: {integrity: sha512-g1Lyi5xL7AXAP6BP8BzRcqVqIhqOSVpA5Bx8Vvj8A/4A6sIHVz2vIZluykD/bJiKg1+G9ojm+OCfdL/c0ebi0A==}
-
-  '@launchdarkly/react-native-client-sdk@10.12.5':
-    resolution: {integrity: sha512-gtY1eMVRWvijoaGsgnsz63qXYpG/N83bG/1UooasQJyQbBxYWUsxdDo5cskG2Az+wWjDn6vDMgigvW7MkTnNhA==}
-    peerDependencies:
       react: 19.1.0
       react-native: '*'
 
@@ -5373,9 +5355,6 @@ packages:
   exponential-backoff@3.1.3:
     resolution: {integrity: sha512-ZgEeZXj30q+I0EN+CbSSpIyPaJ5HVQD18Z1m+u1FXbAeT94mr1zw50q4q6jiiC447Nl/YTcIYSAftiGqetwXCA==}
 
-  fast-deep-equal@2.0.1:
-    resolution: {integrity: sha512-bCK/2Z4zLidyB4ReuIsvALH6w31YfAQDmXMqMx6FyfHqvBxtjC0eRumeSu4Bs3XtXwpyIywtSTrVT99BxY1f9w==}
-
   fast-deep-equal@3.1.3:
     resolution: {integrity: sha512-f3qQ9oQy9j2AhBe/H9VC91wLmKBCCU/gDOnKNAYG5hswO7BLKj09Hc5HYNz9cGI++xlpDCIgDaitVs03ATR84Q==}
 
@@ -6315,14 +6294,6 @@ packages:
 
   launch-editor@2.12.0:
     resolution: {integrity: sha512-giOHXoOtifjdHqUamwKq6c49GzBdLjvxrd2D+Q4V6uOHopJv7p9VJxikDsQ/CBXZbEITgUqSVHXLTG3VhPP1Dg==}
-
-  launchdarkly-js-sdk-common@5.0.3:
-    resolution: {integrity: sha512-wKG8UsVbPVq8+7eavgAm5CVmulQWN6Ddod2ZoA3euZ1zPvJPwIQ2GrOYaCJr3cFrrMIX+nQyBJHBHYxUAPcM+Q==}
-
-  launchdarkly-react-native-client-sdk@9.4.2:
-    resolution: {integrity: sha512-bkuTlPFdht/pvfdl4+bkuNDFeWCco1cVFlnPgZQxfZv7LS8f2S/+krOVJFD0vboP77nDYozgXtuUT1V0l6XhrQ==}
-    peerDependencies:
-      react-native: '>=0.69.0 <0.74.0'
 
   leven@3.1.0:
     resolution: {integrity: sha512-qsda+H8jTaUaN/x5vzW2rzc+8Rw4TAQ/4KjB46IwK5VH+IlVeeeje/EoZRpiXvIqjFgK84QffqPztGI3VBLG1A==}
@@ -11173,20 +11144,6 @@ snapshots:
       react: 19.1.0
       react-native: 0.81.5(@babel/core@7.28.6)(@types/react@19.1.17)(react@19.1.0)
 
-  '@launchdarkly/js-client-sdk-common@1.17.1':
-    dependencies:
-      '@launchdarkly/js-sdk-common': 2.20.0
-
-  '@launchdarkly/js-sdk-common@2.20.0': {}
-
-  '@launchdarkly/react-native-client-sdk@10.12.5(react-native@0.81.5(@babel/core@7.28.6)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)':
-    dependencies:
-      '@launchdarkly/js-client-sdk-common': 1.17.1
-      '@react-native-async-storage/async-storage': 2.2.0(react-native@0.81.5(@babel/core@7.28.6)(@types/react@19.1.17)(react@19.1.0))
-      base64-js: 1.5.1
-      react: 19.1.0
-      react-native: 0.81.5(@babel/core@7.28.6)(@types/react@19.1.17)(react@19.1.0)
-
   '@native-html/css-processor@1.11.0(@types/react-native@0.73.0(@babel/core@7.28.6)(@types/react@19.1.17)(react@19.1.0))(@types/react@19.1.17)':
     dependencies:
       '@types/react': 19.1.17
@@ -15426,8 +15383,6 @@ snapshots:
 
   exponential-backoff@3.1.3: {}
 
-  fast-deep-equal@2.0.1: {}
-
   fast-deep-equal@3.1.3: {}
 
   fast-diff@1.3.0: {}
@@ -16647,17 +16602,6 @@ snapshots:
     dependencies:
       picocolors: 1.1.1
       shell-quote: 1.8.3
-
-  launchdarkly-js-sdk-common@5.0.3:
-    dependencies:
-      base64-js: 1.5.1
-      fast-deep-equal: 2.0.1
-      uuid: 8.3.2
-
-  launchdarkly-react-native-client-sdk@9.4.2(react-native@0.81.5(@babel/core@7.28.6)(@types/react@19.1.17)(react@19.1.0)):
-    dependencies:
-      launchdarkly-js-sdk-common: 5.0.3
-      react-native: 0.81.5(@babel/core@7.28.6)(@types/react@19.1.17)(react@19.1.0)
 
   leven@3.1.0: {}
 
