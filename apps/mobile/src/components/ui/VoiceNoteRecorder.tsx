@@ -69,8 +69,8 @@ export function VoiceNoteRecorder({
   const [audioLevel, setAudioLevel] = useState(0);
 
   const progressAnim = useRef(new Animated.Value(0)).current;
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const meteringRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<number | null>(null);
+  const meteringRef = useRef<number | null>(null);
   const recordingStateRef = useRef(recordingState);
   const hasStartedImmediatelyRef = useRef(false);
   const elapsedMsRef = useRef(0);

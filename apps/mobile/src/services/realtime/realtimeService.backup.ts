@@ -100,18 +100,18 @@ class RealtimeService {
   private connectionState: ConnectionState = "disconnected";
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
-  private reconnectTimeout: NodeJS.Timeout | null = null;
+  private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
   private userId: string | null = null;
   private appStateSubscription: { remove: () => void } | null = null;
   private lastAppState: AppStateStatus = "active";
   private isReconnecting = false;
-  private reconnectDebounceTimeout: NodeJS.Timeout | null = null;
+  private reconnectDebounceTimeout: ReturnType<typeof setTimeout> | null = null;
 
   // Track last processed AI coach message to avoid duplicate updates
   private lastProcessedAIMessageAt: string | null = null;
 
   // Health check to detect stale connections
-  private healthCheckInterval: NodeJS.Timeout | null = null;
+  private healthCheckInterval: ReturnType<typeof setInterval> | null = null;
   private readonly HEALTH_CHECK_INTERVAL_MS = 60000; // Check every 60 seconds
   private lastHealthCheckSuccess: number = Date.now();
   private readonly STALE_THRESHOLD_MS = 120000; // Consider stale after 2 minutes of failed checks

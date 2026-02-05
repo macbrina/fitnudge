@@ -1,6 +1,114 @@
 import "dotenv/config";
+import fs from "fs";
+import path from "path";
 import { ConfigContext, ExpoConfig } from "expo/config";
-import { withPodfile } from "expo/config-plugins";
+import {
+  withPodfile,
+  withAndroidManifest,
+  withDangerousMod,
+  AndroidConfig
+} from "expo/config-plugins";
+import { parseStringPromise, Builder } from "xml2js";
+
+const FCM_NOTIFICATION_COLOR = "com.google.firebase.messaging.default_notification_color";
+const NOTIFICATION_COLOR_RESOURCE = "@color/notification_icon_color";
+
+/**
+ * Fix manifest merger conflicts:
+ * 1. Firebase notification color (expo-notifications vs react-native-firebase)
+ * 2. appComponentFactory (AndroidX vs old support library)
+ */
+function withAndroidManifestFixes(config: ExpoConfig): ExpoConfig {
+  return withAndroidManifest(config, (c) => {
+    const { removeMetaDataItemFromMainApplication } = AndroidConfig.Manifest;
+    AndroidConfig.Manifest.ensureToolsAvailable(c.modResults);
+    const app = AndroidConfig.Manifest.getMainApplicationOrThrow(c.modResults);
+
+    // 1. Firebase notification color
+    removeMetaDataItemFromMainApplication(app, FCM_NOTIFICATION_COLOR);
+    const metaData = (app["meta-data"] ??= []);
+    (metaData as Array<{ $: Record<string, string> }>).push({
+      $: {
+        "android:name": FCM_NOTIFICATION_COLOR,
+        "android:resource": NOTIFICATION_COLOR_RESOURCE,
+        "tools:replace": "android:resource"
+      }
+    });
+
+    // 2. appComponentFactory (AndroidX vs com.android.support)
+    // Must specify the value when using tools:replace, otherwise merger fails
+    const app$ = app.$ as Record<string, string>;
+    app$["android:appComponentFactory"] = "androidx.core.app.CoreComponentFactory";
+    const existing = app$["tools:replace"] ?? "";
+    const toAdd = "android:appComponentFactory";
+    app$["tools:replace"] = existing ? `${existing},${toAdd}` : toAdd;
+
+    return c;
+  });
+}
+
+/**
+ * Same fix for debug AndroidManifest.xml (generated during prebuild).
+ * Patches the file after it exists to add tools:replace.
+ */
+function withFirebaseNotificationColorDebugFix(config: ExpoConfig): ExpoConfig {
+  return withDangerousMod(config, [
+    "android",
+    async (c) => {
+      const debugManifestPath = path.join(
+        c.modRequest.platformProjectRoot,
+        "app",
+        "src",
+        "debug",
+        "AndroidManifest.xml"
+      );
+
+      if (!fs.existsSync(debugManifestPath)) return c;
+
+      const xml = fs.readFileSync(debugManifestPath, "utf8");
+      const manifest = await parseStringPromise(xml);
+
+      const manifestAttrs = (manifest.manifest.$ ??= {});
+      manifestAttrs["xmlns:tools"] ??= "http://schemas.android.com/tools";
+
+      const application = manifest.manifest.application?.[0];
+      if (!application) return c;
+
+      const metaData = (application["meta-data"] ??= []);
+
+      // Remove existing, add our own with tools:replace
+      const filtered = metaData.filter(
+        (item: { $?: { "android:name"?: string } }) =>
+          item?.$?.["android:name"] !== FCM_NOTIFICATION_COLOR
+      );
+      metaData.length = 0;
+      metaData.push(...filtered);
+      metaData.push({
+        $: {
+          "android:name": FCM_NOTIFICATION_COLOR,
+          "android:resource": NOTIFICATION_COLOR_RESOURCE,
+          "tools:replace": "android:resource"
+        }
+      });
+
+      // appComponentFactory (AndroidX vs com.android.support)
+      // Must specify the value when using tools:replace, otherwise merger fails
+      const app$ = (application.$ ??= {}) as Record<string, string>;
+      app$["android:appComponentFactory"] = "androidx.core.app.CoreComponentFactory";
+      const existing = app$["tools:replace"] ?? "";
+      const toAdd = "android:appComponentFactory";
+      app$["tools:replace"] = existing ? `${existing},${toAdd}` : toAdd;
+
+      const builder = new Builder({
+        xmldec: { version: "1.0", encoding: "utf-8" },
+        renderOpts: { pretty: true, indent: "  ", newline: "\n" }
+      });
+
+      fs.writeFileSync(debugManifestPath, builder.buildObject(manifest), "utf8");
+      return c;
+    }
+  ]);
+}
 
 const RNFB_PODFILE_SNIPPET = `
   # --- RNFirebase non-modular header fix (Expo SDK 54 + use_frameworks) ---
@@ -13,6 +121,45 @@ const RNFB_PODFILE_SNIPPET = `
   end
   # --- end fix ---
 `;
+
+/**
+ * Exclude legacy com.android.support dependencies to fix duplicate class error
+ * (checkDebugDuplicateClasses) when AndroidX and support library are both on classpath.
+ */
+function withExcludeSupportLibrary(config: ExpoConfig): ExpoConfig {
+  return withDangerousMod(config, [
+    "android",
+    async (c) => {
+      const buildGradlePath = path.join(c.modRequest.platformProjectRoot, "build.gradle");
+      if (!fs.existsSync(buildGradlePath)) return c;
+
+      let contents = fs.readFileSync(buildGradlePath, "utf8");
+      if (contents.includes("Exclude legacy com.android.support")) return c;
+
+      const exclusionBlock = `
+// --- Exclude legacy com.android.support (fix duplicate class vs AndroidX) ---
+subprojects { subproject ->
+  subproject.configurations.all {
+    exclude group: "com.android.support"
+  }
+}
+// --- end fix ---
+`;
+
+      // Insert before the last apply plugin lines
+      const insertPoint = contents.indexOf('apply plugin: "expo-root-project"');
+      if (insertPoint !== -1) {
+        contents =
+          contents.slice(0, insertPoint) + exclusionBlock + "\n" + contents.slice(insertPoint);
+      } else {
+        contents = contents.trimEnd() + "\n" + exclusionBlock + "\n";
+      }
+
+      fs.writeFileSync(buildGradlePath, contents, "utf8");
+      return c;
+    }
+  ]);
+}
 
 function withRNFBNonModularHeadersFix(config: ExpoConfig): ExpoConfig {
   return withPodfile(config, (c) => {
@@ -64,7 +211,10 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   // Use `any` here so `tsc --noEmit` passes.
   const plugins: any[] = [
     ...filteredPlugins,
+    withExcludeSupportLibrary,
     withRNFBNonModularHeadersFix,
+    withAndroidManifestFixes,
+    withFirebaseNotificationColorDebugFix,
     [
       googlePluginName,
       {

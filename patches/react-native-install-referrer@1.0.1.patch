@@ -1,0 +1,20 @@
+diff --git a/android/build.gradle b/android/build.gradle
+index f4f131982ab871288943963076f5bd3ba2c0c0e4..ec4af14b2db76b50674374a0fa3ff83c9b1b7387 100644
+--- a/android/build.gradle
++++ b/android/build.gradle
+@@ -12,12 +12,11 @@ buildscript {
+ apply plugin: 'com.android.library'
+ 
+ android {
+-    compileSdkVersion 23
+-    buildToolsVersion "23.0.1"
++    compileSdkVersion 36
+ 
+     defaultConfig {
+-        minSdkVersion 16
+-        targetSdkVersion 22
++        minSdkVersion 24
++        targetSdkVersion 36
+         versionCode 1
+         versionName "1.0"
+     }

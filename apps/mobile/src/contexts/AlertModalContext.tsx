@@ -418,7 +418,7 @@ export const AlertModalProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [queue, setQueue] = useState<AlertRequest[]>([]);
   const [currentAlert, setCurrentAlert] = useState<AlertRequest | null>(null);
   const [visible, setVisible] = useState(false);
-  const autoCloseTimer = useRef<NodeJS.Timeout | null>(null);
+  const autoCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!currentAlert && queue.length > 0) {

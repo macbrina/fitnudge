@@ -219,7 +219,7 @@ export function useAICoachChat() {
   );
 
   // Timeout ref for recovery check when waiting too long
-  const recoveryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const recoveryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Clear recovery timeout
   const clearRecoveryTimeout = useCallback(() => {

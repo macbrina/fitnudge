@@ -19,7 +19,8 @@
       "@types/*": ["src/types/*"],
       "@locales/*": ["./locales/*"],
       "@themes/*": ["src/themes/src/*"],
-      "@ui/*": ["../../packages/ui/src/*"]
+      "@ui/*": ["../../packages/ui/src/*"],
+      "@plugins/*": ["plugins/*"]
     },
     "types": ["react-native", "node", "jest"],
     "allowSyntheticDefaultImports": true,

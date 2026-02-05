@@ -80,7 +80,7 @@ export interface SubscriptionStatus {
   tier: SubscriptionTier;
   expiresAt: Date | null;
   willRenew: boolean;
-  platform: "ios" | "android" | "stripe" | null;
+  platform: "ios" | "android" | "stripe" | "promo" | null;
   isInTrial: boolean;
   isInGracePeriod: boolean;
   managementUrl: string | null;

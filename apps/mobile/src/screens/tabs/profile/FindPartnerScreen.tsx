@@ -60,7 +60,7 @@ export const FindPartnerScreen: React.FC = () => {
   const activeTab: PartnerTab = activeTabIndex === 0 ? "search" : "suggested";
 
   // Debounce search query
-  const debounceTimeout = React.useRef<NodeJS.Timeout | null>(null);
+  const debounceTimeout = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleSearchChange = useCallback((text: string) => {
     setSearchQuery(text);
     if (debounceTimeout.current) {
