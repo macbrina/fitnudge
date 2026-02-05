@@ -66,11 +66,10 @@ export function VoiceNoteRecorder({
   const [duration, setDuration] = useState(0);
   const [playbackPosition, setPlaybackPosition] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [audioLevel, setAudioLevel] = useState(0);
 
   const progressAnim = useRef(new Animated.Value(0)).current;
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const meteringRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<number | null>(null);
+  const meteringRef = useRef<number | null>(null);
   const recordingStateRef = useRef(recordingState);
   const hasStartedImmediatelyRef = useRef(false);
   const elapsedMsRef = useRef(0);
@@ -158,28 +157,6 @@ export function VoiceNoteRecorder({
     }
   }, [startImmediately, hasPremium, recordingState]);
 
-  // Metering for audio visualization
-  const startMetering = useCallback(() => {
-    meteringRef.current = setInterval(() => {
-      if (audioRecorder && recordingStateRef.current === "recording") {
-        // Get current metering value (dB, typically -160 to 0)
-        // Note: currentMetering may not be available on all versions of expo-audio
-        const metering = (audioRecorder as { currentMetering?: number }).currentMetering ?? -160;
-        // Normalize to 0-1 range (assuming -60dB is silence, 0dB is max)
-        const normalized = Math.max(0, Math.min(1, (metering + 60) / 60));
-        setAudioLevel(normalized);
-      }
-    }, METERING_UPDATE_INTERVAL);
-  }, [audioRecorder]);
-
-  const stopMetering = useCallback(() => {
-    if (meteringRef.current) {
-      clearInterval(meteringRef.current);
-      meteringRef.current = null;
-    }
-    setAudioLevel(0);
-  }, []);
-
   const startRecording = async () => {
     if (!hasPremium) {
       openModal();
@@ -217,16 +194,12 @@ export function VoiceNoteRecorder({
           stopRecordingRef.current?.();
         }
       }, 50);
-
-      startMetering();
     } catch (err) {
       console.error("Failed to start recording:", err);
     }
   };
 
   const pauseRecording = async () => {
-    stopMetering();
-
     try {
       audioRecorder.pause();
       setRecordingState("paused");
@@ -255,16 +228,12 @@ export function VoiceNoteRecorder({
           stopRecordingRef.current?.();
         }
       }, 50);
-
-      startMetering();
     } catch (err) {
       console.error("Failed to resume recording:", err);
     }
   };
 
   const stopRecording = async (): Promise<{ uri: string | null; duration: number }> => {
-    stopMetering();
-
     const noResult = { uri: null as string | null, duration: 0 };
     try {
       if (timerRef.current) {
@@ -316,7 +285,6 @@ export function VoiceNoteRecorder({
   const deleteRecording = async () => {
     // If currently recording or paused, stop first
     if (recordingState === "recording" || recordingState === "paused") {
-      stopMetering();
       try {
         await audioRecorder.stop();
         await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
