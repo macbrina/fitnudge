@@ -12,7 +12,6 @@ import { useBackendHealthMonitor } from "@/hooks/useBackendHealthMonitor";
 import { prefetchAppConfig } from "@/hooks/api/useAppConfig";
 import { MaintenanceGate } from "@/components/maintenance";
 import { PostHogProvider } from "@/providers/PostHogProvider";
-import { LaunchDarklyProvider } from "@/services/launchDarklyProvider";
 import { logger } from "@/services/logger";
 import { ThemeProvider, useTheme } from "@/themes";
 import { setupDeepLinkListener } from "@/utils/deepLinkHandler";
@@ -56,7 +55,6 @@ try {
 }
 
 // QueryClient is now imported from @/lib/queryClient with persistent cache
-// LaunchDarkly is now handled by the provider pattern
 
 function SafeAreaWrapper() {
   const { colors } = useTheme();
@@ -152,8 +150,6 @@ function ThemedRootWrapper({ children }: { children: ReactNode }) {
     </GestureHandlerRootView>
   );
 }
-
-// LaunchDarkly user identification is now handled by the provider
 
 function RootLayout(): ReactElement {
   // Lock to portrait on app start
@@ -280,24 +276,22 @@ function RootLayout(): ReactElement {
           <ThemeProvider initialBrand="fitnudge">
             <ThemedRootWrapper>
               <PostHogProvider>
-                <LaunchDarklyProvider>
-                  <RealtimeProvider>
-                    <NotificationProvider>
-                      <AlertModalProvider>
-                        <RevenueCatProvider>
-                          <AppUpdateProvider autoShow showDelay={3000}>
-                            <MaintenanceGate>
-                              <StatusBarWrapper />
-                              <SafeAreaWrapper />
-                              <SystemStatusListener />
-                              <AppBadgeSync />
-                            </MaintenanceGate>
-                          </AppUpdateProvider>
-                        </RevenueCatProvider>
-                      </AlertModalProvider>
-                    </NotificationProvider>
-                  </RealtimeProvider>
-                </LaunchDarklyProvider>
+                <RealtimeProvider>
+                  <NotificationProvider>
+                    <AlertModalProvider>
+                      <RevenueCatProvider>
+                        <AppUpdateProvider autoShow showDelay={3000}>
+                          <MaintenanceGate>
+                            <StatusBarWrapper />
+                            <SafeAreaWrapper />
+                            <SystemStatusListener />
+                            <AppBadgeSync />
+                          </MaintenanceGate>
+                        </AppUpdateProvider>
+                      </RevenueCatProvider>
+                    </AlertModalProvider>
+                  </NotificationProvider>
+                </RealtimeProvider>
               </PostHogProvider>
             </ThemedRootWrapper>
           </ThemeProvider>
