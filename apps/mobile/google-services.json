@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "983919404313-mp2pgj2g8nktq2q8o5jaefcbmu1sie17.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.fitnudge.app",
+            "certificate_hash": "5c4ebffb0cc2fa2e09050461c6869fef8dc8e470"
+          }
+        },
+        {
           "client_id": "983919404313-c8jerlaht010velr9negkehobeqt4ede.apps.googleusercontent.com",
           "client_type": 3
         }
