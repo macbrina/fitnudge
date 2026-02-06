@@ -17,7 +17,9 @@ interface RedirectionOptions {
  *
  * @param options.hasCompletedOnboarding - If true, skip personalization (user.onboarding_completed_at is set)
  */
-export async function getRedirection(options: RedirectionOptions = {}): Promise<string> {
+export async function getRedirection(
+  options: RedirectionOptions = {}
+): Promise<string> {
   const { hasCompletedOnboarding } = options;
 
   try {

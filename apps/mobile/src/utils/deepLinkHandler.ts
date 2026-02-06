@@ -1,5 +1,6 @@
 import { router } from "expo-router";
 import { MOBILE_ROUTES } from "@/lib/routes";
+import { storageUtil, STORAGE_KEYS } from "@/utils/storageUtil";
 import * as Linking from "expo-linking";
 import { queryClient } from "@/lib/queryClient";
 import {
@@ -26,6 +27,20 @@ async function isUserAuthenticated(): Promise<boolean> {
 type AuthRedirectType = "signup" | "login";
 
 /**
+ * Route unauthenticated user to auth screen, or onboarding first if they haven't seen it.
+ * Prevents deep links from bypassing onboarding for first-time users.
+ */
+async function routeToAuthOrOnboarding(authUrl: string): Promise<void> {
+  const hasSeenOnboarding = await storageUtil.getItem<boolean>(STORAGE_KEYS.HAS_SEEN_ONBOARDING);
+  if (!hasSeenOnboarding) {
+    const params = new URLSearchParams({ redirectTo: authUrl });
+    router.push(`${MOBILE_ROUTES.ONBOARDING.MAIN}?${params.toString()}`);
+  } else {
+    router.push(authUrl);
+  }
+}
+
+/**
  * Route to authenticated page or auth screen with redirect params
  *
  * @param authenticatedRoute - Route to go to if authenticated
@@ -46,7 +61,7 @@ export async function routeWithAuthCheck(
     const params = new URLSearchParams(redirectParams || {});
     const authRoute = authType === "login" ? MOBILE_ROUTES.AUTH.LOGIN : MOBILE_ROUTES.AUTH.SIGNUP;
     const authUrl = params.toString() ? `${authRoute}?${params.toString()}` : authRoute;
-    router.push(authUrl);
+    await routeToAuthOrOnboarding(authUrl);
   }
 }
 
@@ -214,8 +229,9 @@ export async function handleDeepLink(url: string): Promise<void> {
         router.push(fullPath as any);
       } else {
         // User not authenticated - redirect to auth with original destination
-        const params = new URLSearchParams({ redirectTo: fullPath });
-        router.push(`${MOBILE_ROUTES.AUTH.SIGNUP}?${params.toString()}`);
+        // Check onboarding first so first-time users see intro before signup
+        const authUrl = `${MOBILE_ROUTES.AUTH.SIGNUP}?redirectTo=${encodeURIComponent(fullPath)}`;
+        await routeToAuthOrOnboarding(authUrl);
       }
       return;
     }
@@ -262,12 +278,12 @@ export async function handleDeepLink(url: string): Promise<void> {
         break;
 
       // Referral signup link: /join?ref={code}
-      // Always goes to signup (this IS a signup route)
+      // Goes to signup (or onboarding first if user hasn't seen it)
       case "/join":
         if (queryParams?.ref) {
-          router.push(`${MOBILE_ROUTES.AUTH.SIGNUP}?referral=${queryParams.ref}`);
+          await routeToAuthOrOnboarding(`${MOBILE_ROUTES.AUTH.SIGNUP}?referral=${queryParams.ref}`);
         } else {
-          router.push(MOBILE_ROUTES.AUTH.SIGNUP);
+          await routeToAuthOrOnboarding(MOBILE_ROUTES.AUTH.SIGNUP);
         }
         break;
 
