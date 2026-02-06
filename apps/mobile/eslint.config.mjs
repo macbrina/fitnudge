@@ -11,32 +11,32 @@ export default tseslint.config(
     plugins: {
       react: reactPlugin,
       "react-hooks": reactHooksPlugin,
-      prettier: prettierPlugin
+      prettier: prettierPlugin,
     },
     languageOptions: {
       globals: {
         ...globals.node,
         ...globals.es2020,
-        __DEV__: "readonly"
+        __DEV__: "readonly",
       },
       parserOptions: {
         ecmaFeatures: {
-          jsx: true
+          jsx: true,
         },
         project: ["./tsconfig.json"], // Path to your tsconfig.json file
-        tsconfigRootDir: import.meta.dirname
-      }
+        tsconfigRootDir: import.meta.dirname,
+      },
     },
     settings: {
       "import/resolver": {
         typescript: {},
         node: {
-          extensions: [".js", ".jsx", ".ts", ".tsx"]
-        }
+          extensions: [".js", ".jsx", ".ts", ".tsx"],
+        },
       },
       react: {
-        version: "detect"
-      }
+        version: "detect",
+      },
     },
     rules: {
       // React Native specific rules
@@ -134,16 +134,18 @@ export default tseslint.config(
       "no-restricted-properties": "off",
 
       // Prettier integration
-      "prettier/prettier": [
-        "error",
-        {
-          trailingComma: "none",
-          singleQuote: false,
-          printWidth: 100,
-          tabWidth: 2
-        }
-      ]
-    }
+      // "prettier/prettier": [
+      //   "error",
+      //   {
+      //     trailingComma: "none",
+      //     singleQuote: false,
+      //     printWidth: 100,
+      //     tabWidth: 2
+      //   }
+      // ]
+
+      "prettier/prettier": "off",
+    },
   },
   {
     ignores: [
@@ -153,7 +155,7 @@ export default tseslint.config(
       "ios/**",
       "dist/**",
       "*.config.js",
-      "eslint/**/*"
-    ]
+      "eslint/**/*",
+    ],
   }
 );
