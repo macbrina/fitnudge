@@ -18,14 +18,22 @@ interface RedirectionOptions {
  * @param options.hasCompletedOnboarding - If true, skip personalization (user.onboarding_completed_at is set)
  */
 export async function getRedirection(
-  options: RedirectionOptions = {}
+  options: RedirectionOptions = {},
 ): Promise<string> {
   const { hasCompletedOnboarding } = options;
 
   try {
+    const hasSeenOnboarding = await storageUtil.getItem<boolean>(
+      STORAGE_KEYS.HAS_SEEN_ONBOARDING,
+    );
+
+    if (!hasSeenOnboarding) {
+      return MOBILE_ROUTES.ONBOARDING.MAIN;
+    }
+
     // Check if user has seen notification permission screen
     const hasSeenNotificationPermission = await storageUtil.getItem<boolean>(
-      STORAGE_KEYS.HAS_SEEN_NOTIFICATION_PERMISSION
+      STORAGE_KEYS.HAS_SEEN_NOTIFICATION_PERMISSION,
     );
     if (!hasSeenNotificationPermission) {
       return MOBILE_ROUTES.ONBOARDING.NOTIFICATION_PERMISSION;
@@ -36,7 +44,7 @@ export async function getRedirection(
     // 1. User has seen it before (local storage), OR
     // 2. User has onboarding_completed_at set (from API - handles reinstall case)
     const hasSeenPersonalization = await storageUtil.getItem<boolean>(
-      STORAGE_KEYS.HAS_SEEN_PERSONALIZATION
+      STORAGE_KEYS.HAS_SEEN_PERSONALIZATION,
     );
 
     if (!hasSeenPersonalization && !hasCompletedOnboarding) {

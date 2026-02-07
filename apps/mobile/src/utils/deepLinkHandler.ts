@@ -1,6 +1,7 @@
 import { router } from "expo-router";
 import { MOBILE_ROUTES } from "@/lib/routes";
-import { storageUtil, STORAGE_KEYS } from "@/utils/storageUtil";
+import { getRedirection } from "@/utils/getRedirection";
+import { hasCompletedV2Onboarding } from "@/utils/onboardingUtils";
 import * as Linking from "expo-linking";
 import { queryClient } from "@/lib/queryClient";
 import {
@@ -27,16 +28,19 @@ async function isUserAuthenticated(): Promise<boolean> {
 type AuthRedirectType = "signup" | "login";
 
 /**
- * Route unauthenticated user to auth screen, or onboarding first if they haven't seen it.
- * Prevents deep links from bypassing onboarding for first-time users.
+ * Route unauthenticated user to auth screen, or onboarding first if they haven't completed it.
+ * Uses getRedirection (same as index.tsx) to avoid duplicate redirect logic.
  */
 async function routeToAuthOrOnboarding(authUrl: string): Promise<void> {
-  const hasSeenOnboarding = await storageUtil.getItem<boolean>(STORAGE_KEYS.HAS_SEEN_ONBOARDING);
-  if (!hasSeenOnboarding) {
-    const params = new URLSearchParams({ redirectTo: authUrl });
-    router.push(`${MOBILE_ROUTES.ONBOARDING.MAIN}?${params.toString()}`);
-  } else {
+  const { useAuthStore } = await import("@/stores/authStore");
+  const user = useAuthStore.getState().user;
+  const hasCompletedOnboarding = hasCompletedV2Onboarding(user);
+  const redirectTo = await getRedirection({ hasCompletedOnboarding });
+  if (redirectTo === MOBILE_ROUTES.MAIN.HOME) {
     router.push(authUrl);
+  } else {
+    const params = new URLSearchParams({ redirectTo: authUrl });
+    router.push(`${redirectTo}?${params.toString()}`);
   }
 }
 

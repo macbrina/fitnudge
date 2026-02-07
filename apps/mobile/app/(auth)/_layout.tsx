@@ -1,3 +1,4 @@
+import { LoadingContainer } from "@/components/common/LoadingContainer";
 import { MOBILE_ROUTES } from "@/lib/routes";
 import { queryClient } from "@/lib/queryClient";
 import { initializeAuthenticatedData } from "@/services/prefetch";
@@ -43,6 +44,11 @@ export default function AuthLayout() {
     };
     runRedirect();
   }, [isLoading, isAuthenticated, isVerifyingUser, user]);
+
+  // Show loading while determining redirect (getRedirection)
+  if (!isLoading && isAuthenticated && !isVerifyingUser && destination === null) {
+    return <LoadingContainer />;
+  }
 
   if (!isLoading && isAuthenticated && !isVerifyingUser && destination) {
     return <Redirect href={destination} />;

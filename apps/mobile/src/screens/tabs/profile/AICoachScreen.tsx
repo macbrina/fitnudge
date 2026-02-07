@@ -13,7 +13,6 @@
  * - Markdown rendering for AI responses
  */
 
-import { BotIcon } from "@/components/icons/bot-icon";
 import Button from "@/components/ui/Button";
 import CheckmarkCircle from "@/components/ui/CheckmarkCircle";
 import { getAdUnitId } from "@/constants/adUnits";
@@ -48,6 +47,7 @@ import {
   Animated,
   Easing,
   FlatList,
+  Image,
   Keyboard,
   KeyboardAvoidingView,
   Linking,
@@ -58,6 +58,8 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
+
+const Bot3DImage = require("@assetsimages/images/3d_bot.png");
 
 // =====================================================
 // ANIMATED AUDIO BARS COMPONENT
@@ -1247,7 +1249,11 @@ export default function AICoachModal({ visible, onClose, goalId }: AICoachModalP
             <View style={styles.loadingContainer}>
               <View style={styles.loadingContent}>
                 <View style={styles.loadingIconContainer}>
-                  <BotIcon size={48} color={brandColors.primary} />
+                  <Image
+                    source={Bot3DImage}
+                    style={{ width: 80, height: 80 }}
+                    resizeMode="contain"
+                  />
                 </View>
                 <ActivityIndicator
                   size="large"
@@ -1262,7 +1268,11 @@ export default function AICoachModal({ visible, onClose, goalId }: AICoachModalP
               {/* Center content */}
               <View style={styles.emptyCenter}>
                 <View style={styles.emptyIconContainer}>
-                  <BotIcon size={64} color={brandColors.primary} />
+                  <Image
+                    source={Bot3DImage}
+                    style={{ width: 100, height: 100 }}
+                    resizeMode="contain"
+                  />
                 </View>
                 <Text style={styles.emptyTitle}>{t("ai_coach.empty_title")}</Text>
                 <Text style={styles.emptyDescription}>{t("ai_coach.empty_description")}</Text>
@@ -1394,7 +1404,19 @@ export default function AICoachModal({ visible, onClose, goalId }: AICoachModalP
 
               {/* Bottom Actions */}
               <View style={styles.inputActions}>
-                {isListening ? (
+                {isProcessing && !isListening ? (
+                  // Waiting for AI response: show Cancel button
+                  <TouchableOpacity
+                    style={styles.cancelButton}
+                    onPress={cancelStream}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="close-circle-outline" size={18} color={colors.text.secondary} />
+                    <Text style={styles.cancelButtonText}>
+                      {t("ai_coach.cancel") || "Cancel"}
+                    </Text>
+                  </TouchableOpacity>
+                ) : isListening ? (
                   // Currently listening: Stop+bars (left) + Send icon (right)
                   <>
                     <TouchableOpacity
@@ -2177,6 +2199,24 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     borderColor: colors.border.subtle
   },
   resetButtonText: {
+    fontSize: toRN(tokens.typography.fontSize.sm),
+    fontFamily: fontFamily.medium,
+    color: colors.text.secondary
+  },
+
+  // Cancel button (when waiting for AI response)
+  cancelButton: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: toRN(tokens.spacing[1.5]),
+    paddingVertical: toRN(tokens.spacing[2]),
+    paddingHorizontal: toRN(tokens.spacing[3]),
+    backgroundColor: colors.bg.muted,
+    borderRadius: toRN(tokens.borderRadius.full),
+    borderWidth: 1,
+    borderColor: colors.border.subtle
+  },
+  cancelButtonText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.medium,
     color: colors.text.secondary

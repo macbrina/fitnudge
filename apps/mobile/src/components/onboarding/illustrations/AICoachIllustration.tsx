@@ -8,7 +8,7 @@ import Svg, {
   LinearGradient,
   Stop,
   Text,
-  Image
+  Image,
 } from "react-native-svg";
 // import { Image } from "react-native";
 
@@ -19,20 +19,10 @@ interface AICoachIllustrationProps {
 
 export const AICoachIllustration: React.FC<AICoachIllustrationProps> = ({
   width = 280,
-  height = 280
+  height = 280,
 }) => {
   return (
     <Svg width={width} height={height} viewBox="0 0 280 280">
-      {/* <Defs>
-        <LinearGradient id="purpleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-          <Stop offset="0%" stopColor="#d1cffb" />
-          <Stop offset="100%" stopColor="#dedcfc" />
-        </LinearGradient>
-      </Defs> */}
-
-      {/* Purple rounded rectangle background */}
-      <Rect x="40" y="40" width="200" height="200" fill="url(#purpleGradient)" rx="20" />
-
       {/* AI Motivation Image - Centered */}
       <Image
         x="50"
@@ -49,8 +39,18 @@ export const AICoachIllustration: React.FC<AICoachIllustrationProps> = ({
       <G transform="translate(140, 40)">
         <Circle cx="0" cy="0" r="12" fill="#10b981" />
         <Circle cx="0" cy="0" r="8" fill="#ffffff" />
-        <Path d="M-4 -2 Q0 -4 4 -2 M-4 2 Q0 4 4 2" stroke="#10b981" strokeWidth="1" fill="none" />
-        <Path d="M-2 -4 Q-2 0 -2 4 M2 -4 Q2 0 2 4" stroke="#10b981" strokeWidth="1" fill="none" />
+        <Path
+          d="M-4 -2 Q0 -4 4 -2 M-4 2 Q0 4 4 2"
+          stroke="#10b981"
+          strokeWidth="1"
+          fill="none"
+        />
+        <Path
+          d="M-2 -4 Q-2 0 -2 4 M2 -4 Q2 0 2 4"
+          stroke="#10b981"
+          strokeWidth="1"
+          fill="none"
+        />
       </G>
 
       {/* Smiley face with speech bubble */}

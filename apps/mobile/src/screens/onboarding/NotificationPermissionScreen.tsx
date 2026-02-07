@@ -37,37 +37,52 @@ export default function NotificationPermissionScreen() {
       if (granted) {
         capture("notification_permission_granted", {
           source: "onboarding",
-          screen: "notification_permission"
+          screen: "notification_permission",
         });
-        capture("onboarding_step_completed", { step: "notification_permission", skipped: false });
+        capture("onboarding_step_completed", {
+          step: "notification_permission",
+          skipped: false,
+        });
       } else {
         capture("notification_permission_denied", {
           source: "onboarding",
-          screen: "notification_permission"
+          screen: "notification_permission",
         });
-        capture("onboarding_step_completed", { step: "notification_permission", skipped: true });
+        capture("onboarding_step_completed", {
+          step: "notification_permission",
+          skipped: true,
+        });
       }
 
       const completedOnboarding = hasCompletedV2Onboarding(user);
 
       if (completedOnboarding) {
         // Fast path: navigate immediately, storage in background
-        storageUtil.setItem(STORAGE_KEYS.HAS_SEEN_NOTIFICATION_PERMISSION, true).catch(() => {});
-        storageUtil.setItem(STORAGE_KEYS.HAS_SEEN_PERSONALIZATION, true).catch(() => {});
+        storageUtil
+          .setItem(STORAGE_KEYS.HAS_SEEN_NOTIFICATION_PERMISSION, true)
+          .catch(() => {});
+        storageUtil
+          .setItem(STORAGE_KEYS.HAS_SEEN_PERSONALIZATION, true)
+          .catch(() => {});
         router.replace(MOBILE_ROUTES.MAIN.HOME);
       } else {
         // Need getRedirection to check personalization step
-        await storageUtil.setItem(STORAGE_KEYS.HAS_SEEN_NOTIFICATION_PERMISSION, true);
-        const destination = await getRedirection({ hasCompletedOnboarding: false });
+        await storageUtil.setItem(
+          STORAGE_KEYS.HAS_SEEN_NOTIFICATION_PERMISSION,
+          true,
+        );
+        const destination = await getRedirection({
+          hasCompletedOnboarding: false,
+        });
         router.replace(destination);
       }
     } catch (error) {
       logger.error("Error requesting notification permissions", {
         error: error instanceof Error ? error.message : String(error),
-        screen: "notification_permission"
+        screen: "notification_permission",
       });
       const destination = await getRedirection({
-        hasCompletedOnboarding: hasCompletedV2Onboarding(user)
+        hasCompletedOnboarding: hasCompletedV2Onboarding(user),
       });
       router.replace(destination);
     } finally {
@@ -78,19 +93,31 @@ export default function NotificationPermissionScreen() {
   const handleMaybeLater = async () => {
     capture("notification_permission_skipped", {
       source: "onboarding",
-      screen: "notification_permission"
+      screen: "notification_permission",
     });
-    capture("onboarding_step_completed", { step: "notification_permission", skipped: true });
+    capture("onboarding_step_completed", {
+      step: "notification_permission",
+      skipped: true,
+    });
 
     const completedOnboarding = hasCompletedV2Onboarding(user);
 
     if (completedOnboarding) {
-      storageUtil.setItem(STORAGE_KEYS.HAS_SEEN_NOTIFICATION_PERMISSION, true).catch(() => {});
-      storageUtil.setItem(STORAGE_KEYS.HAS_SEEN_PERSONALIZATION, true).catch(() => {});
+      storageUtil
+        .setItem(STORAGE_KEYS.HAS_SEEN_NOTIFICATION_PERMISSION, true)
+        .catch(() => {});
+      storageUtil
+        .setItem(STORAGE_KEYS.HAS_SEEN_PERSONALIZATION, true)
+        .catch(() => {});
       router.replace(MOBILE_ROUTES.MAIN.HOME);
     } else {
-      await storageUtil.setItem(STORAGE_KEYS.HAS_SEEN_NOTIFICATION_PERMISSION, true);
-      const destination = await getRedirection({ hasCompletedOnboarding: false });
+      await storageUtil.setItem(
+        STORAGE_KEYS.HAS_SEEN_NOTIFICATION_PERMISSION,
+        true,
+      );
+      const destination = await getRedirection({
+        hasCompletedOnboarding: false,
+      });
       router.replace(destination);
     }
   };
@@ -100,11 +127,17 @@ export default function NotificationPermissionScreen() {
       {/* Content */}
       <View style={styles.content}>
         <View style={styles.iconContainer}>
-          <Ionicons name="notifications" size={60} color={brandColors.primary} />
+          <Ionicons
+            name="notifications"
+            size={60}
+            color={brandColors.primary}
+          />
         </View>
 
         <Text style={styles.title}>{t("onboarding.notifications.title")}</Text>
-        <Text style={styles.subtitle}>{t("onboarding.notifications.subtitle")}</Text>
+        <Text style={styles.subtitle}>
+          {t("onboarding.notifications.subtitle")}
+        </Text>
 
         {/* Benefits List */}
         <View style={styles.benefitsContainer}>
@@ -138,36 +171,47 @@ export default function NotificationPermissionScreen() {
           loading={isLoading}
         />
 
-        <TouchableOpacity onPress={handleMaybeLater} style={styles.maybeLaterButton}>
-          <Text style={styles.maybeLaterText}>{t("onboarding.notifications.maybe_later")}</Text>
+        <TouchableOpacity
+          onPress={handleMaybeLater}
+          style={styles.maybeLaterButton}
+        >
+          <Text style={styles.maybeLaterText}>
+            {t("onboarding.notifications.maybe_later")}
+          </Text>
         </TouchableOpacity>
 
-        <Text style={styles.disclaimer}>{t("onboarding.notifications.disclaimer")}</Text>
+        <Text style={styles.disclaimer}>
+          {t("onboarding.notifications.disclaimer")}
+        </Text>
       </View>
     </View>
   );
 }
 
-const makeNotificationPermissionScreenStyles = (tokens: any, colors: any, brand: any) => {
+const makeNotificationPermissionScreenStyles = (
+  tokens: any,
+  colors: any,
+  brand: any,
+) => {
   return {
     container: {
       flex: 1,
-      backgroundColor: colors.bg.canvas
+      backgroundColor: colors.bg.canvas,
     },
     header: {
       alignItems: "center" as const,
       paddingTop: toRN(tokens.spacing[8]),
-      paddingBottom: toRN(tokens.spacing[6])
+      paddingBottom: toRN(tokens.spacing[6]),
     },
     logo: {
       width: 60,
-      height: 60
+      height: 60,
     },
     content: {
       flex: 1,
       alignItems: "center" as const,
       paddingHorizontal: toRN(tokens.spacing[6]),
-      justifyContent: "center" as const
+      justifyContent: "center" as const,
     },
     iconContainer: {
       width: 120,
@@ -176,7 +220,7 @@ const makeNotificationPermissionScreenStyles = (tokens: any, colors: any, brand:
       backgroundColor: brand.primary + "20",
       alignItems: "center" as const,
       justifyContent: "center" as const,
-      marginBottom: toRN(tokens.spacing[8])
+      marginBottom: toRN(tokens.spacing[8]),
     },
     title: {
       fontSize: toRN(tokens.typography.fontSize["3xl"]),
@@ -184,48 +228,48 @@ const makeNotificationPermissionScreenStyles = (tokens: any, colors: any, brand:
       color: colors.text.primary,
       textAlign: "center" as const,
       marginBottom: toRN(tokens.spacing[4]),
-      fontFamily: fontFamily.groteskBold
+      fontFamily: fontFamily.groteskBold,
     },
     subtitle: {
       fontSize: toRN(tokens.typography.fontSize.lg),
       color: colors.text.secondary,
       textAlign: "center" as const,
       marginBottom: toRN(tokens.spacing[8]),
-      fontFamily: fontFamily.groteskRegular
+      fontFamily: fontFamily.groteskRegular,
     },
     benefitsContainer: {
       width: "100%",
-      maxWidth: 300
+      maxWidth: 300,
     },
     benefitItem: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
-      marginBottom: toRN(tokens.spacing[4])
+      marginBottom: toRN(tokens.spacing[4]),
     },
     benefitText: {
       fontSize: toRN(tokens.typography.fontSize.base),
       color: colors.text.primary,
       flex: 1,
-      fontFamily: fontFamily.groteskRegular
+      fontFamily: fontFamily.groteskRegular,
     },
     actions: {
-      paddingHorizontal: toRN(tokens.spacing[6])
+      paddingHorizontal: toRN(tokens.spacing[6]),
     },
     maybeLaterButton: {
       alignItems: "center" as const,
       marginTop: toRN(tokens.spacing[4]),
-      marginBottom: toRN(tokens.spacing[6])
+      marginBottom: toRN(tokens.spacing[6]),
     },
     maybeLaterText: {
       fontSize: toRN(tokens.typography.fontSize.base),
       color: colors.text.secondary,
-      fontFamily: fontFamily.groteskMedium
+      fontFamily: fontFamily.groteskMedium,
     },
     disclaimer: {
       fontSize: toRN(tokens.typography.fontSize.sm),
       color: colors.text.tertiary,
       textAlign: "center" as const,
-      fontFamily: fontFamily.groteskRegular
-    }
+      fontFamily: fontFamily.groteskRegular,
+    },
   };
 };

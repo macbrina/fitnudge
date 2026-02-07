@@ -293,6 +293,8 @@ export const ROUTES = {
       }`,
     CONVERSATIONS: "/ai-coach/conversations",
     CONVERSATION: (id: string) => `/ai-coach/conversations/${id}`,
+    MARK_MESSAGE_FAILED: (id: string) =>
+      `/ai-coach/conversations/${id}/mark-message-failed`,
     CURRENT_CONVERSATION: "/ai-coach/conversations/current",
     NEW_CONVERSATION: "/ai-coach/conversations/new",
     UNLOCK_MESSAGE: "/ai-coach/unlock-message"
