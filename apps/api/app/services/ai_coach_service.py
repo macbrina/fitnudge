@@ -445,6 +445,55 @@ class AICoachService:
             logger.error(f"Clear conversation error: {e}")
             return False
 
+    async def mark_message_failed(
+        self,
+        user_id: str,
+        conversation_id: str,
+        request_id: str,
+    ) -> bool:
+        """
+        Mark pending/generating messages for a request as failed.
+        Used when user cancels or when a stuck request is detected (e.g. worker died).
+        """
+        import json
+        from datetime import datetime
+
+        try:
+            result = (
+                self.supabase.table("ai_coach_conversations")
+                .select("messages")
+                .eq("id", conversation_id)
+                .eq("user_id", user_id)
+                .single()
+                .execute()
+            )
+            if not result.data:
+                return False
+
+            messages = result.data.get("messages", [])
+            if isinstance(messages, str):
+                messages = json.loads(messages)
+
+            for i, msg in enumerate(messages):
+                if msg.get("request_id") != request_id:
+                    continue
+                if msg.get("role") == "user" and msg.get("status") == "pending":
+                    messages[i]["status"] = "completed"
+                elif msg.get("role") == "assistant" and msg.get("status") == "generating":
+                    messages[i]["status"] = "failed"
+
+            self.supabase.table("ai_coach_conversations").update(
+                {
+                    "messages": json.dumps(messages),
+                    "updated_at": datetime.utcnow().isoformat(),
+                }
+            ).eq("id", conversation_id).eq("user_id", user_id).execute()
+
+            return True
+        except Exception as e:
+            logger.error(f"Mark message failed error: {e}")
+            return False
+
     async def start_new_conversation(
         self, user_id: str, goal_id: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:

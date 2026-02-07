@@ -174,6 +174,9 @@ export function useAICoachChat() {
   // Track the pending assistant message ID for updates
   const pendingAssistantMessageIdRef = useRef<string | null>(null);
 
+  // Track request ID for cancel/recovery (mark as failed on backend)
+  const pendingRequestIdRef = useRef<string | null>(null);
+
   // SSE connection ref (Redis streaming) - close on unmount or new message
   const sseConnectionRef = useRef<{ close: () => void } | null>(null);
 
@@ -241,13 +244,20 @@ export function useAICoachChat() {
           const msgs = response.data.messages;
           const lastMessage = msgs[msgs.length - 1];
 
-          if (lastMessage?.role === "assistant") {
+          // Only consider completed assistant messages (skip stuck generating/pending)
+          const isCompleted =
+            lastMessage?.role === "assistant" &&
+            lastMessage?.status === "completed" &&
+            (lastMessage?.content || "").trim().length > 0;
+
+          if (isCompleted) {
             console.log("[AI Coach] ✅ Recovery found AI response, updating UI");
             const freshMessages = convertToGiftedMessages(msgs);
             setMessages(freshMessages);
             setWaitingByConversationId((prev) => ({ ...prev, [convId]: false }));
             setError(null);
             pendingAssistantMessageIdRef.current = null;
+            pendingRequestIdRef.current = null;
             failedMessageRef.current = null;
             clearRecoveryTimeout();
 
@@ -277,7 +287,19 @@ export function useAICoachChat() {
           console.log("[AI Coach] ⚠️ Recovery timeout - no AI response found, showing error");
           setError("Response taking too long. Please try again.");
           setWaitingByConversationId((prev) => ({ ...prev, [convId]: false }));
-          // Mark message as failed
+
+          // Mark as failed on backend so DB doesn't stay stuck
+          const reqId = pendingRequestIdRef.current;
+          if (convId && reqId && hasAccess) {
+            try {
+              await aiCoachService.markMessageFailed(convId, reqId);
+            } catch (e) {
+              logger.warn("Failed to mark message as failed on timeout", e as Record<string, unknown>);
+            }
+          }
+          pendingRequestIdRef.current = null;
+
+          // Mark message as failed locally
           setMessages((prev) =>
             prev.map((msg) =>
               msg.pending && msg.user._id !== 1
@@ -293,7 +315,7 @@ export function useAICoachChat() {
         }
       }, delayMs);
     },
-    [checkForAIResponse, clearRecoveryTimeout]
+    [checkForAIResponse, clearRecoveryTimeout, hasAccess]
   );
 
   // Clean up recovery timeout and SSE connection on unmount
@@ -372,6 +394,7 @@ export function useAICoachChat() {
 
                 // Remove pending message ref
                 pendingAssistantMessageIdRef.current = null;
+                pendingRequestIdRef.current = null;
                 failedMessageRef.current = null;
 
                 // Refetch rate limit - AI responded so rate limit was decremented
@@ -453,6 +476,7 @@ export function useAICoachChat() {
     setStreamingText("");
     setStreamingVia(null);
     pendingAssistantMessageIdRef.current = null;
+    pendingRequestIdRef.current = null;
     failedMessageRef.current = null;
     clearRecoveryTimeout();
 
@@ -596,15 +620,40 @@ export function useAICoachChat() {
 
         if (conversation) {
           setConversationId(conversation.id);
-          setMessages(convertToGiftedMessages(conversation.messages));
+
+          // Detect stuck messages (generating/pending > 2 min) and mark as failed
+          const STUCK_THRESHOLD_MS = 2 * 60 * 1000;
+          let messagesToConvert = conversation.messages ?? [];
+          const lastMsg = messagesToConvert[messagesToConvert.length - 1];
+          if (
+            lastMsg?.role === "assistant" &&
+            (lastMsg.status === "generating" || lastMsg.status === "pending") &&
+            lastMsg.request_id
+          ) {
+            const createdAt = lastMsg.created_at ? new Date(lastMsg.created_at).getTime() : 0;
+            if (Date.now() - createdAt > STUCK_THRESHOLD_MS) {
+              try {
+                await aiCoachService.markMessageFailed(conversation.id, lastMsg.request_id);
+                messagesToConvert = messagesToConvert.map((m, i) =>
+                  i === messagesToConvert.length - 1 && m.role === "assistant"
+                    ? { ...m, status: "failed" as const }
+                    : m
+                );
+              } catch (e) {
+                logger.warn("Failed to mark stuck message as failed", e as Record<string, unknown>);
+              }
+            }
+          }
+
+          setMessages(convertToGiftedMessages(messagesToConvert));
           // Derive "busy" from persisted message statuses so reopen is stable even if realtime lags.
-          const lastMsg = conversation.messages?.[conversation.messages.length - 1];
+          const lastMsgForBusy = messagesToConvert[messagesToConvert.length - 1];
           const isBusy =
-            (lastMsg?.role === "assistant" &&
-              (lastMsg as any)?.status &&
-              ((lastMsg as any).status === "generating" ||
-                (lastMsg as any).status === "pending")) ||
-            conversation.messages?.some((m: any) => m.status === "pending") ||
+            (lastMsgForBusy?.role === "assistant" &&
+              (lastMsgForBusy as any)?.status &&
+              ((lastMsgForBusy as any).status === "generating" ||
+                (lastMsgForBusy as any).status === "pending")) ||
+            messagesToConvert.some((m: any) => m.status === "pending") ||
             false;
           setWaitingByConversationId((prev) => ({ ...prev, [conversation.id]: isBusy }));
           setHasMoreMessages(conversation.has_more_messages ?? false);
@@ -814,6 +863,18 @@ export function useAICoachChat() {
             requestId: response.data.request_id
           });
 
+          // Store requestId on pending assistant message and ref (for cancel/recovery)
+          if (response.data.request_id) {
+            pendingRequestIdRef.current = response.data.request_id;
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.pending && msg.user._id !== 1
+                  ? { ...msg, requestId: response.data!.request_id }
+                  : msg
+              )
+            );
+          }
+
           // Update conversation ID if this was a new conversation
           if (newConversationId && newConversationId !== conversationId) {
             setConversationId(newConversationId);
@@ -887,6 +948,7 @@ export function useAICoachChat() {
                       clearRecoveryTimeout();
                       queryClient.refetchQueries({ queryKey: aiCoachQueryKeys.rateLimit() });
                       pendingAssistantMessageIdRef.current = null;
+                      pendingRequestIdRef.current = null;
                       failedMessageRef.current = null;
                       setStreamingVia(null);
                       sseConnectionRef.current?.close();
@@ -1005,7 +1067,7 @@ export function useAICoachChat() {
     ]
   );
 
-  // Retry failed message or regenerate response for unanswered message
+  // Retry failed message or regenerate response for unanswered/stuck message
   const retryLastMessage = useCallback(() => {
     if (isStreaming || isWaitingForResponse) return;
 
@@ -1016,17 +1078,29 @@ export function useAICoachChat() {
       return;
     }
 
-    // Case 2: Last message has no AI response (e.g., connection dropped)
-    // Find the last user message and regenerate
+    // Case 2: Last user message has no AI response (failed, timed out, or stuck)
+    // Find the most recent user message (messages are newest-first)
     const lastUserMessage = messages.find((msg) => msg.user._id === 1);
-    if (lastUserMessage && !lastUserMessage.pending) {
-      // Use stored language or default to 'en'
-      sendMessage(lastUserMessage.text, selectedLanguage, true);
+    if (lastUserMessage?.text?.trim()) {
+      sendMessage(lastUserMessage.text.trim(), selectedLanguage, true);
     }
   }, [sendMessage, isStreaming, isWaitingForResponse, messages, selectedLanguage]);
 
-  // Cancel streaming or waiting
-  const cancelStream = useCallback(() => {
+  // Cancel streaming or waiting - marks message as failed on backend so user can retry
+  const cancelStream = useCallback(async () => {
+    // Mark as failed on backend so DB doesn't stay stuck (e.g. worker died)
+    const pendingAssistant = messages.find(
+      (m) => m.requestId && m.pending && m.user._id !== 1
+    );
+    const reqId = pendingAssistant?.requestId;
+    if (conversationId && reqId && hasAccess) {
+      try {
+        await aiCoachService.markMessageFailed(conversationId, reqId);
+      } catch (e) {
+        logger.warn("Failed to mark message as failed on cancel", e as Record<string, unknown>);
+      }
+    }
+
     // Clear streaming interval if active
     if (streamingIntervalRef.current) {
       clearInterval(streamingIntervalRef.current);
@@ -1042,11 +1116,12 @@ export function useAICoachChat() {
     setWaitingByConversationId((prev) => ({ ...prev, [currentKey]: false }));
     setStreamingText("");
 
-    // Remove the pending message
+    // Remove the pending message from local state
     setMessages((prev) => prev.filter((msg) => !msg.pending));
     failedMessageRef.current = null;
     pendingAssistantMessageIdRef.current = null;
-  }, [clearRecoveryTimeout]);
+    pendingRequestIdRef.current = null;
+  }, [clearRecoveryTimeout, conversationId, messages, hasAccess]);
 
   // Clear/delete conversation with optimistic UI update
   const clearConversation = useCallback(async () => {

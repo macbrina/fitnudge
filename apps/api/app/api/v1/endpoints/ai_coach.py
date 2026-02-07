@@ -621,6 +621,42 @@ async def start_new_conversation(
     )
 
 
+class MarkMessageFailedRequest(BaseModel):
+    """Request to mark a stuck message as failed."""
+
+    request_id: str = Field(..., description="Request ID of the pending/generating message")
+
+
+@router.post("/conversations/{conversation_id}/mark-message-failed")
+async def mark_message_failed(
+    conversation_id: str,
+    body: MarkMessageFailedRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Mark a pending/generating message as failed.
+    Use when user cancels or when a request has been stuck for too long.
+    Allows the user to retry the message.
+    """
+    user_id = current_user["id"]
+
+    has_access, reason = await check_ai_coach_access(user_id)
+    if not has_access:
+        raise HTTPException(status_code=403, detail=reason)
+
+    service = get_ai_coach_service()
+    success = await service.mark_message_failed(
+        user_id, conversation_id, body.request_id
+    )
+
+    if not success:
+        raise HTTPException(
+            status_code=500, detail="Failed to mark message as failed"
+        )
+
+    return {"success": True, "message": "Message marked as failed"}
+
+
 @router.delete("/conversations/{conversation_id}")
 async def delete_conversation(
     conversation_id: str,

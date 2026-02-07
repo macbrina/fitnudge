@@ -6,14 +6,19 @@
  * Placed on HomeScreen to provide easy access to the AI Coach.
  */
 
-import React from "react";
-import { View, Text, TouchableOpacity, Image, Platform, ImageSourcePropType } from "react-native";
-import { useStyles, useTheme } from "@/themes";
-import { tokens } from "@/themes/tokens";
-import { toRN } from "@/lib/units";
 import { fontFamily } from "@/lib/fonts";
 import { useTranslation } from "@/lib/i18n";
+import { toRN } from "@/lib/units";
+import { useStyles, useTheme } from "@/themes";
 import { ChevronRight } from "lucide-react-native";
+import {
+  Image,
+  ImageSourcePropType,
+  Platform,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 // 3D Bot image asset
 const Bot3DImage: ImageSourcePropType = require("@assetsimages/images/3d_bot.png");
@@ -30,7 +35,7 @@ function GlowOrb({
   top,
   left,
   right,
-  bottom
+  bottom,
 }: {
   size: number;
   color: string;
@@ -58,9 +63,9 @@ function GlowOrb({
             shadowColor: color,
             shadowOffset: { width: 0, height: 0 },
             shadowOpacity: 0.8,
-            shadowRadius: size / 2
-          }
-        })
+            shadowRadius: size / 2,
+          },
+        }),
       }}
     />
   );
@@ -84,8 +89,8 @@ export function AICoachCard({ onPress }: AICoachCardProps) {
         styles.container,
         {
           backgroundColor: cardBgColor,
-          shadowColor: isDark ? brandColors.primary : "#000"
-        }
+          shadowColor: isDark ? brandColors.primary : "#000",
+        },
       ]}
       accessibilityLabel={t("home.ai_coach_card_label") || "Chat with AI Coach"}
       accessibilityRole="button"
@@ -95,16 +100,30 @@ export function AICoachCard({ onPress }: AICoachCardProps) {
       <GlowOrb size={8} color={glowColor} opacity={0.12} top={8} right={100} />
       <GlowOrb size={5} color={glowColor} opacity={0.18} top={25} right={140} />
       <GlowOrb size={10} color={glowColor} opacity={0.1} bottom={5} left={56} />
-      <GlowOrb size={7} color={glowColor} opacity={0.14} bottom={8} right={120} />
-      <GlowOrb size={4} color={glowColor} opacity={0.2} bottom={30} right={160} />
+      <GlowOrb
+        size={7}
+        color={glowColor}
+        opacity={0.14}
+        bottom={8}
+        right={120}
+      />
+      <GlowOrb
+        size={4}
+        color={glowColor}
+        opacity={0.2}
+        bottom={30}
+        right={160}
+      />
 
       {/* Subtle border */}
       <View
         style={[
           styles.innerBorder,
           {
-            borderColor: isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"
-          }
+            borderColor: isDark
+              ? "rgba(255, 255, 255, 0.08)"
+              : "rgba(0, 0, 0, 0.06)",
+          },
         ]}
       />
 
@@ -115,8 +134,12 @@ export function AICoachCard({ onPress }: AICoachCardProps) {
           <Text style={[styles.title, { color: colors.text.primary }]}>
             {t("home.ai_coach_title") || "Your AI Coach"}
           </Text>
-          <Text style={[styles.subtitle, { color: colors.text.secondary }]} numberOfLines={2}>
-            {t("home.ai_coach_subtitle") || "Get personalized guidance & motivation"}
+          <Text
+            style={[styles.subtitle, { color: colors.text.secondary }]}
+            numberOfLines={2}
+          >
+            {t("home.ai_coach_subtitle") ||
+              "Get personalized guidance & motivation"}
           </Text>
 
           {/* CTA */}
@@ -124,13 +147,21 @@ export function AICoachCard({ onPress }: AICoachCardProps) {
             <Text style={[styles.ctaText, { color: brandColors.primary }]}>
               {t("home.ai_coach_cta") || "Start chatting"}
             </Text>
-            <ChevronRight size={16} color={brandColors.primary} strokeWidth={2.5} />
+            <ChevronRight
+              size={16}
+              color={brandColors.primary}
+              strokeWidth={2.5}
+            />
           </View>
         </View>
 
         {/* 3D Bot Image */}
         <View style={styles.imageContainer}>
-          <Image source={Bot3DImage} style={styles.botImage} resizeMode="contain" />
+          <Image
+            source={Bot3DImage}
+            style={styles.botImage}
+            resizeMode="contain"
+          />
         </View>
       </View>
 
@@ -140,8 +171,8 @@ export function AICoachCard({ onPress }: AICoachCardProps) {
           styles.glowEffect,
           {
             backgroundColor: `${brandColors.primary}20`,
-            shadowColor: brandColors.primary
-          }
+            shadowColor: brandColors.primary,
+          },
         ]}
       />
     </TouchableOpacity>
@@ -153,17 +184,14 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     marginBottom: toRN(tokens.spacing[4]),
     borderRadius: 20,
     overflow: "hidden" as const,
-    // Shadow for depth (shadowColor applied dynamically)
+    // Shadow for depth on iOS only; Android matches GoalCard (no shadow)
     ...Platform.select({
       ios: {
         shadowOffset: { width: 0, height: 6 },
         shadowOpacity: 0.15,
-        shadowRadius: 12
+        shadowRadius: 12,
       },
-      android: {
-        elevation: 6
-      }
-    })
+    }),
   },
 
   innerBorder: {
@@ -173,7 +201,7 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     right: 0,
     bottom: 0,
     borderRadius: 20,
-    borderWidth: 1
+    borderWidth: 1,
   },
 
   contentContainer: {
@@ -182,37 +210,37 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     paddingVertical: toRN(tokens.spacing[4]),
     paddingLeft: toRN(tokens.spacing[5]),
     paddingRight: toRN(tokens.spacing[2]),
-    minHeight: 120
+    minHeight: 120,
   },
 
   textContainer: {
     flex: 1,
     paddingRight: toRN(tokens.spacing[2]),
-    zIndex: 10 // Above glow orbs
+    zIndex: 10, // Above glow orbs
   },
 
   title: {
     fontSize: toRN(tokens.typography.fontSize.lg),
     fontFamily: fontFamily.bold,
-    marginBottom: toRN(tokens.spacing[1])
+    marginBottom: toRN(tokens.spacing[1]),
   },
 
   subtitle: {
     fontSize: toRN(tokens.typography.fontSize.sm),
     fontFamily: fontFamily.regular,
     lineHeight: toRN(tokens.typography.fontSize.sm) * 1.4,
-    marginBottom: toRN(tokens.spacing[3])
+    marginBottom: toRN(tokens.spacing[3]),
   },
 
   ctaContainer: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    gap: 4
+    gap: 4,
   },
 
   ctaText: {
     fontSize: toRN(tokens.typography.fontSize.sm),
-    fontFamily: fontFamily.semiBold
+    fontFamily: fontFamily.semiBold,
   },
 
   imageContainer: {
@@ -220,13 +248,13 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
     height: 100,
     justifyContent: "center" as const,
     alignItems: "center" as const,
-    zIndex: 10 // Above glow orbs
+    zIndex: 10, // Above glow orbs
   },
 
   botImage: {
     width: 110,
     height: 110,
-    marginRight: -10
+    marginRight: -10,
   },
 
   glowEffect: {
@@ -241,10 +269,10 @@ const makeStyles = (tokens: any, colors: any, brand: any) => ({
       ios: {
         shadowOffset: { width: 0, height: 0 },
         shadowOpacity: 0.5,
-        shadowRadius: 20
-      }
-    })
-  }
+        shadowRadius: 20,
+      },
+    }),
+  },
 });
 
 export default AICoachCard;

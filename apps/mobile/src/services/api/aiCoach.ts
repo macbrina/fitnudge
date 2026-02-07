@@ -197,6 +197,20 @@ class AICoachService extends BaseApiService {
   }
 
   /**
+   * Mark a stuck (pending/generating) message as failed.
+   * Allows user to retry after cancel or when request timed out.
+   */
+  async markMessageFailed(
+    conversationId: string,
+    requestId: string
+  ): Promise<ApiResponse<{ success: boolean }>> {
+    return this.post<{ success: boolean }>(
+      ROUTES.AI_COACH.MARK_MESSAGE_FAILED(conversationId),
+      { request_id: requestId }
+    );
+  }
+
+  /**
    * Send a message asynchronously (background processing via Celery)
    * Returns immediately with pending status. Response is processed in background
    * and will be available via realtime subscription or next conversation fetch.

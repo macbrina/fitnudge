@@ -12,7 +12,10 @@
 import { useAlertModal } from "@/contexts/AlertModalContext";
 import { partnersQueryKeys } from "@/hooks/api/queryKeys";
 import { useTranslation } from "@/lib/i18n";
-import { subscriptionsService, SyncSubscriptionRequest } from "@/services/api/subscriptions";
+import {
+  subscriptionsService,
+  SyncSubscriptionRequest,
+} from "@/services/api/subscriptions";
 import type {
   BillingPeriod,
   CustomerInfo,
@@ -21,7 +24,7 @@ import type {
   IAPProduct,
   PurchaseState,
   SubscriptionStatus,
-  SubscriptionTier
+  SubscriptionTier,
 } from "@/services/iap/types";
 import { useAuthStore } from "@/stores/authStore";
 import { useExitOfferStore } from "@/stores/exitOfferStore";
@@ -35,7 +38,7 @@ import {
   useContext,
   useEffect,
   useRef,
-  useState
+  useState,
 } from "react";
 import { Platform } from "react-native";
 
@@ -49,6 +52,12 @@ try {
   const RNPurchases = require("react-native-purchases");
   Purchases = RNPurchases.default;
   LOG_LEVEL = RNPurchases.LOG_LEVEL;
+  // Set log handler immediately to avoid "customLogHandler is not a function" error.
+  // The native SDK can emit log events before configure() runs; without this, the
+  // event listener callback is undefined and crashes.
+  if (Purchases?.setLogHandler) {
+    Purchases.setLogHandler(() => {});
+  }
 } catch (e) {
   // console.warn(
   //   "[RevenueCat] react-native-purchases not installed. IAP features will be disabled."
@@ -56,12 +65,14 @@ try {
 }
 
 // RevenueCat API Keys - should be in environment variables
-const REVENUECAT_API_KEY_IOS = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY_IOS || "";
-const REVENUECAT_API_KEY_ANDROID = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID || "";
+const REVENUECAT_API_KEY_IOS =
+  process.env.EXPO_PUBLIC_REVENUECAT_API_KEY_IOS || "";
+const REVENUECAT_API_KEY_ANDROID =
+  process.env.EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID || "";
 
 // Entitlement IDs configured in RevenueCat dashboard (2-tier system)
 const ENTITLEMENTS = {
-  PREMIUM: "premium_access"
+  PREMIUM: "premium_access",
 } as const;
 
 // Trial eligibility result per product ID
@@ -105,7 +116,7 @@ const defaultSubscriptionStatus: SubscriptionStatus = {
   platform: null,
   isInTrial: false,
   isInGracePeriod: false,
-  managementUrl: null
+  managementUrl: null,
 };
 
 const RevenueCatContext = createContext<RevenueCatContextValue | null>(null);
@@ -119,7 +130,9 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
   const [isReady, setIsReady] = useState(false);
   const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
   const [offerings, setOfferings] = useState<IAPOffering[]>([]);
-  const [currentOffering, setCurrentOffering] = useState<IAPOffering | null>(null);
+  const [currentOffering, setCurrentOffering] = useState<IAPOffering | null>(
+    null,
+  );
   const [purchaseState, setPurchaseState] = useState<PurchaseState>("idle");
   const [error, setError] = useState<IAPError | null>(null);
   const [subscriptionStatus, setSubscriptionStatus] =
@@ -132,7 +145,8 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
   // External stores
   const { user, isAuthenticated, isVerifyingUser } = useAuthStore();
   const { plans, fetchPlans } = usePricingStore();
-  const { refresh: refreshSubscription, setOptimisticPlan } = useSubscriptionStore();
+  const { refresh: refreshSubscription, setOptimisticPlan } =
+    useSubscriptionStore();
   const { markAsSubscribed } = useExitOfferStore();
 
   // Note: Previously used queryClient for cache invalidation, but this caused issues
@@ -152,7 +166,9 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
     initializingRef.current = true;
 
     try {
-      const apiKey = isIOS ? REVENUECAT_API_KEY_IOS : REVENUECAT_API_KEY_ANDROID;
+      const apiKey = isIOS
+        ? REVENUECAT_API_KEY_IOS
+        : REVENUECAT_API_KEY_ANDROID;
 
       if (!apiKey) {
         // console.error("[RevenueCat] API key not configured");
@@ -171,7 +187,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
         // Configure RevenueCat
         await Purchases.configure({
           apiKey,
-          appUserID: user?.id || null
+          appUserID: user?.id || null,
         });
       }
 
@@ -200,15 +216,21 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
               const tier = getTierFromCustomerInfo(info);
               const isActive = hasActiveEntitlement(info);
               const entitlementId = getEntitlementIdForTier(tier);
-              const entitlement = entitlementId ? info.entitlements?.active?.[entitlementId] : null;
+              const entitlement = entitlementId
+                ? info.entitlements?.active?.[entitlementId]
+                : null;
 
               const syncRequest: SyncSubscriptionRequest = {
                 tier,
                 is_active: isActive,
                 expires_at: entitlement?.expirationDate || null,
                 will_renew: entitlement?.willRenew || false,
-                platform: getPlatformFromStore(entitlement?.store || "") || null,
-                product_id: info.activeSubscriptions?.[0] || entitlement?.productIdentifier || null
+                platform:
+                  getPlatformFromStore(entitlement?.store || "") || null,
+                product_id:
+                  info.activeSubscriptions?.[0] ||
+                  entitlement?.productIdentifier ||
+                  null,
               };
 
               // Only sync if there's a potential mismatch
@@ -226,7 +248,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
               // console.error("[RevenueCat] Background sync failed", err);
             }
           }
-        }
+        },
       );
 
       // Fetch initial customer info
@@ -268,7 +290,9 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
           //   dbPlan: currentPlan,
           // });
           const entitlementId = getEntitlementIdForTier(tier);
-          const entitlement = entitlementId ? info.entitlements?.active?.[entitlementId] : null;
+          const entitlement = entitlementId
+            ? info.entitlements?.active?.[entitlementId]
+            : null;
 
           await subscriptionsService.syncSubscription({
             tier,
@@ -276,7 +300,10 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
             expires_at: entitlement?.expirationDate || null,
             will_renew: entitlement?.willRenew || false,
             platform: getPlatformFromStore(entitlement?.store || "") || null,
-            product_id: info.activeSubscriptions?.[0] || entitlement?.productIdentifier || null
+            product_id:
+              info.activeSubscriptions?.[0] ||
+              entitlement?.productIdentifier ||
+              null,
           });
           await refreshSubscription();
           console.log("[RevenueCat] ✅ Initial sync: store refreshed");
@@ -286,7 +313,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
       // console.error("[RevenueCat] Initialization failed", err);
       setError({
         code: "INIT_FAILED",
-        message: "Failed to initialize purchases"
+        message: "Failed to initialize purchases",
       });
     } finally {
       initializingRef.current = false;
@@ -297,7 +324,11 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
   // Helper Functions
   // ====================
 
-  const loginUser = async (userId: string, email?: string | null, displayName?: string | null) => {
+  const loginUser = async (
+    userId: string,
+    email?: string | null,
+    displayName?: string | null,
+  ) => {
     if (!Purchases) return;
 
     try {
@@ -339,8 +370,8 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
       }
 
       // Convert to our format
-      const convertedOfferings = Object.values(rcOfferings.all).map((offering: any) =>
-        convertOffering(offering)
+      const convertedOfferings = Object.values(rcOfferings.all).map(
+        (offering: any) => convertOffering(offering),
       );
 
       setOfferings(convertedOfferings);
@@ -355,13 +386,15 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
   };
 
   const convertOffering = (offering: any): IAPOffering => {
-    const packages = offering.availablePackages.map((pkg: any) => convertPackage(pkg));
+    const packages = offering.availablePackages.map((pkg: any) =>
+      convertPackage(pkg),
+    );
 
     return {
       identifier: offering.identifier,
       packages,
       monthlyPackage: packages.find((p: IAPProduct) => p.period === "monthly"),
-      annualPackage: packages.find((p: IAPProduct) => p.period === "annual")
+      annualPackage: packages.find((p: IAPProduct) => p.period === "annual"),
     };
   };
 
@@ -383,10 +416,10 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
             priceString: product.introPrice.priceString,
             period: product.introPrice.periodNumberOfUnits?.toString() || "1",
             periodUnit: product.introPrice.periodUnit || "MONTH",
-            cycles: product.introPrice.cycles || 1
+            cycles: product.introPrice.cycles || 1,
           }
         : undefined,
-      rcPackage: pkg
+      rcPackage: pkg,
     };
   };
 
@@ -410,7 +443,9 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
 
     const tier = getTierFromCustomerInfo(info);
     const entitlementId = getEntitlementIdForTier(tier);
-    const entitlement = entitlementId ? info.entitlements?.active?.[entitlementId] : null;
+    const entitlement = entitlementId
+      ? info.entitlements?.active?.[entitlementId]
+      : null;
 
     if (!entitlement) {
       setSubscriptionStatus(defaultSubscriptionStatus);
@@ -420,12 +455,14 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
     setSubscriptionStatus({
       isActive: true,
       tier,
-      expiresAt: entitlement.expirationDate ? new Date(entitlement.expirationDate) : null,
+      expiresAt: entitlement.expirationDate
+        ? new Date(entitlement.expirationDate)
+        : null,
       willRenew: entitlement.willRenew,
       platform: getPlatformFromStore(entitlement.store),
       isInTrial: entitlement.periodType === "TRIAL",
       isInGracePeriod: entitlement.periodType === "GRACE_PERIOD",
-      managementUrl: info.managementURL || null
+      managementUrl: info.managementURL || null,
     });
   };
 
@@ -447,7 +484,9 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
     }
   };
 
-  const getPlatformFromStore = (store: string): "ios" | "android" | "stripe" | "promo" | null => {
+  const getPlatformFromStore = (
+    store: string,
+  ): "ios" | "android" | "stripe" | "promo" | null => {
     switch (store) {
       case "APP_STORE":
       case "MAC_APP_STORE":
@@ -485,10 +524,12 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
 
     // Check for active entitlements
     const hasEntitlements =
-      info.entitlements?.active && Object.keys(info.entitlements.active).length > 0;
+      info.entitlements?.active &&
+      Object.keys(info.entitlements.active).length > 0;
 
     // Also check for active subscriptions (some setups have subscriptions without entitlements)
-    const hasSubscriptions = info.activeSubscriptions && info.activeSubscriptions.length > 0;
+    const hasSubscriptions =
+      info.activeSubscriptions && info.activeSubscriptions.length > 0;
 
     // console.info("[RevenueCat] Checking active status:", {
     //   hasEntitlements,
@@ -503,14 +544,18 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
   const findPackageByIdentifier = (packageId: string): IAPProduct | null => {
     for (const offering of offerings) {
       const pkg = offering.packages.find(
-        (p) => p.rcPackage?.identifier === packageId || p.identifier.includes(packageId)
+        (p) =>
+          p.rcPackage?.identifier === packageId ||
+          p.identifier.includes(packageId),
       );
       if (pkg) return pkg;
     }
 
     if (currentOffering) {
       const pkg = currentOffering.packages.find(
-        (p) => p.rcPackage?.identifier === packageId || p.identifier.includes(packageId)
+        (p) =>
+          p.rcPackage?.identifier === packageId ||
+          p.identifier.includes(packageId),
       );
       if (pkg) return pkg;
     }
@@ -527,35 +572,37 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
       if (!Purchases || !isReady) {
         setError({
           code: "NOT_READY",
-          message: "Purchases are not available yet"
+          message: "Purchases are not available yet",
         });
         showAlert({
           title: t("onboarding.subscription.not_ready_title"),
           message: t("onboarding.subscription.not_ready_message"),
-          variant: "warning"
+          variant: "warning",
         });
         return false;
       }
 
       const product =
-        period === "annual" ? currentOffering?.annualPackage : currentOffering?.monthlyPackage;
+        period === "annual"
+          ? currentOffering?.annualPackage
+          : currentOffering?.monthlyPackage;
 
       if (!product) {
         setError({
           code: "PRODUCT_NOT_FOUND",
-          message: `No ${period} product available`
+          message: `No ${period} product available`,
         });
         showAlert({
           title: t("onboarding.subscription.product_not_available_title"),
           message: t("onboarding.subscription.product_not_available_message"),
-          variant: "error"
+          variant: "error",
         });
         return false;
       }
 
       return purchasePackage(product);
     },
-    [isReady, currentOffering, showAlert, t]
+    [isReady, currentOffering, showAlert, t],
   );
 
   const purchasePackage = useCallback(
@@ -563,12 +610,12 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
       if (!Purchases || !isReady) {
         setError({
           code: "NOT_READY",
-          message: "Purchases are not available yet"
+          message: "Purchases are not available yet",
         });
         showAlert({
           title: t("onboarding.subscription.not_ready_title"),
           message: t("onboarding.subscription.not_ready_message"),
-          variant: "warning"
+          variant: "warning",
         });
         return false;
       }
@@ -578,7 +625,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
         showAlert({
           title: t("onboarding.subscription.already_subscribed_title"),
           message: t("onboarding.subscription.already_subscribed_message"),
-          variant: "info"
+          variant: "info",
         });
         return false;
       }
@@ -591,7 +638,9 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
         //   productId: product.identifier,
         // });
 
-        const { customerInfo: info } = await Purchases.purchasePackage(product.rcPackage);
+        const { customerInfo: info } = await Purchases.purchasePackage(
+          product.rcPackage,
+        );
 
         setCustomerInfo(info);
         updateSubscriptionStatus(info);
@@ -622,7 +671,9 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
         // Solves the race condition where webhook hasn't arrived yet
         try {
           const entitlementId = getEntitlementIdForTier(purchasedTier);
-          const entitlement = entitlementId ? info.entitlements?.active?.[entitlementId] : null;
+          const entitlement = entitlementId
+            ? info.entitlements?.active?.[entitlementId]
+            : null;
 
           await subscriptionsService.syncSubscription({
             tier: purchasedTier,
@@ -630,7 +681,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
             expires_at: entitlement?.expirationDate || null,
             will_renew: entitlement?.willRenew || false,
             platform: getPlatformFromStore(entitlement?.store || "") || null,
-            product_id: product.identifier
+            product_id: product.identifier,
           });
 
           // Refresh subscription store - hasFeature() will return correct values
@@ -638,7 +689,10 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
           console.log("[RevenueCat] ✅ Post-purchase: store refreshed");
         } catch (syncErr) {
           // Log but don't fail - webhook will eventually catch up
-          console.warn("[RevenueCat] Post-purchase sync failed, webhook will catch up", syncErr);
+          console.warn(
+            "[RevenueCat] Post-purchase sync failed, webhook will catch up",
+            syncErr,
+          );
           // Still refresh to pick up data when webhook arrives
           await refreshSubscription();
         }
@@ -651,7 +705,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
           showAlert({
             title: t("onboarding.subscription.purchase_cancelled_title"),
             message: t("onboarding.subscription.purchase_cancelled_message"),
-            variant: "info"
+            variant: "info",
           });
           return false;
         }
@@ -660,30 +714,37 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
         setError({
           code: err.code || "PURCHASE_FAILED",
           message: err.message || "Purchase failed",
-          userCancelled: false
+          userCancelled: false,
         });
         // console.error("[RevenueCat] Purchase failed", err);
         showAlert({
           title: t("onboarding.subscription.purchase_error_title"),
           message: t("onboarding.subscription.purchase_error_message"),
-          variant: "error"
+          variant: "error",
         });
         return false;
       }
     },
-    [isReady, customerInfo, refreshSubscription, markAsSubscribed, showAlert, t]
+    [
+      isReady,
+      customerInfo,
+      refreshSubscription,
+      markAsSubscribed,
+      showAlert,
+      t,
+    ],
   );
 
   const purchaseProExitOffer = useCallback(async (): Promise<boolean> => {
     if (!Purchases || !isReady) {
       setError({
         code: "NOT_READY",
-        message: "Purchases are not available yet"
+        message: "Purchases are not available yet",
       });
       showAlert({
         title: t("onboarding.subscription.not_ready_title"),
         message: t("onboarding.subscription.not_ready_message"),
-        variant: "warning"
+        variant: "warning",
       });
       return false;
     }
@@ -734,7 +795,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
       showAlert({
         title: t("onboarding.subscription.promo_ineligible_title"),
         message: t("onboarding.subscription.promo_ineligible_message"),
-        variant: "warning"
+        variant: "warning",
       });
       return false;
     } catch (err: any) {
@@ -744,7 +805,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
         showAlert({
           title: t("onboarding.subscription.purchase_cancelled_title"),
           message: t("onboarding.subscription.purchase_cancelled_message"),
-          variant: "info"
+          variant: "info",
         });
         return false;
       }
@@ -752,13 +813,13 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
       setPurchaseState("error");
       setError({
         code: err.code || "EXIT_OFFER_FAILED",
-        message: err.message || "Exit offer purchase failed"
+        message: err.message || "Exit offer purchase failed",
       });
       // console.error("[RevenueCat] Exit offer purchase failed", err);
       showAlert({
         title: t("onboarding.subscription.purchase_error_title"),
         message: t("onboarding.subscription.purchase_error_message"),
-        variant: "error"
+        variant: "error",
       });
       return false;
     }
@@ -770,7 +831,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
     refreshSubscription,
     showAlert,
     markAsSubscribed,
-    t
+    t,
   ]);
 
   const restorePurchases = useCallback(async (): Promise<boolean> => {
@@ -778,12 +839,12 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
       // console.warn("[RevenueCat] Restore failed - not ready");
       setError({
         code: "NOT_READY",
-        message: "Purchases are not available yet"
+        message: "Purchases are not available yet",
       });
       showAlert({
         title: t("onboarding.subscription.not_ready_title"),
         message: t("onboarding.subscription.not_ready_message"),
-        variant: "warning"
+        variant: "warning",
       });
       return false;
     }
@@ -817,7 +878,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
         showAlert({
           title: t("onboarding.subscription.restore_success_title"),
           message: t("onboarding.subscription.restore_success_message"),
-          variant: "success"
+          variant: "success",
         });
 
         await markAsSubscribed();
@@ -827,7 +888,9 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
         // Solves the race condition where webhook hasn't arrived yet
         try {
           const entitlementId = getEntitlementIdForTier(restoredTier);
-          const entitlement = entitlementId ? info.entitlements?.active?.[entitlementId] : null;
+          const entitlement = entitlementId
+            ? info.entitlements?.active?.[entitlementId]
+            : null;
 
           await subscriptionsService.syncSubscription({
             tier: restoredTier,
@@ -835,7 +898,10 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
             expires_at: entitlement?.expirationDate || null,
             will_renew: entitlement?.willRenew || false,
             platform: getPlatformFromStore(entitlement?.store || "") || null,
-            product_id: info.activeSubscriptions?.[0] || entitlement?.productIdentifier || null
+            product_id:
+              info.activeSubscriptions?.[0] ||
+              entitlement?.productIdentifier ||
+              null,
           });
 
           // Refresh subscription store - hasFeature() will return correct values
@@ -843,7 +909,10 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
           console.log("[RevenueCat] ✅ Post-restore: store refreshed");
         } catch (syncErr) {
           // Log but don't fail - webhook will eventually catch up
-          console.warn("[RevenueCat] Post-restore sync failed, webhook will catch up", syncErr);
+          console.warn(
+            "[RevenueCat] Post-restore sync failed, webhook will catch up",
+            syncErr,
+          );
           // Still refresh to pick up data when webhook arrives
           await refreshSubscription();
         }
@@ -854,14 +923,14 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
         // console.info("[RevenueCat] No active purchases found");
         setError({
           code: "NO_PURCHASES",
-          message: "No previous purchases found"
+          message: "No previous purchases found",
         });
 
         // Show info message
         showAlert({
           title: t("onboarding.subscription.restore_no_purchases_title"),
           message: t("onboarding.subscription.restore_no_purchases_message"),
-          variant: "info"
+          variant: "info",
         });
         return false;
       }
@@ -869,7 +938,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
       setPurchaseState("error");
       setError({
         code: err.code || "RESTORE_FAILED",
-        message: err.message || "Failed to restore purchases"
+        message: err.message || "Failed to restore purchases",
       });
       // console.error("[RevenueCat] Restore failed", err);
 
@@ -877,7 +946,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
       showAlert({
         title: t("onboarding.subscription.restore_error_title"),
         message: t("onboarding.subscription.restore_error_message"),
-        variant: "error"
+        variant: "error",
       });
       return false;
     }
@@ -909,11 +978,15 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
       const tier = getTierFromCustomerInfo(customerInfo);
       const isActive = hasActiveEntitlement(customerInfo);
       const entitlementId = getEntitlementIdForTier(tier);
-      const entitlement = entitlementId ? customerInfo.entitlements?.active?.[entitlementId] : null;
+      const entitlement = entitlementId
+        ? customerInfo.entitlements?.active?.[entitlementId]
+        : null;
 
       // Get product ID from first active subscription
       const productId =
-        customerInfo.activeSubscriptions?.[0] || entitlement?.productIdentifier || null;
+        customerInfo.activeSubscriptions?.[0] ||
+        entitlement?.productIdentifier ||
+        null;
 
       const syncRequest: SyncSubscriptionRequest = {
         tier,
@@ -921,7 +994,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
         expires_at: entitlement?.expirationDate || null,
         will_renew: entitlement?.willRenew || false,
         platform: getPlatformFromStore(entitlement?.store || "") || null,
-        product_id: productId
+        product_id: productId,
       };
 
       // console.info("[RevenueCat] Syncing with backend", {
@@ -932,7 +1005,8 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
 
       // Only sync if there's a potential mismatch
       const needsSync =
-        (isActive && tier !== "free" && user.plan !== tier) || (!isActive && user.plan !== "free");
+        (isActive && tier !== "free" && user.plan !== tier) ||
+        (!isActive && user.plan !== "free");
 
       if (!needsSync) {
         // console.info("[RevenueCat] Already in sync, skipping");
@@ -978,14 +1052,19 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
         if (Platform.OS === "ios") {
           // iOS: Use RevenueCat's proper eligibility check
           const eligibilityResult =
-            await Purchases.checkTrialOrIntroductoryPriceEligibility(productIds);
+            await Purchases.checkTrialOrIntroductoryPriceEligibility(
+              productIds,
+            );
 
           const result: TrialEligibilityMap = {};
-          for (const [productId, eligibility] of Object.entries(eligibilityResult)) {
+          for (const [productId, eligibility] of Object.entries(
+            eligibilityResult,
+          )) {
             // INTRO_ELIGIBILITY_STATUS.ELIGIBLE = 2
             result[productId] =
               (eligibility as any)?.status === 2 ||
-              (eligibility as any)?.status === "INTRO_ELIGIBILITY_STATUS_ELIGIBLE";
+              (eligibility as any)?.status ===
+                "INTRO_ELIGIBILITY_STATUS_ELIGIBLE";
           }
           return result;
         } else {
@@ -1013,7 +1092,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
         return result;
       }
     },
-    [isReady]
+    [isReady],
   );
 
   // ====================
@@ -1027,7 +1106,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
         ? currentOffering.annualPackage || null
         : currentOffering.monthlyPackage || null;
     },
-    [currentOffering]
+    [currentOffering],
   );
 
   const getCurrentTier = useCallback((): SubscriptionTier => {
@@ -1043,7 +1122,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
       if (!customerInfo?.entitlements?.active) return false;
       return !!customerInfo.entitlements.active[entitlementId];
     },
-    [customerInfo]
+    [customerInfo],
   );
 
   const clearError = useCallback(() => {
@@ -1115,10 +1194,14 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
     hasEntitlement,
 
     // Helpers
-    clearError
+    clearError,
   };
 
-  return <RevenueCatContext.Provider value={value}>{children}</RevenueCatContext.Provider>;
+  return (
+    <RevenueCatContext.Provider value={value}>
+      {children}
+    </RevenueCatContext.Provider>
+  );
 }
 
 // ====================

@@ -129,8 +129,14 @@ cd apps/api
 # Activate Poetry environment (if not already)
 poetry shell
 
-# Start Celery worker
+# Start Celery worker (macOS/Linux)
 poetry run celery -A celery_worker worker --loglevel=info
+
+# On Windows: use --pool=solo to avoid PermissionError (billiard multiprocessing)
+poetry run celery -A celery_worker worker --loglevel=info --pool=solo
+
+# Or use the helper script (auto-detects Windows and adds --pool=solo)
+poetry run python scripts/run_celery_worker.py
 
 # Note: Celery workers don't auto-reload code changes.
 # Restart the worker manually when you modify task code.

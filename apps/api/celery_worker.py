@@ -4,6 +4,12 @@ Celery Worker Entry Point
 Run this file to start Celery workers:
     celery -A celery_worker worker --loglevel=info
 
+On Windows, use --pool=solo to avoid PermissionError/OSError (billiard multiprocessing):
+    celery -A celery_worker worker --loglevel=info --pool=solo
+
+Or use the helper script (auto-detects Windows):
+    poetry run python scripts/run_celery_worker.py
+
 Or with specific queue:
     celery -A celery_worker worker --loglevel=info -Q plan_generation
 
